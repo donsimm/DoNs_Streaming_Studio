@@ -72,4 +72,10 @@ Genannt in P05 (2026-11-02, nicht abgerufen, siehe Bericht P05):
 - QWidget::grab: https://doc.qt.io/qt-6.8/qwidget.html#grab
 - PNG, IHDR-Block: https://www.w3.org/TR/png-3/#11IHDR
 
+Abgerufen in P06 (2026-11-02):
+
+- OBS Studio, Design «Yami» und Standardwerte, Commit `65c320b46e1af5c7a555161aea6182cdf7a8c524`: https://github.com/obsproject/obs-studio (`frontend/data/themes/Yami.obt`, `frontend/OBSApp.cpp` Zeile 420, Lizenz `COPYING`, GPL Version 2)
+- Open Sans 3.003, Commit `bd7e37632246368c60fdcbd374dbf9bad11969b6`: https://github.com/googlefonts/opensans (Lizenz `OFL.txt`, SIL Open Font License 1.1)
+- Qt 6.8.2, `qstylesheetstyle.cpp`: https://raw.githubusercontent.com/qt/qtbase/v6.8.2/src/widgets/styles/qstylesheetstyle.cpp
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.

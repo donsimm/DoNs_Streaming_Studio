@@ -12,6 +12,7 @@ Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach k
 | P03 | Projektgerüst, Einrichtungsskript | `dss-core`, `dss-app`, `dss_common`, Tests |
 | P04 | Overlay-Modell, Format der Overlay-Datei | Speichern/Laden, Token-Datei, `dss-cli` |
 | P05 | Nachträge Modell, Fenster-Gerüst | Fenster nach Bild, ohne Daten |
+| P06 | Aussehen wie OBS | Design «Yami», Open Sans, Zahlenfelder mit Pfeilen, Verbindungsknöpfe mit vier Zuständen; ausgeführt (2026-11-02), Handtest offen; Bericht `docs/berichte/P06-bericht.md` |
 
 ## Geplant
 
@@ -19,7 +20,6 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P06 | Aussehen wie OBS | Stylesheet nach OBS «Yami», Open Sans als Datei, Zahlenfelder mit Pfeilen, Verbindungsknöpfe mit vier Farben | P05 | – (Punkte 27 bis 30) |
 | P07 | Kern als Dienst, Verbindung Fenster–Kern | `dss-core` hält die Overlays (Modell aus P04), startet mit der Anmeldung, Fenster verbindet sich lokal, Statuszeile «Kern-Dienst: verbunden», echte Werte CPU, RAM, LAN; Fenster zeigt Overlays und Quellen in den Docks (nur anzeigen) | P04, P06 | E-02 |
 | P08 | Bearbeiten im Fenster | Docks Overlays, Quellen, Eigenschaften bedienbar: Overlays anlegen/umbenennen (mit Rückfrage zur Adresse)/kopieren/löschen, Quellen hinzufügen/entfernen/Reihenfolge/ein-ausblenden, Zahleneingabe für Lage, Grösse, Drehung, Eigenschaften von Text (TX-01 bis TX-05) und Video (Wiederholen). Alle Änderungen gehen an den Kern | P07 | E-01, E-03 (Daten), E-07, E-08 (Zahlen) |
 | P09 | Zeichner im Editor | Leinwand zeichnet Bild, Text (Schriftdatei), Video und WebM mit Alpha (libavcodec, libvpx); Quelle mit der Maus wählen, verschieben, skalieren, drehen | P08 | E-03 bis E-05, E-08 (Maus), E-09, E-11 |
