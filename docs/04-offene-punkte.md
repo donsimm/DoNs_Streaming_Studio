@@ -92,3 +92,7 @@ Stand: 2026-11-02 (nach P07).
 - Punkt 39: so lassen. Das Handy per USB ist eine Übergangslösung, bis das Heimnetz per Kabel besteht; die Anzeige wechselt von selbst aufs Kabel, sobald es die Standardroute ist.
 - Punkt 40: entschieden, vorderste Quelle oben wie in OBS. Datei und `dss-cli` bleiben bei «Nr. 1 = hinterste».
 - Punkt 37 (und 22): entschieden, Overlays sind per Maus frei verschiebbar, Reihenfolge wird gespeichert; dazu Ordner mit einer Ebene (keine Unterordner). Umsetzung in P08. Siehe `docs/01-festlegungen.md`, Abschnitt «Overlay-Liste».
+- Punkt 36 (Neustartgrenze von systemd): so lassen; das Fenster zeigt dann «nicht verbunden».
+- Punkt 38 (Annahmen zu CPU und LAN-Verlauf): so lassen; Werte vom Nutzer mit der Leistungsanzeige des Systems abgeglichen.
+- Punkt 41 (hängender Kern wird nicht erkannt): mit P10 lösen.
+- Punkt 42 (Kern startet aus dem Repo-Ordner): mit P10 lösen, durch einen festen Installationsort ausserhalb des Repos und ein Installationsskript. Grund: Sobald die Browserquelle im Stream genutzt wird, soll eine laufende Claude-Code-Sitzung die Programme im Einsatz nicht austauschen.
