@@ -30,4 +30,4 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 14. Module sind fest eingebaut. Jedes Modul nutzt dieselbe Schnittstelle zum Ereignisfluss. Es gibt kein Plugin-System, auch nicht für Dritte.
 15. Der Abschlussbericht nennt: geänderte Dateien, ausgeführte Befehle und Tests mit Ergebnis, nicht erledigte Punkte, getroffene Annahmen, Quellen.
 16. Technisch bleiben. Keine Aussagen über die eigene Leistung oder Intelligenz.
-17. Commits enden mit den Zeilen aus der Sitzungsvorgabe (Co-Authored-By). Kein Push ohne Auftrag des Nutzers.
+17. Commits enden mit den Zeilen aus der Sitzungsvorgabe (Co-Authored-By). Am Ende jedes Auftrags pusht Claude Code selbst: zuerst `git pull --rebase origin main`, dann `git push origin main` (erlaubt in `.claude/settings.json`, entschieden vom Nutzer am 2026-11-02). Andere Pushes (andere Zweige, `--force`) nur mit ausdrücklichem Auftrag des Nutzers.
