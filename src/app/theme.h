@@ -4,6 +4,8 @@
 #include <QPalette>
 #include <QString>
 
+#include <functional>
+
 // Farben des Fensters an einer Stelle (Auftrag P05; später auch das helle Design, E-16).
 // Kein anderer Teil des Fensters schreibt eine Farbe als Wert hin.
 //
@@ -75,7 +77,9 @@ Theme darkTheme();
 // https://doc.qt.io/qt-6.8/qpalette.html
 QPalette palette(const Theme &theme);
 
-// Stylesheet für die ganze Anwendung aus den Farben des Themes. symbolDir ist der Ordner
-// mit den Bildern für Auswahlliste, Kontrollkästchen, Dock-Knöpfe und Zahlenfelder.
+// Stylesheet für die ganze Anwendung aus den Farben des Themes. symbolPath liefert zu einem
+// Dateinamen den Pfad der Bilder für Auswahlliste, Kontrollkästchen, Dock-Knöpfe und
+// Zahlenfelder (eigene Datei des Nutzers vor der mitgelieferten, P07).
 // https://doc.qt.io/qt-6.8/stylesheet-reference.html
-QString styleSheet(const Theme &theme, const QString &symbolDir);
+QString styleSheet(const Theme &theme,
+                   const std::function<QString(const QString &)> &symbolPath);

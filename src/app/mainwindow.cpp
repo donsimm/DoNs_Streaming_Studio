@@ -1,8 +1,10 @@
 #include "mainwindow.h"
 
 #include "canvaswidget.h"
+#include "configpaths.h"
 #include "docks.h"
 #include "headerbar.h"
+#include "symbols.h"
 #include "version.h"
 
 #include <QCloseEvent>
@@ -15,7 +17,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QStackedWidget>
-#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -27,11 +28,10 @@ namespace {
 constexpr int kLayoutVersion = 1;
 
 // Datei der Fenstereinstellungen: ~/.config/dons-streaming-studio/fenster.ini
-// (bzw. $XDG_CONFIG_HOME/…). https://doc.qt.io/qt-6.8/qstandardpaths.html
+// (bzw. $XDG_CONFIG_HOME/…), derselbe Ordner wie die eigenen Symbole (dss::configDir()).
 QString layoutFile()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-           + QStringLiteral("/dons-streaming-studio/fenster.ini");
+    return dss::configDir() + QStringLiteral("/fenster.ini");
 }
 
 } // namespace
@@ -160,9 +160,15 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(this, QStringLiteral("Über DoNs Streaming Studio"),
-                       QStringLiteral("<b>DoNs Streaming Studio</b><br>Version %1<br>Qt %2")
-                           .arg(dss::version(), QString::fromLatin1(qVersion())));
+    QString text = QStringLiteral("<b>DoNs Streaming Studio</b><br>Version %1<br>Qt %2")
+                       .arg(dss::version(), QString::fromLatin1(qVersion()));
+    // Markenhinweis, sobald der Nutzer ein eigenes NDI-Symbol einsetzt (offener Punkt aus
+    // «Entschieden vor P06»). Wortlaut nach den Lizenzangaben des NDI SDK:
+    // https://docs.ndi.video/docs/sdk/licensing («About Box … NDI® is a registered trademark
+    // of Vizrt NDI AB»).
+    if (hasUserSymbol(QStringLiteral("ndi.svg")))
+        text += QStringLiteral("<br><br>%1").arg(dss::ndiTrademarkNotice());
+    QMessageBox::about(this, QStringLiteral("Über DoNs Streaming Studio"), text);
 }
 
 void MainWindow::paintEvent(QPaintEvent *event)

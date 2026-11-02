@@ -1,5 +1,7 @@
 #include "symbols.h"
 
+#include "configpaths.h"
+
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QPainter>
@@ -10,6 +12,17 @@ QString symbolDir()
 {
     // DSS_SYMBOL_DIR kommt aus src/app/CMakeLists.txt (Ordner im Quellbaum).
     return QStringLiteral(DSS_SYMBOL_DIR);
+}
+
+QString symbolPath(const QString &fileName)
+{
+    const QString found = dss::findSymbolFile(fileName, {dss::userSymbolDir(), symbolDir()});
+    return found.isEmpty() ? symbolDir() + QLatin1Char('/') + fileName : found;
+}
+
+bool hasUserSymbol(const QString &fileName)
+{
+    return !dss::findSymbolFile(fileName, {dss::userSymbolDir()}).isEmpty();
 }
 
 QImage tintedSymbol(const QString &path, const QSize &size, const QColor &color)
@@ -30,7 +43,7 @@ QImage tintedSymbol(const QString &path, const QSize &size, const QColor &color)
 
 QIcon loadSymbol(const QString &fileName, const QSize &size)
 {
-    const QString path = symbolDir() + QLatin1Char('/') + fileName;
+    const QString path = symbolPath(fileName);
     if (!QFileInfo::exists(path)) {
         qWarning("Symbol fehlt: %s", qPrintable(path));
         return {};

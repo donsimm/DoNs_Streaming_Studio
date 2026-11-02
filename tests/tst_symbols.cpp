@@ -6,6 +6,7 @@
 #include "symbols.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFile>
 #include <QPalette>
 #include <QSet>
@@ -136,6 +137,39 @@ private slots:
                           QColor(0x12, 0x34, 0x56));
         verifySingleColor(icon.pixmap(size, QIcon::Disabled).toImage(), original,
                           QColor(0xab, 0xcd, 0xef));
+    }
+
+    void userSymbolOverridesBuiltin()
+    {
+        // P07, Teil A: Eine Datei im Symbolordner des Nutzers ersetzt die mitgelieferte mit
+        // demselben Namen und wird gleich eingefärbt. Eigener Ordner statt ~/.config.
+        QTemporaryDir config;
+        QVERIFY(config.isValid());
+        const QByteArray previous = qgetenv("XDG_CONFIG_HOME");
+        qputenv("XDG_CONFIG_HOME", config.path().toLocal8Bit());
+        const QString userDir = config.path() + QStringLiteral("/dons-streaming-studio/symbole");
+        QVERIFY(QDir().mkpath(userDir));
+        QFile file(userDir + QStringLiteral("/ndi.svg"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(kColorfulSvg);
+        file.close();
+
+        QVERIFY(hasUserSymbol(QStringLiteral("ndi.svg")));
+        QVERIFY(!hasUserSymbol(QStringLiteral("twitch.svg")));
+        QCOMPARE(symbolPath(QStringLiteral("ndi.svg")), file.fileName());
+        QCOMPARE(symbolPath(QStringLiteral("twitch.svg")),
+                 symbolDir() + QStringLiteral("/twitch.svg"));
+
+        QPalette palette;
+        palette.setColor(QPalette::Normal, QPalette::ButtonText, QColor(0x12, 0x34, 0x56));
+        QApplication::setPalette(palette);
+        const QSize size(28, 28);
+        const QImage own = plainRender(file.fileName(), size);
+        const QImage builtin = plainRender(symbolDir() + QStringLiteral("/ndi.svg"), size);
+        QVERIFY(own != builtin);
+        verifySingleColor(loadSymbol(QStringLiteral("ndi.svg"), size).pixmap(size).toImage(), own,
+                          QColor(0x12, 0x34, 0x56));
+        qputenv("XDG_CONFIG_HOME", previous);
     }
 };
 

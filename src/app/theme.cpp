@@ -1,5 +1,7 @@
 #include "theme.h"
 
+#include <QRegularExpression>
+
 // Werte aus Yami.obt (OBS Studio, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524, GPL Version 2),
 // Abschnitt @OBSThemeVars. Die Farbtabelle dort:
 //   --grey1 #5B6273  --grey2 #4E5566  --grey3 #464B59  --grey4 #3C404D
@@ -82,7 +84,7 @@ QPalette palette(const Theme &t)
     return p;
 }
 
-QString styleSheet(const Theme &t, const QString &symbolDir)
+QString styleSheet(const Theme &t, const std::function<QString(const QString &)> &symbolPath)
 {
     // Aus Yami.obt übernommen und mit aufgelösten Werten geschrieben. OBS rechnet die
     // Variablen beim Laden aus; hier gelten die Standardwerte obsFontScale = 10 und
@@ -95,7 +97,7 @@ QString styleSheet(const Theme &t, const QString &symbolDir)
     //   --border_radius 4px, --border_radius_small 2px, --scrollbar_size 12px.
     // Namen von OBS-eigenen Klassen sind durch unsere ersetzt: OBSDock → QDockWidget,
     // OBSDock QToolBar → #dockButtons, OBSBasicStatusBar → QStatusBar.
-    // Platzhalter @name@ werden durch die Farben ersetzt, @symbols@ durch den Symbolordner.
+    // Platzhalter @name@ werden durch die Farben ersetzt, @symbols@/<Datei> durch den Pfad aus symbolPath.
     QString css = QStringLiteral(R"(
 QWidget { alternate-background-color: @base@; color: @text@;
           selection-background-color: @primary@; selection-color: @text@;
@@ -324,7 +326,10 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
     };
     for (const auto &[name, color] : colors)
         css.replace(QLatin1Char('@') + QLatin1String(name) + QLatin1Char('@'), color.name());
-    css.replace(QStringLiteral("@symbols@"), symbolDir);
+    static const QRegularExpression symbolPattern(QStringLiteral("@symbols@/([A-Za-z0-9._-]+)"));
+    QRegularExpressionMatch m;
+    while ((m = symbolPattern.match(css)).hasMatch())
+        css.replace(m.capturedStart(), m.capturedLength(), symbolPath(m.captured(1)));
     css.replace(QStringLiteral("@fontFamily@"), t.fontFamily);
     css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
     css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));

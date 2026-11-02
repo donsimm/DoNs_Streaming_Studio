@@ -20,6 +20,8 @@ dss_add_test(tst_connectionstate)
 
 dss_add_test(tst_windowsize)
 
+dss_add_test(tst_configpaths)
+
 # Testdateien wie im Handtest (CLAUDE.md Regel 7): Bild und Video aus
 # prototypes/messung/media_erzeugen.sh, Schriftdatei aus dem System (fc-list).
 set(DSS_TEST_MEDIA_DIR "${PROJECT_SOURCE_DIR}/prototypes/media" CACHE PATH "Testdateien (Bild, Video)")
@@ -48,9 +50,12 @@ if(DSS_BUILD_APP)
   qt_add_executable(tst_symbols tst_symbols.cpp ${PROJECT_SOURCE_DIR}/src/app/symbols.cpp)
   target_include_directories(tst_symbols PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
   target_compile_definitions(tst_symbols PRIVATE DSS_SYMBOL_DIR="${PROJECT_SOURCE_DIR}/src/app/symbole")
-  target_link_libraries(tst_symbols PRIVATE dss_warnings Qt6::Widgets Qt6::Test)
+  target_link_libraries(tst_symbols PRIVATE dss_common dss_warnings Qt6::Widgets Qt6::Test)
   add_test(NAME tst_symbols COMMAND tst_symbols)
-  set_tests_properties(tst_symbols PROPERTIES SKIP_RETURN_CODE 77)
+  # Eigener Ordner der Einstellungen, damit nie die Symbole des Nutzers gelesen werden (P07).
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/symbole-config)
+  set_tests_properties(tst_symbols PROPERTIES SKIP_RETURN_CODE 77
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/symbole-config")
 endif()
 
 # Bildschirmfoto des Fensters in der X11-Sitzung (P05). Nur mit dem Fenster (DSS_BUILD_APP).

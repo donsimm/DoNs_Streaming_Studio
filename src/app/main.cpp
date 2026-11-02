@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
         qWarning("Schrift «%s» nicht geladen, Qt wählt einen Ersatz", qPrintable(theme.fontFamily));
     QApplication::setFont(QFont(theme.fontFamily, theme.fontSize));
     QApplication::setPalette(palette(theme));
-    app.setStyleSheet(styleSheet(theme, symbolDir()));
+    app.setStyleSheet(styleSheet(theme, symbolPath));
 
     MainWindow window(theme, screenshotFile.isEmpty());
     if (parser.isSet(statesOption)) {
