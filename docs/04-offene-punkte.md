@@ -31,7 +31,7 @@ Stand: 2026-11-02.
 25. Aus P04: Dass die temporäre Datei von `tokens.json` schon vor dem Schreiben des Tokens die Rechte 0600 hat, ist nicht geprüft (`strace` nicht installiert); geprüft sind die Rechte der fertigen Datei.
 
 26. Aus P05: Der X-Bildschirmschoner startet nach 600 s ohne Eingabe (`xset q`), danach sperrt `light-locker` die Sitzung (Wechsel zum Anmeldebildschirm auf VT 8). Gesperrt bleiben neue Fenster ungezeichnet (`IsUnMapped`); die Startprüfung meldet dann «nicht sauber». Erledigt (2026-11-02): Bildschirmschoner und light-locker auf Wunsch des Nutzers ganz abgeschaltet, siehe `docs/02-umgebung.md`.
-27. Aus P05: Farbe der Verbindungsknöpfe je Zustand ist eine Annahme (rot = nicht verbunden, grün = verbunden, nach dem Bild). Was das graue YouTube-Symbol auf dem Bild bedeutet (zum Beispiel «nicht eingerichtet»), ist offen.
+27. Aus P05: Farbe der Verbindungsknöpfe je Zustand ist eine Annahme (rot = nicht verbunden, grün = verbunden, nach dem Bild). Erledigt (2026-11-02): vier Zustände grün, orange, rot, grau, siehe `docs/01-festlegungen.md`, Abschnitt «Verbindungsanzeige im Kopfbereich». Umsetzung im Fenster noch offen (P05 kennt nur rot und grün).
 28. Aus P05: Die Symbole unter `src/app/symbole/` enthalten ihre Farbe selbst (SVG); sie folgen einem späteren hellen Design (E-16) nicht von allein.
 29. Aus P05: Schrift des Fensters ist die Standardschrift von Qt auf dem Studio-PC (DejaVu Sans); das Bild des Nutzers zeigt eine andere Schrift (nicht bestimmt). Welche Schrift das Fenster nutzen soll, ist offen.
 30. Aus P05: Die Zahlenfelder (Eigenschaften, Steuerung) zeigen wegen des Stylesheets keine Pfeile wie auf dem Bild.

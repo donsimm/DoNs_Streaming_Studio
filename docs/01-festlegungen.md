@@ -100,3 +100,16 @@ Entschieden (2026-11-02, vom Nutzer bestätigt): Der Nutzer testet nur, was sinn
 ## Arbeitsweise mit Claude Code
 
 - Claude Code darf am Ende eines Auftrags selbst `git push origin main` ausführen, ohne Rückfrage (entschieden 2026-11-02). Umgesetzt in `.claude/settings.json`. Gepusht wird per SSH-Schlüssel des Studio-PCs.
+
+## Verbindungsanzeige im Kopfbereich
+
+Entschieden (2026-11-02, vom Nutzer bestätigt): Vier Verbindungen werden angezeigt: Twitch, YouTube (der Nutzer streamt auch auf YouTube), OBS (obs-websocket zum Streaming-PC) und NDI (ob die NDI-Ausgabe läuft). Farben der Knöpfe:
+
+| Farbe | Bedeutung |
+|---|---|
+| Grün | verbunden bzw. Ausgabe läuft |
+| Orange | Verbindungsversuch läuft |
+| Rot | eingerichtet, aber nicht verbunden (Fehler) |
+| Grau | nicht eingerichtet oder abgeschaltet |
+
+Offen: Was die Software mit YouTube tun soll (Chat, Ereignisse); wird mit dem Chat-Bot-Modul geklärt.
