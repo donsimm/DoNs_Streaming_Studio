@@ -59,4 +59,4 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 
 ## Zugriff auf das Repo
 
-Repo: https://github.com/donsimm/DoNs_Streaming_Studio (Branch `main`). Der Chat braucht Schreibrechte auf dieses Repo, sonst kann er nicht pushen. Vom Studio-PC aus pusht der Nutzer selbst (Benutzername `donsimm`, als Passwort ein persönliches Zugangstoken von GitHub).
+Repo: https://github.com/donsimm/DoNs_Streaming_Studio (Branch `main`). Der Chat braucht Schreibrechte auf dieses Repo, sonst kann er nicht pushen. Vom Studio-PC aus wird per SSH gepusht (seit 2026-11-02): Schlüssel `~/.ssh/id_ed25519` ohne Passphrase, bei GitHub als «Studio-PC» hinterlegt, Adresse des Repos `git@github.com:donsimm/DoNs_Streaming_Studio.git`. Claude Code kann damit selbst pushen, eine Eingabe von Benutzername oder Token ist nicht mehr nötig.
