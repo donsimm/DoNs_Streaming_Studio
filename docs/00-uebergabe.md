@@ -1,0 +1,63 @@
+# 00 – Übergabe an den nächsten Chat
+
+Stand: 2026-11-02. Diese Datei zuerst lesen, danach `CLAUDE.md` und die Dokumente 01 bis 05 unter `docs/`. Die Festlegungen stehen auch im Claude Doc: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13 (gleicher Inhalt wie die Dateien, Repo ist massgebend bei Abweichungen).
+
+## Kurzfassung
+
+Private Overlay-Software für den Twitch-Stream des Nutzers. Pro Overlay eine Leinwand, Ausgabe hauptsächlich als Browserquelle in OBS, später per NDI (höchstens 2 Ausgänge). Module: Editor (Hauptfokus) und Chat-Bot zuerst, später Live-Modul, Zuschauer-Minispiele, Musikplayer. Programmiert wird sie von Claude Code direkt auf dem Studio-PC. Es gibt noch keinen Programmcode.
+
+## Entschieden (vom Nutzer bestätigt, 2026-11-02)
+
+| Thema | Entscheid |
+|---|---|
+| Betriebssystem | Debian 13 mit Xfce unter X11 |
+| Technik | C++ mit Qt 6, eigene Leinwand: Der Editor zeichnet selbst. Für die Browserquelle in OBS gibt es einen zweiten Zeichner als Webseite |
+| Kern (Hintergrundprogramm) | getrennt vom Fenster, Sprache C++ |
+| Fenster | dünn, ohne Logik, Oberfläche wie auf dem Bild des Nutzers |
+| Module | fest eingebaut, gleiche Schnittstelle zum Ereignisfluss, kein Plugin-System, auch nicht für Dritte |
+| OBS | kein OBS-Plugin; Browserquelle, später NDI |
+| Netz | Overlay-Server im Heimnetz, Token pro Overlay, kein Port am Router; Studio-PC per Kabel mit fester Adresse |
+| Lastziele | 1080p30, bis zu 2 NDI-Ausgänge, bis zu 10 Quellen pro Overlay |
+| Abbild der Installation (Clonezilla) | verzichtet |
+| Nicht Teil | Spenden und Tip Jar |
+
+Funktionsideen aus dem alten Projekt (`donstv_Studio`) bleiben als Ideen erhalten. Technik des alten Projekts wird nicht übernommen. Das alte Repo ist nur zum Lesen da.
+
+## Messungen (auf dem Studio-PC)
+
+Berichte: `docs/messungen/P01-bericht.md`, `docs/messungen/P02-bericht.md`. Wichtigste Ergebnisse:
+
+- Alle drei Prototypen starteten 20 von 20 Mal sauber (P01).
+- Qt Multimedia 6.8.2 liefert VP9-WebM mit Alpha als NV12, also ohne Alpha. Ein eigener Dekodierweg über libavcodec mit `libvpx-vp9` stellt den Alpha korrekt dar (P02, M1).
+- Qt WebEngine rendert minimiert nicht; verdeckt und ausserhalb des Bildschirms schon. Mit zwei Overlays im selben Prozess nur 26 bis 29 neue Bilder pro Sekunde (P02, M2). Dieser Weg wird nicht weiterverfolgt, bleibt aber als Referenz.
+- NDI ist nicht gemessen (Netzwerk fehlt).
+
+## Offen
+
+Vollständige Liste: `docs/04-offene-punkte.md`. Vor dem ersten Bau-Prompt zu klären:
+
+1. Prioritäten des Editors (MUSS, SOLL, KANN) aus `docs/03-funktionen-entwurf.md`.
+2. Konzept gegen das Auseinanderlaufen der zwei Zeichner (Vorschlag in `docs/01-festlegungen.md`: gemeinsame Beschreibung der Leinwand als eine Datenquelle, fester Funktionsumfang pro Quelle, automatische Bildvergleiche). Noch nicht bestätigt.
+
+Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (brauchen das Netzwerk), Chat-Bot-Umfang und Streamer.bot-Import (Daten der alten Installation hat der Nutzer), Live-Modul, was Qt 6.8.2 unter Debian 13 für Webserver und Twitch mitbringt (klärt der Prompt für den Kern).
+
+## Nächste Schritte
+
+1. Prioritäten des Editors festlegen (Entwurf von Claude, Nutzer ändert und bestätigt).
+2. Konzept der zwei Zeichner und das Format der Overlay-Daten festlegen.
+3. Bau-Prompts schreiben (`prompts/P03-…`), je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
+4. Sobald das Netzwerk besteht: T-03 bis T-05.
+
+## Arbeitsweise mit dem Nutzer
+
+- Immer nur ein Schritt pro Nachricht. Fragen nummerieren, mit einer Ziffer beantwortbar.
+- Klar sagen, ob etwas ein Token oder ein Passwort ist, und ob für einen Prompt eine neue Claude-Code-Sitzung nötig ist.
+- Kein Hin- und Herkopieren zwischen Claude Code und Chat: Aufträge und Berichte liegen als Dateien im Repo.
+- Zugangsdaten nie im Chat oder im Klartext (CLAUDE.md, Regel 12).
+- Offizielle Dokumente und Bewerbungen nach Schweizer Standard; Texte in Schweizer Rechtschreibung (kein «ß»).
+- Technisch bleiben, nicht über die eigene Leistung sprechen, immer alle Quellen nennen.
+- Bei Unklarheit nachfragen statt raten. Wenig Fachbegriffe, keine wechselnden Bezeichnungen für dieselbe Sache.
+
+## Zugriff auf das Repo
+
+Repo: https://github.com/donsimm/DoNs_Streaming_Studio (Branch `main`). Der Chat braucht Schreibrechte auf dieses Repo, sonst kann er nicht pushen. Vom Studio-PC aus pusht der Nutzer selbst (Benutzername `donsimm`, als Passwort ein persönliches Zugangstoken von GitHub).

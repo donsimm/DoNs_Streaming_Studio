@@ -51,4 +51,4 @@ Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, AS
 
 - Entwicklung und Tests laufen auf diesem Gerät, in der Xfce-Sitzung.
 - Pakete mit festen Versionen. Ein Einrichtungsskript im Repo baut die Umgebung wieder auf (kommt mit dem ersten Baustein).
-- Ein Abbild der sauberen Installation (zum Beispiel mit Clonezilla) ist empfohlen, vom Nutzer noch nicht bestätigt.
+- Ein Abbild der sauberen Installation (zum Beispiel mit Clonezilla): Der Nutzer verzichtet darauf (entschieden 2026-11-02). Die Umgebung wird stattdessen per Einrichtungsskript im Repo reproduzierbar gemacht.

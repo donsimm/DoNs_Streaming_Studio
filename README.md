@@ -8,6 +8,7 @@ Status: Neustart, Definitionsphase. Es gibt noch keinen Programmcode. Zuerst wer
 
 | Ordner / Datei | Inhalt |
 |---|---|
+| `docs/00-uebergabe.md` | Übergabe: Stand, Entscheide, offene Punkte, nächste Schritte (zuerst lesen) |
 | `CLAUDE.md` | Regeln für Claude Code in diesem Projekt |
 | `docs/01-festlegungen.md` | Alle bisherigen Entscheide, mit Stand und Herkunft |
 | `docs/02-umgebung.md` | Zielsystem (Studio-PC) mit gemessenen Ist-Werten |
