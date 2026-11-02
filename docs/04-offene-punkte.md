@@ -4,16 +4,19 @@ Stand: 2026-11-02.
 
 ## Offen
 
-1. Betriebssystem: entschieden (2026-11-02), Debian 13 mit Xfce unter X11. Technik: offen, Wahl zwischen A (C++/Qt) und B (Kern plus Qt WebEngine) nach Prompt P02. Variante C wird nicht weiterverfolgt.
+1. Betriebssystem: entschieden (2026-11-02), Debian 13 mit Xfce unter X11. Technik: offen, Wahl zwischen A (C++/Qt) und B (Kern plus Qt WebEngine); Messungen aus P02 liegen vor (`docs/messungen/P02-bericht.md`). Variante C wird nicht weiterverfolgt.
 2. NDI-SDK: Lizenzbedingungen für die private Nutzung und der Bezug für Linux sind nicht geprüft.
 3. Chat-Bot: Umfang und Streamer.bot-Import werden geklärt, wenn das Modul an der Reihe ist. Die Daten der alten Installation sind vorhanden.
 4. Live-Modul: Inhalt wird später geklärt.
 5. Funktionsprioritäten (MUSS, SOLL, KANN): pro Modul festlegen, Editor zuerst.
 6. Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI), T-04 (Browserquelle in OBS), T-05 (obs-websocket).
 7. Abbild der sauberen Installation (Clonezilla): empfohlen, vom Nutzer noch nicht bestätigt.
-8. Aus P01: Qt Multimedia 6.8.2 (Debian) liefert VP9-WebM mit Alpha als `NV12`, also ohne Alpha. Ein Dekodierweg mit libvpx für A/C ist nicht gemessen. Siehe `docs/messungen/P01-bericht.md`.
+8. Aus P01: Qt Multimedia 6.8.2 (Debian) liefert VP9-WebM mit Alpha als `NV12`, also ohne Alpha. Erledigt mit P02 (M1): Ein eigener Dekodierweg über libavcodec mit `libvpx-vp9` stellt den Alpha in A korrekt dar. Siehe `docs/messungen/P02-bericht.md`.
 9. Aus P01: Der GPU-Weg von Qt (Qt Quick) ist nicht gemessen; A und C nutzen QPainter in Software.
 10. Aus P01: Kernel-Angabe in `docs/02-umgebung.md` auf 6.12.113 korrigiert (erledigt).
+11. Aus P02 (M1): 63 Abstände über 50 ms bei den Videobildern, höhere GPU-Auslastung (36,5 % statt 11,6 %) und etwas langsamerer Start als A; Ursachen nicht geprüft.
+12. Aus P02 (M2): Qt WebEngine rendert minimiert nicht (Abgriff schwarz), verdeckt und ausserhalb des Bildschirms schon. Mit zwei Overlays im selben Prozess nur 26 bis 29 neue Bilder pro Sekunde; Abgriff in getrennten Threads oder Prozessen nicht gemessen.
+13. Aus P02: Für NDI offen sind Farbmatrix und Bereich bei UYVY, Vormultiplikation bei UYVA und ob die Umwandlung besser das NDI-SDK übernimmt (laut NDI-Dokumentation empfohlen). Alpha im Abgriff bei transparenter Seite nicht geprüft.
 
 ## Machbarkeitstests
 
