@@ -23,7 +23,7 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-13 | Vorschau mit einstellbarer Bildrate und Verkleinerung | SOLL | Leinwand funktioniert auch mit fester Bildrate |
 | E-14 | Animationen pro Quelle (Schweben, Atmen, Schreibmaschine) | SOLL | Grösstes Risiko für Abweichungen zwischen den Zeichnern, erst nach dem Konzept der zwei Zeichner |
 | E-15 | Konfiguration exportieren und importieren | SOLL | Speichern (E-02) reicht für den Anfang |
-| E-16 | Helles Design (dunkel ist Standard) | KANN | Keine Funktion für den Stream |
+| E-16 | ~~Helles Design~~ | gestrichen | Entscheid des Nutzers 2026-11-02: kein helles Design |
 | E-17 | Spezialquellen: Chat-Box, Alert-Box, Ereignisliste, Zielbalken | KANN | Brauchen die Twitch-Anbindung, kommen mit dem Chat-Bot |
 | E-18 | Quellen an die aktive OBS-Szene koppeln | KANN | Braucht obs-websocket, wartet auf T-05 |
 | E-19 | NDI, höchstens 2 Ausgänge | KANN | Bereits als «später» entschieden, wartet auf T-03 und das NDI-SDK |

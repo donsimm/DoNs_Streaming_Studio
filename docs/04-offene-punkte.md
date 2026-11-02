@@ -73,3 +73,5 @@ Stand: 2026-11-02.
 ## Entschieden nach P06 (2026-11-02)
 
 - Eigene Symbole des Nutzers liegen ausserhalb des Repos in `~/.config/dons-streaming-studio/symbole/`. Das Fenster sucht Symbole zuerst dort und nimmt nur, wenn dort keine Datei mit dem Namen liegt, die Datei aus `src/app/symbole/`. Grund: Das Repo ist öffentlich, und Claude Code committet am Ende jedes Auftrags (Regel 17). Umsetzung als erster Teil von P07.
+- Punkt 33 (Test `formatDocExample` schlägt in frischem Checkout fehl): wird als kleiner Teil von P07 behoben; der Test darf nicht von zufällig erzeugten Testdateien abhängen.
+- Punkt 34 (helle Fassungen der Bilder im Design): erledigt, weil es kein helles Design gibt (E-16 gestrichen, Entscheid des Nutzers 2026-11-02).
