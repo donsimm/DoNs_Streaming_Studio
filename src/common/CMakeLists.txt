@@ -9,6 +9,7 @@ add_library(dss_common STATIC
   overlaystore.h overlaystore.cpp
   tokenstore.h tokenstore.cpp
   canvasview.h canvasview.cpp
+  connectionstate.h connectionstate.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}")

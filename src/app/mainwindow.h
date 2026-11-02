@@ -1,9 +1,11 @@
 #pragma once
 
+#include "connectionstate.h"
 #include "theme.h"
 
 #include <QMainWindow>
 
+class HeaderBar;
 class QMenu;
 class QStackedWidget;
 
@@ -18,6 +20,9 @@ public:
     // keepLayout: Grösse, Lage und Anordnung der Docks beim Start laden und beim
     // Beenden speichern (aus bei --bildschirmfoto).
     explicit MainWindow(const Theme &theme, bool keepLayout, QWidget *parent = nullptr);
+
+    // Zustand eines Verbindungsknopfes im Kopfbereich.
+    void setConnectionState(dss::Connection connection, dss::ConnectionState state);
 
 signals:
     // Nach dem ersten Zeichnen, einmal (für --bildschirmfoto).
@@ -39,6 +44,7 @@ private:
     Theme m_theme;
     bool m_keepLayout = false;
     QMenu *m_docksMenu = nullptr;
+    HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     bool m_firstPaintReported = false;
 };

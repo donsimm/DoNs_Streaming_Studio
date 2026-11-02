@@ -36,9 +36,14 @@ int main(int argc, char *argv[])
         QStringLiteral("Fenster in 1280x800 öffnen, nach dem ersten Zeichnen als Bild speichern "
                        "und beenden."),
         QStringLiteral("DATEI"));
+    const QCommandLineOption statesOption(
+        QStringLiteral("zustaende-zeigen"),
+        QStringLiteral("Nur mit --bildschirmfoto: die vier Verbindungsknöpfe in den vier "
+                       "Zuständen zeigen (Twitch grün, YouTube orange, OBS rot, NDI grau)."));
     parser.addOption(helpOption);
     parser.addOption(versionOption);
     parser.addOption(screenshotOption);
+    parser.addOption(statesOption);
     // Unbekannte Optionen (zum Beispiel von Qt wie -platform) bleiben QApplication überlassen.
     parser.parse(arguments);
     if (parser.isSet(versionOption)) {
@@ -52,6 +57,10 @@ int main(int argc, char *argv[])
     const QString screenshotFile = parser.value(screenshotOption);
     if (parser.isSet(screenshotOption) && screenshotFile.isEmpty()) {
         QTextStream(stderr) << "Fehler: --bildschirmfoto braucht einen Dateinamen.\n";
+        return 2;
+    }
+    if (parser.isSet(statesOption) && !parser.isSet(screenshotOption)) {
+        QTextStream(stderr) << "Fehler: --zustaende-zeigen gilt nur mit --bildschirmfoto.\n";
         return 2;
     }
 
@@ -73,6 +82,11 @@ int main(int argc, char *argv[])
     app.setStyleSheet(styleSheet(theme, symbolDir()));
 
     MainWindow window(theme, screenshotFile.isEmpty());
+    if (parser.isSet(statesOption)) {
+        for (dss::Connection c : {dss::Connection::Twitch, dss::Connection::YouTube,
+                                  dss::Connection::Obs, dss::Connection::Ndi})
+            window.setConnectionState(c, dss::shownState(c));
+    }
 
     // SIGINT/SIGTERM schliessen das Fenster, also derselbe Weg wie beim Schliessen von Hand.
     dss::UnixSignalWatcher signalWatcher;

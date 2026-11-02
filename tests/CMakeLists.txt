@@ -16,6 +16,8 @@ dss_add_test(tst_overlaymodel)
 
 dss_add_test(tst_canvasview)
 
+dss_add_test(tst_connectionstate)
+
 # Testdateien wie im Handtest (CLAUDE.md Regel 7): Bild und Video aus
 # prototypes/messung/media_erzeugen.sh, Schriftdatei aus dem System (fc-list).
 set(DSS_TEST_MEDIA_DIR "${PROJECT_SOURCE_DIR}/prototypes/media" CACHE PATH "Testdateien (Bild, Video)")

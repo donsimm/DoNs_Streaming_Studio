@@ -74,8 +74,8 @@ void MainWindow::createCentralArea()
     column->setContentsMargins(4, 4, 4, 0);
     column->setSpacing(6);
 
-    auto *header = new HeaderBar(central);
-    column->addWidget(header);
+    m_header = new HeaderBar(central);
+    column->addWidget(m_header);
 
     m_modules = new QStackedWidget(central);
     m_modules->addWidget(new CanvasWidget(m_theme, m_modules));
@@ -89,8 +89,13 @@ void MainWindow::createCentralArea()
     m_modules->addWidget(chatBotPage);
     column->addWidget(m_modules, 1);
 
-    connect(header, &HeaderBar::moduleSelected, m_modules, &QStackedWidget::setCurrentIndex);
+    connect(m_header, &HeaderBar::moduleSelected, m_modules, &QStackedWidget::setCurrentIndex);
     setCentralWidget(central);
+}
+
+void MainWindow::setConnectionState(dss::Connection connection, dss::ConnectionState state)
+{
+    m_header->setConnectionState(connection, state);
 }
 
 void MainWindow::createDocks()

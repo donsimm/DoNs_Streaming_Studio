@@ -274,7 +274,10 @@ QCheckBox::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-au
 QToolButton#connectionButton { border: 2px solid @stateOff@; border-radius: 4px;
                                background: @input@; color: @text@; font-weight: bold; }
 QToolButton#connectionButton:hover { background: @buttonHover@; }
-QToolButton#connectionButton[state="disconnected"] { border-color: @stateError@; }
+/* Zustand im Rahmen (Werte von «state»: src/common/connectionstate.cpp). */
+QToolButton#connectionButton[state="off"] { border-color: @stateOff@; }
+QToolButton#connectionButton[state="error"] { border-color: @stateError@; }
+QToolButton#connectionButton[state="connecting"] { border-color: @stateConnecting@; }
 QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@; }
 
 #gaugeTitle { color: @textMuted@; }

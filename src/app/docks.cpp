@@ -35,7 +35,7 @@ QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
 {
     auto *button = new QToolButton(parent);
     button->setText(fallback);
-    const QIcon icon = loadSymbol(symbolFile);
+    const QIcon icon = loadSymbol(symbolFile, QSize(14, 14));
     if (!icon.isNull())
         button->setIcon(icon);
     button->setIconSize(QSize(14, 14));

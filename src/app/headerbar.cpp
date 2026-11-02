@@ -6,6 +6,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QStyle>
 #include <QToolButton>
 
 namespace {
@@ -20,23 +21,19 @@ QToolButton *moduleButton(const QString &text, QWidget *parent)
 }
 
 // Verbindungsknopf; Zustand über die Eigenschaft «state», Farben im Theme.
-QToolButton *connectionButton(const QString &name, const QString &shortText,
-                              const QString &symbolFile, QWidget *parent)
+QToolButton *connectionButton(const QString &shortText, const QString &symbolFile, QWidget *parent)
 {
     auto *button = new QToolButton(parent);
     button->setObjectName(QStringLiteral("connectionButton"));
-    button->setProperty("state", QStringLiteral("disconnected"));
     button->setFixedSize(46, 40);
     button->setIconSize(QSize(28, 28));
     button->setFocusPolicy(Qt::NoFocus);
     button->setText(shortText);
-    const QIcon icon = loadSymbol(symbolFile);
+    const QIcon icon = loadSymbol(symbolFile, button->iconSize());
     if (!icon.isNull()) {
         button->setIcon(icon);
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
-    button->setToolTip(QStringLiteral("%1: nicht verbunden").arg(name));
-    button->setAccessibleName(QStringLiteral("%1: nicht verbunden").arg(name));
     return button;
 }
 
@@ -94,16 +91,36 @@ HeaderBar::HeaderBar(QWidget *parent)
 
     row->addWidget(tabs, 0, Qt::AlignVCenter);
     row->addSpacing(70);
-    row->addWidget(connectionButton(QStringLiteral("Twitch"), QStringLiteral("TW"),
-                                    QStringLiteral("twitch.svg"), this));
-    row->addWidget(connectionButton(QStringLiteral("YouTube"), QStringLiteral("YT"),
-                                    QStringLiteral("youtube.svg"), this));
-    row->addWidget(connectionButton(QStringLiteral("OBS"), QStringLiteral("OBS"),
-                                    QStringLiteral("obs.svg"), this));
-    row->addWidget(connectionButton(QStringLiteral("NDI"), QStringLiteral("NDI"),
-                                    QStringLiteral("ndi.svg"), this));
+    const QList<std::tuple<dss::Connection, QString, QString>> connections = {
+        {dss::Connection::Twitch, QStringLiteral("TW"), QStringLiteral("twitch.svg")},
+        {dss::Connection::YouTube, QStringLiteral("YT"), QStringLiteral("youtube.svg")},
+        {dss::Connection::Obs, QStringLiteral("OBS"), QStringLiteral("obs.svg")},
+        {dss::Connection::Ndi, QStringLiteral("NDI"), QStringLiteral("ndi.svg")},
+    };
+    for (const auto &[connection, shortText, symbolFile] : connections) {
+        QToolButton *button = connectionButton(shortText, symbolFile, this);
+        m_connections.insert(connection, button);
+        row->addWidget(button);
+        // Noch keine Verbindungen (P06): alle grau.
+        setConnectionState(connection, dss::ConnectionState::Off);
+    }
     row->addSpacing(16);
     row->addWidget(gauge(QStringLiteral("CPU"), this), 1);
     row->addWidget(gauge(QStringLiteral("RAM"), this), 1);
     row->addWidget(gauge(QStringLiteral("LAN"), this), 1);
+}
+
+void HeaderBar::setConnectionState(dss::Connection connection, dss::ConnectionState state)
+{
+    QToolButton *button = m_connections.value(connection);
+    if (!button)
+        return;
+    const QString text = dss::connectionStateText(connection, state);
+    button->setProperty("state", dss::connectionStateKey(state));
+    button->setToolTip(text);
+    button->setAccessibleName(text);
+    // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
+    // https://doc.qt.io/qt-6.8/stylesheet-syntax.html#selector-types (Hinweis zu Eigenschaften)
+    button->style()->unpolish(button);
+    button->style()->polish(button);
 }
