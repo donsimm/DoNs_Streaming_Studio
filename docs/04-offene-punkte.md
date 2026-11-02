@@ -19,7 +19,7 @@ Stand: 2026-11-02.
 13. Aus P02: Für NDI offen sind Farbmatrix und Bereich bei UYVY, Vormultiplikation bei UYVA und ob die Umwandlung besser das NDI-SDK übernimmt (laut NDI-Dokumentation empfohlen). Alpha im Abgriff bei transparenter Seite nicht geprüft.
 14. Aus P03: Die Startprüfung beendet `dss-app` per SIGTERM (das Programm schliesst dann sein Fenster). Das Schliessen über den Schliessknopf des Fenstermanagers prüft nur der Handtest; für eine automatische Prüfung fehlt ein Werkzeug wie `xdotool` (nicht installiert).
 15. Aus P03: Der Installationsweg von `scripts/einrichten.sh` (fehlendes Paket, `sudo apt install Name=Version`) ist nicht geprüft, weil auf dem Studio-PC alle Pakete schon installiert waren.
-16. Aus P03: In `docs/00-uebergabe.md` steht noch «Es gibt noch keinen Programmcode»; der Auftrag P03 verlangte nur die Anpassung in `README.md`.
+16. Aus P03: Satz «Es gibt noch keinen Programmcode» in `docs/00-uebergabe.md`: erledigt (2026-11-02).
 
 ## Machbarkeitstests
 
