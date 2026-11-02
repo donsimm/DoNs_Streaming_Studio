@@ -2,7 +2,7 @@
 
 Private Software für den Twitch-Stream von Dominik Simmen. Sie übernimmt alles, was nicht zum Haupt-OBS gehört. Hauptfokus ist der Editor: pro Overlay eine eigene Leinwand, die als Browserquelle (später auch per NDI) an OBS ausgegeben wird.
 
-Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an (noch ohne Bearbeiten). Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
+Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an. Seit P08 lassen sich Overlays (mit Ordnern), Quellen und ihre Eigenschaften im Fenster bearbeiten; die Leinwand zeichnet die Quellen noch nicht. Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
 
 ## Inhalt
 
@@ -63,6 +63,7 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_BUILD_APP` | `ON` | Fenster `dss-app` bauen; aus: nur Kern (und Tests) |
 | `DSS_BUILD_TESTS` | `ON` | Tests bauen und bei `ctest` anmelden |
 | `DSS_BUILD_CLI` | `ON` | Werkzeug `dss-cli` bauen |
+| `DSS_APP_EDITING` | `ON` | Bearbeiten im Fenster (P08); aus: Fenster zeigt nur an wie in P07 |
 
 Das Fenster speichert Grösse, Lage und Anordnung der Docks beim Beenden in `~/.config/dons-streaming-studio/fenster.ini` (bzw. `$XDG_CONFIG_HOME/…`). Löschen der Datei stellt die Standardanordnung her.
 

@@ -89,4 +89,15 @@ Abgerufen in P07 (2026-11-02):
 - systemd: systemd.service(5), systemd.unit(5), systemctl(1), sd_notify(3), systemd-system.conf(5), D-Bus-Eigenschaften der Einheiten: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html, https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html, https://www.freedesktop.org/software/systemd/man/latest/systemctl.html, https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html, https://www.freedesktop.org/software/systemd/man/latest/systemd-system.conf.html, https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
 - NDI-Markenhinweis: https://docs.ndi.video/docs/sdk/licensing
 
+Abgerufen in P08 (2026-11-02 und 2026-11-03):
+
+- Be Vietnam Pro 1.002 im Repo google/fonts, Commit `c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1`: https://github.com/google/fonts/tree/c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1/ofl/bevietnampro (Dateien über https://raw.githubusercontent.com/google/fonts/c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1/ofl/bevietnampro/, Lizenz `OFL.txt`, SIL Open Font License 1.1, Verweis in der Datei: https://scripts.sil.org/OFL); Projekt der Schrift: https://github.com/bettergui/BeVietnamPro
+- fontconfig, Muster und Ausgabeformat von fc-list/fc-query: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html; Umrechnung des Gewichts (FcWeightToOpenType): https://gitlab.freedesktop.org/fontconfig/fontconfig/-/blob/2.15.0/src/fcweight.c
+- QAbstractItemView (DragDropMode, DropIndicatorPosition): https://doc.qt.io/qt-6.8/qabstractitemview.html
+- QAbstractSpinBox::keyboardTracking: https://doc.qt.io/qt-6.8/qabstractspinbox.html#keyboardTracking-prop
+- Qt::TimerType (Genauigkeit von CoarseTimer, ±5 %): https://doc.qt.io/qt-6.8/qt.html#TimerType-enum
+- QStatusBar::showMessage: https://doc.qt.io/qt-6.8/qstatusbar.html#showMessage
+- QProcess: https://doc.qt.io/qt-6.8/qprocess.html
+- Qt Test: https://doc.qt.io/qt-6.8/qttest-index.html
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.

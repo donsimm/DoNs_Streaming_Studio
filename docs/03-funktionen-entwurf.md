@@ -1,6 +1,6 @@
 # 03 – Funktionen je Modul (Entwurf)
 
-Stand: 2026-11-02. Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
+Stand: 2026-11-03 (E-22 ergänzt nach Entscheid vor P08). Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
 
 ## Editor (Hauptfokus)
 
@@ -29,6 +29,7 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-19 | NDI, höchstens 2 Ausgänge | KANN | Bereits als «später» entschieden, wartet auf T-03 und das NDI-SDK |
 | E-20 | Ton von Videos über eine Audiokarte des Studio-PCs (über das Mischpult zum Streaming-PC) | MUSS | Entscheid des Nutzers 2026-11-02, gehört zu E-05 |
 | E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte» |
+| E-22 | Rückgängig und Wiederholen | SOLL | Entscheid des Nutzers 2026-11-02 (vor P08): Änderungen wirken sofort, Rückgängig kommt später |
 
 ### Quelle Text (E-03)
 
