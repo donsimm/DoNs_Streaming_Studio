@@ -62,3 +62,8 @@ Stand: 2026-11-02.
 - Punkt 18 (Drehrichtung): im Uhrzeigersinn.
 - Punkt 19 (ß in der Adresse): «ß» → «ss», «æ» → «ae», «ø» → «oe», «ł» → «l».
 - Umsetzung von Punkt 17 (Feld für Wiederholen) und 19 im Modell: mit P05, erledigt (2026-11-02).
+
+## Entschieden vor P06 (2026-11-02)
+
+- Symbole der Verbindungsknöpfe: P06 zeichnet jede Symboldatei einfarbig in Textfarbe. Der Nutzer ersetzt die Kürzel-Dateien später selbst durch eigene Dateien (zum Beispiel die einfarbigen Symbole aus seinem alten Repo `donstv_Studio`, `assets/icons/connections/`, Herkunft Simple Icons). Claude legt keine Markenlogos ab.
+- Offen: Markenhinweis für NDI («NDI® is a registered trademark of Vizrt NDI AB», laut README des alten Repos) in «Hilfe → Über», sobald der Nutzer ein NDI-Symbol einsetzt oder NDI gebaut wird.

@@ -32,7 +32,9 @@ P05 hat das Fenster-Gerüst gebaut, mit eigenem dunklem Design, Systemschrift (D
 
 - Zustände und Farben nach `docs/01-festlegungen.md`, Abschnitt «Verbindungsanzeige im Kopfbereich»: grün = verbunden bzw. Ausgabe läuft, orange = Verbindungsversuch, rot = eingerichtet aber nicht verbunden, grau = nicht eingerichtet oder abgeschaltet. Farbwerte aus `Yami.obt`: `--green3` `#25A231`, `--yellow2` `#E5AF24`, `--red3` `#C01C37`, für grau ein Grauton aus `Yami.obt`.
 - Der Zustand eines Knopfes ist eine Eigenschaft, die später der Kern setzt. In P06 gibt es noch keine Verbindungen, also stehen alle vier Knöpfe auf **grau**.
-- Die Symbole (Kürzel «TW», «YT», «OBS», «NDI») sind einfarbig in Textfarbe; die Farbe des Zustands zeigt der Rahmen des Knopfes (Punkt 28: Symbole folgen so dem Design).
+- Die Symbole werden **immer einfarbig in Textfarbe** gezeichnet, egal welche Farben die Datei unter `src/app/symbole/` selbst hat (zum Beispiel Datei als Maske verwenden und mit der Textfarbe füllen). So folgen sie dem Design (Punkt 28). Die Farbe des Zustands zeigt der Rahmen des Knopfes.
+- Die Kürzel-Dateien aus P05 («TW», «YT», «OBS», «NDI») bleiben der Standard. Der Nutzer ersetzt sie später selbst durch eigene Dateien mit demselben Namen (Entscheid 2026-11-02). Lege selbst **keine** Markenlogos ab. Prüfe die Einfärbung mit einer selbst erstellten mehrfarbigen Test-SVG (nur im Test, nicht unter `src/app/symbole/`).
+- Nenne im Bericht für den Nutzer: Dateinamen, Format (SVG, Grösse), wo sie liegen, dass kein neuer Bau nötig ist.
 - Zur Prüfung: `dss-app --bildschirmfoto DATEI --zustaende-zeigen` setzt die vier Knöpfe auf die vier verschiedenen Zustände (Twitch grün, YouTube orange, OBS rot, NDI grau), nur für das Bildschirmfoto.
 
 ### 5. Bildschirmfotos
