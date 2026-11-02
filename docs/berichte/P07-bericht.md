@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Xfce/xfwm4 unter X11, `DISPLAY=:0.0`, systemd 257.13-1~deb13u1, Qt 6.8.2+dfsg-9+deb13u2). Kein Xvfb und kein offscreen: Fenstertests liefen in der aktiven X11-Sitzung (vor jeder Prüfung `loginctl show-session … -p State -p LockedHint` → `State=active`, `LockedHint=no`).
 
-Auftrag: `prompts/P07-kern-dienst.md`. Abnahme Handtest: offen.
+Auftrag: `prompts/P07-kern-dienst.md`. Abnahme Handtest: erledigt am 2026-11-02, alle 5 Schritte in Ordnung (Rückmeldung des Nutzers im Chat; CPU, RAM, LAN mit einer Leistungsanzeige des Systems abgeglichen). Der Nutzer hatte Schritt 1 versehentlich zweimal ausgeführt; dabei entstand wie vorgesehen ein zweites Overlay mit Adresse `handtest-p07-2`, beide wurden beim Aufräumen gelöscht. Schritt 5 lief ohne erneuten Start des Kerns.
 
 ## Kurzfassung
 
@@ -13,7 +13,7 @@ Auftrag: `prompts/P07-kern-dienst.md`. Abnahme Handtest: offen.
 | Startprüfung `--runs 20` | 20/20 sauber in allen vier Fällen (`core-sigterm`, `core-sigint`, `app-sigterm`, neu `app-kern-sigterm`) |
 | Dienstprüfung | bestanden: Start durch das Fenster, 5 × `kill -9` des Kerns (Neustart nach 1,07 bis 1,12 s), Kern läuft nach `kill -9` des Fensters weiter, Kern endet nach normalem Schliessen des letzten Fensters, Einrichten und Entfernen je zweimal |
 | Echte Einheit | `dss-core.service` eingerichtet, Zustand `inactive`, `static` (nicht laufend, kein Start bei der Anmeldung) |
-| Handtest | offen, 5 Schritte unten |
+| Handtest | ja: 5 Schritte in Ordnung (2026-11-02) |
 
 **Es wurde kein Paket installiert.** Qt Network (`libqt6network6` 6.8.2+dfsg-9+deb13u2) war schon installiert und gehört zu `qt6-base-dev`. Für systemd wird keine Bibliothek gebraucht: Die Meldung an systemd (`sd_notify`) schreibt der Kern selbst auf den Socket aus `NOTIFY_SOCKET` (Protokoll laut sd_notify(3)).
 
