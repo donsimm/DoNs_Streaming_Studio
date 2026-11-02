@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QPixmap>
 #include <QTextStream>
 
 #include <csignal>
@@ -27,8 +28,14 @@ int main(int argc, char *argv[])
                                         QStringLiteral("Hilfe ausgeben und beenden."));
     const QCommandLineOption versionOption(QStringLiteral("version"),
                                            QStringLiteral("Version ausgeben und beenden."));
+    const QCommandLineOption screenshotOption(
+        QStringLiteral("bildschirmfoto"),
+        QStringLiteral("Fenster in 1280x800 öffnen, nach dem ersten Zeichnen als Bild speichern "
+                       "und beenden."),
+        QStringLiteral("DATEI"));
     parser.addOption(helpOption);
     parser.addOption(versionOption);
+    parser.addOption(screenshotOption);
     // Unbekannte Optionen (zum Beispiel von Qt wie -platform) bleiben QApplication überlassen.
     parser.parse(arguments);
     if (parser.isSet(versionOption)) {
@@ -38,6 +45,11 @@ int main(int argc, char *argv[])
     if (parser.isSet(helpOption)) {
         QTextStream(stdout) << parser.helpText();
         return 0;
+    }
+    const QString screenshotFile = parser.value(screenshotOption);
+    if (parser.isSet(screenshotOption) && screenshotFile.isEmpty()) {
+        QTextStream(stderr) << "Fehler: --bildschirmfoto braucht einen Dateinamen.\n";
+        return 2;
     }
 
     QApplication app(argc, argv);
@@ -52,7 +64,7 @@ int main(int argc, char *argv[])
     QApplication::setPalette(palette(theme));
     app.setStyleSheet(styleSheet(theme));
 
-    MainWindow window(theme, true);
+    MainWindow window(theme, screenshotFile.isEmpty());
 
     // SIGINT/SIGTERM schliessen das Fenster, also derselbe Weg wie beim Schliessen von Hand.
     dss::UnixSignalWatcher signalWatcher;
@@ -66,6 +78,24 @@ int main(int argc, char *argv[])
                                signalNumber == SIGINT ? "SIGINT" : "SIGTERM");
                          window.close();
                      });
+
+    if (!screenshotFile.isEmpty()) {
+        // Bild des Fensters ohne Rahmen des Fenstermanagers, QWidget::grab():
+        // https://doc.qt.io/qt-6.8/qwidget.html#grab
+        window.resize(1280, 800);
+        QObject::connect(&window, &MainWindow::firstPainted, &app, [&window, screenshotFile] {
+            const QPixmap image = window.grab();
+            if (!image.save(screenshotFile)) {
+                qCritical("Bildschirmfoto konnte nicht gespeichert werden: %s",
+                          qPrintable(screenshotFile));
+                QCoreApplication::exit(1);
+                return;
+            }
+            qInfo("Bildschirmfoto gespeichert: %s (%dx%d)", qPrintable(screenshotFile),
+                  image.width(), image.height());
+            window.close();
+        });
+    }
 
     qInfo().noquote() << dss::startLine(name);
     window.show();

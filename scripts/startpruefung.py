@@ -7,6 +7,9 @@ Je Start:
 - Dauer bis zum Start: Zeit vor Popen bis zur Protokollzeile «… gestartet, Qt …» (dss-core)
   bzw. «Fenster gezeichnet» (dss-app), gemessen im Skript mit CLOCK_MONOTONIC beim Lesen der Zeile.
 - dss-app: zusätzlich, ob xwininfo ein sichtbares Fenster «DoNs Streaming Studio» findet.
+  Seit P05 läuft dss-app mit eigenem XDG_CONFIG_HOME (ein temporärer Ordner je Fall), damit
+  die Prüfung die Fenstereinstellungen des Nutzers nicht ändert. Ab dem zweiten Start lädt
+  dss-app also die beim vorigen Beenden gespeicherte Anordnung.
 - Beenden: nach 1 s Laufzeit SIGTERM (dss-core auch SIGINT). dss-app schliesst bei SIGTERM sein
   Fenster, also derselbe Weg wie beim Schliessen von Hand.
 - Sauber: Exit-Code 0, Startzeile gelesen, «beendet, Exit-Code 0» im Protokoll, keine
@@ -22,6 +25,7 @@ import selectors
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -98,13 +102,13 @@ def read_until(proc, pattern, timeout_s, lines):
         sel.close()
 
 
-def one_run(build, case, idx):
+def one_run(build, case, idx, env=None):
     rel, sig, ready_pattern, expected = CASES[case]
     cmd = [os.path.join(build, rel)]
     lines = []
     t0 = time.monotonic_ns()
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                         start_new_session=True)
+                         start_new_session=True, env=env)
     t_ready = read_until(p, ready_pattern, START_TIMEOUT_S, lines)
     visible = None
     if t_ready is not None:
@@ -174,12 +178,17 @@ def main():
     for case in args.cases:
         started = time.strftime("%Y-%m-%d %H:%M:%S %z")
         results = []
+        config_dir = tempfile.TemporaryDirectory(prefix="dss-startpruefung-")
+        env = dict(os.environ, XDG_CONFIG_HOME=config_dir.name)
         for i in range(1, args.runs + 1):
-            r = one_run(args.build, case, i)
+            r = one_run(args.build, case, i, env)
             results.append(r)
             print(json.dumps({k: v for k, v in r.items() if k != "log"}, ensure_ascii=False),
                   flush=True)
             time.sleep(0.5)
+        config_saved = os.path.exists(
+            os.path.join(config_dir.name, "dons-streaming-studio", "fenster.ini"))
+        config_dir.cleanup()
 
         st = sorted(r["start_ms"] for r in results if r["start_ms"] is not None)
         ex = sorted(r["exit_ms"] for r in results)
@@ -189,6 +198,7 @@ def main():
             "command": os.path.join(args.build, CASES[case][0]),
             "signal": CASES[case][1].name,
             "display": os.environ.get("DISPLAY"),
+            "config_saved": config_saved if case.startswith("app") else None,
             "runs": len(results),
             "clean": sum(r["clean"] for r in results),
             "start_ms_min": st[0] if st else None,

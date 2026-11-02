@@ -28,3 +28,13 @@ add_test(NAME media_vorbereiten
   COMMAND sh -c "test -f '${DSS_TEST_MEDIA_DIR}/alpha.webm' || sh '${PROJECT_SOURCE_DIR}/prototypes/messung/media_erzeugen.sh' '${DSS_TEST_MEDIA_DIR}'")
 set_tests_properties(media_vorbereiten PROPERTIES FIXTURES_SETUP dss_media)
 set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
+
+# Bildschirmfoto des Fensters in der X11-Sitzung (P05). Nur mit dem Fenster (DSS_BUILD_APP).
+# Ohne X11-Sitzung meldet ctest den Test als übersprungen (Exit-Code 77).
+if(DSS_BUILD_APP)
+  find_program(DSS_PYTHON3 python3 REQUIRED)
+  add_test(NAME bildschirmfoto
+    COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/bildschirmfoto_pruefen.py
+            $<TARGET_FILE:dss-app> ${CMAKE_CURRENT_BINARY_DIR}/bildschirmfoto)
+  set_tests_properties(bildschirmfoto PROPERTIES SKIP_RETURN_CODE 77)
+endif()
