@@ -1,6 +1,7 @@
 // dss-app: Fenster nach docs/bilder/oberflaeche.png, in P05 noch ohne Daten.
 
 #include "mainwindow.h"
+#include "symbols.h"
 #include "theme.h"
 
 #include "logging.h"
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     QApplication::setStyle(QStringLiteral("Fusion"));
     const Theme theme = darkTheme();
     QApplication::setPalette(palette(theme));
-    app.setStyleSheet(styleSheet(theme));
+    app.setStyleSheet(styleSheet(theme, symbolDir()));
 
     MainWindow window(theme, screenshotFile.isEmpty());
 

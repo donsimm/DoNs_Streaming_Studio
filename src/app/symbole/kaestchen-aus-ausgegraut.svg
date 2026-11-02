@@ -1,0 +1,8 @@
+<!-- Aus OBS Studio, https://github.com/obsproject/obs-studio, Datei frontend/data/themes/Yami/checkbox_unchecked_disabled.svg, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524. Lizenz: GNU GPL Version 2 (Datei COPYING im Repo von OBS Studio). Unverändert bis auf diesen Kommentar. -->
+<svg version="1.1" x="0" y="0" width="128" height="128" viewBox="0 0 128 128">
+<g>
+	<path fill="none" stroke="#4A4C53" stroke-width="8" stroke-miterlimit="10" d="M115.579,104.737
+		c0,6.221-5.012,11.263-11.192,11.263H22.771c-6.182,0-11.192-5.042-11.192-11.263V23.263c0-6.221,5.01-11.263,11.192-11.263h81.615
+		c6.181,0,11.192,5.042,11.192,11.263V104.737z"/>
+</g>
+</svg>

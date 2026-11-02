@@ -52,7 +52,7 @@ void CanvasWidget::leaveEvent(QEvent *)
 void CanvasWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
-    p.fillRect(rect(), m_theme.canvasOutside);
+    p.fillRect(rect(), m_theme.preview);
 
     // Fläche ohne Lineale; darin wird die Leinwand eingepasst.
     const QRect area(kRulerSize, kRulerSize, width() - kRulerSize, height() - kRulerSize);
@@ -74,8 +74,8 @@ void CanvasWidget::paintEvent(QPaintEvent *)
     p.restore();
 
     // Lineale oben und links, in Pixeln der Leinwand.
-    p.fillRect(0, 0, width(), kRulerSize, m_theme.ruler);
-    p.fillRect(0, 0, kRulerSize, height(), m_theme.ruler);
+    p.fillRect(0, 0, width(), kRulerSize, m_theme.preview);
+    p.fillRect(0, 0, kRulerSize, height(), m_theme.preview);
     QFont small = font();
     small.setPixelSize(9);
     p.setFont(small);

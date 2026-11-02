@@ -7,3 +7,6 @@
 // neuen Bau ersetzen kann. Fehlt die Datei, steht eine Warnung im Protokoll und das
 // Ergebnis ist leer (der Knopf zeigt dann seinen Text).
 QIcon loadSymbol(const QString &fileName);
+
+// Ordner der Symbole (src/app/symbole/), auch für die Bilder im Stylesheet.
+QString symbolDir();
