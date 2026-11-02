@@ -37,14 +37,15 @@ Berichte: `docs/messungen/P01-bericht.md`, `docs/messungen/P02-bericht.md`. Wich
 Vollständige Liste: `docs/04-offene-punkte.md`. Vor dem ersten Bau-Prompt zu klären:
 
 1. Erledigt (2026-11-02): Prioritäten des Editors, Tabelle E-01 bis E-19 in `docs/03-funktionen-entwurf.md`. Umfang der Quelle Text ebenfalls erledigt: TX-01 bis TX-16.
-2. Erledigt (2026-11-02): Konzept der zwei Zeichner, K-01 bis K-08 in `docs/01-festlegungen.md` (Text zeichnen beide Zeichner selbst). Offen: Zeilenumbruch nur im Kern (Vorschlag zu K-04).
+2. Erledigt (2026-11-02): Konzept der zwei Zeichner, K-01 bis K-08 in `docs/01-festlegungen.md` (Text zeichnen beide Zeichner selbst). Zeilenumbruch rechnet nur der Kern.
 
 Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (brauchen das Netzwerk), Chat-Bot-Umfang und Streamer.bot-Import (Daten der alten Installation hat der Nutzer), Live-Modul, was Qt 6.8.2 unter Debian 13 für Webserver und Twitch mitbringt (klärt der Prompt für den Kern).
 
 ## Nächste Schritte
 
-1. Bau-Prompts schreiben (`prompts/P03-…`), je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
-2. Sobald das Netzwerk besteht: T-03 bis T-05.
+1. `prompts/P03-projektgeruest.md` ist geschrieben (2026-11-02) und wartet auf Ausführung in einer neuen Claude-Code-Sitzung. Danach P04 (Overlay-Modell und Format der Overlay-Datei, K-01).
+2. Weitere Bau-Prompts, je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
+3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
 ## Arbeitsweise mit dem Nutzer
 

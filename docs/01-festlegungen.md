@@ -74,4 +74,4 @@ Entschieden (2026-11-02, vom Nutzer bestätigt). Grundidee: Der Kern ist die ein
 
 Nicht geprüft: Ob Chromium auf dem Studio-PC gleich zeichnet wie die Browserquelle in OBS auf dem Streaming-PC (zeigt erst T-04).
 
-Vorschlag zu K-04, noch nicht bestätigt: Den automatischen Zeilenumbruch (TX-11) rechnet nur der Kern und schickt die fertigen Zeilen; die Zeichner brechen nie selbst um.
+Zu K-04, entschieden (2026-11-02, vom Nutzer bestätigt): Den automatischen Zeilenumbruch (TX-11) rechnet nur der Kern und schickt die fertigen Zeilen; die Zeichner brechen nie selbst um.

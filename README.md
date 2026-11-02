@@ -15,6 +15,7 @@ Status: Neustart, Definitionsphase. Es gibt noch keinen Programmcode. Zuerst wer
 | `docs/03-funktionen-entwurf.md` | Funktionen je Modul (Entwurf, noch nicht priorisiert) |
 | `docs/04-offene-punkte.md` | Offene Punkte und Reihenfolge der nächsten Schritte |
 | `docs/05-quellen.md` | Quellen |
+| `docs/berichte/` | Berichte der Bau-Prompts (ab P03) |
 | `prompts/` | Aufträge an Claude Code, in Reihenfolge, je eine eigene Sitzung |
 
 Die Festlegungen wurden in einem Claude-Dokument gesammelt: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13. Dieses Repo enthält dieselben Inhalte als Dateien, damit Claude Code sie ohne Umweg lesen kann.

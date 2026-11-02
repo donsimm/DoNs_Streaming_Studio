@@ -44,7 +44,7 @@ Umfang entschieden (2026-11-02, vom Nutzer bestätigt). Stufen wie beim Editor. 
 | TX-08 | Umriss (Farbe, Breite) | SOLL | Lesbarkeit im Stream |
 | TX-09 | Schatten (Farbe, Versatz X/Y, Unschärfe) | SOLL | Lesbarkeit im Stream |
 | TX-10 | Hintergrundfläche hinter dem Text (Farbe, Innenabstand, runde Ecken) | SOLL | Ersetzt eine separate Bildquelle |
-| TX-11 | Automatischer Zeilenumbruch an der Breite der Box | SOLL | Grösstes Risiko für Abweichungen zwischen Qt und Browser (Einschätzung, nicht gemessen); Lösung gehört zum Konzept der zwei Zeichner |
+| TX-11 | Automatischer Zeilenumbruch an der Breite der Box | SOLL | Rechnet nur der Kern, die Zeichner brechen nie selbst um (K-04) |
 | TX-12 | Verhalten bei zu langem Text: abschneiden oder Schrift verkleinern | KANN | Erst nach TX-11 sinnvoll |
 | TX-13 | Farbverlauf als Füllung | KANN | Gestaltung |
 | TX-14 | Unterschiedliche Formate in einem Text (einzelnes Wort fett oder farbig) | KANN | Aufwendig in beiden Zeichnern |
