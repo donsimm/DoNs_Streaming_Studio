@@ -136,3 +136,11 @@ Vorlage ist das Standard-Design von OBS Studio, «Yami» in der Variante «Defau
 | Farben für Zustände (Vorschlag für die Verbindungsknöpfe) | `--green3`, `--yellow2`, `--red3` | `#25A231`, `#E5AF24`, `#C01C37` |
 
 - Lizenz: OBS Studio steht unter GPL Version 2 (Datei `COPYING`). Farbwerte zu übernehmen ist unkritisch. Wird mehr übernommen (Stylesheet-Teile, Symbole), gilt die GPL für diese Teile; solange die Software privat bleibt und nicht weitergegeben wird, entstehen daraus keine Pflichten (Einschätzung, keine Rechtsberatung).
+
+## Kern als Dienst
+
+Entschieden (2026-11-02, vom Nutzer bestätigt):
+
+- Der Kern startet automatisch bei der Anmeldung des Nutzers und startet nach einem Absturz von selbst neu.
+- Solange der Kern läuft, ändert nur der Kern die Overlay-Dateien; `dss-cli` darf dann nur anzeigen.
+- Die LAN-Anzeige zeigt automatisch die Netzwerkverbindung der Standardroute (beim Studio-PC das Kabel).
