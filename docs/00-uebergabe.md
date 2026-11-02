@@ -13,7 +13,7 @@ Private Overlay-Software für den Twitch-Stream des Nutzers. Pro Overlay eine Le
 | Betriebssystem | Debian 13 mit Xfce unter X11 |
 | Technik | C++ mit Qt 6, eigene Leinwand: Der Editor zeichnet selbst. Für die Browserquelle in OBS gibt es einen zweiten Zeichner als Webseite |
 | Kern (Hintergrundprogramm) | getrennt vom Fenster, Sprache C++ |
-| Fenster | dünn, ohne Logik, Oberfläche wie auf dem Bild des Nutzers |
+| Fenster | dünn, ohne Logik, Oberfläche wie auf dem Bild des Nutzers (`docs/bilder/oberflaeche.png`) |
 | Module | fest eingebaut, gleiche Schnittstelle zum Ereignisfluss, kein Plugin-System, auch nicht für Dritte |
 | OBS | kein OBS-Plugin; Browserquelle, später NDI |
 | Netz | Overlay-Server im Heimnetz, Token pro Overlay, kein Port am Router; Studio-PC per Kabel mit fester Adresse |
