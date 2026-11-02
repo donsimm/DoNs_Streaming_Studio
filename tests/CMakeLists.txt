@@ -36,6 +36,27 @@ add_test(NAME media_vorbereiten
 set_tests_properties(media_vorbereiten PROPERTIES FIXTURES_SETUP dss_media)
 set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
 
+# P07: Schnittstelle, Leistungswerte, Aufbereitung für das Fenster (ohne Qt Gui).
+dss_add_test(tst_protocol)
+dss_add_test(tst_windowdata)
+dss_add_test(tst_systemstats)
+target_compile_definitions(tst_systemstats PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
+
+# P07: Tests mit dss-core (und dss-cli) als eigenen Prozessen, eigener Datenordner und eigene
+# Verbindung in $XDG_RUNTIME_DIR. Nur Qt Core, Network und Test.
+dss_add_test(tst_sperre)
+target_compile_definitions(tst_sperre PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+if(DSS_BUILD_CLI)
+  target_compile_definitions(tst_sperre PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
+  add_dependencies(tst_sperre dss-cli)
+endif()
+add_dependencies(tst_sperre dss-core)
+dss_add_test(tst_kernverbindung)
+target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
+add_dependencies(tst_kernverbindung dss-core)
+set_tests_properties(tst_kernverbindung PROPERTIES FIXTURES_REQUIRED dss_media)
+
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).
 if(DSS_BUILD_APP)

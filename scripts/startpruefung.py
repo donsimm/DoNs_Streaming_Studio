@@ -12,6 +12,13 @@ Je Start:
   dss-app also die beim vorigen Beenden gespeicherte Anordnung.
 - Beenden: nach 1 s Laufzeit SIGTERM (dss-core auch SIGINT). dss-app schliesst bei SIGTERM sein
   Fenster, also derselbe Weg wie beim Schliessen von Hand.
+- Seit P07 nie mit echten Daten: dss-core läuft mit eigenem --datenordner und eigener
+  --verbindung (temporäre Ordner, Socket in $XDG_RUNTIME_DIR). dss-app läuft mit einer eigenen
+  --verbindung, an der kein Kern antwortet, und einer --einheit, die es nicht gibt: Das Fenster
+  versucht die Einheit zu starten, das scheitert, und es startet trotzdem (Teil F).
+  Fall «app-kern-sigterm»: vor jedem Start ein eigener dss-core; das Fenster verbindet sich, beim
+  Schliessen bittet es den Kern, sich zu beenden. Sauber heisst dann zusätzlich: Der Kern endet
+  mit Exit-Code 0 und meldet «Beenden erbeten von dss-app».
 - Sauber: Exit-Code 0, Startzeile gelesen, «beendet, Exit-Code 0» im Protokoll, keine
   Zeitüberschreitung, keine unerwarteten Protokollzeilen und 2 s nach Ende kein Prozess der
   Sitzung mehr vorhanden (Sitzungs-ID aus /proc/<pid>/stat, proc(5)).
@@ -34,15 +41,23 @@ START_TIMEOUT_S = 10
 EXIT_TIMEOUT_S = 10
 RUNNING_S = 1.0
 
+CORE = "src/core/dss-core"
+UNIT_MISSING = "dss-startpruefung-gibt-es-nicht.service"
+CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: "]
+
 # Programm, Signal zum Beenden, Muster der Startzeile, erwartete Protokollzeilen
 CASES = {
-    "core-sigterm": ("src/core/dss-core", signal.SIGTERM, " gestartet, Qt ",
-                     [" gestartet, Qt ", "SIGTERM erhalten, beende", "beendet, Exit-Code 0"]),
-    "core-sigint": ("src/core/dss-core", signal.SIGINT, " gestartet, Qt ",
-                    [" gestartet, Qt ", "SIGINT erhalten, beende", "beendet, Exit-Code 0"]),
+    "core-sigterm": (CORE, signal.SIGTERM, "Verbindung offen: ",
+                     CORE_EXPECTED + ["SIGTERM erhalten, beende", "beendet, Exit-Code 0"]),
+    "core-sigint": (CORE, signal.SIGINT, "Verbindung offen: ",
+                    CORE_EXPECTED + ["SIGINT erhalten, beende", "beendet, Exit-Code 0"]),
     "app-sigterm": ("src/app/dss-app", signal.SIGTERM, "Fenster gezeichnet",
                     [" gestartet, Qt ", "Fenster gezeichnet", "SIGTERM erhalten, schliesse Fenster",
                      "beendet, Exit-Code 0"]),
+    "app-kern-sigterm": ("src/app/dss-app", signal.SIGTERM, "Fenster gezeichnet",
+                         [" gestartet, Qt ", "Fenster gezeichnet",
+                          "SIGTERM erhalten, schliesse Fenster", "Kern beendet sich",
+                          "beendet, Exit-Code 0"]),
 }
 
 
@@ -102,9 +117,28 @@ def read_until(proc, pattern, timeout_s, lines):
         sel.close()
 
 
-def one_run(build, case, idx, env=None):
+def start_core(build, data_dir, socket_path, env):
+    """Eigener Kern für den Fall app-kern-sigterm; wartet, bis er Verbindungen annimmt."""
+    core = subprocess.Popen([os.path.join(build, CORE), "--datenordner", data_dir,
+                             "--verbindung", socket_path], stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, start_new_session=True, env=env)
+    core_lines = []
+    ready = read_until(core, "Verbindung offen: ", START_TIMEOUT_S, core_lines)
+    return core, core_lines, ready is not None
+
+
+def one_run(build, case, idx, env=None, data_dir=None, socket_path=None):
     rel, sig, ready_pattern, expected = CASES[case]
     cmd = [os.path.join(build, rel)]
+    if rel == CORE:
+        cmd += ["--datenordner", data_dir, "--verbindung", socket_path]
+    else:
+        cmd += ["--verbindung", socket_path, "--einheit", UNIT_MISSING]
+    core = None
+    core_ok = True
+    core_lines = []
+    if case == "app-kern-sigterm":
+        core, core_lines, core_ok = start_core(build, data_dir, socket_path, env)
     lines = []
     t0 = time.monotonic_ns()
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -141,10 +175,24 @@ def one_run(build, case, idx, env=None):
         except OSError:
             pass
 
+    core_exit = None
+    if core is not None:
+        try:
+            _, core_err = core.communicate(timeout=EXIT_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            core.kill()
+            _, core_err = core.communicate()
+            core_ok = False
+        core_lines += [l for l in core_err.splitlines() if l.strip()]
+        core_exit = core.returncode
+        core_ok = (core_ok and core_exit == 0
+                   and any("Beenden erbeten von dss-app" in l for l in core_lines))
+
     unexpected = [l for l in lines if not any(e in l for e in expected)]
     missing = [e for e in expected if not any(e in l for l in lines)]
     clean = (p.returncode == 0 and not timeout and t_ready is not None and not leftovers
-             and not unexpected and not missing and visible is not False and not out.strip())
+             and not unexpected and not missing and visible is not False and not out.strip()
+             and core_ok)
     return {
         "run": idx,
         "exit_code": p.returncode,
@@ -157,6 +205,8 @@ def one_run(build, case, idx, env=None):
         "missing_lines": missing,
         "stdout": out.strip(),
         "log": lines,
+        "core_exit_code": core_exit,
+        "core_log": core_lines,
         "clean": clean,
     }
 
@@ -179,16 +229,24 @@ def main():
         started = time.strftime("%Y-%m-%d %H:%M:%S %z")
         results = []
         config_dir = tempfile.TemporaryDirectory(prefix="dss-startpruefung-")
+        data_dir = tempfile.TemporaryDirectory(prefix="dss-startpruefung-daten-")
+        # Kurzer Pfad: Unix-Sockets fassen höchstens 107 Byte (unix(7)).
+        run_dir = tempfile.TemporaryDirectory(prefix="dss-sp-",
+                                              dir=os.environ.get("XDG_RUNTIME_DIR"))
+        socket_path = os.path.join(run_dir.name, "kern.sock")
         env = dict(os.environ, XDG_CONFIG_HOME=config_dir.name)
         for i in range(1, args.runs + 1):
-            r = one_run(args.build, case, i, env)
+            r = one_run(args.build, case, i, env, data_dir.name, socket_path)
             results.append(r)
-            print(json.dumps({k: v for k, v in r.items() if k != "log"}, ensure_ascii=False),
+            print(json.dumps({k: v for k, v in r.items() if k not in ("log", "core_log")},
+                             ensure_ascii=False),
                   flush=True)
             time.sleep(0.5)
         config_saved = os.path.exists(
             os.path.join(config_dir.name, "dons-streaming-studio", "fenster.ini"))
         config_dir.cleanup()
+        data_dir.cleanup()
+        run_dir.cleanup()
 
         st = sorted(r["start_ms"] for r in results if r["start_ms"] is not None)
         ex = sorted(r["exit_ms"] for r in results)
@@ -196,6 +254,7 @@ def main():
             "case": case,
             "started": started,
             "command": os.path.join(args.build, CASES[case][0]),
+            "with_core": case == "app-kern-sigterm",
             "signal": CASES[case][1].name,
             "display": os.environ.get("DISPLAY"),
             "config_saved": config_saved if case.startswith("app") else None,
