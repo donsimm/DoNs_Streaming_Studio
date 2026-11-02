@@ -52,7 +52,26 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 
 - Betriebssystem: entschieden (2026-11-02, vom Nutzer bestätigt): Debian 13 mit Xfce unter X11. Grundlage: Messung P01, alle drei Prototypen starteten dort 20 von 20 Mal sauber. Debian 13 ist von den drei geprüften Systemen (Debian 13, Ubuntu 26.04 LTS, Fedora 44) das einzige mit X11-Sitzung. Andere Systeme wurden nicht untersucht.
 - Technik: entschieden (2026-11-02, vom Nutzer bestätigt): C++ mit Qt 6, eigene Leinwand (frühere Variante A). Der Editor zeichnet die Leinwand selbst in C++. Für die Browserquelle in OBS braucht es einen zweiten Zeichner als Webseite. Begründung des Nutzers: Aufwand ist zweitrangig, Kontrolle und Flexibilität zählen. Python/PyQt6 (Variante C) und Qt WebEngine als Editor-Zeichner (Variante B) werden nicht weiterverfolgt. Grundlage: `docs/messungen/P01-bericht.md`, `docs/messungen/P02-bericht.md`.
-- Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen sind ein Vorschlag, noch nicht bestätigt: eine gemeinsame Beschreibung der Leinwand (eine Datenquelle für beide Zeichner), ein fester Funktionsumfang pro Quelle und automatische Bildvergleiche beider Zeichner.
+- Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen: siehe Abschnitt «Konzept der zwei Zeichner».
 - Video mit Alpha in der eigenen Leinwand: eigener Dekodierweg über libavcodec mit `libvpx-vp9` (gemessen in P02, M1). Qt Multimedia 6.8.2 liefert den Alpha nicht.
 - Sprache des Kerns (Hintergrundprogramm): entschieden (2026-11-02, vom Nutzer bestätigt): C++, dieselbe Sprache und Werkzeugkette wie das Fenster. Begründung: gemeinsamer Code für Leinwand-Modell, Dekodierung und Zeichnen. Ungeprüft: Was Qt 6.8.2 unter Debian 13 für Webserver und Twitch-Anbindung mitbringt; das klärt der Prompt für den Kern.
 - Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket).
+
+## Konzept der zwei Zeichner
+
+Entschieden (2026-11-02, vom Nutzer bestätigt). Grundidee: Der Kern ist die einzige Stelle, die weiss, wie ein Overlay aussieht. Beide Zeichner (Editor und Browserquelle) stellen dar, was der Kern vorgibt.
+
+| Nr. | Regel |
+|---|---|
+| K-01 | Eine Datei pro Overlay im Format JSON. Inhalt: Auflösung, Liste der Quellen in Zeichenreihenfolge, pro Quelle Nummer, Art, X, Y, Breite, Höhe (ganze Pixel), Drehung, sichtbar ja/nein, Eigenschaften der Art. Dazu eine Versionsnummer des Formats. |
+| K-02 | Der Kern verteilt die Datei. Editor und Browserquelle bekommen sie vom Kern. Bei jeder Änderung schickt der Kern das ganze Overlay neu. |
+| K-03 | Dateien (Bilder, Videos, Schriften) liegen im Kern und werden von beiden Zeichnern von dort geholt. |
+| K-04 | Text zeichnen beide Zeichner selbst, aus derselben Schriftdatei (E-11). Entscheid des Nutzers gegen den Vorschlag «Text als Bild vom Kern»: schärfer beim Vergrössern, höheres Risiko für Abweichungen. |
+| K-05 | Bild, Video, WebM stellen beide Zeichner selbst dar (Editor über libavcodec mit libvpx). Verglichen wird ein festes Einzelbild, nicht der Ablauf. |
+| K-06 | Animationen (E-14) stehen als Formel mit Zeit in der Datei. Beide Zeichner rechnen dieselbe Formel. |
+| K-07 | Eine neue Eigenschaft kommt nur dazu, wenn beide Zeichner sie können und der Bildvergleich besteht. |
+| K-08 | Automatischer Bildvergleich: Beide Zeichner zeichnen dasselbe Test-Overlay ohne Fenster (Webseite in Chromium), die Bilder werden verglichen. Erlaubt sind nur kleine Unterschiede an Kanten; die Grenze wird im Bau-Prompt festgelegt und gemessen. |
+
+Nicht geprüft: Ob Chromium auf dem Studio-PC gleich zeichnet wie die Browserquelle in OBS auf dem Streaming-PC (zeigt erst T-04).
+
+Vorschlag zu K-04, noch nicht bestätigt: Den automatischen Zeilenumbruch (TX-11) rechnet nur der Kern und schickt die fertigen Zeilen; die Zeichner brechen nie selbst um.
