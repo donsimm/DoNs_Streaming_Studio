@@ -44,7 +44,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 ## Nächste Schritte
 
 1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P05 (`prompts/P05-fenster-geruest.md`) ausgeführt (2026-11-02): Nachträge zum Modell und Fenster-Gerüst; abgenommen, einschliesslich Handtest.
-2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge P06 bis P12 bestätigt am 2026-11-02). P06: Aussehen wie OBS (`prompts/P06-aussehen-obs.md`) abgenommen (2026-11-02), einschliesslich Handtest. Als Nächstes P07. Vorher zu klären: die vom Nutzer auf dem Studio-PC ersetzten Symboldateien unter `src/app/symbole/` sind nicht committet (Arbeitsordner geändert).
+2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge P06 bis P12 bestätigt am 2026-11-02). P06: Aussehen wie OBS (`prompts/P06-aussehen-obs.md`) abgenommen (2026-11-02), einschliesslich Handtest. Als Nächstes P07. Entschieden: eigene Symbole des Nutzers ausserhalb des Repos (`~/.config/dons-streaming-studio/symbole/`), Umbau als erster Teil von P07.
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
 ## Rolle des Chats (Vorgabe des Nutzers, 2026-11-02, bis auf Weiteres)

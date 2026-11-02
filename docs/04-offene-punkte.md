@@ -69,3 +69,7 @@ Stand: 2026-11-02.
 
 - Symbole der Verbindungsknöpfe: P06 zeichnet jede Symboldatei einfarbig in Textfarbe. Der Nutzer ersetzt die Kürzel-Dateien später selbst durch eigene Dateien (zum Beispiel die einfarbigen Symbole aus seinem alten Repo `donstv_Studio`, `assets/icons/connections/`, Herkunft Simple Icons). Claude legt keine Markenlogos ab.
 - Offen: Markenhinweis für NDI («NDI® is a registered trademark of Vizrt NDI AB», laut README des alten Repos) in «Hilfe → Über», sobald der Nutzer ein NDI-Symbol einsetzt oder NDI gebaut wird.
+
+## Entschieden nach P06 (2026-11-02)
+
+- Eigene Symbole des Nutzers liegen ausserhalb des Repos in `~/.config/dons-streaming-studio/symbole/`. Das Fenster sucht Symbole zuerst dort und nimmt nur, wenn dort keine Datei mit dem Namen liegt, die Datei aus `src/app/symbole/`. Grund: Das Repo ist öffentlich, und Claude Code committet am Ende jedes Auftrags (Regel 17). Umsetzung als erster Teil von P07.
