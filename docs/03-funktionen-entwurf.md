@@ -27,6 +27,8 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-17 | Spezialquellen: Chat-Box, Alert-Box, Ereignisliste, Zielbalken | KANN | Brauchen die Twitch-Anbindung, kommen mit dem Chat-Bot |
 | E-18 | Quellen an die aktive OBS-Szene koppeln | KANN | Braucht obs-websocket, wartet auf T-05 |
 | E-19 | NDI, höchstens 2 Ausgänge | KANN | Bereits als «später» entschieden, wartet auf T-03 und das NDI-SDK |
+| E-20 | Ton von Videos über eine Audiokarte des Studio-PCs (über das Mischpult zum Streaming-PC) | MUSS | Entscheid des Nutzers 2026-11-02, gehört zu E-05 |
+| E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte» |
 
 ### Quelle Text (E-03)
 

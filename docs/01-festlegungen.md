@@ -84,6 +84,11 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 - Drehung wird als ganze Zahl in Zehntelgrad gespeichert (0 bis 3599), angezeigt mit einer Nachkommastelle.
 - Die Adresse der Browserquelle wird aus dem Namen des Overlays gebildet (Kleinbuchstaben, Umlaute als ae/oe/ue, übrige Zeichen als «-»), zum Beispiel `ueberblick-start`. Bei gleichem Namen hängt die Software eine Zahl an.
 - Beim Umbenennen fragt die Software, ob die Adresse mitgeändert werden soll. Standard «nein», damit OBS weiterläuft.
+- Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn, um die Mitte der Quelle (entschieden 2026-11-02). So drehen Qt (`QPainter::rotate`) und der Browser (CSS `rotate()`, Leserichtung links nach rechts) von sich aus; keiner der Zeichner rechnet um.
+- Adresse: «ß» wird «ss», «æ» wird «ae», «ø» wird «oe», «ł» wird «l» (entschieden 2026-11-02), zum Beispiel «Straße» → `strasse`. Noch umzusetzen (P04 wandelt diese Zeichen in «-» um).
+- Video: Wiederholen am Ende ist pro Quelle wählbar, Standard «wiederholen» (entschieden 2026-11-02). Noch umzusetzen (P04 speichert nur die Datei).
+- Ton von Videos (entschieden 2026-11-02): Der Studio-PC spielt den Ton über eine Audiokarte des Systems ab; von dort geht er über das externe Mischpult zum Streaming-PC. Alle Quellen des Editors nutzen denselben Audioausgang; dieser soll wählbar sein. Später werden mehrere Audiokarten bespielt (andere Module, zum Beispiel Musikplayer). Folgerung von Claude, nicht bestätigt: Die Browserquelle in OBS spielt Videos stumm ab, sonst käme der Ton doppelt an.
+- Risiko (Einschätzung, nicht gemessen): Bild (über das Netz als Browserquelle) und Ton (über das Mischpult) kommen auf verschiedenen Wegen beim Streaming-PC an und können gegeneinander verschoben sein. Prüfbar erst mit T-04.
 
 - Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json`, die nur der Benutzer lesen kann (Dateirechte 0600).
 - Reihenfolge: zuerst P04 (Overlay-Modell), dann P05 (Fenster-Gerüst ohne Daten).
