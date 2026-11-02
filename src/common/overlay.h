@@ -58,6 +58,7 @@ struct Source
     bool visible = true;
     TextProperties text; // nur bei SourceKind::Text
     QString file;        // nur bei Image und Video: Verweis "media/<sha256>.<endung>"
+    bool loop = false;   // nur bei Video: am Ende wieder von vorne, Standard nicht wiederholen
 
     bool operator==(const Source &) const = default;
 };

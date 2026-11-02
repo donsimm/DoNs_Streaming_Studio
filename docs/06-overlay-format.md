@@ -23,7 +23,7 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
-| `format_version` | ganze Zahl | genau `1` | Version des Formats. Eine höhere Zahl wird abgewiesen, nicht geraten. |
+| `format_version` | ganze Zahl | genau `1` | Version des Formats. Eine höhere Zahl wird abgewiesen, nicht geraten. Das Feld `video.loop` kam in P05 dazu, ohne neue Version: Auf dem Studio-PC gab es noch keine echten Overlay-Dateien (geprüft 2026-11-02, Bericht P05). |
 | `id` | Text | UUID, Kleinbuchstaben, ohne Klammern | Kennung, ändert sich nie. Bestimmt den Dateinamen. |
 | `name` | Text | nicht leer (nicht nur Leerzeichen) | frei wählbarer Name |
 | `address` | Text | `a-z`, `0-9`, einzelne `-` dazwischen | Adresse für die Browserquelle, siehe «Adresse» |
@@ -46,7 +46,7 @@ Gemeinsame Felder aller Arten:
 | `visible` | true/false | | eingeblendet |
 | `text` / `image` / `video` | Objekt | genau das zur Art passende | Eigenschaften der Art |
 
-Nicht festgelegt und daher von P04 nicht beschrieben: die Drehrichtung (im Uhrzeigersinn oder dagegen), siehe Bericht P04, `[OFFEN]`.
+Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn um die Mitte der Quelle (entschieden 2026-11-02, `docs/01-festlegungen.md`). Das Format speichert nur den Winkel.
 
 ### Art `text` (TX-01 bis TX-05)
 
@@ -71,8 +71,9 @@ Nicht festgelegt und daher von P04 nicht beschrieben: die Drehrichtung (im Uhrze
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
 | `file` | Text | Verweis `media/<SHA-256>.<Endung>` | Videodatei, auch WebM (VP9) mit Alpha |
+| `loop` | true/false | | am Ende wieder von vorne; beim Hinzufügen `false` (nicht wiederholen) |
 
-Wiederholen, Ton und weitere Eigenschaften von Videos sind nicht entschieden (Bericht P04, `[OFFEN]`).
+`loop` gibt es nur bei `video`; bei `image` ist es ein unbekanntes Feld. Zum Ton speichert das Format nichts: Der Studio-PC spielt ihn über eine Audiokarte ab, die Browserquelle ist immer stumm (`docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»). Start und Stopp von Videos sind nicht entschieden.
 
 ## Regeln beim Lesen
 
@@ -138,7 +139,8 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "rotation": 0,
             "visible": false,
             "video": {
-                "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm"
+                "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm",
+                "loop": false
             }
         },
         {

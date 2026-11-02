@@ -46,6 +46,8 @@ QJsonObject sourceToJson(const Source &source)
     case SourceKind::Video: {
         QJsonObject f;
         f.insert(QStringLiteral("file"), source.file);
+        if (source.kind == SourceKind::Video)
+            f.insert(QStringLiteral("loop"), source.loop);
         o.insert(sourceKindName(source.kind), f);
         break;
     }
@@ -217,6 +219,12 @@ bool sourceFromJson(const QJsonObject &object, const QString &path, Source *sour
                    QStringLiteral("unbekannt «%1», erlaubt sind left, center, right").arg(align));
         if (p.ok())
             p.check(QString(), validateTextProperties(t));
+    } else if (source->kind == SourceKind::Video) {
+        p.allowOnly({QStringLiteral("file"), QStringLiteral("loop")});
+        source->file = p.string(QStringLiteral("file"));
+        source->loop = p.boolean(QStringLiteral("loop"));
+        if (p.ok())
+            p.check(QStringLiteral("file"), validateMediaReference(source->file));
     } else {
         p.allowOnly({QStringLiteral("file")});
         source->file = p.string(QStringLiteral("file"));

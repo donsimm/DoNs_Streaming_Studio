@@ -391,7 +391,7 @@ QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QSt
 }
 
 QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                                   QString *error)
+                                   bool loop, QString *error)
 {
     if (!overlay(overlayId)) {
         *error = unknownOverlay(overlayId);
@@ -405,17 +405,19 @@ QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePa
     source.kind = kind;
     source.name = QFileInfo(filePath).fileName(); // ursprünglicher Dateiname als Vorschlag
     source.file = reference;
+    source.loop = loop;
     return addPreparedSource(overlayId, source, error);
 }
 
 QUuid OverlayStore::addImageSource(const QUuid &overlayId, const QString &filePath, QString *error)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Image, error);
+    return addMediaSource(overlayId, filePath, SourceKind::Image, false, error);
 }
 
-QUuid OverlayStore::addVideoSource(const QUuid &overlayId, const QString &filePath, QString *error)
+QUuid OverlayStore::addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
+                                   QString *error)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Video, error);
+    return addMediaSource(overlayId, filePath, SourceKind::Video, loop, error);
 }
 
 QUuid OverlayStore::addTextSource(const QUuid &overlayId, const QString &content,

@@ -78,7 +78,9 @@ public:
     // Quellen (E-07). Neue Quellen liegen zuoberst, an Lage 0/0 in der Grösse des Overlays.
     // Name: ursprünglicher Dateiname bzw. «Text: <erste Zeile>».
     QUuid addImageSource(const QUuid &overlayId, const QString &filePath, QString *error);
-    QUuid addVideoSource(const QUuid &overlayId, const QString &filePath, QString *error);
+    // loop: am Ende wiederholen (Standard im Modell: nicht wiederholen)
+    QUuid addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
+                         QString *error);
     QUuid addTextSource(const QUuid &overlayId, const QString &content,
                         const QString &fontFilePath, QString *error);
     bool removeSource(const QUuid &overlayId, const QUuid &sourceId, QString *error);
@@ -100,7 +102,7 @@ private:
     bool modify(const QUuid &overlayId, const std::function<QString(Overlay *)> &change,
                 QString *error);
     QUuid addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                         QString *error);
+                         bool loop, QString *error);
     QUuid addPreparedSource(const QUuid &overlayId, Source source, QString *error);
     void insertSorted(const Overlay &overlay);
     int indexOf(const QUuid &overlayId) const;

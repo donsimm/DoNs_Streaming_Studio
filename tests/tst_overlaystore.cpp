@@ -127,9 +127,9 @@ private slots:
         QVERIFY(!id.isNull());
         const QUuid image = store->addImageSource(id, kImage, &error);
         QVERIFY2(!image.isNull(), qPrintable(error));
-        const QUuid video = store->addVideoSource(id, kVideo, &error);
+        const QUuid video = store->addVideoSource(id, kVideo, false, &error);
         QVERIFY2(!video.isNull(), qPrintable(error));
-        const QUuid alpha = store->addVideoSource(id, kAlphaVideo, &error);
+        const QUuid alpha = store->addVideoSource(id, kAlphaVideo, true, &error);
         QVERIFY2(!alpha.isNull(), qPrintable(error));
         const QUuid text = store->addTextSource(id, QStringLiteral("Willkommen\nZweite Zeile"), kFont, &error);
         QVERIFY2(!text.isNull(), qPrintable(error));
@@ -148,6 +148,8 @@ private slots:
         QCOMPARE(saved.sources[1].name, QStringLiteral("bild1.png")); // ursprünglicher Dateiname
         QCOMPARE(saved.sources[2].name, QStringLiteral("Text: Willkommen"));
         QCOMPARE(saved.sources[2].text.content, QStringLiteral("Willkommen\nZweite Zeile"));
+        QCOMPARE(saved.sources[0].loop, false);
+        QCOMPARE(saved.sources[3].loop, true);
 
         auto reloaded = openStore();
         QCOMPARE(reloaded->loadErrors(), QStringList());
@@ -320,7 +322,7 @@ private slots:
         // Falsche Art der Datei (Endung), fehlende Datei, unbekanntes Overlay
         QVERIFY(store->addImageSource(id, kFont, &error).isNull());
         QVERIFY(error.contains(QStringLiteral("Endung")));
-        QVERIFY(store->addVideoSource(id, kImage, &error).isNull());
+        QVERIFY(store->addVideoSource(id, kImage, false, &error).isNull());
         QVERIFY(store->addTextSource(id, QStringLiteral("x"), kImage, &error).isNull());
         QVERIFY(store->addImageSource(id, dataDir() + QStringLiteral("/fehlt.png"), &error).isNull());
         QVERIFY(store->addImageSource(QUuid::createUuid(), kImage, &error).isNull());
@@ -501,6 +503,7 @@ private slots:
         QCOMPARE(o->sources[0].rotation, 125);
         QCOMPARE(o->sources[1].kind, SourceKind::Video);
         QCOMPARE(o->sources[1].visible, false);
+        QCOMPARE(o->sources[1].loop, false);
         QCOMPARE(o->sources[2].kind, SourceKind::Text);
         QCOMPARE(o->sources[2].text.content, QStringLiteral("Willkommen\nZweite Zeile"));
         QCOMPARE(o->sources[2].text.align, TextAlign::Center);

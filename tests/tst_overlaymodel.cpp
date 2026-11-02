@@ -40,6 +40,7 @@ Source makeVideo()
     s.name = QStringLiteral("alpha.webm");
     s.visible = false;
     s.file = kMediaWebm;
+    s.loop = true;
     return s;
 }
 
@@ -94,18 +95,26 @@ void setInSource(QJsonObject &o, int index, const QString &key, const QJsonValue
     o.insert(QStringLiteral("sources"), sources);
 }
 
-void setInText(QJsonObject &o, const QString &key, const QJsonValue &value)
+// Setzt einen Wert im Eigenschaftsobjekt einer Quelle ("text", "image", "video");
+// Undefined entfernt das Feld.
+void setInKind(QJsonObject &o, int index, const QString &kindKey, const QString &key,
+               const QJsonValue &value)
 {
     QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
-    QJsonObject s = sources.at(2).toObject();
-    QJsonObject t = s.value(QStringLiteral("text")).toObject();
+    QJsonObject s = sources.at(index).toObject();
+    QJsonObject t = s.value(kindKey).toObject();
     if (value.isUndefined())
         t.remove(key);
     else
         t.insert(key, value);
-    s.insert(QStringLiteral("text"), t);
-    sources[2] = s;
+    s.insert(kindKey, t);
+    sources[index] = s;
     o.insert(QStringLiteral("sources"), sources);
+}
+
+void setInText(QJsonObject &o, const QString &key, const QJsonValue &value)
+{
+    setInKind(o, 2, QStringLiteral("text"), key, value);
 }
 
 } // namespace
@@ -201,6 +210,8 @@ private slots:
         QTest::newRow("Quellname leer") << 16 << QStringLiteral("Name der Quelle");
         QTest::newRow("Kennung doppelt") << 17 << QStringLiteral("mehrfach");
         QTest::newRow("Schriftdatei fehlt") << 18 << QStringLiteral("Schriftdatei");
+        QTest::newRow("Wiederholen bei Bild") << 19 << QStringLiteral("nur bei Quellen der Art Video");
+        QTest::newRow("Wiederholen bei Text") << 20 << QStringLiteral("nur bei Quellen der Art Video");
     }
 
     void invalidValuesRejected()
@@ -227,6 +238,8 @@ private slots:
         case 16: o.sources[1].name.clear(); break;
         case 17: o.sources[1].id = o.sources[0].id; break;
         case 18: o.sources[2].text.fontFile.clear(); break;
+        case 19: o.sources[0].loop = true; break;
+        case 20: o.sources[2].loop = true; break;
         }
         const QString error = validateOverlay(o);
         QVERIFY2(error.contains(expectedPart), qPrintable(error));
@@ -293,6 +306,7 @@ private slots:
         QString error;
         QVERIFY2(parseOverlay(serializeOverlay(original), &loaded, &error), qPrintable(error));
         QCOMPARE(loaded, original);
+        QCOMPARE(loaded.sources[1].loop, true);
         QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 1);
     }
 
@@ -316,6 +330,9 @@ private slots:
         QTest::newRow("Text statt Zahl") << 14 << QStringLiteral("«height»");
         QTest::newRow("Kennung mit Klammern") << 15 << QStringLiteral("«id»");
         QTest::newRow("Zahl zu gross") << 16 << QStringLiteral("sources[0].y");
+        QTest::newRow("Wiederholen fehlt") << 17 << QStringLiteral("«sources[1].video.loop»: fehlt");
+        QTest::newRow("Wiederholen kein bool") << 18 << QStringLiteral("«sources[1].video.loop»: muss true oder false");
+        QTest::newRow("Wiederholen bei Bild") << 19 << QStringLiteral("«sources[0].image.loop»: unbekanntes Feld");
     }
 
     void jsonRejected()
@@ -348,6 +365,9 @@ private slots:
             case 14: o.insert(QStringLiteral("height"), QStringLiteral("1080")); break;
             case 15: o.insert(QStringLiteral("id"), QUuid::createUuid().toString()); break;
             case 16: setInSource(o, 0, QStringLiteral("y"), 3e9); break;
+            case 17: setInKind(o, 1, QStringLiteral("video"), QStringLiteral("loop"), QJsonValue::Undefined); break;
+            case 18: setInKind(o, 1, QStringLiteral("video"), QStringLiteral("loop"), QStringLiteral("ja")); break;
+            case 19: setInKind(o, 0, QStringLiteral("image"), QStringLiteral("loop"), false); break;
             }
         });
         QVERIFY2(error.contains(expectedPart), qPrintable(error));

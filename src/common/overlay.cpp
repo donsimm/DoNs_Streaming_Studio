@@ -135,6 +135,9 @@ QString validateSource(const Source &source)
     if (const QString e = validateSourceGeometry(source.width, source.height, source.rotation);
         !e.isEmpty())
         return e;
+    // Wiederholen wird nur bei Video gespeichert; anderswo ginge der Wert beim Speichern verloren.
+    if (source.loop && source.kind != SourceKind::Video)
+        return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
     switch (source.kind) {
     case SourceKind::Text:
         return validateTextProperties(source.text);

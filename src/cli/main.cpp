@@ -40,10 +40,11 @@ const char *const kUsage =
     "  overlay-loeschen ADRESSE\n"
     "  quelle-liste ADRESSE\n"
     "  quelle-bild ADRESSE DATEI\n"
-    "  quelle-video ADRESSE DATEI\n"
+    "  quelle-video ADRESSE DATEI [--wiederholen]\n"
     "  quelle-text ADRESSE TEXT SCHRIFTDATEI\n"
     "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG\n"
     "\n"
+    "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "NR: Nummer der Quelle aus quelle-liste (1 = ganz hinten).\n"
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/dons-streaming-studio).\n"
@@ -53,6 +54,7 @@ struct Arguments
 {
     QString dataDir;
     bool changeAddress = false;
+    bool loop = false;
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -70,6 +72,8 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->dataDir = args.at(++i);
         } else if (a == QLatin1String("--adresse-mitaendern")) {
             result->changeAddress = true;
+        } else if (a == QLatin1String("--wiederholen")) {
+            result->loop = true;
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -143,6 +147,8 @@ public:
         const QStringList a = m_args.positional.mid(1);
         if (command != QLatin1String("overlay-umbenennen") && m_args.changeAddress)
             return usage(QStringLiteral("--adresse-mitaendern gilt nur für overlay-umbenennen."));
+        if (command != QLatin1String("quelle-video") && m_args.loop)
+            return usage(QStringLiteral("--wiederholen gilt nur für quelle-video."));
 
         struct Command
         {
@@ -291,12 +297,14 @@ private:
                                     QStringLiteral("Sichtbar"), QStringLiteral("X"),
                                     QStringLiteral("Y"), QStringLiteral("Breite"),
                                     QStringLiteral("Höhe"), QStringLiteral("Drehung"),
-                                    QStringLiteral("Name")}};
+                                    QStringLiteral("Wiederholen"), QStringLiteral("Name")}};
         for (qsizetype i = 0; i < o->sources.size(); ++i) {
             const dss::Source &s = o->sources.at(i);
             rows.append({QString::number(i + 1), dss::sourceKindName(s.kind), yesNo(s.visible),
                          QString::number(s.x), QString::number(s.y), QString::number(s.width),
-                         QString::number(s.height), dss::rotationDisplay(s.rotation), s.name});
+                         QString::number(s.height), dss::rotationDisplay(s.rotation),
+                         s.kind == dss::SourceKind::Video ? yesNo(s.loop) : QStringLiteral("–"),
+                         s.name});
         }
         printTable(rows);
         return kExitOk;
@@ -308,8 +316,11 @@ private:
         const int index = dss::sourceIndex(*o, sourceId);
         const dss::Source &s = o->sources.at(index);
         const QString file = s.kind == dss::SourceKind::Text ? s.text.fontFile : s.file;
-        out() << QStringLiteral("Quelle %1 «%2» (%3) hinzugefügt, Datei %4\n")
+        out() << QStringLiteral("Quelle %1 «%2» (%3) hinzugefügt, Datei %4")
                      .arg(index + 1).arg(s.name, dss::sourceKindName(s.kind), file);
+        if (s.kind == dss::SourceKind::Video)
+            out() << QStringLiteral(", Wiederholen %1").arg(yesNo(s.loop));
+        out() << '\n';
         return kExitOk;
     }
 
@@ -322,7 +333,7 @@ private:
         const QUuid overlayId = o->id;
         const QUuid sourceId = kind == dss::SourceKind::Image
                                    ? m_store->addImageSource(overlayId, a.at(1), &error)
-                                   : m_store->addVideoSource(overlayId, a.at(1), &error);
+                                   : m_store->addVideoSource(overlayId, a.at(1), m_args.loop, &error);
         if (sourceId.isNull())
             return fail(error);
         return printAdded(overlayId, sourceId);
