@@ -43,7 +43,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 
 ## Nächste Schritte
 
-1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. Als Nächstes P05: Fenster-Gerüst wie `docs/bilder/oberflaeche.png`, noch ohne Daten.
+1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. Als Nächstes P05 (`prompts/P05-fenster-geruest.md`, geschrieben 2026-11-02): Nachträge zum Modell (ss in der Adresse, Video wiederholen) und Fenster-Gerüst wie `docs/bilder/oberflaeche.png`, noch ohne Daten.
 2. Weitere Bau-Prompts, je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
