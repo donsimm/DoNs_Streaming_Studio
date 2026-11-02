@@ -3,6 +3,8 @@ add_library(dss_common STATIC
   version.h version.cpp
   logging.h logging.cpp
   unixsignals.h unixsignals.cpp
+  overlay.h overlay.cpp
+  address.h address.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}")
