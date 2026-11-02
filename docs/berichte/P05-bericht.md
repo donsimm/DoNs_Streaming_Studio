@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Xfce/xfwm4 unter X11, `DISPLAY=:0.0`, `XDG_SESSION_TYPE=x11`). Kein Xvfb, keine offscreen-Plattform von Qt.
 
-Abnahme Punkt 5 (Handtest durch den Nutzer): ausstehend, Schritte im Abschnitt «Handtest».
+Abnahme Punkt 5 (Handtest durch den Nutzer): erledigt am 2026-11-02, alle 5 Schritte in Ordnung (Rückmeldung des Nutzers im Chat).
 
 ## Kurzfassung
 
@@ -12,7 +12,7 @@ Abnahme Punkt 5 (Handtest durch den Nutzer): ausstehend, Schritte im Abschnitt �
 | 2. `ctest --test-dir build` | 7 von 7 bestanden (neu: `tst_canvasview` 21 Fälle, `bildschirmfoto`; `tst_overlaymodel` jetzt 64 Fälle) |
 | 3. Startprüfung `scripts/startpruefung.py --runs 20` | 20/20 sauber in allen drei Fällen (Lauf 16:07). Ein früherer Lauf ergab für `dss-app` 15/20, Ursache: gesperrte Sitzung (Abschnitt «Startprüfung») |
 | 4. Bildschirmfoto im Bericht, Abweichungen aufgelistet | ja: `docs/berichte/P05-bilder/fenster-1280x800.png`, Abweichungen im Abschnitt «Vergleich mit dem Bild des Nutzers» |
-| 5. Handtest durch den Nutzer | ausstehend |
+| 5. Handtest durch den Nutzer | ja: alle 5 Schritte in Ordnung (2026-11-02) |
 
 Teil A, Punkt 3 (Format): Auf dem Studio-PC gibt es keine echten Overlay-Dateien, `format_version` bleibt `1`:
 
@@ -307,12 +307,11 @@ Grund (Regel 10): Aussehen und Bedienung mit Maus kann Claude Code nicht selbst 
 
 ## Nicht erledigt
 
-- Handtest durch den Nutzer (Abnahme 5).
 - **[OFFEN]** Schrift des Fensters (Abweichung 1, Punkt 29).
 - **[OFFEN]** Bedeutung des grauen YouTube-Symbols auf dem Bild; Farbe je Verbindungszustand ist eine Annahme (Punkt 27).
 - **[OFFEN]** Pfeile der Zahlenfelder (Punkt 30).
 - **[OFFEN]** Bildschirmschoner und `light-locker` stören Fenstertests nach 10 Minuten ohne Eingabe (Punkt 26).
-- Nicht geprüft: Speichern der Dock-Anordnung nach Schliessen oder Lösen eines Docks (nur Handtest, Schritt 5); Schliessen über den Schliessknopf des Fenstermanagers und über «Datei → Beenden» (Handtest, Schritt 4).
+- Speichern der Dock-Anordnung nach Schliessen oder Lösen eines Docks und Beenden über «Datei → Beenden»: nur im Handtest geprüft, in Ordnung.
 - Nicht geprüft: ob die Symbole auch als PNG unter dem Namen `….svg` laden.
 - Ändern von «Wiederholen» bei einer bestehenden Video-Quelle (Punkt 31).
 - Nicht Teil des Auftrags: Verbindung Fenster–Kern, echte Werte, Overlays und Quellen in den Docks, Zeichnen von Quellen, Rückfrage beim Umbenennen, Ton, Browserquelle, Webserver, helles Design, Einrasten, Raster, Hilfslinien.

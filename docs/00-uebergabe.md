@@ -4,7 +4,7 @@ Stand: 2026-11-02. Diese Datei zuerst lesen, danach `CLAUDE.md` und die Dokument
 
 ## Kurzfassung
 
-Private Overlay-Software für den Twitch-Stream des Nutzers. Pro Overlay eine Leinwand, Ausgabe hauptsächlich als Browserquelle in OBS, später per NDI (höchstens 2 Ausgänge). Module: Editor (Hauptfokus) und Chat-Bot zuerst, später Live-Modul, Zuschauer-Minispiele, Musikplayer. Programmiert wird sie von Claude Code direkt auf dem Studio-PC. Seit P03 (2026-11-02) gibt es das Projektgerüst: Kern `dss-core`, Fenster `dss-app`, Bibliothek `dss_common`, Einrichtungsskript, Tests. Bericht: `docs/berichte/P03-bericht.md`. Seit P04 (2026-11-02) gibt es das Overlay-Modell mit Speichern und Laden, Token-Datei und das Werkzeug `dss-cli`; Format: `docs/06-overlay-format.md`, Bericht: `docs/berichte/P04-bericht.md` (abgenommen, einschliesslich Handtest). Seit P05 (2026-11-02) gelten die Nachträge zum Modell (ss in der Adresse, Video wiederholen), und das Fenster `dss-app` hat das Gerüst nach dem Bild, noch ohne Daten; Bericht: `docs/berichte/P05-bericht.md` (Handtest des Nutzers ausstehend).
+Private Overlay-Software für den Twitch-Stream des Nutzers. Pro Overlay eine Leinwand, Ausgabe hauptsächlich als Browserquelle in OBS, später per NDI (höchstens 2 Ausgänge). Module: Editor (Hauptfokus) und Chat-Bot zuerst, später Live-Modul, Zuschauer-Minispiele, Musikplayer. Programmiert wird sie von Claude Code direkt auf dem Studio-PC. Seit P03 (2026-11-02) gibt es das Projektgerüst: Kern `dss-core`, Fenster `dss-app`, Bibliothek `dss_common`, Einrichtungsskript, Tests. Bericht: `docs/berichte/P03-bericht.md`. Seit P04 (2026-11-02) gibt es das Overlay-Modell mit Speichern und Laden, Token-Datei und das Werkzeug `dss-cli`; Format: `docs/06-overlay-format.md`, Bericht: `docs/berichte/P04-bericht.md` (abgenommen, einschliesslich Handtest). Seit P05 (2026-11-02) gelten die Nachträge zum Modell (ss in der Adresse, Video wiederholen), und das Fenster `dss-app` hat das Gerüst nach dem Bild, noch ohne Daten; Bericht: `docs/berichte/P05-bericht.md` (abgenommen, einschliesslich Handtest).
 
 ## Entschieden (vom Nutzer bestätigt, 2026-11-02)
 
@@ -43,7 +43,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 
 ## Nächste Schritte
 
-1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P05 (`prompts/P05-fenster-geruest.md`) ausgeführt (2026-11-02): Nachträge zum Modell und Fenster-Gerüst; Abnahme wartet auf den Handtest des Nutzers.
+1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P05 (`prompts/P05-fenster-geruest.md`) ausgeführt (2026-11-02): Nachträge zum Modell und Fenster-Gerüst; abgenommen, einschliesslich Handtest.
 2. Weitere Bau-Prompts, je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
