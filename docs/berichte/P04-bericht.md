@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Xfce/xfwm4 unter X11, `DISPLAY=:0.0`, `XDG_SESSION_TYPE=x11`, umask `0002`).
 
-Abnahme Punkt 5 (Handtest durch den Nutzer): **ausstehend**, Befehle im Abschnitt «Handtest».
+Abnahme Punkt 5 (Handtest durch den Nutzer): erledigt am 2026-11-02 um 15:25, alle Ausgaben wie erwartet (Abschnitt «Ergebnis des Handtests»).
 
 ## Kurzfassung
 
@@ -12,7 +12,7 @@ Abnahme Punkt 5 (Handtest durch den Nutzer): **ausstehend**, Befehle im Abschnit
 | 2. `ctest --test-dir build` | 5 von 5 bestanden (`tst_version`, `tst_unixsignals`, `tst_overlaymodel` 54 Fälle, `media_vorbereiten`, `tst_overlaystore` 18 Fälle) |
 | 3. Startprüfung `scripts/startpruefung.py --runs 20` | 20/20 sauber in allen drei Fällen (60 Starts) |
 | 4. `docs/06-overlay-format.md` vollständig, Beispiel lädt (Test) | ja: Test `tst_overlaystore::formatDocExample` liest das Beispiel aus der Datei und lädt es ohne Fehler und ohne Warnung |
-| 5. Handtest durch den Nutzer | ausstehend |
+| 5. Handtest durch den Nutzer | ja: Schritte 1 bis 18, alle Ausgaben wie erwartet |
 
 ## Aufbau
 
@@ -263,25 +263,28 @@ Erwartete Ausgabe von Schritt 16 (Kennungen sind bei jedem Lauf anders; Felder a
 
 Die SHA-256-Werte hängen vom Inhalt der Dateien ab; `bild1.png` wird von `media_erzeugen.sh` erzeugt und kann sich bei einer Neuerzeugung ändern.
 
+## Ergebnis des Handtests
+
+Durch den Nutzer am 2026-11-02 im Terminal der Xfce-Sitzung (Ausgaben im Chat übermittelt). Schritte 1 bis 5 einzeln, Schritte 6 bis 18 in einem Befehl (Schleife über dieselben Befehle, danach `cat`, `ls -l`, `rm -r`). Alle Ausgaben stimmen mit der Tabelle oben überein: Adresse `ueberblick-start`, Umbenennen ohne und mit neuer Adresse, Kopie `pause-kopie`, Löschen, Drehung 360 abgewiesen (Exit-Code 1), Overlay-Datei mit `"rotation": 125`, `"x": -100` und ohne Token, `tokens.json` mit `-rw-------`, zwei Dateien in `media/`. Kennungen: Overlay `c6067ec6-c804-4d28-a06b-b58d826e42fa` (bei jedem Lauf anders).
+
 ## Geänderte und neue Dateien
 
-| Datei | Art | Commit |
+| Datei | Art | Commit (Nummern nach `git pull --rebase` beim Push) |
 |---|---|---|
-| `src/common/overlay.h/.cpp`, `src/common/address.h/.cpp` | neu | 3cca7de |
-| `src/common/CMakeLists.txt` | Dateien ergänzt | 3cca7de, 00a9744, 57eebd8 |
-| `src/common/overlayjson.h/.cpp`, `src/common/overlaystore.h/.cpp` | neu | 00a9744 |
-| `src/common/tokenstore.h/.cpp`; `overlaystore.h/.cpp` angepasst | neu / geändert | 57eebd8 |
-| `src/cli/main.cpp`, `src/cli/CMakeLists.txt`; `CMakeLists.txt` (Schalter `DSS_BUILD_CLI`) | neu / geändert | f8f6bc3 |
-| `tests/tst_overlaymodel.cpp`, `tests/tst_overlaystore.cpp`, `tests/CMakeLists.txt` | neu / geändert | ff1ef86 |
-| `docs/06-overlay-format.md`; Test `formatDocExample` | neu / geändert | 1634d11 |
-| `docs/berichte/P04-bericht.md`, `docs/berichte/P04-daten/…` | neu | Bericht-Commit |
-| `README.md` (Status, `dss-cli`, Schalter, `docs/06`), `docs/00-uebergabe.md` (Stand P04), `docs/04-offene-punkte.md` (Punkte 17 bis 25), `docs/05-quellen.md` (Qt-Quellen) | geändert | Bericht-Commit |
+| `src/common/overlay.h/.cpp`, `src/common/address.h/.cpp` | neu | f1b8403 |
+| `src/common/CMakeLists.txt` | Dateien ergänzt | f1b8403, f551180, 0c1b557 |
+| `src/common/overlayjson.h/.cpp`, `src/common/overlaystore.h/.cpp` | neu | f551180 |
+| `src/common/tokenstore.h/.cpp`; `overlaystore.h/.cpp` angepasst | neu / geändert | 0c1b557 |
+| `src/cli/main.cpp`, `src/cli/CMakeLists.txt`; `CMakeLists.txt` (Schalter `DSS_BUILD_CLI`) | neu / geändert | ebc4516 |
+| `tests/tst_overlaymodel.cpp`, `tests/tst_overlaystore.cpp`, `tests/CMakeLists.txt` | neu / geändert | 6f02ceb |
+| `docs/06-overlay-format.md`; Test `formatDocExample` | neu / geändert | f9a5f5f |
+| `docs/berichte/P04-bericht.md`, `docs/berichte/P04-daten/…` | neu | 4aa4723 |
+| `README.md` (Status, `dss-cli`, Schalter, `docs/06`), `docs/00-uebergabe.md` (Stand P04), `docs/04-offene-punkte.md` (Punkte 17 bis 25), `docs/05-quellen.md` (Qt-Quellen) | geändert | 4aa4723 |
 
 `prototypes/`, `src/core/`, `src/app/` und `scripts/` sind unverändert.
 
 ## Nicht erledigt
 
-- **[OFFEN]** Handtest durch den Nutzer (Abnahme 5).
 - **[OFFEN]** Eigenschaften der Quelle Video (Wiederholen, Ton) sind nicht entschieden; `video` hat nur `file` (Auftrag; `docs/04-offene-punkte.md` Punkt 17).
 - **[OFFEN]** Drehrichtung ist nicht festgelegt (Punkt 18). Das Format speichert nur den Winkel; beide Zeichner müssen dieselbe Richtung verwenden.
 - **[OFFEN]** `ß` wird nach der Regel wörtlich zu `-` («Straße» → `stra-e`), ebenso Buchstaben ohne Unicode-Zerlegung (`ł`, `æ`, `ø`). Ob `ß` → `ss` gewünscht ist, entscheidet der Nutzer (Punkt 19).
