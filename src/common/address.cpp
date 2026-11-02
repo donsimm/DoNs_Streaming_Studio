@@ -9,6 +9,12 @@ QString addressFromName(const QString &name)
     text.replace(QChar(0x00E4), QLatin1String("ae")); // ä
     text.replace(QChar(0x00F6), QLatin1String("oe")); // ö
     text.replace(QChar(0x00FC), QLatin1String("ue")); // ü
+    // Buchstaben ohne Unicode-Zerlegung (Entscheid nach P04). Grossbuchstaben sind durch
+    // toLower() schon klein; «ẞ» (U+1E9E) wird dabei zu «ß».
+    text.replace(QChar(0x00DF), QLatin1String("ss")); // ß
+    text.replace(QChar(0x00E6), QLatin1String("ae")); // æ
+    text.replace(QChar(0x00F8), QLatin1String("oe")); // ø
+    text.replace(QChar(0x0142), QLatin1String("l"));  // ł
 
     // Übrige Akzente: zerlegen (NFD) und die Akzentzeichen (Kategorie Mn) weglassen.
     // https://doc.qt.io/qt-6.8/qstring.html#normalized

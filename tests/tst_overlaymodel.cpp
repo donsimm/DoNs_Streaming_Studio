@@ -131,8 +131,13 @@ private slots:
         QTest::newRow("nur Sonderzeichen") << QStringLiteral("!!! ???") << QStringLiteral("overlay");
         QTest::newRow("leer") << QString() << QStringLiteral("overlay");
         QTest::newRow("Ziffern") << QStringLiteral("1080p 60") << QStringLiteral("1080p-60");
-        // Nach der Regel wörtlich: ß ist kein Akzent und wird zu «-» (siehe Bericht P04, [OFFEN])
-        QTest::newRow("Eszett") << QStringLiteral("Straße") << QStringLiteral("stra-e");
+        // ß/æ/ø/ł haben keine Unicode-Zerlegung, eigene Regel (entschieden nach P04)
+        QTest::newRow("Eszett") << QStringLiteral("Straße") << QStringLiteral("strasse");
+        QTest::newRow("Eszett gross") << QStringLiteral("STRAẞE") << QStringLiteral("strasse");
+        QTest::newRow("ae") << QStringLiteral("Æble æble") << QStringLiteral("aeble-aeble");
+        QTest::newRow("oe") << QStringLiteral("Øl øl") << QStringLiteral("oel-oel");
+        QTest::newRow("l") << QStringLiteral("Łódź łąka") << QStringLiteral("lodz-laka");
+        QTest::newRow("gemischt") << QStringLiteral("Grüße aus Køge") << QStringLiteral("gruesse-aus-koege");
         QTest::newRow("Emoji") << QStringLiteral("Live 🎮 Start") << QStringLiteral("live-start");
     }
 

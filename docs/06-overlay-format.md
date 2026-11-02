@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-02 (P04). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-02 (P04, Nachträge P05). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -89,12 +89,13 @@ Die Adresse wird beim Anlegen aus dem Namen gebildet:
 
 1. Kleinbuchstaben.
 2. `ä` → `ae`, `ö` → `oe`, `ü` → `ue` (auch wenn der Umlaut als Buchstabe mit Akzentzeichen eingegeben ist).
-3. Andere Akzente fallen weg (`é` → `e`, `ñ` → `n`): Zerlegung nach Unicode NFD, Akzentzeichen (Kategorie Mn) werden entfernt.
-4. Jedes andere Zeichen ausser `a-z` und `0-9` wird `-`; mehrere `-` hintereinander werden eines; `-` am Anfang und am Ende fällt weg. Auch `ß` wird nach dieser Regel zu `-` (Bericht P04, `[OFFEN]`).
-5. Leeres Ergebnis → `overlay`.
-6. Ist die Adresse vergeben, wird `-2`, `-3` usw. angehängt.
+3. `ß` → `ss`, `æ` → `ae`, `ø` → `oe`, `ł` → `l`, gross wie klein (diese Buchstaben haben keine Unicode-Zerlegung; entschieden nach P04, umgesetzt in P05).
+4. Andere Akzente fallen weg (`é` → `e`, `ñ` → `n`): Zerlegung nach Unicode NFD, Akzentzeichen (Kategorie Mn) werden entfernt.
+5. Jedes andere Zeichen ausser `a-z` und `0-9` wird `-`; mehrere `-` hintereinander werden eines; `-` am Anfang und am Ende fällt weg.
+6. Leeres Ergebnis → `overlay`.
+7. Ist die Adresse vergeben, wird `-2`, `-3` usw. angehängt.
 
-Beispiele: «Überblick Start» → `ueberblick-start`, «Café Crème» → `cafe-creme`, «Chat & Alerts #2!» → `chat-alerts-2`, «!!!» → `overlay`, zweites «Überblick Start» → `ueberblick-start-2`.
+Beispiele: «Überblick Start» → `ueberblick-start`, «Café Crème» → `cafe-creme`, «Chat & Alerts #2!» → `chat-alerts-2`, «Straße» → `strasse`, «Grüße aus Køge» → `gruesse-aus-koege`, «!!!» → `overlay`, zweites «Überblick Start» → `ueberblick-start-2`.
 
 Beim Umbenennen bleibt die Adresse gleich, ausser der Aufrufer verlangt ausdrücklich eine neue (dann nach denselben Regeln, die eigene alte Adresse gilt dabei nicht als vergeben). Beim Kopieren heisst die Kopie «<Name> Kopie» und bekommt eine eigene Adresse und einen eigenen Token.
 
