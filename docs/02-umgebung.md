@@ -21,7 +21,7 @@ Stand: 2026-11-02. Alle Werte wurden auf dem Studio-PC gemessen (Ausgaben des Nu
 | Git | 2.47.3 |
 | Claude Code | 2.1.309, aus dem apt-Repository (Kanal «stable») |
 
-Nicht installiert (Stand der Messung): `pip3`, `cmake`, `node`, `ffmpeg`. Sie werden erst installiert, wenn die Technik feststeht.
+Nicht installiert (Stand der ersten Messung): `pip3`, `cmake`, `node`, `ffmpeg`. Seither installiert: `cmake` und `ffmpeg` (P01), die FFmpeg-Entwicklungspakete (P02), siehe unten. `pip3` und `node` sind weiterhin nicht installiert (nicht erneut geprüft).
 
 ## Paketversionen in Debian 13 (Installationskandidaten)
 
@@ -35,6 +35,22 @@ Nicht installiert (Stand der Messung): `pip3`, `cmake`, `node`, `ffmpeg`. Sie we
 | nvidia-settings | 550.163.01-1 (contrib) |
 
 Ob PyQt6 6.9.0 zusammen mit Qt 6.8.2 im Betrieb Probleme macht, ist nicht geprüft.
+
+## Installierte Pakete zum Bauen und Testen
+
+Liste und Einrichtung: `scripts/pakete.txt`, `scripts/einrichten.sh`. Gemessen am 2026-11-02 (P03) mit `LANG=C apt-cache policy <Paket>` und `dpkg-query -W -f='${Package} ${Version}\n' <Paket>`; installierte Version und Kandidat sind jeweils gleich.
+
+| Paket | installiert | Herkunft |
+|---|---|---|
+| build-essential | 12.12 | war schon installiert |
+| cmake | 3.31.6-2 | P01 |
+| qt6-base-dev | 6.8.2+dfsg-9+deb13u2 | P01 (enthält auch Qt Test, `Qt6TestConfig.cmake`) |
+| libavformat-dev | 7:7.1.5-0+deb13u1 | P02 |
+| libavcodec-dev | 7:7.1.5-0+deb13u1 | P02 |
+| libavutil-dev | 7:7.1.5-0+deb13u1 | P02 |
+| libswscale-dev | 7:7.1.5-0+deb13u1 | P02 |
+
+Ebenfalls vorhanden, aber nicht in der Liste: `qt6-base-dev-tools` 6.8.2+dfsg-9+deb13u2 und `libqt6test6` 6.8.2+dfsg-9+deb13u2 (Abhängigkeiten von `qt6-base-dev`), `pkgconf` 1.8.1-4, `x11-utils` 7.7+7 (`xwininfo`, genutzt von der Startprüfung). Nicht weiterverfolgt, aber weiterhin installiert: `qt6-webengine-dev`, `qt6-multimedia-dev`, PyQt6. Nicht installiert: `xdotool`, `wmctrl`, `shellcheck`.
 
 ## Streaming-PC (nicht Teil der Entwicklung)
 
