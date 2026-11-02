@@ -1,4 +1,5 @@
-# Tests mit Qt Test, ausgeführt über ctest. Nur Qt Core und Qt Test, kein Qt Gui.
+# Tests mit Qt Test, ausgeführt über ctest. Nur Qt Core und Qt Test, kein Qt Gui
+# (ausser den Tests des Fensters unter DSS_BUILD_APP).
 # https://doc.qt.io/qt-6.8/qttest-index.html
 function(dss_add_test name)
   qt_add_executable(${name} ${name}.cpp)
@@ -28,6 +29,17 @@ add_test(NAME media_vorbereiten
   COMMAND sh -c "test -f '${DSS_TEST_MEDIA_DIR}/alpha.webm' || sh '${PROJECT_SOURCE_DIR}/prototypes/messung/media_erzeugen.sh' '${DSS_TEST_MEDIA_DIR}'")
 set_tests_properties(media_vorbereiten PROPERTIES FIXTURES_SETUP dss_media)
 set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
+
+# Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
+# Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).
+if(DSS_BUILD_APP)
+  qt_add_executable(tst_fonts tst_fonts.cpp ${PROJECT_SOURCE_DIR}/src/app/fonts.cpp)
+  target_include_directories(tst_fonts PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
+  target_compile_definitions(tst_fonts PRIVATE DSS_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften")
+  target_link_libraries(tst_fonts PRIVATE dss_warnings Qt6::Gui Qt6::Test)
+  add_test(NAME tst_fonts COMMAND tst_fonts)
+  set_tests_properties(tst_fonts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
 
 # Bildschirmfoto des Fensters in der X11-Sitzung (P05). Nur mit dem Fenster (DSS_BUILD_APP).
 # Ohne X11-Sitzung meldet ctest den Test als übersprungen (Exit-Code 77).

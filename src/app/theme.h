@@ -14,6 +14,13 @@
 
 struct Theme
 {
+    // Schrift: Yami.obt nennt 'Open Sans' zuerst; --font_base = 1pt × obsFontScale, Standard
+    // von obsFontScale ist 10 (OBS Studio, frontend/OBSApp.cpp, config_set_default_int(…,
+    // "Appearance", "FontScale", 10)); --font_small = max(7pt, 0.8pt × 10) = 8pt.
+    QString fontFamily;     // Open Sans
+    int fontSize = 10;      // --font_base in Punkt
+    int fontSizeSmall = 8;  // --font_small in Punkt (Titel der Docks)
+
     // Grundfarben
     QColor window;          // --bg_window (--grey7): Fenster, Menüleiste, Statuszeile
     QColor base;            // --bg_base (--grey6): Kopfbereich, Docks, Listen

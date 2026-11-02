@@ -1,5 +1,6 @@
 // dss-app: Fenster nach docs/bilder/oberflaeche.png, in P05 noch ohne Daten.
 
+#include "fonts.h"
 #include "mainwindow.h"
 #include "symbols.h"
 #include "theme.h"
@@ -10,6 +11,7 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFont>
 #include <QPixmap>
 #include <QTextStream>
 
@@ -62,6 +64,11 @@ int main(int argc, char *argv[])
     // https://doc.qt.io/qt-6.8/qstylefactory.html
     QApplication::setStyle(QStringLiteral("Fusion"));
     const Theme theme = darkTheme();
+    // Schrift aus src/app/schriften/, nicht aus einer Installation (Auftrag P06).
+    const QStringList families = loadWindowFonts(fontDir());
+    if (!families.contains(theme.fontFamily))
+        qWarning("Schrift «%s» nicht geladen, Qt wählt einen Ersatz", qPrintable(theme.fontFamily));
+    QApplication::setFont(QFont(theme.fontFamily, theme.fontSize));
     QApplication::setPalette(palette(theme));
     app.setStyleSheet(styleSheet(theme, symbolDir()));
 

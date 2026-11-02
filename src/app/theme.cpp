@@ -10,6 +10,9 @@
 Theme darkTheme()
 {
     Theme t;
+    t.fontFamily = QStringLiteral("Open Sans");
+    t.fontSize = 10;
+    t.fontSizeSmall = 8;
     t.window = QColor(0x1d, 0x1f, 0x26);
     t.base = QColor(0x27, 0x2a, 0x33);
     t.text = QColor(0xff, 0xff, 0xff);
@@ -95,7 +98,8 @@ QString styleSheet(const Theme &t, const QString &symbolDir)
     // Platzhalter @name@ werden durch die Farben ersetzt, @symbols@ durch den Symbolordner.
     QString css = QStringLiteral(R"(
 QWidget { alternate-background-color: @base@; color: @text@;
-          selection-background-color: @primary@; selection-color: @text@; }
+          selection-background-color: @primary@; selection-color: @text@;
+          font-size: @fontSize@pt; font-family: '@fontFamily@', Helvetica, Arial, sans-serif; }
 QWidget:disabled { color: @textDisabled@; }
 
 QDialog, QMainWindow, QMenuBar, QMenu { background-color: @window@; }
@@ -146,7 +150,7 @@ QDockWidget > QWidget { background: @base@; border-bottom-left-radius: 4px;
                            margin-top: 2px; padding: 4px; max-width: 14px; max-height: 14px; }
 #dockButtons QToolButton:hover { border-color: @inputBorderHover@; }
 #dockButtons QToolButton:disabled { background: @window@; }
-QDockWidget { font-weight: bold; color: @text@;
+QDockWidget { font-size: @fontSizeSmall@pt; font-weight: bold; color: @text@;
               titlebar-close-icon: url("@symbols@/dock-schliessen.svg");
               titlebar-normal-icon: url("@symbols@/dock-loesen.svg"); }
 QDockWidget::title { text-align: left; background-color: @dockTitle@; border: 1px solid @border@;
@@ -296,5 +300,8 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
     for (const auto &[name, color] : colors)
         css.replace(QLatin1Char('@') + QLatin1String(name) + QLatin1Char('@'), color.name());
     css.replace(QStringLiteral("@symbols@"), symbolDir);
+    css.replace(QStringLiteral("@fontFamily@"), t.fontFamily);
+    css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
+    css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));
     return css;
 }
