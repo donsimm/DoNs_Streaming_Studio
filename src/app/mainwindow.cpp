@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 
+#include "canvaswidget.h"
 #include "headerbar.h"
 #include "version.h"
 
@@ -48,8 +49,7 @@ void MainWindow::createCentralArea()
     column->addWidget(header);
 
     m_modules = new QStackedWidget(central);
-    auto *overlaysPage = new QWidget(m_modules);
-    m_modules->addWidget(overlaysPage);
+    m_modules->addWidget(new CanvasWidget(m_theme, m_modules));
 
     auto *chatBotPage = new QWidget(m_modules);
     chatBotPage->setObjectName(QStringLiteral("chatBotPage"));
