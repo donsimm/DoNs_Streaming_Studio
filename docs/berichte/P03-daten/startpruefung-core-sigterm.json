@@ -1,0 +1,379 @@
+{
+ "summary": {
+  "case": "core-sigterm",
+  "started": "2026-11-02 13:38:08 +0100",
+  "command": "/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core",
+  "signal": "SIGTERM",
+  "display": ":0.0",
+  "runs": 20,
+  "clean": 20,
+  "start_ms_min": 3.6,
+  "start_ms_median": 5.3,
+  "start_ms_max": 5.9,
+  "exit_ms_min": 0.7,
+  "exit_ms_median": 0.9,
+  "exit_ms_max": 0.9
+ },
+ "runs": [
+  {
+   "run": 1,
+   "exit_code": 0,
+   "start_ms": 3.9,
+   "exit_ms": 0.7,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:08.440 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:09.441 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:09.441 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 2,
+   "exit_code": 0,
+   "start_ms": 5.3,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:09.952 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:10.953 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:10.953 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 3,
+   "exit_code": 0,
+   "start_ms": 3.6,
+   "exit_ms": 0.8,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:11.465 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:12.465 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:12.466 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 4,
+   "exit_code": 0,
+   "start_ms": 5.3,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:12.977 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:13.978 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:13.978 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 5,
+   "exit_code": 0,
+   "start_ms": 4.9,
+   "exit_ms": 0.7,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:14.491 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:15.492 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:15.492 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 6,
+   "exit_code": 0,
+   "start_ms": 5.6,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:16.004 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:17.004 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:17.004 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 7,
+   "exit_code": 0,
+   "start_ms": 5.0,
+   "exit_ms": 0.7,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:17.518 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:18.518 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:18.518 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 8,
+   "exit_code": 0,
+   "start_ms": 5.1,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:19.030 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:20.030 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:20.030 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 9,
+   "exit_code": 0,
+   "start_ms": 5.5,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:20.544 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:21.545 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:21.545 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 10,
+   "exit_code": 0,
+   "start_ms": 4.0,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:22.057 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:23.058 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:23.058 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 11,
+   "exit_code": 0,
+   "start_ms": 5.2,
+   "exit_ms": 0.8,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:23.572 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:24.572 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:24.572 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 12,
+   "exit_code": 0,
+   "start_ms": 4.2,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:25.085 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:26.085 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:26.085 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 13,
+   "exit_code": 0,
+   "start_ms": 5.9,
+   "exit_ms": 0.8,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:26.598 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:27.598 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:27.598 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 14,
+   "exit_code": 0,
+   "start_ms": 4.4,
+   "exit_ms": 0.7,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:28.109 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:29.109 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:29.109 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 15,
+   "exit_code": 0,
+   "start_ms": 5.6,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:29.621 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:30.622 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:30.622 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 16,
+   "exit_code": 0,
+   "start_ms": 5.0,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:31.135 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:32.136 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:32.136 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 17,
+   "exit_code": 0,
+   "start_ms": 5.7,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:32.650 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:33.650 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:33.650 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 18,
+   "exit_code": 0,
+   "start_ms": 5.3,
+   "exit_ms": 0.8,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:34.165 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:35.165 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:35.165 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 19,
+   "exit_code": 0,
+   "start_ms": 5.7,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:35.695 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:36.695 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:36.695 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 20,
+   "exit_code": 0,
+   "start_ms": 5.8,
+   "exit_ms": 0.9,
+   "window_visible": null,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-02 13:38:37.210 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-02 13:38:38.210 info SIGTERM erhalten, beende",
+    "2026-11-02 13:38:38.210 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  }
+ ]
+}
