@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Xfce/xfwm4 unter X11, `DISPLAY=:0.0`, `XDG_SESSION_TYPE=x11`). Kein Xvfb, keine offscreen-Plattform von Qt.
 
-Abnahme Punkt 5 (Handtest: der Nutzer startet `dss-app`, sieht das Fenster und schliesst es): **[OFFEN]**, steht aus.
+Abnahme Punkt 5 (Handtest): erledigt am 2026-11-02 um 14:37 durch den Nutzer, siehe Abschnitt «Handtest».
 
 ## Kurzfassung
 
@@ -12,7 +12,7 @@ Abnahme Punkt 5 (Handtest: der Nutzer startet `dss-app`, sieht das Fenster und s
 | 2. Bau ohne Warnungen mit `-Wall -Wextra`; mit `-DDSS_BUILD_APP=OFF` nur der Kern | ja: 0 Warnungen; ohne Fenster werden `dss_common`, `dss-core` und die Tests gebaut, kein `dss-app` |
 | 3. `ctest --test-dir build` | 2 von 2 Tests bestanden |
 | 4. Startprüfung, 20 von 20 je Programm | `dss-core` SIGTERM 20/20, `dss-core` SIGINT 20/20, `dss-app` 20/20 |
-| 5. Handtest durch den Nutzer | **[OFFEN]** |
+| 5. Handtest durch den Nutzer | ja: Fenster erschienen, mit dem Schliessknopf geschlossen, Exit-Code 0 |
 
 ## Aufbau
 
@@ -264,6 +264,18 @@ Gegenprobe des Skripts: Ein Ersatzprogramm (Shell-Skript, schreibt die Startzeil
 
 Ein Probelauf mit 2 Starts je Fall (13:37) lief vor der Messung ebenfalls sauber.
 
+## Handtest
+
+Durch den Nutzer am 2026-11-02, Fenster über den Schliessknopf des Fenstermanagers geschlossen. Ausgabe (vom Nutzer im Chat übermittelt):
+
+```
+$ build/src/app/dss-app; echo "Exit-Code: $?"
+2026-11-02 14:37:01.574 info dss-app 0.1.0 gestartet, Qt 6.8.2
+2026-11-02 14:37:01.586 info Fenster gezeichnet
+2026-11-02 14:37:08.440 info beendet, Exit-Code 0
+Exit-Code: 0
+```
+
 ## Geänderte und neue Dateien
 
 | Datei | Art | Commit |
@@ -285,7 +297,6 @@ Ein Probelauf mit 2 Starts je Fall (13:37) lief vor der Messung ebenfalls sauber
 
 ## Nicht erledigt
 
-- **[OFFEN]** Handtest durch den Nutzer (Abnahme 5): `build/src/app/dss-app` starten, Fenster «DoNs Streaming Studio» ansehen, über den Schliessknopf schliessen; im Terminal sollte «beendet, Exit-Code 0» stehen und `echo $?` 0 zeigen.
 - **[OFFEN]** Schliessen über den Fenstermanager ist nicht automatisch geprüft (kein `xdotool`/`wmctrl`), siehe `docs/04-offene-punkte.md` Punkt 14.
 - **[OFFEN]** Installationsweg von `einrichten.sh` nicht geprüft (Punkt 15).
 - **[OFFEN]** `docs/00-uebergabe.md` sagt noch «Es gibt noch keinen Programmcode» (Punkt 16; nicht Teil des Auftrags).

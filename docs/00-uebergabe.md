@@ -43,7 +43,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 
 ## Nächste Schritte
 
-1. P03 ausgeführt (2026-11-02), Abnahme 1 bis 4 erfüllt, Handtest des Nutzers offen. Danach P04 (Overlay-Modell und Format der Overlay-Datei, K-01).
+1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. Als Nächstes P04 (Overlay-Modell und Format der Overlay-Datei, K-01).
 2. Weitere Bau-Prompts, je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
