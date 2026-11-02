@@ -19,7 +19,8 @@ set(DSS_TEST_MEDIA_DIR "${PROJECT_SOURCE_DIR}/prototypes/media" CACHE PATH "Test
 set(DSS_TEST_FONT "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" CACHE FILEPATH "Schriftdatei für Tests")
 dss_add_test(tst_overlaystore)
 target_compile_definitions(tst_overlaystore PRIVATE
-  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
+  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}"
+  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md")
 # Erzeugt die Testdateien, falls sie fehlen. Braucht ffmpeg (installiert seit P01, nicht in scripts/pakete.txt).
 add_test(NAME media_vorbereiten
   COMMAND sh -c "test -f '${DSS_TEST_MEDIA_DIR}/alpha.webm' || sh '${PROJECT_SOURCE_DIR}/prototypes/messung/media_erzeugen.sh' '${DSS_TEST_MEDIA_DIR}'")

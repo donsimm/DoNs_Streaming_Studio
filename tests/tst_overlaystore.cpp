@@ -26,6 +26,7 @@ const QString kImage2 = kMediaDir + QStringLiteral("/bild2.png");
 const QString kVideo = kMediaDir + QStringLiteral("/video.webm");
 const QString kAlphaVideo = kMediaDir + QStringLiteral("/alpha.webm");
 const QString kFont = QStringLiteral(DSS_TEST_FONT);
+const QString kFormatDoc = QStringLiteral(DSS_FORMAT_DOC);
 
 constexpr QFileDevice::Permissions kUnixBits =
     QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner
@@ -461,6 +462,56 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("tokens.json")), qPrintable(error));
         QVERIFY(!error.contains(QStringLiteral("zu-kurz")));
         QCOMPARE(readFile(tokensPath), broken);
+    }
+
+    // Abnahme 4: Das Beispiel in docs/06-overlay-format.md lässt sich mit dem Modell laden.
+    void formatDocExample()
+    {
+        const QString doc = QString::fromUtf8(readFile(kFormatDoc));
+        const qsizetype begin = doc.indexOf(QStringLiteral("<!-- beispiel-anfang -->"));
+        const qsizetype end = doc.indexOf(QStringLiteral("<!-- beispiel-ende -->"));
+        QVERIFY2(begin >= 0 && end > begin, "Markierungen des Beispiels fehlen");
+        QString block = doc.mid(begin, end - begin);
+        block = block.section(QStringLiteral("```json"), 1).section(QStringLiteral("```"), 0, 0);
+        QVERIFY(!block.trimmed().isEmpty());
+
+        const QString id = QStringLiteral("db7f47a9-dee3-4de5-b056-40b5b3507607");
+        QVERIFY(QDir().mkpath(dataDir() + QStringLiteral("/overlays")));
+        QVERIFY(writeFile(dataDir() + QStringLiteral("/overlays/") + id + QStringLiteral(".json"),
+                          block.toUtf8()));
+        // Die Dateien unter media/ wie beim Hinzufügen anlegen. Ohne Token in tokens.json
+        // bekommt das Overlay beim ersten Laden einen neuen (Warnung).
+        {
+            auto store = openStore();
+            QCOMPARE(store->loadErrors(), QStringList());
+            QVERIFY(store->loadWarnings().join(QLatin1Char('\n')).contains(QStringLiteral("neuer Token")));
+            QString error;
+            QVERIFY2(!store->importMedia(kImage, MediaUse::Image, &error).isEmpty(), qPrintable(error));
+            QVERIFY2(!store->importMedia(kAlphaVideo, MediaUse::Video, &error).isEmpty(), qPrintable(error));
+            QVERIFY2(!store->importMedia(kFont, MediaUse::Font, &error).isEmpty(), qPrintable(error));
+        }
+        auto store = openStore();
+        QCOMPARE(store->loadErrors(), QStringList());
+        const Overlay *o = store->overlay(QUuid::fromString(id));
+        QVERIFY(o);
+        QCOMPARE(o->name, QStringLiteral("Überblick Start"));
+        QCOMPARE(o->address, QStringLiteral("ueberblick-start"));
+        QCOMPARE(o->sources.size(), 3);
+        QCOMPARE(o->sources[0].kind, SourceKind::Image);
+        QCOMPARE(o->sources[0].rotation, 125);
+        QCOMPARE(o->sources[1].kind, SourceKind::Video);
+        QCOMPARE(o->sources[1].visible, false);
+        QCOMPARE(o->sources[2].kind, SourceKind::Text);
+        QCOMPARE(o->sources[2].text.content, QStringLiteral("Willkommen\nZweite Zeile"));
+        QCOMPARE(o->sources[2].text.align, TextAlign::Center);
+        // Keine Warnung: Die Verweise im Beispiel passen zu den Testdateien, der Token ist da.
+        QCOMPARE(store->loadWarnings(), QStringList());
+        QVERIFY(!store->token(o->id).isEmpty());
+        // Wieder geschrieben ergibt sich dasselbe Overlay.
+        Overlay reparsed;
+        QString error;
+        QVERIFY(parseOverlay(serializeOverlay(*o), &reparsed, &error));
+        QCOMPARE(reparsed, *o);
     }
 
     void generatedTokensDiffer()
