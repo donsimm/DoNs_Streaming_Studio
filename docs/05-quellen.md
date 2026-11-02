@@ -1,0 +1,58 @@
+# 05 – Quellen
+
+Stand: 2026-11-02.
+
+## Angaben des Nutzers
+
+Hardware des Studio-PCs (Bildschirmfotos, 32 GB DDR3), Streaming-PC (i9-14900KF, RTX 4090, Nobara), alle Entscheide, Bild der Oberfläche, Dokument mit den Lehren aus dem alten Projekt, Ausgaben der Terminalbefehle auf dem Studio-PC.
+
+## Alter Entwurf (nur gelesen)
+
+https://github.com/donsimm/donstv_Studio (CLAUDE.md, docs/01 bis 05)
+
+## Betriebssysteme und Qt
+
+- Debian 13, PyQt6: https://packages.debian.org/ja/trixie/python3-pyqt6
+- Debian 13, PySide6: https://packages.debian.org/tr/trixie/libpyside6-py3-6.8
+- Debian 13 Veröffentlichung: https://www.omgubuntu.co.uk/2025/08/debian-13-trixie-released
+- Ubuntu 26.04 LTS: https://www.debugpoint.com/ubuntu-26-04-lts/?amp=1
+- Fedora 44 (Qt): https://linuxsecurity.com/advisories/fedora/qt6-fedora-44-2026-70776c2dc3 und https://packages.fedoraproject.org/pkgs/qt6-qtdeclarative/qt6-qtdeclarative/
+- Fedora Mass Rebuild: https://fedoraproject.org/wiki/Fedora_44_Mass_Rebuild und https://fedoraproject.org/wiki/Fedora_43_Mass_Rebuild
+- X11 und Wayland (Sekundärquelle): https://www.besthub.dev/articles/why-linux-desktops-are-abandoning-x11-for-wayland-in-2026-after-40-years-effbf2257ca0
+- PyQt-Mailingliste: https://riverbankcomputing.com/pipermail/pyqt/2025-April/046191.html
+- Qt Quick Szenengraph: https://doc.qt.io/qt-6.2/qtquick-visualcanvas-scenegraph.html
+- Qt Multimedia: https://doc.qt.io/qt-6.4/qtmultimedia-index.html
+
+## OBS
+
+- Browserquelle: https://obsproject.com/kb/browser-source.html
+- Installation: https://obsproject.com/wiki/Install-Instructions
+- OBS 33 (CEF, Plugin-Umbau): https://www.linuxcompatible.org/story/obs-studio-330rc1-released-major-plugin-rework-and-cef-upgrade-lead-the-way/
+- Flatpak-Unterstützung: https://www.gamingonlinux.com/2022/02/obs-studio-272-is-out-bringing-flatpak-support-and-much-more/page=1/
+- obs-websocket: https://github.com/obsproject/obs-websocket und https://github.com/obsproject/obs-websocket/blob/release/5.0.0/docs/generated/protocol.md
+
+## NDI
+
+- Leistung und Umsetzung: https://docs.ndi.video/all/developing-with-ndi/sdk/performance-and-implementation
+- Bandbreite: https://docs.ndi.video/docs/white-paper/bandwidth/ndi-high-bandwidth-based-on-speedhq7-8bit-4-2-2-4
+- Last auf älterer CPU (Forum, alt): https://forums.vmix.com/posts/t7077-CPU-usage-with-multiple-NDI-desktop-capture-s
+
+## WebM mit Alpha
+
+- FFmpeg-Ticket: https://trac.ffmpeg.org/ticket/8344
+
+## Grafikkarte und Treiber
+
+- GTX 1660 SUPER (Datenblatt): https://preisvergleich.heise.de/gigabyte-geforce-gtx-1660-super-oc-6g-gv-n166soc-6gd-a2167345.html?va=b
+- NVIDIA-Treiber und offene Kernel-Module: https://hn.jakechampion.name/reader/https://archlinux.org/news/nvidia-590-driver-drops-pascal-support-main-packages-switch-to-open-kernel-modules
+- Installation des Debian-13-Treibers (Sekundärquelle): https://linuxcapable.com/install-nvidia-drivers-on-debian/
+
+## Claude Code und Abbild
+
+- Installation von Claude Code: https://code.claude.com/docs/en/setup
+- Clonezilla Live: https://clonezilla.org/clonezilla-live-doc.php
+
+## Twitch und Chat-Bot
+
+- EventSub per WebSocket: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
+- Streamer.bot: https://docs.streamer.bot/guide/actions und https://streamer.bot/features
