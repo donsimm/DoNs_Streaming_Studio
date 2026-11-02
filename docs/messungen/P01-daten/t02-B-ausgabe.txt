@@ -1,0 +1,133 @@
+{
+ "variant": "B",
+ "started": "2026-11-02 11:17:24 +0100",
+ "app_command": [
+  "/home/dominik/DoNs_Streaming_Studio/prototypes/b-web/host/build/p01_b_host",
+  "--mode",
+  "t02",
+  "--url",
+  "http://127.0.0.1:8765/overlay.html?duration=75",
+  "--stats",
+  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P01-daten/t02-B/app-zeitstempel.json"
+ ],
+ "commands": {
+  "mpstat": [
+   "mpstat",
+   "1",
+   "60"
+  ],
+  "pidstat": [
+   "pidstat",
+   "-h",
+   "-u",
+   "-r",
+   "-p",
+   "10963,10973,10975,10993,10972,10961",
+   "1",
+   "60"
+  ],
+  "nvidia-smi": "nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv,noheader,nounits -l 1",
+  "screenshot": "ffmpeg -hide_banner -loglevel error -y -f x11grab -video_size 1920x1080 -i :0.0+0,0 -frames:v 1 /home/dominik/DoNs_Streaming_Studio/docs/messungen/P01-bilder/t02-B.png"
+ },
+ "app_exit_code": 0,
+ "processes": {
+  "10963": "p01_b_host",
+  "10973": "QtWebEngineProc",
+  "10975": "QtWebEngineProc",
+  "10993": "QtWebEngineProc",
+  "10972": "QtWebEngineProc",
+  "10961": "python3"
+ },
+ "cpu_gesamt_prozent": {
+  "min": 6.0,
+  "mittel": 8.6,
+  "max": 11.3
+ },
+ "cpu_prozesse_prozent_eines_kerns": {
+  "min": 41.0,
+  "mittel": 56.5,
+  "max": 75.0
+ },
+ "rss_prozesse_mib": {
+  "min": 581.6,
+  "mittel": 589.4,
+  "max": 592.4
+ },
+ "pss_prozesse_mib_bei_30s": 358.8,
+ "je_befehl": {
+  "python3": {
+   "cpu_mittel": 0.0,
+   "rss_max_mib": 19.1
+  },
+  "p01_b_host": {
+   "cpu_mittel": 14.7,
+   "rss_max_mib": 297.8
+  },
+  "QtWebEngineProc": {
+   "cpu_mittel": 10.4,
+   "rss_max_mib": 136.3
+  }
+ },
+ "gpu_auslastung_prozent": {
+  "min": 13.0,
+  "mittel": 34.0,
+  "max": 44.0
+ },
+ "gpu_speicher_mib": {
+  "min": 456.0,
+  "mittel": 458.1,
+  "max": 472.0
+ },
+ "bildschirmfoto": "docs/messungen/P01-bilder/t02-B.png",
+ "bildrate": {
+  "bilder": 1800,
+  "bilder_pro_s": 30.0,
+  "pro_s": {
+   "min": 29,
+   "mittel": 30.0,
+   "max": 31
+  },
+  "sekunden_unter_28": 0,
+  "abstand_max_ms": 50.1,
+  "einbrueche_ueber_50ms": 3
+ },
+ "video_bilder": {
+  "bilder": 1779,
+  "bilder_pro_s": 29.65,
+  "pro_s": {
+   "min": 26,
+   "mittel": 29.6,
+   "max": 31
+  },
+  "sekunden_unter_28": 4,
+  "abstand_max_ms": 100.1,
+  "einbrueche_ueber_50ms": 19
+ },
+ "alpha_bilder": {
+  "bilder": 1776,
+  "bilder_pro_s": 29.6,
+  "pro_s": {
+   "min": 24,
+   "mittel": 29.6,
+   "max": 31
+  },
+  "sekunden_unter_28": 3,
+  "abstand_max_ms": 83.7,
+  "einbrueche_ueber_50ms": 25
+ },
+ "raf_bildwiederholung": {
+  "bilder": 1845,
+  "bilder_pro_s": 30.75,
+  "pro_s": {
+   "min": 30,
+   "mittel": 30.8,
+   "max": 41
+  },
+  "sekunden_unter_28": 0,
+  "abstand_max_ms": 50.1,
+  "einbrueche_ueber_50ms": 1
+ },
+ "app_info": {
+  "webgl_renderer": "NVIDIA GeForce GTX 1660 SUPER/PCIe/SSE2"
+ }
+}

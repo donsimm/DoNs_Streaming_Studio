@@ -1,0 +1,219 @@
+{
+ "summary": {
+  "variant": "C",
+  "started": "2026-11-02 11:15:15 +0100",
+  "command": [
+   "python3",
+   "/home/dominik/DoNs_Streaming_Studio/prototypes/c-pyqt/main.py",
+   "--mode",
+   "t01"
+  ],
+  "runs": 20,
+  "clean": 20,
+  "first_frame_ms_min": 144.2,
+  "first_frame_ms_median": 159.2,
+  "first_frame_ms_max": 173.7
+ },
+ "runs": [
+  {
+   "run": 1,
+   "exit_code": 0,
+   "first_frame_ms": 159.7,
+   "total_ms": 1180.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 2,
+   "exit_code": 0,
+   "first_frame_ms": 168.8,
+   "total_ms": 1200.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 3,
+   "exit_code": 0,
+   "first_frame_ms": 159.2,
+   "total_ms": 1184.2,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 4,
+   "exit_code": 0,
+   "first_frame_ms": 170.9,
+   "total_ms": 1192.6,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 5,
+   "exit_code": 0,
+   "first_frame_ms": 172.0,
+   "total_ms": 1195.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 6,
+   "exit_code": 0,
+   "first_frame_ms": 154.1,
+   "total_ms": 1185.1,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 7,
+   "exit_code": 0,
+   "first_frame_ms": 149.1,
+   "total_ms": 1171.0,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 8,
+   "exit_code": 0,
+   "first_frame_ms": 154.0,
+   "total_ms": 1177.6,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 9,
+   "exit_code": 0,
+   "first_frame_ms": 166.6,
+   "total_ms": 1187.9,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 10,
+   "exit_code": 0,
+   "first_frame_ms": 173.7,
+   "total_ms": 1194.1,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 11,
+   "exit_code": 0,
+   "first_frame_ms": 144.2,
+   "total_ms": 1167.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 12,
+   "exit_code": 0,
+   "first_frame_ms": 154.4,
+   "total_ms": 1175.9,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 13,
+   "exit_code": 0,
+   "first_frame_ms": 153.4,
+   "total_ms": 1174.3,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 14,
+   "exit_code": 0,
+   "first_frame_ms": 171.8,
+   "total_ms": 1196.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 15,
+   "exit_code": 0,
+   "first_frame_ms": 157.5,
+   "total_ms": 1188.8,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 16,
+   "exit_code": 0,
+   "first_frame_ms": 157.9,
+   "total_ms": 1197.2,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 17,
+   "exit_code": 0,
+   "first_frame_ms": 159.3,
+   "total_ms": 1190.7,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 18,
+   "exit_code": 0,
+   "first_frame_ms": 163.6,
+   "total_ms": 1201.8,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 19,
+   "exit_code": 0,
+   "first_frame_ms": 155.0,
+   "total_ms": 1177.4,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  },
+  {
+   "run": 20,
+   "exit_code": 0,
+   "first_frame_ms": 154.0,
+   "total_ms": 1182.6,
+   "timeout": false,
+   "leftover_processes": [],
+   "stderr_lines": 0,
+   "clean": true
+  }
+ ]
+}

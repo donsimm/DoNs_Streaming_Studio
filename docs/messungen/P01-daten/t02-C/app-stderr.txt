@@ -1,0 +1,11 @@
+qt.multimedia.ffmpeg: Using Qt multimedia with FFmpeg version 7.1.5-0+deb13u1 GPL version 2 or later
+qt.multimedia.ffmpeg: Available HW decoding frameworks:
+qt.multimedia.ffmpeg:      cuda
+qt.multimedia.ffmpeg:      vdpau
+qt.multimedia.ffmpeg:      vulkan
+qt.multimedia.ffmpeg: Available HW encoding frameworks:
+qt.multimedia.ffmpeg:      cuda
+qt.multimedia.ffmpeg:      vdpau
+qt.multimedia.ffmpeg:      vulkan
+qt.multimedia.ffmpeg.mediadataholder: AVStream duration -9223372036854775808 is invalid. Taking it from the metadata
+qt.multimedia.ffmpeg.mediadataholder: AVStream duration -9223372036854775808 is invalid. Taking it from the metadata

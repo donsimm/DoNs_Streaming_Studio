@@ -1,0 +1,114 @@
+{
+ "variant": "C",
+ "started": "2026-11-02 11:18:43 +0100",
+ "app_command": [
+  "python3",
+  "/home/dominik/DoNs_Streaming_Studio/prototypes/c-pyqt/main.py",
+  "--mode",
+  "t02",
+  "--media",
+  "/home/dominik/DoNs_Streaming_Studio/prototypes/media",
+  "--stats",
+  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P01-daten/t02-C/app-zeitstempel.json",
+  "--duration",
+  "75"
+ ],
+ "commands": {
+  "mpstat": [
+   "mpstat",
+   "1",
+   "60"
+  ],
+  "pidstat": [
+   "pidstat",
+   "-h",
+   "-u",
+   "-r",
+   "-p",
+   "11088",
+   "1",
+   "60"
+  ],
+  "nvidia-smi": "nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv,noheader,nounits -l 1",
+  "screenshot": "ffmpeg -hide_banner -loglevel error -y -f x11grab -video_size 1920x1080 -i :0.0+0,0 -frames:v 1 /home/dominik/DoNs_Streaming_Studio/docs/messungen/P01-bilder/t02-C.png"
+ },
+ "app_exit_code": 0,
+ "processes": {
+  "11088": "python3"
+ },
+ "cpu_gesamt_prozent": {
+  "min": 7.4,
+  "mittel": 10.4,
+  "max": 13.0
+ },
+ "cpu_prozesse_prozent_eines_kerns": {
+  "min": 57.0,
+  "mittel": 70.4,
+  "max": 80.0
+ },
+ "rss_prozesse_mib": {
+  "min": 578.7,
+  "mittel": 580.9,
+  "max": 582.6
+ },
+ "pss_prozesse_mib_bei_30s": 508.3,
+ "je_befehl": {
+  "python3": {
+   "cpu_mittel": 70.4,
+   "rss_max_mib": 582.6
+  }
+ },
+ "gpu_auslastung_prozent": {
+  "min": 10.0,
+  "mittel": 10.7,
+  "max": 13.0
+ },
+ "gpu_speicher_mib": {
+  "min": 479.0,
+  "mittel": 483.2,
+  "max": 595.0
+ },
+ "bildschirmfoto": "docs/messungen/P01-bilder/t02-C.png",
+ "bildrate": {
+  "bilder": 1800,
+  "bilder_pro_s": 30.0,
+  "pro_s": {
+   "min": 30,
+   "mittel": 30.0,
+   "max": 30
+  },
+  "sekunden_unter_28": 0,
+  "abstand_max_ms": 35.1,
+  "einbrueche_ueber_50ms": 0
+ },
+ "video_bilder": {
+  "bilder": 1800,
+  "bilder_pro_s": 30.0,
+  "pro_s": {
+   "min": 30,
+   "mittel": 30.0,
+   "max": 30
+  },
+  "sekunden_unter_28": 0,
+  "abstand_max_ms": 36.5,
+  "einbrueche_ueber_50ms": 0
+ },
+ "alpha_bilder": {
+  "bilder": 1800,
+  "bilder_pro_s": 30.0,
+  "pro_s": {
+   "min": 29,
+   "mittel": 30.0,
+   "max": 31
+  },
+  "sekunden_unter_28": 0,
+  "abstand_max_ms": 35.1,
+  "einbrueche_ueber_50ms": 0
+ },
+ "app_info": {
+  "alpha_pixel_format": "NV12",
+  "alpha_image_format": 18,
+  "video_pixel_format": "NV12",
+  "video_image_format": 18
+ }
+}

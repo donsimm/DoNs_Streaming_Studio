@@ -11,6 +11,9 @@ Stand: 2026-11-02.
 5. Funktionsprioritäten (MUSS, SOLL, KANN): pro Modul festlegen, Editor zuerst.
 6. Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI), T-04 (Browserquelle in OBS), T-05 (obs-websocket).
 7. Abbild der sauberen Installation (Clonezilla): empfohlen, vom Nutzer noch nicht bestätigt.
+8. Aus P01: Qt Multimedia 6.8.2 (Debian) liefert VP9-WebM mit Alpha als `NV12`, also ohne Alpha. Ein Dekodierweg mit libvpx für A/C ist nicht gemessen. Siehe `docs/messungen/P01-bericht.md`.
+9. Aus P01: Der GPU-Weg von Qt (Qt Quick) ist nicht gemessen; A und C nutzen QPainter in Software.
+10. Aus P01: In `docs/02-umgebung.md` steht Kernel 6.12.107, gemessen am 2026-11-02 ist 6.12.113+deb13-amd64.
 
 ## Machbarkeitstests
 
