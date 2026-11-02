@@ -88,3 +88,42 @@ if(DSS_BUILD_APP)
             $<TARGET_FILE:dss-app> ${CMAKE_CURRENT_BINARY_DIR}/bildschirmfoto)
   set_tests_properties(bildschirmfoto PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# P08: Reihenfolge und Ordner der Overlay-Liste (liste.json), ohne Qt Gui.
+dss_add_test(tst_overlayliste)
+
+# P08: Schriften (fc-list, fc-query, Auflösung Name und Schnitt → Datei), ohne Qt Gui.
+dss_add_test(tst_schriften)
+target_compile_definitions(tst_schriften PRIVATE DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften")
+
+# P08: Bearbeiten über den Kern mit zwei Verbindungen, Neustart (dss-core als eigener Prozess).
+dss_add_test(tst_bearbeiten)
+target_compile_definitions(tst_bearbeiten PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
+add_dependencies(tst_bearbeiten dss-core)
+set_tests_properties(tst_bearbeiten PROPERTIES FIXTURES_REQUIRED dss_media)
+
+# P08: Änderungen (Nachrichten, Abweisungen, Modell, Zusammenfassen beim Speichern), ohne Qt Gui.
+dss_add_test(tst_aenderungen)
+target_compile_definitions(tst_aenderungen PRIVATE
+  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
+set_tests_properties(tst_aenderungen PROPERTIES FIXTURES_REQUIRED dss_media)
+
+# P08: Rechnungen des Fensters fürs Bearbeiten (Quellen, Adresse, Drehung, Farbe, Schrift), ohne Qt Gui.
+dss_add_test(tst_windowedit)
+target_compile_definitions(tst_windowedit PRIVATE DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften")
+
+# P08: Bearbeiten im echten Fenster (MainWindow aus dss_app_ui) mit eigenem dss-core, in der
+# X11-Sitzung; ohne X11 übersprungen (77). Eigener Ordner der Einstellungen wie bei tst_symbols.
+if(DSS_BUILD_APP)
+  qt_add_executable(tst_fensterbearbeiten tst_fensterbearbeiten.cpp)
+  target_link_libraries(tst_fensterbearbeiten PRIVATE dss_app_ui dss_warnings Qt6::Test)
+  target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}")
+  add_dependencies(tst_fensterbearbeiten dss-core)
+  add_test(NAME tst_fensterbearbeiten COMMAND tst_fensterbearbeiten)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fenster-config)
+  set_tests_properties(tst_fensterbearbeiten PROPERTIES SKIP_RETURN_CODE 77
+    FIXTURES_REQUIRED dss_media
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/fenster-config")
+endif()

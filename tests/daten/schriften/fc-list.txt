@@ -1,0 +1,191 @@
+/usr/share/fonts/opentype/urw-base35/C059-Italic.otf	0	C059	Italic	80	100	False
+/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf	0	Liberation Mono	Bold	200	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusSans-BoldItalic.otf	0	Nimbus Sans	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/NimbusSans-Italic.t1	0	Nimbus Sans	Italic	80	100	False
+/usr/share/fonts/type1/urw-base35/NimbusSansNarrow-Oblique.t1	0	Nimbus Sans Narrow	Oblique	80	110	False
+/usr/share/fonts/type1/urw-base35/P052-Roman.t1	0	P052	Roman	100	0	False
+/usr/share/fonts/truetype/liberation/LiberationSerif-BoldItalic.ttf	0	Liberation Serif	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/NimbusSans-BoldItalic.pfb	0	Nimbus Sans	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/NimbusSansNarrow-Bold.t1	0	Nimbus Sans Narrow	Bold	200	0	False
+/usr/share/fonts/truetype/lato/Lato-Hairline.ttf	0	Lato	Hairline	45	0	False
+/usr/share/fonts/type1/urw-base35/P052-BoldItalic.t1	0	P052	Bold Italic	200	100	False
+/usr/share/fonts/opentype/mathjax/MathJax_Typewriter-Regular.otf	0	MathJax_Typewriter	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_AMS-Regular.otf	0	MathJax_AMS	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusRoman-Italic.otf	0	Nimbus Roman	Italic	80	100	False
+/usr/share/fonts/truetype/lato/Lato-Heavy.ttf	0	Lato	Heavy	205	0	False
+/usr/share/fonts/type1/urw-base35/NimbusMonoPS-Italic.t1	0	Nimbus Mono PS	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/URWGothic-BookOblique.otf	0	URW Gothic	Book Oblique	80	110	False
+/usr/share/fonts/type1/urw-base35/NimbusMonoPS-Bold.t1	0	Nimbus Mono PS	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/URWBookman-DemiItalic.t1	0	URW Bookman	Demi Italic	180	100	False
+/usr/share/fonts/type1/urw-base35/C059-Bold.t1	0	C059	Bold	200	0	False
+/usr/share/fonts/truetype/noto/NotoSansMono-Bold.ttf	0	Noto Sans Mono	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/NimbusRoman-BoldItalic.t1	0	Nimbus Roman	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/NimbusMonoPS-Italic.pfb	0	Nimbus Mono PS	Italic	80	100	False
+/usr/share/fonts/X11/Type1/P052-Bold.pfb	0	P052	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/NimbusRoman-Italic.t1	0	Nimbus Roman	Italic	80	100	False
+/usr/share/fonts/truetype/lato/Lato-Medium.ttf	0	Lato	Medium	100	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Math-Italic.otf	0	MathJax_Math	Italic	80	100	False
+/usr/share/fonts/type1/urw-base35/URWBookman-Demi.t1	0	URW Bookman	Demi	180	0	False
+/usr/share/fonts/truetype/lato/Lato-LightItalic.ttf	0	Lato	Light Italic	50	100	False
+/usr/share/fonts/X11/Type1/P052-Roman.pfb	0	P052	Roman	100	0	False
+/usr/share/fonts/X11/Type1/C059-Bold.pfb	0	C059	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Fraktur-Bold.otf	0	MathJax_Fraktur	Bold	200	0	False
+/usr/share/fonts/X11/Type1/StandardSymbolsPS.pfb	0	Standard Symbols PS	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusRoman-Regular.otf	0	Nimbus Roman	Regular	80	0	False
+/usr/share/fonts/X11/Type1/D050000L.pfb	0	D050000L	Regular	80	0	False
+/usr/share/fonts/X11/Type1/Z003-MediumItalic.pfb	0	Z003	Medium Italic	100	100	False
+/usr/share/fonts/type1/urw-base35/URWGothic-Book.t1	0	URW Gothic	Book	75	0	False
+/usr/share/fonts/opentype/urw-base35/URWBookman-Light.otf	0	URW Bookman	Light	50	0	False
+/usr/share/fonts/X11/Type1/c0648bt_.pfb	0	Bitstream Charter	Regular	80	0	False
+/usr/share/fonts/X11/Type1/NimbusSans-Regular.pfb	0	Nimbus Sans	Regular	80	0	False
+/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf	0	DejaVu Serif	Bold	200	0	False
+/usr/share/fonts/X11/Type1/c0419bt_.pfb	0	Courier 10 Pitch	Regular	80	0	False
+/usr/share/fonts/X11/Type1/c0649bt_.pfb	0	Bitstream Charter	Italic	80	100	False
+/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf	0	Liberation Sans	Regular	80	0	False
+/usr/share/fonts/X11/Type1/NimbusSansNarrow-Oblique.pfb	0	Nimbus Sans Narrow	Oblique	80	110	False
+/usr/share/fonts/opentype/urw-base35/C059-BdIta.otf	0	C059	Bold Italic	200	100	False
+/usr/share/fonts/truetype/lato/Lato-Italic.ttf	0	Lato	Italic	80	100	False
+/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf	0	Liberation Sans	Bold	200	0	False
+/usr/share/fonts/X11/Type1/c0633bt_.pfb	0	Bitstream Charter	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/NimbusRoman-Regular.pfb	0	Nimbus Roman	Regular	80	0	False
+/usr/share/fonts/truetype/libreoffice/opens___.ttf	0	OpenSymbol	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationMono-Italic.ttf	0	Liberation Mono	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/StandardSymbolsPS.otf	0	Standard Symbols PS	Regular	80	0	False
+/usr/share/fonts/X11/Type1/P052-BoldItalic.pfb	0	P052	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/NimbusSansNarrow-Regular.pfb	0	Nimbus Sans Narrow	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/P052-Italic.t1	0	P052	Italic	80	100	False
+/usr/share/fonts/truetype/quicksand/Quicksand-Regular.ttf	0	Quicksand	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf	0	Liberation Serif	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/URWGothic-Book.otf	0	URW Gothic	Book	80	0	False
+/usr/share/fonts/X11/Type1/NimbusSansNarrow-BoldOblique.pfb	0	Nimbus Sans Narrow	Bold Oblique	200	110	False
+/usr/share/fonts/opentype/mathjax/MathJax_SansSerif-Italic.otf	0	MathJax_SansSerif	Italic	80	100	False
+/usr/share/fonts/truetype/lato/Lato-HeavyItalic.ttf	0	Lato	Heavy Italic	205	100	False
+/usr/share/fonts/X11/Type1/URWBookman-Light.pfb	0	URW Bookman	Light	50	0	False
+/usr/share/fonts/truetype/lato/Lato-BoldItalic.ttf	0	Lato	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/NimbusRoman-Bold.pfb	0	Nimbus Roman	Bold	200	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-BoldOblique.otf	0	Nimbus Sans Narrow	Bold Oblique	200	110	False
+/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf	0	Z003	Medium Italic	100	100	False
+/usr/share/fonts/truetype/noto/NotoMono-Regular.ttf	0	Noto Mono	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Regular.ttf	0	Liberation Sans Narrow	Regular	80	0	False
+/usr/share/fonts/truetype/lato/Lato-MediumItalic.ttf	0	Lato	Medium Italic	100	100	False
+/usr/share/fonts/type1/urw-base35/URWBookman-Light.t1	0	URW Bookman	Light	50	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusRoman-BoldItalic.otf	0	Nimbus Roman	Bold Italic	200	100	False
+/usr/share/fonts/truetype/quicksand/Quicksand-Light.ttf	0	Quicksand Light	Regular	50	0	False
+/usr/share/fonts/X11/Type1/NimbusMonoPS-Regular.pfb	0	Nimbus Mono PS	Regular	80	0	False
+/usr/share/fonts/X11/Type1/URWBookman-Demi.pfb	0	URW Bookman	Demi	180	0	False
+/usr/share/fonts/X11/Type1/URWGothic-Book.pfb	0	URW Gothic	Book	75	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusSans-Bold.otf	0	Nimbus Sans	Bold	200	0	False
+/usr/share/fonts/X11/Type1/NimbusRoman-BoldItalic.pfb	0	Nimbus Roman	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/URWGothic-BookOblique.t1	0	URW Gothic	Book Oblique	75	110	False
+/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf	0	DejaVu Sans	Book	80	0	False
+/usr/share/fonts/type1/urw-base35/C059-Roman.t1	0	C059	Roman	100	0	False
+/usr/share/fonts/type1/urw-base35/C059-Italic.t1	0	C059	Italic	100	100	False
+/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Italic.otf	0	Nimbus Mono PS	Italic	80	100	False
+/usr/share/fonts/truetype/lato/Lato-SemiboldItalic.ttf	0	Lato	Semibold Italic	180	100	False
+/usr/share/fonts/type1/urw-base35/NimbusSans-Bold.t1	0	Nimbus Sans	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Size4-Regular.otf	0	MathJax_Size4	Regular	80	0	False
+/usr/share/fonts/truetype/lato/Lato-ThinItalic.ttf	0	Lato	Thin Italic	47.5	100	False
+/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Regular.otf	0	Nimbus Mono PS	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/NimbusMonoPS-Regular.t1	0	Nimbus Mono PS	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Vector-Regular.otf	0	MathJax_Vector	Regular	100	0	False
+/usr/share/fonts/X11/Type1/c0632bt_.pfb	0	Bitstream Charter	Bold	200	0	False
+/usr/share/fonts/opentype/urw-base35/P052-Bold.otf	0	P052	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Main-Regular.otf	0	MathJax_Main	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf	0	Liberation Sans	Italic	80	100	False
+/usr/share/fonts/opentype/mathjax/MathJax_Vector-Bold.otf	0	MathJax_Vector-Bold	Bold	100	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf	0	Nimbus Sans	Regular	80	0	False
+/usr/share/fonts/X11/Type1/NimbusMonoPS-BoldItalic.pfb	0	Nimbus Mono PS	Bold Italic	200	100	False
+/usr/share/fonts/truetype/quicksand/Quicksand-Bold.ttf	0	Quicksand	Bold	200	0	False
+/usr/share/fonts/truetype/lato/Lato-BlackItalic.ttf	0	Lato	Black Italic	210	100	False
+/usr/share/fonts/X11/Type1/C059-Roman.pfb	0	C059	Roman	100	0	False
+/usr/share/fonts/truetype/lato/Lato-Thin.ttf	0	Lato	Thin	47.5	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Math-BoldItalic.otf	0	MathJax_Math	BoldItalic	200	100	False
+/usr/share/fonts/opentype/mathjax/MathJax_Size1-Regular.otf	0	MathJax_Size1	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Size2-Regular.otf	0	MathJax_Size2	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/NimbusRoman-Bold.t1	0	Nimbus Roman	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Caligraphic-Bold.otf	0	MathJax_Caligraphic	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_SansSerif-Regular.otf	0	MathJax_SansSerif	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Size3-Regular.otf	0	MathJax_Size3	Regular	80	0	False
+/usr/share/fonts/truetype/lato/Lato-Light.ttf	0	Lato	Light	50	0	False
+/usr/share/fonts/type1/urw-base35/Z003-MediumItalic.t1	0	Z003	Medium Italic	100	100	False
+/usr/share/fonts/X11/Type1/P052-Italic.pfb	0	P052	Italic	80	100	False
+/usr/share/fonts/X11/Type1/c0583bt_.pfb	0	Courier 10 Pitch	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Main-Bold.otf	0	MathJax_Main	Bold	200	0	False
+/usr/share/fonts/X11/Type1/URWGothic-Demi.pfb	0	URW Gothic	Demi	180	0	False
+/usr/share/fonts/X11/Type1/NimbusRoman-Italic.pfb	0	Nimbus Roman	Italic	80	100	False
+/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Oblique.ttf	0	DejaVu Sans Mono	Oblique	80	110	False
+/usr/share/fonts/truetype/lato/Lato-HairlineItalic.ttf	0	Lato	Hairline Italic	45	100	False
+/usr/share/fonts/opentype/urw-base35/P052-Italic.otf	0	P052	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/NimbusSans-Italic.otf	0	Nimbus Sans	Italic	80	100	False
+/usr/share/fonts/truetype/lato/Lato-Black.ttf	0	Lato	Black	210	0	False
+/usr/share/fonts/truetype/lato/Lato-Regular.ttf	0	Lato	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_WinChrome-Regular.otf	0	MathJax_WinChrome	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/D050000L.t1	0	D050000L	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/C059-Bold.otf	0	C059	Bold	200	0	False
+/usr/share/fonts/opentype/urw-base35/P052-Roman.otf	0	P052	Roman	80	0	False
+/usr/share/fonts/type1/urw-base35/NimbusRoman-Regular.t1	0	Nimbus Roman	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/NimbusSansNarrow-BoldOblique.t1	0	Nimbus Sans Narrow	Bold Oblique	200	110	False
+/usr/share/fonts/X11/Type1/c0611bt_.pfb	0	Courier 10 Pitch	Bold Italic	200	100	False
+/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf	0	Symbola	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Bold.otf	0	Nimbus Mono PS	Bold	200	0	False
+/usr/share/fonts/truetype/liberation/LiberationMono-BoldItalic.ttf	0	Liberation Mono	Bold Italic	200	100	False
+/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf	0	Droid Sans Fallback	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Script-Regular.otf	0	MathJax_Script	Regular	80	0	False
+/usr/share/fonts/X11/Type1/URWBookman-DemiItalic.pfb	0	URW Bookman	Demi Italic	180	100	False
+/usr/share/fonts/opentype/mathjax/MathJax_Fraktur-Regular.otf	0	MathJax_Fraktur	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Italic.ttf	0	Liberation Sans Narrow	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Oblique.otf	0	Nimbus Sans Narrow	Oblique	80	110	False
+/usr/share/fonts/opentype/mathjax/MathJax_Main-Italic.otf	0	MathJax_Main	Italic	80	100	False
+/usr/share/fonts/X11/Type1/c0582bt_.pfb	0	Courier 10 Pitch	Italic	80	100	False
+/usr/share/fonts/X11/Type1/URWGothic-DemiOblique.pfb	0	URW Gothic	Demi Oblique	180	110	False
+/usr/share/fonts/X11/Type1/URWGothic-BookOblique.pfb	0	URW Gothic	Book Oblique	75	110	False
+/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf	0	Liberation Mono	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/StandardSymbolsPS.t1	0	Standard Symbols PS	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/NimbusSans-Regular.t1	0	Nimbus Sans	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusRoman-Bold.otf	0	Nimbus Roman	Bold	200	0	False
+/usr/share/fonts/X11/Type1/C059-BdIta.pfb	0	C059	Bold Italic	200	100	False
+/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf	0	DejaVu Serif	Book	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_WinIE6-Regular.otf	0	MathJax_WinIE6	Regular	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Caligraphic-Regular.otf	0	MathJax_Caligraphic	Regular	80	0	False
+/usr/share/fonts/truetype/quicksand/Quicksand-Medium.ttf	0	Quicksand Medium	Regular	100	0	False
+/usr/share/fonts/opentype/urw-base35/URWBookman-LightItalic.otf	0	URW Bookman	Light Italic	50	100	False
+/usr/share/fonts/X11/Type1/URWBookman-LightItalic.pfb	0	URW Bookman	Light Italic	50	100	False
+/usr/share/fonts/X11/Type1/NimbusMonoPS-Bold.pfb	0	Nimbus Mono PS	Bold	200	0	False
+/usr/share/fonts/X11/Type1/NimbusSans-Italic.pfb	0	Nimbus Sans	Italic	80	100	False
+/usr/share/fonts/opentype/urw-base35/URWBookman-DemiItalic.otf	0	URW Bookman	Demi Italic	180	100	False
+/usr/share/fonts/truetype/lato/Lato-Bold.ttf	0	Lato	Bold	200	0	False
+/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Bold.ttf	0	Liberation Sans Narrow	Bold	200	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-BoldItalic.otf	0	Nimbus Mono PS	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/URWGothic-Demi.t1	0	URW Gothic	Demi	180	0	False
+/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf	0	DejaVu Sans Mono	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/NimbusSans-BoldItalic.t1	0	Nimbus Sans	Bold Italic	200	100	False
+/usr/share/fonts/X11/Type1/C059-Italic.pfb	0	C059	Italic	100	100	False
+/usr/share/fonts/opentype/urw-base35/URWGothic-DemiOblique.otf	0	URW Gothic	Demi Oblique	180	110	False
+/usr/share/fonts/opentype/urw-base35/D050000L.otf	0	D050000L	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/P052-BoldItalic.otf	0	P052	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/NimbusMonoPS-BoldItalic.t1	0	Nimbus Mono PS	Bold Italic	200	100	False
+/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf	0	DejaVu Sans Mono	Book	80	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_SansSerif-Bold.otf	0	MathJax_SansSerif	Bold	200	0	False
+/usr/share/fonts/X11/Type1/NimbusSansNarrow-Bold.pfb	0	Nimbus Sans Narrow	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/URWGothic-DemiOblique.t1	0	URW Gothic	Demi Oblique	180	110	False
+/usr/share/fonts/truetype/liberation/LiberationSansNarrow-BoldItalic.ttf	0	Liberation Sans Narrow	Bold Italic	200	100	False
+/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Regular.otf	0	Nimbus Sans Narrow	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/C059-Roman.otf	0	C059	Roman	80	0	False
+/usr/share/fonts/truetype/font-awesome/fontawesome-webfont.ttf	0	FontAwesome	Regular	80	0	False
+/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Bold.otf	0	Nimbus Sans Narrow	Bold	200	0	False
+/usr/share/fonts/truetype/dejavu/DejaVuSansMono-BoldOblique.ttf	0	DejaVu Sans Mono	Bold Oblique	200	110	False
+/usr/share/fonts/truetype/liberation/LiberationSans-BoldItalic.ttf	0	Liberation Sans	Bold Italic	200	100	False
+/usr/share/fonts/type1/urw-base35/NimbusSansNarrow-Regular.t1	0	Nimbus Sans Narrow	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/C059-BdIta.t1	0	C059	Bold Italic	200	100	False
+/usr/share/fonts/opentype/urw-base35/URWBookman-Demi.otf	0	URW Bookman	Demi	180	0	False
+/usr/share/fonts/X11/Type1/NimbusSans-Bold.pfb	0	Nimbus Sans	Bold	200	0	False
+/usr/share/fonts/opentype/font-awesome/FontAwesome.otf	0	FontAwesome	Regular	80	0	False
+/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf	0	Liberation Serif	Regular	80	0	False
+/usr/share/fonts/truetype/lato/Lato-Semibold.ttf	0	Lato	Semibold	180	0	False
+/usr/share/fonts/opentype/urw-base35/URWGothic-Demi.otf	0	URW Gothic	Demi	180	0	False
+/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf	0	Noto Sans Mono	Regular	80	0	False
+/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf	0	DejaVu Sans	Bold	200	0	False
+/usr/share/fonts/opentype/mathjax/MathJax_Math-Regular.otf	0	MathJax_Math	Regular	80	0	False
+/usr/share/fonts/type1/urw-base35/URWBookman-LightItalic.t1	0	URW Bookman	Light Italic	50	100	False
+/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf	0	Liberation Serif	Bold	200	0	False
+/usr/share/fonts/type1/urw-base35/P052-Bold.t1	0	P052	Bold	200	0	False
