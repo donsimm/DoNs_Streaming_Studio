@@ -1,0 +1,13 @@
+# Pakete zum Bauen und Testen von DoNs Streaming Studio
+# Eine Zeile pro Paket: Name und erwartete Version (dpkg-query ${Version}).
+# Versionen gemessen auf dem Studio-PC am 2026-11-02 mit
+#   LANG=C apt-cache policy <Paket>   und   dpkg-query -W -f='${Package} ${Version}\n' <Paket>
+# Nicht in dieser Liste (Wege nicht weiterverfolgt, bleiben aber installiert):
+#   qt6-webengine-dev, qt6-multimedia-dev, PyQt6
+build-essential 12.12
+cmake 3.31.6-2
+qt6-base-dev 6.8.2+dfsg-9+deb13u2
+libavformat-dev 7:7.1.5-0+deb13u1
+libavcodec-dev 7:7.1.5-0+deb13u1
+libavutil-dev 7:7.1.5-0+deb13u1
+libswscale-dev 7:7.1.5-0+deb13u1
