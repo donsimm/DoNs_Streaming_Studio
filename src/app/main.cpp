@@ -55,7 +55,8 @@ int main(int argc, char *argv[])
         QStringLiteral("verbindung"),
         QStringLiteral("Unix-Socket des Kerns (Standard: "
                        "$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock). Mit --bildschirmfoto: "
-                       "erst nach Verbindung, erstem Overlay und 3.5 s Leistungswerten speichern."),
+                       "erst nach Verbindung, erstem Overlay und 3.5 s Leistungswerten speichern, "
+                       "ohne Kern nach 10 s."),
         QStringLiteral("PFAD"));
     const QCommandLineOption unitOption(
         QStringLiteral("einheit"),
@@ -163,7 +164,12 @@ int main(int argc, char *argv[])
         // https://doc.qt.io/qt-6.8/qt.html#WindowType-enum
         if (parser.isSet(sizeOption))
             window.setWindowFlag(Qt::X11BypassWindowManagerHint);
-        const auto takeScreenshot = [&window, screenshotFile] {
+        // Nur ein Bild, auch wenn Verbindung und Zeitgrenze beide auslösen.
+        auto taken = std::make_shared<bool>(false);
+        const auto takeScreenshot = [&window, screenshotFile, taken] {
+            if (*taken)
+                return;
+            *taken = true;
             const QPixmap image = window.grab();
             if (!image.save(screenshotFile)) {
                 qCritical("Bildschirmfoto konnte nicht gespeichert werden: %s",
@@ -188,6 +194,17 @@ int main(int argc, char *argv[])
                              [&window, takeScreenshot](bool connected) {
                                  if (connected)
                                      QTimer::singleShot(3500, &window, takeScreenshot);
+                             });
+            // Antwortet kein Kern, nach 10 s das Bild ohne Verbindung (Status rot, Docks leer),
+            // statt ohne Ende zu warten.
+            QObject::connect(&window, &MainWindow::firstPainted, &window,
+                             [&window, &client, takeScreenshot] {
+                                 QTimer::singleShot(10000, &window, [&client, takeScreenshot] {
+                                     if (client->isConnected())
+                                         return;
+                                     qInfo("Kein Kern nach 10 s, Bildschirmfoto ohne Verbindung");
+                                     takeScreenshot();
+                                 });
                              });
         }
     }
