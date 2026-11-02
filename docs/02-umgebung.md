@@ -68,3 +68,13 @@ Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, AS
 - Entwicklung und Tests laufen auf diesem Gerät, in der Xfce-Sitzung.
 - Pakete mit festen Versionen. Ein Einrichtungsskript im Repo baut die Umgebung wieder auf (kommt mit dem ersten Baustein).
 - Ein Abbild der sauberen Installation (zum Beispiel mit Clonezilla): Der Nutzer verzichtet darauf (entschieden 2026-11-02). Die Umgebung wird stattdessen per Einrichtungsskript im Repo reproduzierbar gemacht.
+
+## Bildschirmschoner und Sperre
+
+Abgeschaltet am 2026-11-02 (Entscheid des Nutzers, Punkt 26 in `docs/04-offene-punkte.md`), damit Prüfungen mit Fenstern nicht von der Sperre unterbrochen werden. Nur für den Benutzer, keine Systemdateien geändert:
+
+- `~/.config/autostart/light-locker.desktop` mit `Hidden=true`: light-locker startet nicht mehr (Autostart-Spezifikation, https://specifications.freedesktop.org/autostart-spec/latest/).
+- `~/.config/autostart/bildschirmschoner-aus.desktop` mit `Exec=xset s off`: Bildschirmschoner von X11 bei jeder Anmeldung aus.
+- Abschaltung des Bildschirms (DPMS) in der Energieverwaltung von Xfce war schon aus (`/xfce4-power-manager/dpms-enabled false`).
+
+Geprüft nach Neustart: `xset q` zeigt `timeout: 0`, `pgrep light-locker` findet nichts. Rückgängig: beide Dateien löschen und neu anmelden.
