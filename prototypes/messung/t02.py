@@ -46,9 +46,12 @@ def parse_pidstat(text):
         s = per_t.setdefault(t, {"cpu": 0.0, "rss": 0})
         s["cpu"] += float(row["%CPU"])
         s["rss"] += int(row["RSS"])
-        c = per_cmd.setdefault(row["Command"], {"cpu": [], "rss": []})
-        c["cpu"].append(float(row["%CPU"]))
-        c["rss"].append(int(row["RSS"]))
+        # je Befehl: Summe über gleichnamige Prozesse (z. B. mehrere QtWebEngineProcess) je Zeitpunkt
+        c = per_cmd.setdefault(row["Command"], {}).setdefault(t, {"cpu": 0.0, "rss": 0})
+        c["cpu"] += float(row["%CPU"])
+        c["rss"] += int(row["RSS"])
+    per_cmd = {k: {"cpu": [x["cpu"] for x in v.values()], "rss": [x["rss"] for x in v.values()]}
+               for k, v in per_cmd.items()}
     return per_t, per_cmd
 
 
