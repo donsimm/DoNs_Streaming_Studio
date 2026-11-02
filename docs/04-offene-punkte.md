@@ -84,3 +84,8 @@ Stand: 2026-11-02 (nach P07).
 - Eigene Symbole des Nutzers liegen ausserhalb des Repos in `~/.config/dons-streaming-studio/symbole/`. Das Fenster sucht Symbole zuerst dort und nimmt nur, wenn dort keine Datei mit dem Namen liegt, die Datei aus `src/app/symbole/`. Grund: Das Repo ist öffentlich, und Claude Code committet am Ende jedes Auftrags (Regel 17). Umsetzung als erster Teil von P07, erledigt (2026-11-02).
 - Punkt 33 (Test `formatDocExample` schlägt in frischem Checkout fehl): wird als kleiner Teil von P07 behoben; der Test darf nicht von zufällig erzeugten Testdateien abhängen.
 - Punkt 34 (helle Fassungen der Bilder im Design): erledigt, weil es kein helles Design gibt (E-16 gestrichen, Entscheid des Nutzers 2026-11-02).
+
+## Entschieden nach P07 (2026-11-02)
+
+- Punkt 35: so lassen. Wird der Kern bei offenem Fenster absichtlich angehalten, startet das Fenster ihn nicht wieder. Neu starten durch Schliessen und Öffnen des Fensters.
+- Punkt 43: erledigt durch den Handtest P07 (Schliessen mit dem Schliessknopf, Kern danach `inactive`).
