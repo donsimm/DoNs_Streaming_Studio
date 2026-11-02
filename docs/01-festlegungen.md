@@ -50,6 +50,6 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 
 ## Betriebssystem und Technik
 
-- Betriebssystem: vorläufig Debian 13 mit X11-Sitzung (Xfce). Endgültig erst nach den Messungen auf dem Studio-PC. Debian 13 ist von den drei geprüften Systemen (Debian 13, Ubuntu 26.04 LTS, Fedora 44) das einzige mit X11-Sitzung. Andere Systeme wurden nicht untersucht.
+- Betriebssystem: entschieden (2026-11-02, vom Nutzer bestätigt): Debian 13 mit Xfce unter X11. Grundlage: Messung P01, alle drei Prototypen starteten dort 20 von 20 Mal sauber. Debian 13 ist von den drei geprüften Systemen (Debian 13, Ubuntu 26.04 LTS, Fedora 44) das einzige mit X11-Sitzung. Andere Systeme wurden nicht untersucht.
 - Technik: offen. Zwei Varianten werden gemessen: (A) C++ mit Qt 6, nativ; (B) ein unabhängiger Kern mit Web-Oberfläche. Python mit PyQt6 bleibt nur im Rennen, wenn es die Messungen besteht. Das ist eine Einschätzung von Claude, nicht belegt.
 - Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket).

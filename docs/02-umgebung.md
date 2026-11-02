@@ -7,7 +7,7 @@ Stand: 2026-11-02. Alle Werte wurden auf dem Studio-PC gemessen (Ausgaben des Nu
 | Punkt | Wert |
 |---|---|
 | Betriebssystem | Debian GNU/Linux 13 (trixie) |
-| Kernel | 6.12.107+deb13-amd64 |
+| Kernel | 6.12.113+deb13-amd64 (gemessen in P01 am 2026-11-02; am Morgen derselben Tages war 6.12.107 gemeldet) |
 | Sitzung | X11 (`XDG_SESSION_TYPE=x11`), Xfce (Fenstermanager xfwm4) |
 | CPU | Intel Core i7-4771 @ 3,50 GHz, 4 Kerne / 8 Threads, AVX, AVX2, SSE4.2 |
 | RAM | 31 GiB nutzbar (32 GB DDR3) |
