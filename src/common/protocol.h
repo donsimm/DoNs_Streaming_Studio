@@ -1,7 +1,9 @@
 #pragma once
 
 #include "connectionstate.h"
+#include "fontcatalog.h"
 #include "overlay.h"
+#include "overlaylist.h"
 #include "systemstats.h"
 
 #include <QByteArray>
@@ -11,15 +13,18 @@
 #include <QString>
 #include <QUuid>
 
-// Schnittstelle zwischen Kern und Fenster (P07, Teil D): JSON, eine Nachricht pro Zeile.
+// Schnittstelle zwischen Kern und Fenster (P07, Teil D; Änderungen seit P08, Teil A): JSON, eine
+// Nachricht pro Zeile.
 // Vollständige Beschreibung: docs/08-kern-schnittstelle.md. Hier steht nur das Umwandeln von
 // Nachrichten in Daten und zurück, ohne Verbindung und ohne Qt Gui (CLAUDE.md Regel 9).
 // Der Token eines Overlays kommt in keiner Nachricht vor (CLAUDE.md Regel 12).
 
 namespace dss {
 
-// Version der Schnittstelle; steht in der Begrüssung beider Seiten.
-inline constexpr int kProtocolVersion = 1;
+// Version der Schnittstelle; steht in der Begrüssung beider Seiten. 2 seit P08: Änderungen vom
+// Fenster an den Kern, overlay_list mit Ordnern in der Reihenfolge der Liste
+// (Begründung: docs/08-kern-schnittstelle.md, «Version»).
+inline constexpr int kProtocolVersion = 2;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -37,7 +42,33 @@ inline constexpr char kStats[] = "stats";
 inline constexpr char kConnections[] = "connections";
 inline constexpr char kQuitReply[] = "quit_reply";
 inline constexpr char kError[] = "error";
+// P08: Schriften und Änderungen
+inline constexpr char kGetFonts[] = "get_fonts";
+inline constexpr char kFontList[] = "font_list";
+inline constexpr char kChangeResult[] = "change_result";
+inline constexpr char kCreateOverlay[] = "create_overlay";
+inline constexpr char kRenameOverlay[] = "rename_overlay";
+inline constexpr char kCopyOverlay[] = "copy_overlay";
+inline constexpr char kRemoveOverlay[] = "remove_overlay";
+inline constexpr char kMoveOverlay[] = "move_overlay";
+inline constexpr char kCreateFolder[] = "create_folder";
+inline constexpr char kRenameFolder[] = "rename_folder";
+inline constexpr char kRemoveFolder[] = "remove_folder";
+inline constexpr char kMoveFolder[] = "move_folder";
+inline constexpr char kSetFolderExpanded[] = "set_folder_expanded";
+inline constexpr char kAddImageSource[] = "add_image_source";
+inline constexpr char kAddVideoSource[] = "add_video_source";
+inline constexpr char kAddTextSource[] = "add_text_source";
+inline constexpr char kRemoveSource[] = "remove_source";
+inline constexpr char kMoveSource[] = "move_source";
+inline constexpr char kUpdateSource[] = "update_source";
+inline constexpr char kSetTextFont[] = "set_text_font";
+inline constexpr char kReplaceImageFile[] = "replace_image_file";
 } // namespace msg
+
+// Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
+QStringList changeTypes();
+bool isChangeType(const QString &type);
 
 // Fehlercodes in der Nachricht «error»
 namespace err {
@@ -48,6 +79,11 @@ inline constexpr char kHelloMissing[] = "hello_missing";
 inline constexpr char kProtocolVersion[] = "protocol_version";
 inline constexpr char kUnknownOverlay[] = "unknown_overlay";
 inline constexpr char kMessageTooLong[] = "message_too_long";
+// P08: Antworten auf Änderungen (change_result)
+inline constexpr char kUnknownSource[] = "unknown_source";
+inline constexpr char kUnknownFolder[] = "unknown_folder";
+inline constexpr char kRejected[] = "rejected";       // Modell oder Datei lehnt ab
+inline constexpr char kSaveFailed[] = "save_failed";  // verzögertes Speichern gescheitert (error)
 } // namespace err
 
 // Eine Zeile: kompaktes JSON (enthält nie ein Zeilenende) und «\n».
@@ -97,8 +133,20 @@ struct OverlaySummary
 };
 OverlaySummary summarizeOverlay(const Overlay &overlay);
 
-QJsonObject overlayListMessage(const QList<OverlaySummary> &overlays);
-bool parseOverlayList(const QJsonObject &message, QList<OverlaySummary> *overlays, QString *error);
+// overlay_list (seit Version 2): Einträge in der Reihenfolge der Liste mit Ordnern (liste.json).
+struct OverlayListData
+{
+    OverlayLayout layout;             // nur Kennungen, wie liste.json
+    QList<OverlaySummary> overlays;   // in der Reihenfolge der Liste
+    QString listError;                // leer, wenn liste.json gültig ist
+
+    const OverlaySummary *summary(const QUuid &id) const;
+    bool operator==(const OverlayListData &) const = default;
+};
+// Einträge zu Kennungen ohne Zusammenfassung werden übergangen.
+QJsonObject overlayListMessage(const OverlayLayout &layout, const QList<OverlaySummary> &summaries,
+                               const QString &listError = QString());
+bool parseOverlayList(const QJsonObject &message, OverlayListData *data, QString *error);
 
 // type: msg::kOverlay (Antwort auf get_overlay) oder msg::kOverlayChanged. Das Overlay steht im
 // Feld «overlay» im Format der Overlay-Datei (docs/06-overlay-format.md), ohne Token.
@@ -137,7 +185,58 @@ struct ErrorInfo
 QJsonObject errorMessage(const ErrorInfo &error);
 bool parseError(const QJsonObject &message, ErrorInfo *error, QString *parseErrorText);
 
-// Nachricht ohne weitere Felder (get_overlay_list, quit_request).
+// Nachricht ohne weitere Felder (get_overlay_list, quit_request, get_fonts).
 QJsonObject simpleMessage(const char *type);
+
+// font_list: alle Schnitte zur Auswahl (Teil F) und eine Meldung, wenn ein Teil fehlt.
+QJsonObject fontListMessage(const QList<FontFace> &faces, const QString &fontError);
+bool parseFontList(const QJsonObject &message, QList<FontFace> *faces, QString *fontError,
+                   QString *error);
+
+// Änderung einzelner Eigenschaften einer Quelle im Feld «changes» von update_source.
+QJsonObject sourceChangesToJson(const SourceChanges &changes);
+bool sourceChangesFromJson(const QJsonObject &object, SourceChanges *changes, QString *error);
+
+// Änderung vom Fenster an den Kern (P08). Welche Felder zu welchem Typ gehören, steht in
+// docs/08-kern-schnittstelle.md; die übrigen bleiben leer.
+struct ChangeRequest
+{
+    QString type;                 // einer aus changeTypes()
+    qint64 requestId = 0;         // vom Fenster gewählt, kommt in change_result zurück
+    QUuid overlayId;
+    QUuid sourceId;
+    QUuid folderId;               // bei move_overlay das Ziel, null = oberste Ebene
+    QString name;
+    QString file;                 // Pfad der Datei des Nutzers oder Verweis "media/…" (Schrift)
+    int width = 0;
+    int height = 0;
+    int index = 0;
+    bool changeAddress = false;   // rename_overlay
+    bool expanded = false;        // set_folder_expanded
+    std::optional<int> weight;    // set_text_font; leer = aus der Datei
+    std::optional<bool> italic;   // set_text_font; leer = aus der Datei
+    SourceChanges changes;        // update_source
+
+    bool operator==(const ChangeRequest &) const = default;
+};
+QJsonObject changeRequestMessage(const ChangeRequest &request);
+bool parseChangeRequest(const QJsonObject &message, ChangeRequest *request, QString *error);
+// request_id einer Nachricht, -1 wenn keine gültige da ist (für die Antwort auf eine sonst
+// ungültige Änderung).
+qint64 messageRequestId(const QJsonObject &message);
+
+// Antwort des Kerns auf eine Änderung, nur an das Fenster, das sie geschickt hat.
+struct ChangeResult
+{
+    qint64 requestId = 0;
+    bool ok = false;
+    QUuid id;         // neu angelegtes Overlay, Ordner oder Quelle (sonst null)
+    QString code;     // bei !ok, siehe err
+    QString message;  // bei !ok, auf Deutsch
+
+    bool operator==(const ChangeResult &) const = default;
+};
+QJsonObject changeResultMessage(const ChangeResult &result);
+bool parseChangeResult(const QJsonObject &message, ChangeResult *result, QString *error);
 
 } // namespace dss

@@ -4,6 +4,8 @@
 #include <QString>
 #include <QUuid>
 
+#include <optional>
+
 // Datenmodell eines Overlays (P04, K-01). Nur Qt Core.
 // Alle Lagen und Grössen sind ganze Pixel der Overlay-Auflösung (CLAUDE.md Regel 11).
 // Ungültige Werte werden mit einer Meldung abgewiesen, nie still korrigiert.
@@ -97,6 +99,34 @@ QString moveSourceBackward(Overlay *overlay, const QUuid &sourceId); // eine Stu
 QString setSourceVisible(Overlay *overlay, const QUuid &sourceId, bool visible);
 QString setSourceGeometry(Overlay *overlay, const QUuid &sourceId, int x, int y, int width,
                           int height, int rotation);
+// Setzt die Quelle an die Stelle index der Zeichenreihenfolge (0 = ganz hinten), P08.
+QString moveSource(Overlay *overlay, const QUuid &sourceId, int index);
+
+// Änderung einzelner Eigenschaften einer Quelle (P08, Teil E). Nur gesetzte Werte ändern sich.
+// Schriftdatei, Gewicht und kursiv ändern sich nur zusammen (OverlayStore::setTextFont), die
+// Datei von Bild und Video nur mit einer Kopie im Datenordner.
+struct SourceChanges
+{
+    std::optional<QString> name;
+    std::optional<int> x;
+    std::optional<int> y;
+    std::optional<int> width;
+    std::optional<int> height;
+    std::optional<int> rotation; // Zehntelgrad
+    std::optional<bool> visible;
+    std::optional<bool> loop;        // nur Video
+    std::optional<QString> content;  // nur Text
+    std::optional<int> fontSize;     // nur Text
+    std::optional<QString> color;    // nur Text, #RRGGBBAA
+    std::optional<TextAlign> align;  // nur Text
+
+    bool isEmpty() const;
+    bool operator==(const SourceChanges &) const = default;
+};
+// Wendet die Änderungen an und prüft die Quelle danach (validateSource). Eine Eigenschaft, die
+// es bei der Art der Quelle nicht gibt (zum Beispiel loop bei Text), ist ein Fehler.
+QString applySourceChanges(Source *source, const SourceChanges &changes);
+QString updateSource(Overlay *overlay, const QUuid &sourceId, const SourceChanges &changes);
 
 // Drehung als Text mit einer Nachkommastelle, zum Beispiel 125 → "12.5 °"
 QString rotationDisplay(int tenthDegrees);

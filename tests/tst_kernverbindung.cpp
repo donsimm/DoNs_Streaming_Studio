@@ -183,13 +183,15 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 1);
+        QCOMPARE(c->coreHello().protocolVersion, 2);
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
-        // Sortiert nach Name wie im Kern: «Chat Ecke» vor «Überblick Start».
-        QCOMPARE(c->overlays().at(0), summarizeOverlay(storedOverlay(m_chatId)));
-        QCOMPARE(c->overlays().at(1), summarizeOverlay(storedOverlay(m_overviewId)));
-        QCOMPARE(c->overlays().at(1).sourceCount, 3);
-        QCOMPARE(c->overlays().at(0).width, 800);
+        // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
+        // «Chat Ecke».
+        QCOMPARE(c->overlays().at(0), summarizeOverlay(storedOverlay(m_overviewId)));
+        QCOMPARE(c->overlays().at(1), summarizeOverlay(storedOverlay(m_chatId)));
+        QCOMPARE(c->overlays().at(0).sourceCount, 3);
+        QCOMPARE(c->overlays().at(1).width, 800);
+        QCOMPARE(c->listData().layout.entries.size(), 2);
         QCOMPARE(c->statusText(), QStringLiteral("Mit dem Kern verbunden (dss-core %1)").arg(version()));
         for (Connection con : kAllConnections)
             QCOMPARE(c->connectionStates().value(con), ConnectionState::Off);

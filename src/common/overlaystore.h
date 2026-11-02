@@ -112,6 +112,31 @@ public:
                           QString *error);
     bool setSourceGeometry(const QUuid &overlayId, const QUuid &sourceId, int x, int y,
                            int width, int height, int rotation, QString *error);
+    // P08: Stelle in der Zeichenreihenfolge (0 = ganz hinten).
+    bool moveSource(const QUuid &overlayId, const QUuid &sourceId, int index, QString *error);
+    // P08: einzelne Eigenschaften (Name, Lage, Grösse, Drehung, sichtbar, Text, Wiederholen).
+    bool updateSource(const QUuid &overlayId, const QUuid &sourceId, const SourceChanges &changes,
+                      QString *error);
+    // P08: Schriftdatei, Gewicht und kursiv einer Textquelle zusammen. fontFile ist ein Pfad (die
+    // Datei wird kopiert, gleicher Inhalt → eine Kopie) oder ein Verweis "media/…" auf eine schon
+    // vorhandene Kopie. *reference (falls nicht nullptr) bekommt den Verweis.
+    bool setTextFont(const QUuid &overlayId, const QUuid &sourceId, const QString &fontFile,
+                     int weight, bool italic, QString *error, QString *reference = nullptr);
+    // P08: Bild einer Bildquelle ersetzen (Kopie im Datenordner wie beim Hinzufügen).
+    bool replaceImageFile(const QUuid &overlayId, const QUuid &sourceId, const QString &filePath,
+                          QString *error);
+
+    // Verzögertes Speichern (P08, Teil A): Änderungen an bestehenden Overlays gelten sofort im
+    // Speicher; die Datei schreibt erst flushPendingWrites(). Damit fasst der Kern häufige
+    // Änderungen zusammen. Anlegen, Kopieren, Löschen, Token, Liste und Kopien im Datenordner
+    // werden weiterhin sofort geschrieben. Ohne setDeferredWrites(true) wird sofort gespeichert
+    // (dss-cli).
+    void setDeferredWrites(bool deferred) { m_deferredWrites = deferred; }
+    bool hasPendingWrites() const { return !m_pendingWrites.isEmpty(); }
+    // Schreibt alle geänderten Overlays. Was nicht gespeichert werden kann, bleibt vorgemerkt.
+    bool flushPendingWrites(QString *error);
+    // Anzahl geschriebener Overlay-Dateien seit dem Anlegen dieses Objekts (für Prüfungen).
+    int overlayWriteCount() const { return m_overlayWrites; }
 
 private:
     QString overlaysDir() const;
@@ -143,6 +168,9 @@ private:
     QList<Overlay> m_overlays;
     OverlayLayout m_layout;
     QString m_layoutError;
+    bool m_deferredWrites = false;
+    QSet<QUuid> m_pendingWrites;
+    int m_overlayWrites = 0;
     QStringList m_loadErrors;
     QStringList m_loadWarnings;
 };

@@ -82,6 +82,7 @@ bool OverlayStore::load(QString *error, LoadMode mode)
 {
     const bool readOnly = mode == LoadMode::ReadOnly;
     m_overlays.clear();
+    m_pendingWrites.clear();
     m_loadErrors.clear();
     m_loadWarnings.clear();
     for (const QString &dir : {overlaysDir(), mediaDir()}) {
@@ -293,6 +294,29 @@ bool OverlayStore::writeOverlay(const Overlay &overlay, QString *error)
                      .arg(file.fileName(), file.errorString());
         return false;
     }
+    ++m_overlayWrites;
+    m_pendingWrites.remove(overlay.id);
+    return true;
+}
+
+bool OverlayStore::flushPendingWrites(QString *error)
+{
+    QStringList errors;
+    const QSet<QUuid> pending = m_pendingWrites;
+    for (const QUuid &id : pending) {
+        const Overlay *o = overlay(id);
+        if (!o) {
+            m_pendingWrites.remove(id);
+            continue;
+        }
+        QString e;
+        if (!writeOverlay(*o, &e))
+            errors.append(e);
+    }
+    if (!errors.isEmpty()) {
+        *error = errors.join(QStringLiteral("; "));
+        return false;
+    }
     return true;
 }
 
@@ -330,7 +354,9 @@ bool OverlayStore::modify(const QUuid &overlayId, const std::function<QString(Ov
         *error = e;
         return false;
     }
-    if (!writeOverlay(changed, error))
+    if (m_deferredWrites)
+        m_pendingWrites.insert(overlayId); // geschrieben von flushPendingWrites()
+    else if (!writeOverlay(changed, error))
         return false;
     m_overlays.removeAt(index);
     insertSorted(changed);
@@ -410,6 +436,7 @@ bool OverlayStore::removeOverlay(const QUuid &overlayId, QString *error)
         return false;
     }
     m_overlays.removeAt(index);
+    m_pendingWrites.remove(overlayId);
     if (!m_tokens.removeToken(overlayId, error)) {
         *error = QStringLiteral("Overlay gelöscht, aber Token nicht entfernt: ") + *error;
         return false;
@@ -610,6 +637,92 @@ bool OverlayStore::setSourceGeometry(const QUuid &overlayId, const QUuid &source
 {
     return modify(overlayId, [&](Overlay *o) {
         return dss::setSourceGeometry(o, sourceId, x, y, width, height, rotation);
+    }, error);
+}
+
+bool OverlayStore::moveSource(const QUuid &overlayId, const QUuid &sourceId, int index,
+                              QString *error)
+{
+    return modify(overlayId, [&](Overlay *o) { return dss::moveSource(o, sourceId, index); }, error);
+}
+
+bool OverlayStore::updateSource(const QUuid &overlayId, const QUuid &sourceId,
+                                const SourceChanges &changes, QString *error)
+{
+    return modify(overlayId, [&](Overlay *o) { return dss::updateSource(o, sourceId, changes); },
+                  error);
+}
+
+static QString findSourceOfKind(const Overlay *overlay, const QUuid &overlayId,
+                                const QUuid &sourceId, SourceKind kind, const QString &what)
+{
+    if (!overlay)
+        return unknownOverlay(overlayId);
+    const int index = sourceIndex(*overlay, sourceId);
+    if (index < 0)
+        return QStringLiteral("Quelle %1 nicht gefunden.").arg(sourceId.toString(QUuid::WithoutBraces));
+    if (overlay->sources.at(index).kind != kind)
+        return what;
+    return {};
+}
+
+bool OverlayStore::setTextFont(const QUuid &overlayId, const QUuid &sourceId,
+                               const QString &fontFile, int weight, bool italic, QString *error,
+                               QString *reference)
+{
+    if (const QString e = findSourceOfKind(overlay(overlayId), overlayId, sourceId,
+                                           SourceKind::Text,
+                                           QStringLiteral("Eine Schrift gibt es nur bei Quellen der Art Text."));
+        !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    QString ref;
+    if (validateMediaReference(fontFile).isEmpty()) {
+        // Verweis auf eine Kopie, die schon im Datenordner liegt.
+        if (!allowedMediaSuffixes(MediaUse::Font).contains(QFileInfo(fontFile).suffix())
+            || !QFileInfo::exists(mediaFilePath(fontFile))) {
+            *error = QStringLiteral("Schriftdatei %1 fehlt im Datenordner.").arg(fontFile);
+            return false;
+        }
+        ref = fontFile;
+    } else {
+        ref = importMedia(fontFile, MediaUse::Font, error);
+        if (ref.isEmpty())
+            return false;
+    }
+    const bool ok = modify(overlayId, [&](Overlay *o) {
+        const int index = sourceIndex(*o, sourceId);
+        Source changed = o->sources.at(index);
+        changed.text.fontFile = ref;
+        changed.text.weight = weight;
+        changed.text.italic = italic;
+        if (const QString e = validateSource(changed); !e.isEmpty())
+            return e;
+        o->sources[index] = changed;
+        return QString();
+    }, error);
+    if (ok && reference)
+        *reference = ref;
+    return ok;
+}
+
+bool OverlayStore::replaceImageFile(const QUuid &overlayId, const QUuid &sourceId,
+                                    const QString &filePath, QString *error)
+{
+    if (const QString e = findSourceOfKind(overlay(overlayId), overlayId, sourceId,
+                                           SourceKind::Image,
+                                           QStringLiteral("Datei ersetzen gibt es nur bei Quellen der Art Bild."));
+        !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    const QString ref = importMedia(filePath, MediaUse::Image, error);
+    if (ref.isEmpty())
+        return false;
+    return modify(overlayId, [&](Overlay *o) {
+        o->sources[sourceIndex(*o, sourceId)].file = ref;
+        return QString();
     }, error);
 }
 

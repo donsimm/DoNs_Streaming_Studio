@@ -123,6 +123,9 @@ int main(int argc, char *argv[])
         qInfo("systemd: bereit gemeldet");
     const int rc = app.exec();
     dss::notifySystemd("STOPPING=1");
+    // Änderungen, die noch nicht in der Datei sind, vor dem Beenden speichern (P08, Teil A).
+    if (!service.savePending(&error))
+        qCritical("Beim Beenden nicht gespeichert: %s", qPrintable(error));
     qInfo("beendet, Exit-Code %d", rc);
     return rc;
 }

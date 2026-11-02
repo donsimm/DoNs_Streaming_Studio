@@ -93,6 +93,39 @@ void CoreClient::requestOverlayList()
         send(simpleMessage(msg::kGetOverlayList));
 }
 
+void CoreClient::requestFonts()
+{
+    if (m_connected)
+        send(simpleMessage(msg::kGetFonts));
+}
+
+qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
+{
+    if (!m_connected)
+        return 0;
+    if (!coalesceKey.isEmpty() && m_requestOfKey.contains(coalesceKey)) {
+        m_heldChanges.insert(coalesceKey, request); // ersetzt eine ältere zurückgehaltene
+        return -1;
+    }
+    return transmit(request, coalesceKey);
+}
+
+qint64 CoreClient::transmit(ChangeRequest request, const QString &coalesceKey)
+{
+    request.requestId = m_nextRequestId++;
+    if (!coalesceKey.isEmpty()) {
+        m_keyOfRequest.insert(request.requestId, coalesceKey);
+        m_requestOfKey.insert(coalesceKey, request.requestId);
+    }
+    send(changeRequestMessage(request));
+    return request.requestId;
+}
+
+bool CoreClient::isChangePending(const QString &coalesceKey) const
+{
+    return m_requestOfKey.contains(coalesceKey) || m_heldChanges.contains(coalesceKey);
+}
+
 std::optional<QuitReply> CoreClient::requestQuit(int timeoutMs)
 {
     if (!m_connected)
@@ -247,15 +280,15 @@ void CoreClient::handleMessage(const QJsonObject &message)
         return;
     }
     if (type == QLatin1String(msg::kOverlayList)) {
-        QList<OverlaySummary> list;
+        OverlayListData list;
         if (!parseOverlayList(message, &list, &error)) {
             qWarning("Kern: overlay_list ungültig: %s", qPrintable(error));
             return;
         }
-        m_overlays = list;
+        m_list = list;
         // Overlays, die es nicht mehr gibt, auch aus dem Zwischenspeicher nehmen.
         QSet<QUuid> ids;
-        for (const OverlaySummary &s : std::as_const(list))
+        for (const OverlaySummary &s : std::as_const(list.overlays))
             ids.insert(s.id);
         for (auto it = m_overlayCache.begin(); it != m_overlayCache.end();) {
             if (ids.contains(it.key()))
@@ -273,7 +306,7 @@ void CoreClient::handleMessage(const QJsonObject &message)
         m_overlayCache.insert(o.id, o);
         // Eintrag der Liste nachführen (Name, Auflösung, Anzahl Quellen).
         bool listChanged = false;
-        for (OverlaySummary &s : m_overlays) {
+        for (OverlaySummary &s : m_list.overlays) {
             if (s.id == o.id && !(s == summarizeOverlay(o))) {
                 s = summarizeOverlay(o);
                 listChanged = true;
@@ -289,9 +322,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
             return;
         }
         m_overlayCache.remove(id);
-        const qsizetype before = m_overlays.size();
-        m_overlays.removeIf([&id](const OverlaySummary &s) { return s.id == id; });
-        if (m_overlays.size() != before)
+        const qsizetype before = m_list.overlays.size();
+        m_list.overlays.removeIf([&id](const OverlaySummary &s) { return s.id == id; });
+        removeOverlayFromLayout(&m_list.layout, id);
+        if (m_list.overlays.size() != before)
             emit overlayListChanged();
         emit overlayRemoved(id);
     } else if (type == QLatin1String(msg::kStats)) {
@@ -318,6 +352,30 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_quitReply = reply;
         emit quitReplied(reply);
+    } else if (type == QLatin1String(msg::kFontList)) {
+        QList<FontFace> faces;
+        QString fontError;
+        if (!parseFontList(message, &faces, &fontError, &error)) {
+            qWarning("Kern: font_list ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_fonts = faces;
+        m_fontError = fontError;
+        emit fontsChanged();
+    } else if (type == QLatin1String(msg::kChangeResult)) {
+        ChangeResult result;
+        if (!parseChangeResult(message, &result, &error)) {
+            qWarning("Kern: change_result ungültig: %s", qPrintable(error));
+            return;
+        }
+        const QString key = m_keyOfRequest.take(result.requestId);
+        if (!key.isEmpty() && m_requestOfKey.value(key) == result.requestId) {
+            m_requestOfKey.remove(key);
+            // Die zuletzt zurückgehaltene Änderung zu diesem Schlüssel jetzt schicken.
+            if (m_heldChanges.contains(key))
+                transmit(m_heldChanges.take(key), key);
+        }
+        emit changeFinished(result);
     } else if (type == QLatin1String(msg::kError)) {
         ErrorInfo info;
         if (!parseError(message, &info, &error)) {
@@ -356,8 +414,13 @@ void CoreClient::setStatus(const QString &text)
 void CoreClient::clearData()
 {
     m_coreHello = Hello();
-    m_overlays.clear();
+    m_list = OverlayListData();
     m_overlayCache.clear();
+    m_fonts.clear();
+    m_fontError.clear();
+    m_keyOfRequest.clear();
+    m_requestOfKey.clear();
+    m_heldChanges.clear();
     m_lastStats.reset();
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);

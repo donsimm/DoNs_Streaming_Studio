@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-02 (P07). Version der Schnittstelle: **1**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`. Tests: `tst_protocol` (alle Nachrichten lesen und schreiben, ohne Qt Gui) und `tst_kernverbindung` (Kern als eigener Prozess, Zusammenspiel).
+Stand: 2026-11-03 (P08). Version der Schnittstelle: **2**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
 
-In P07 ist die Schnittstelle **nur lesend**: Das Fenster kann Overlays ansehen, aber nichts ändern (Bearbeiten kommt mit P08). Der **Token** eines Overlays wird nie übertragen (kommt mit P10; CLAUDE.md Regel 12).
+Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays wird nie übertragen, weder gelesen noch geändert (kommt mit P10; CLAUDE.md Regel 12).
+
+### Version 2 (P08)
+
+Die Version stieg von 1 auf 2, weil sich `overlay_list` so geändert hat, dass ein Fenster der Version 1 die Nachricht als ungültig verwerfen würde (Feld `entries` mit Ordnern statt `overlays`, Reihenfolge der Liste statt nach Name). Dazu kommen die Änderungen, `change_result`, `get_fonts` und `font_list`, die ein Kern der Version 1 mit `unknown_type` beantworten würde. Die Regel «unbekannte Felder werden übergangen» reicht dafür nicht, weil Pflichtfelder wegfallen. Fenster und Kern werden immer zusammen gebaut; eine abweichende Version meldet das `hello` (unten, Ablauf Punkte 2 und 3).
 
 ## Verbindung
 
@@ -22,7 +26,7 @@ Quellen: https://doc.qt.io/qt-6.8/qlocalserver.html (`SocketOption`, `removeServ
 - Jede Nachricht ist **ein JSON-Objekt in einer Zeile** (UTF-8, kompakt), abgeschlossen mit `\n` (Byte 0x0A). Zeilenwechsel in Texten stehen im JSON als `\n` (zwei Zeichen), nie als Byte 0x0A.
 - Jede Nachricht hat das Feld `type` (Text). Die übrigen Felder hängen vom Typ ab.
 - Eine Zeile darf höchstens 16 MiB (16 777 216 Byte) lang sein. Eine längere Zeile beendet die Verbindung (Kern schickt vorher `error` mit `message_too_long`).
-- **Pflichtfelder** müssen vorhanden sein und den richtigen Typ haben, sonst ist die Nachricht ungültig. **Unbekannte Felder** werden übergangen; so lassen sich später Felder ergänzen, ohne die Version zu erhöhen. Eine Änderung, die alte Gegenstellen falsch verstehen würden, erhöht die Version.
+- **Pflichtfelder** müssen vorhanden sein und den richtigen Typ haben, sonst ist die Nachricht ungültig. **Unbekannte Felder** werden übergangen; so lassen sich später Felder ergänzen, ohne die Version zu erhöhen. Eine Änderung, die alte Gegenstellen falsch verstehen würden, erhöht die Version. Ausnahme: Im Objekt `changes` von `update_source` ist ein unbekanntes Feld ein Fehler, damit kein Tippfehler still verloren geht.
 - Kennungen (`id`) sind UUID in Kleinbuchstaben ohne Klammern, wie in der Overlay-Datei.
 - Zahlen: JSON-Zahlen. «ganze Zahl» heisst ohne Nachkommastellen.
 
@@ -44,26 +48,35 @@ Fenster                                 Kern
    | <--- overlay_removed {id} ----------- |   an alle Fenster
    | <--- overlay_list ------------------- |   nach Änderungen, an alle Fenster
    |                ...                    |
+   | ---- update_source {request_id 7} --> |   Änderung (P08)
+   | <--- overlay_changed {overlay} ------ |   an alle Fenster, auch an dieses
+   | <--- change_result {request_id 7} --- |   nur an dieses Fenster, zuletzt
+   |                ...                    |
+   | ---- get_fonts ---------------------> |
+   | <--- font_list ---------------------- |
+   |                ...                    |
    | ---- quit_request ------------------> |   normales Schliessen des Fensters
    | <--- quit_reply {accepted} ---------- |
    | ---- trennt -------------------------X|
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 1 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 1».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 2 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 2».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `connections` und, falls schon gemessen, die letzte `stats`.
-5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed` und `overlay_list` an **alle** begrüssten Verbindungen.
+5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
 
-### Änderungen (K-02)
+### Verteilen von Änderungen (K-02)
 
-Bei jeder Änderung schickt der Kern das **ganze** geänderte Overlay (`overlay_changed`) an alle Fenster, auch an solche, die es nie angefragt haben. In P07 ändert sich nur etwas, wenn der Kern den Datenordner neu lädt (SIGHUP, zum Beispiel `systemctl --user reload dss-core.service`): Dann vergleicht er jedes Overlay mit dem Stand vorher und schickt
+Bei jeder Änderung schickt der Kern das **ganze** geänderte Overlay (`overlay_changed`) an alle Fenster, auch an solche, die es nie angefragt haben. Eine Änderung entsteht durch eine Änderungsnachricht eines Fensters (Abschnitt «Änderungen») oder wenn der Kern den Datenordner neu lädt (SIGHUP, zum Beispiel `systemctl --user reload dss-core.service`). In beiden Fällen vergleicht er jedes Overlay und die Liste mit dem Stand vorher und schickt in dieser Reihenfolge
 
 - `overlay_changed` für jedes neue oder geänderte Overlay,
 - `overlay_removed` für jedes Overlay, das es nicht mehr gibt,
-- zum Schluss einmal `overlay_list`, wenn sich etwas geändert hat.
+- einmal `overlay_list`, wenn sich die Liste geändert hat (Reihenfolge, Ordner, Name, Adresse, Auflösung oder Anzahl Quellen eines Overlays).
+
+Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschnitt «Speichern»). Waren die Schriften schon geladen, lädt er sie danach neu und schickt `font_list` an alle.
 
 ### Beenden (Entscheid 1 in P07)
 
@@ -80,27 +93,41 @@ Bei jeder Änderung schickt der Kern das **ganze** geänderte Overlay (`overlay_
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `1` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `2` |
 
 ```json
-{"program":"dss-core","protocol_version":1,"type":"hello","version":"0.1.0"}
+{"program":"dss-core","protocol_version":2,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
 
-Liste aller geladenen Overlays, sortiert wie im Kern (nach Name ohne Gross-/Kleinschreibung, dann Adresse; Punkt 22).
+Liste aller geladenen Overlays **in der Reihenfolge der Liste** mit Ordnern (eine Ebene), wie sie in `<Datenordner>/liste.json` steht (`docs/06-overlay-format.md`, Abschnitt «Liste»). Geändert in Version 2 (vorher flache Liste nach Name).
 
 | Feld | Typ | Inhalt |
 |---|---|---|
-| `overlays` | Liste | 0 oder mehr Einträge |
-| `overlays[].id` | Text | Kennung |
-| `overlays[].name` | Text | Name |
-| `overlays[].address` | Text | Adresse der Browserquelle |
-| `overlays[].width`, `overlays[].height` | ganze Zahl | Auflösung (1 bis 7680 bzw. 1 bis 4320) |
-| `overlays[].source_count` | ganze Zahl ab 0 | Anzahl Quellen |
+| `entries` | Liste | Einträge der obersten Ebene, 0 oder mehr |
+| `entries[].kind` | Text | `overlay` oder `folder` |
+| `entries[].overlay` | Objekt | bei `overlay`: Eintrag eines Overlays (unten) |
+| `entries[].id` | Text | bei `folder`: Kennung des Ordners |
+| `entries[].name` | Text | bei `folder`: Name des Ordners |
+| `entries[].expanded` | true/false | bei `folder`: aufgeklappt |
+| `entries[].overlays` | Liste | bei `folder`: Einträge der Overlays im Ordner, 0 oder mehr |
+| `list_error` | Text oder `null` | Meldung, wenn `liste.json` nicht gelesen werden konnte; die Liste steht dann nach Name, Änderungen an Reihenfolge und Ordnern werden abgewiesen (`rejected`), bis die Datei von Hand repariert ist. Anlegen, Kopieren und Löschen von Overlays gehen weiter |
+
+Eintrag eines Overlays:
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `id` | Text | Kennung |
+| `name` | Text | Name |
+| `address` | Text | Adresse der Browserquelle |
+| `width`, `height` | ganze Zahl | Auflösung (1 bis 7680 bzw. 1 bis 4320) |
+| `source_count` | ganze Zahl ab 0 | Anzahl Quellen |
+
+Jedes Overlay steht genau einmal in der Liste; jede Kennung (Overlay und Ordner) kommt nur einmal vor. Sonst ist die Nachricht ungültig.
 
 ```json
-{"overlays":[{"address":"ueberblick-start","height":1080,"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","name":"Überblick Start","source_count":3,"width":1920}],"type":"overlay_list"}
+{"entries":[{"expanded":true,"id":"70fcf543-5e55-4028-ace3-1ddfed919ce5","kind":"folder","name":"Szenen","overlays":[{"address":"ueberblick-start","height":1080,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","name":"Überblick Start","source_count":0,"width":1920}]}],"list_error":null,"type":"overlay_list"}
 ```
 
 ### `overlay` und `overlay_changed`
@@ -124,6 +151,45 @@ Ein ganzes Overlay. `overlay` ist die Antwort auf `get_overlay`, `overlay_change
 ```json
 {"id":"7be08f35-6885-4a95-9c32-939c45a688ea","type":"overlay_removed"}
 ```
+
+### `change_result`
+
+Antwort auf eine Änderung, **nur** an das Fenster, das sie geschickt hat, und immer **nach** den Nachrichten an alle, die die Änderung auslöst. Kommt `change_result`, hat das Fenster den neuen Zustand also schon.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `request_id` | ganze Zahl | `request_id` der Änderung |
+| `ok` | true/false | `true`: übernommen |
+| `id` | Text oder `null` | Kennung des neu angelegten Overlays, Ordners oder der neuen Quelle (`create_overlay`, `copy_overlay`, `create_folder`, `add_*_source`), sonst `null` |
+| `code` | Text oder `null` | bei `ok: false` der Fehlercode (`invalid_message`, `unknown_overlay`, `unknown_source`, `unknown_folder`, `rejected`), sonst `null` |
+| `message` | Text oder `null` | bei `ok: false` die Meldung auf Deutsch; das Fenster zeigt sie in der Statuszeile. Sonst `null` |
+
+```json
+{"code":null,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","message":null,"ok":true,"request_id":1,"type":"change_result"}
+{"code":"rejected","id":null,"message":"Drehung 3600 ungültig, erlaubt sind 0 bis 3599 Zehntelgrad.","ok":false,"request_id":6,"type":"change_result"}
+{"code":"invalid_message","id":null,"message":"Feld changes.breite ist unbekannt","ok":false,"request_id":7,"type":"change_result"}
+```
+
+### `font_list`
+
+Auswahl der Schriften für Textquellen (P08, Teil F), Antwort auf `get_fonts`. Der Kern lädt die Liste beim ersten `get_fonts` (ohne zu blockieren: `fc-list`, dann `fc-query` für die mitgelieferte Be Vietnam Pro und die Schriftdateien im Datenordner; auf dem Studio-PC 13 ms) und behält sie. Kommt durch eine Änderung eine neue Schriftdatei in den Datenordner, schickt er `font_list` an **alle**.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `faces` | Liste | Schnitte, sortiert: Mitgelieferte zuerst, dann nach Familie (ohne Gross-/Kleinschreibung), Gewicht, kursiv |
+| `faces[].family` | Text | Familie, zum Beispiel `DejaVu Sans` |
+| `faces[].style` | Text | Name des Schnitts laut Datei, zum Beispiel `Bold Oblique` |
+| `faces[].weight` | ganze Zahl 100 bis 900 | Gewicht wie in der Overlay-Datei |
+| `faces[].italic` | true/false | kursiv oder schräg |
+| `faces[].file` | Text | `builtin` und `system`: absoluter Pfad auf dem Studio-PC; `media`: Verweis `media/<SHA-256>.<Endung>` |
+| `faces[].origin` | Text | `builtin` (Be Vietnam Pro im Repo), `system` (installiert), `media` (Kopie im Datenordner) |
+| `error` | Text oder `null` | Meldung, wenn ein Teil fehlt (zum Beispiel `fc-list` nicht ausführbar); die übrigen Schnitte sind trotzdem da |
+
+```json
+{"error":null,"faces":[{"family":"Be Vietnam Pro","file":"/home/dominik/DoNs_Streaming_Studio/src/common/schriften/be-vietnam-pro/BeVietnamPro-Thin.ttf","italic":false,"origin":"builtin","style":"Thin","weight":100},{"family":"DejaVu Sans","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","italic":false,"origin":"system","style":"Bold","weight":700},{"family":"DejaVu Sans","file":"media/a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890.ttf","italic":false,"origin":"media","style":"Bold","weight":700}],"type":"font_list"}
+```
+
+(gekürzt: auf dem Studio-PC 133 Schnitte am 2026-11-03)
 
 ### `stats`
 
@@ -194,17 +260,96 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `1`) | `overlay_list`, `connections`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `2`) | `overlay_list`, `connections`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
+| `get_fonts` | – | `font_list` |
 | `quit_request` | – | `quit_reply` |
+| Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":1,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":2,"type":"hello","version":"0.1.0"}
+{"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
 {"type":"quit_request"}
 ```
+
+## Änderungen (P08)
+
+Jede Änderung ist eine eigene Nachricht mit dem Feld `request_id` (ganze Zahl 0 bis 2^53, vom Fenster gewählt, kommt in `change_result` zurück). Der Kern prüft sie mit dem Modell (dieselben Prüfungen wie beim Lesen der Overlay-Datei, `docs/06-overlay-format.md`), übernimmt sie und schickt den neuen Zustand an alle Fenster (Abschnitt «Verteilen von Änderungen»), danach `change_result` an das Fenster, das sie geschickt hat. Eine abgewiesene Änderung ändert nichts; der Kern schreibt sie als Warnung ins Protokoll.
+
+Das Fenster übernimmt den Zustand **nur** aus `overlay_changed`, `overlay_removed` und `overlay_list`, nie aus der eigenen Änderung. So sehen alle Fenster immer dasselbe.
+
+Kennungen: `overlay_id`, `source_id`, `folder_id` sind Text (UUID). `file` ist ein absoluter Pfad auf dem Studio-PC (Fenster und Kern laufen auf demselben Rechner); bei `set_text_font` auch ein Verweis `media/…` auf eine Kopie im Datenordner. Der Kern kopiert jede Datei nach `media/<SHA-256>.<Endung>`; gleicher Inhalt gibt eine Kopie (K-03).
+
+| Typ | Felder | Wirkung | `id` in `change_result` |
+|---|---|---|---|
+| `create_overlay` | `name`, `width`, `height` (ganze Zahlen) | neues Overlay ohne Quellen, Adresse aus dem Namen, eigener Token; ans Ende der Liste | Overlay |
+| `rename_overlay` | `overlay_id`, `name`, `change_address` (true/false) | neuer Name; bei `true` auch neue Adresse aus dem Namen (eindeutig gemacht) | – |
+| `copy_overlay` | `overlay_id` | Kopie mit neuen Kennungen, Name «<Name> Kopie», eigener Adresse und neuem Token; direkt nach dem Original in der Liste | Overlay |
+| `remove_overlay` | `overlay_id` | löscht das Overlay (Datei und Eintrag in der Liste) | – |
+| `move_overlay` | `overlay_id`, `folder_id` (Text oder `null` = oberste Ebene), `index` (ganze Zahl ab 0) | setzt das Overlay an die Stelle `index` im Ziel; `index` zählt nach dem Herausnehmen | – |
+| `create_folder` | `name` | neuer Ordner (aufgeklappt, leer) am Ende der Liste | Ordner |
+| `rename_folder` | `folder_id`, `name` | neuer Name | – |
+| `remove_folder` | `folder_id` | löscht den Ordner; seine Overlays kommen an seiner Stelle auf die oberste Ebene | – |
+| `move_folder` | `folder_id`, `index` | setzt den Ordner an die Stelle `index` der obersten Ebene | – |
+| `set_folder_expanded` | `folder_id`, `expanded` (true/false) | auf- oder zugeklappt (wird gespeichert) | – |
+| `add_image_source` | `overlay_id`, `file` | neue Bildquelle zuoberst, Lage 0/0 in der Grösse des Overlays | Quelle |
+| `add_video_source` | `overlay_id`, `file` | neue Videoquelle wie oben, «Wiederholen» aus | Quelle |
+| `add_text_source` | `overlay_id` | neue Textquelle wie oben, Inhalt «Text», Schrift Be Vietnam Pro Regular | Quelle |
+| `remove_source` | `overlay_id`, `source_id` | entfernt die Quelle (die Kopie im Datenordner bleibt) | – |
+| `move_source` | `overlay_id`, `source_id`, `index` | Stelle in der Zeichenreihenfolge, 0 = ganz hinten | – |
+| `update_source` | `overlay_id`, `source_id`, `changes` (Objekt, unten) | ändert die angegebenen Eigenschaften, alle zusammen oder keine | – |
+| `set_text_font` | `overlay_id`, `source_id`, `file`, `weight` (100 bis 900 oder `null`), `italic` (true/false oder `null`) | Schriftdatei, Gewicht und kursiv zusammen; `null` = aus der Datei lesen (`fc-query`, für «Datei wählen …») | – |
+| `replace_image_file` | `overlay_id`, `source_id`, `file` | neues Bild für eine Bildquelle; Lage und Grösse bleiben | – |
+
+Objekt `changes` (nur angegebene Felder ändern sich, mindestens eines; unbekannte Felder sind ein Fehler):
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `name` | Text | Name der Quelle, nicht leer |
+| `x`, `y` | ganze Zahl | Lage in Pixeln der Overlay-Auflösung, auch negativ |
+| `width`, `height` | ganze Zahl | Grösse in Pixeln, ab 1 |
+| `rotation` | ganze Zahl | Drehung in Zehntelgrad, 0 bis 3599 |
+| `visible` | true/false | sichtbar |
+| `video.loop` | true/false | nur Video: wiederholen |
+| `text.content` | Text | nur Text: Inhalt, mehrzeilig |
+| `text.font_size` | ganze Zahl | nur Text: Schriftgrösse in Pixeln, ab 1 |
+| `text.color` | Text | nur Text: `#RRGGBBAA` |
+| `text.align` | Text | nur Text: `left`, `center`, `right` |
+
+Grenzen und Meldungen kommen aus dem Modell (`docs/06-overlay-format.md`). Eine Eigenschaft, die es bei der Art der Quelle nicht gibt, wird abgewiesen («Wiederholen gibt es nur bei Quellen der Art Video.»).
+
+```json
+{"type":"create_overlay","request_id":1,"name":"Überblick Start","width":1920,"height":1080}
+{"type":"create_folder","request_id":2,"name":"Szenen"}
+{"type":"move_overlay","request_id":3,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","folder_id":"70fcf543-5e55-4028-ace3-1ddfed919ce5","index":0}
+{"type":"add_text_source","request_id":4,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8"}
+{"type":"update_source","request_id":5,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","changes":{"x":40,"y":900,"text":{"content":"Willkommen","font_size":72}}}
+{"type":"set_text_font","request_id":8,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","weight":700,"italic":false}
+```
+
+(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`)
+
+Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `request_id`, antwortet der Kern mit `change_result` `ok: false`, `code: invalid_message`; sonst mit `error` `invalid_message`.
+
+### Häufige Änderungen zusammenfassen
+
+Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele Änderungen pro Sekunde. Zwei Stufen verhindern, dass der Kern überlastet wird oder die Datei bei jedem Schritt schreibt:
+
+1. **Fenster** (`CoreClient::sendChange` mit Schlüssel, zum Beispiel Feld und Quelle): Je Schlüssel ist höchstens eine Änderung unterwegs. Eine neue Änderung, bevor `change_result` da ist, wird zurückgehalten und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. Gemessen in `tst_bearbeiten` (2026-11-03): 200 Schritte → 3 Änderungen an den Kern, der letzte Wert kommt an.
+2. **Kern** (Abschnitt «Speichern»): Jede Änderung gilt sofort im Speicher und geht sofort an alle Fenster; die Datei schreibt er später.
+
+### Speichern
+
+| Punkt | Festlegung |
+|---|---|
+| Overlay-Dateien | nach 300 ms ohne weitere Änderung, spätestens 1000 ms nach der ersten noch nicht gespeicherten Änderung (`SaveScheduler`); atomar (`QSaveFile`) |
+| Sofort geschrieben | Anlegen, Kopieren, Löschen eines Overlays, `liste.json`, Kopien im Datenordner |
+| Beim Beenden | vor dem Ende (`quit_request`, SIGTERM, SIGINT) und vor dem Neuladen (SIGHUP) speichert der Kern alles Offene |
+| `kill -9` / Absturz | höchstens etwa die Änderungen der letzten Sekunde gehen verloren |
+| Fehler | Kann eine Datei nicht geschrieben werden, schreibt der Kern das ins Protokoll (kritisch), schickt `error` `save_failed` an alle und versucht es mit der nächsten Änderung und beim Beenden wieder. Im Speicher bleibt die Änderung gültig |
 
 ## Fehlerfälle
 
@@ -215,7 +360,11 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 | `unknown_type` | unbekannter Wert in `type` | Nachricht übergangen |
 | `hello_missing` | Anfrage vor dem `hello` | Anfrage übergangen |
 | `protocol_version` | `hello` mit anderer Version | Kern trennt die Verbindung |
-| `unknown_overlay` | `get_overlay` mit einer Kennung, die es nicht gibt | – |
+| `unknown_overlay` | `get_overlay` oder eine Änderung mit einer Kennung, die es nicht gibt | – |
+| `unknown_source` | Änderung mit einer Quelle, die es im Overlay nicht gibt (nur in `change_result`) | – |
+| `unknown_folder` | Änderung mit einem Ordner, den es nicht gibt (nur in `change_result`) | – |
+| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen, zum Beispiel ungültiger Wert, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
+| `save_failed` | verzögertes Speichern gescheitert (als `error` an alle, `request` `null`) | Änderung bleibt im Speicher, neuer Versuch |
 | `message_too_long` | Zeile länger als 16 MiB | Kern trennt die Verbindung |
 
 Auf der Fenster-Seite gibt es keine Fehlermeldungen an den Kern: Ungültige Nachrichten des Kerns werden im Protokoll gemeldet und übergangen; ein ungültiges `hello` oder eine zu lange Zeile trennt die Verbindung (neuer Versuch nach 2 s).

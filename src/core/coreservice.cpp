@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSet>
 #include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -24,7 +25,13 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath, QO
     , m_socketPath(socketPath)
     , m_server(new QLocalServer(this))
     , m_statsTimer(new QTimer(this))
+    , m_saver(new dss::SaveScheduler(this))
+    , m_fontLoader(new dss::FontCatalogLoader(this))
 {
+    // Änderungen gelten sofort im Speicher, die Dateien schreibt m_saver zusammengefasst (Teil A).
+    m_store->setDeferredWrites(true);
+    connect(m_saver, &dss::SaveScheduler::saveRequested, this, &CoreService::onSaveRequested);
+    connect(m_fontLoader, &dss::FontCatalogLoader::finished, this, &CoreService::onFontsLoaded);
     // In P07 gibt es noch keine Verbindungen: alle «nicht eingerichtet» (grau).
     for (dss::Connection c : dss::kAllConnections)
         m_connectionStates.insert(c, dss::ConnectionState::Off);
@@ -35,6 +42,9 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath, QO
 
 CoreService::~CoreService()
 {
+    QString error;
+    if (!savePending(&error))
+        qCritical("Nicht gespeichert: %s", qPrintable(error));
     const QList<QLocalSocket *> sockets = m_clients.keys();
     m_clients.clear();
     for (QLocalSocket *socket : sockets) {
@@ -96,23 +106,35 @@ QList<dss::OverlaySummary> CoreService::summaries() const
     return list;
 }
 
-void CoreService::reload()
+QJsonObject CoreService::listMessage() const
 {
-    const QList<dss::Overlay> before = m_store->overlays();
-    QString error;
-    if (!m_store->load(&error)) {
-        qCritical("Neu laden fehlgeschlagen: %s", qPrintable(error));
-        return;
-    }
-    for (const QString &e : m_store->loadErrors())
-        qWarning("Fehler beim Laden: %s", qPrintable(e));
-    for (const QString &w : m_store->loadWarnings())
-        qWarning("Warnung: %s", qPrintable(w));
+    return dss::overlayListMessage(m_store->layout(), summaries(), m_store->layoutError());
+}
 
+bool CoreService::savePending(QString *error)
+{
+    if (!m_store->hasPendingWrites())
+        return true;
+    return m_store->flushPendingWrites(error);
+}
+
+void CoreService::onSaveRequested()
+{
+    QString error;
+    if (savePending(&error))
+        return;
+    // Bleibt vorgemerkt; der nächste Versuch kommt mit der nächsten Änderung und beim Beenden.
+    qCritical("Speichern fehlgeschlagen: %s", qPrintable(error));
+    broadcast(dss::errorMessage({QString::fromLatin1(dss::err::kSaveFailed),
+                                 QStringLiteral("Speichern fehlgeschlagen: ") + error, QString()}));
+}
+
+std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> &before,
+                                                      const QJsonObject &listBefore)
+{
     int changed = 0;
     int removed = 0;
-    const QList<dss::Overlay> after = m_store->overlays();
-    for (const dss::Overlay &o : after) {
+    for (const dss::Overlay &o : m_store->overlays()) {
         const auto old = std::find_if(before.begin(), before.end(),
                                       [&o](const dss::Overlay &b) { return b.id == o.id; });
         if (old == before.end() || !(*old == o)) {
@@ -126,10 +148,38 @@ void CoreService::reload()
             ++removed;
         }
     }
-    if (changed > 0 || removed > 0)
-        broadcast(dss::overlayListMessage(summaries()));
+    const QJsonObject listAfter = listMessage();
+    if (listAfter != listBefore)
+        broadcast(listAfter);
+    return {changed, removed};
+}
+
+void CoreService::reload()
+{
+    // Zuerst speichern, was noch offen ist, sonst ginge es beim Neu laden verloren.
+    QString error;
+    if (!savePending(&error))
+        qCritical("Vor dem Neu laden nicht gespeichert: %s", qPrintable(error));
+    const QList<dss::Overlay> before = m_store->overlays();
+    const QJsonObject listBefore = listMessage();
+    if (!m_store->load(&error)) {
+        qCritical("Neu laden fehlgeschlagen: %s", qPrintable(error));
+        return;
+    }
+    for (const QString &e : m_store->loadErrors())
+        qWarning("Fehler beim Laden: %s", qPrintable(e));
+    for (const QString &w : m_store->loadWarnings())
+        qWarning("Warnung: %s", qPrintable(w));
+
+    const auto [changed, removed] = broadcastDifferences(before, listBefore);
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
-          static_cast<long long>(after.size()), changed, removed);
+          static_cast<long long>(m_store->overlays().size()), changed, removed);
+    // Schriftdateien im Datenordner können sich geändert haben.
+    if (m_fontsLoaded) {
+        m_fontsLoaded = false;
+        m_broadcastFonts = true;
+        startFontLoading();
+    }
 }
 
 void CoreService::onNewConnection()
@@ -146,6 +196,7 @@ void CoreService::onNewConnection()
 
 void CoreService::onDisconnected(QLocalSocket *socket)
 {
+    m_fontWaiters.removeAll(QPointer<QLocalSocket>(socket));
     const auto it = m_clients.find(socket);
     if (it != m_clients.end()) {
         if (it->greeted)
@@ -210,7 +261,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         client.hello = hello;
         qInfo("Verbunden: %s %s (%lld Verbindungen)", qPrintable(hello.program),
               qPrintable(hello.version), static_cast<long long>(m_clients.size()));
-        send(socket, dss::overlayListMessage(summaries()));
+        send(socket, listMessage());
         send(socket, dss::connectionsMessage(m_connectionStates));
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
@@ -221,8 +272,12 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
                   QStringLiteral("Zuerst hello schicken"), type);
         return;
     }
-    if (type == QLatin1String(dss::msg::kGetOverlayList)) {
-        send(socket, dss::overlayListMessage(summaries()));
+    if (dss::isChangeType(type)) {
+        handleChange(socket, message);
+    } else if (type == QLatin1String(dss::msg::kGetFonts)) {
+        handleGetFonts(socket);
+    } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
+        send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetOverlay)) {
         QUuid id;
         if (!dss::parseOverlayId(message, &id, &error)) {
@@ -288,4 +343,213 @@ void CoreService::sampleStats()
     const qint64 elapsed = m_sinceLastSample.restart();
     m_lastStats = m_sampler.sample(elapsed);
     broadcast(dss::statsMessage(*m_lastStats));
+}
+
+void CoreService::handleChange(QLocalSocket *socket, const QJsonObject &message)
+{
+    dss::ChangeRequest request;
+    QString error;
+    if (!dss::parseChangeRequest(message, &request, &error)) {
+        const qint64 id = dss::messageRequestId(message);
+        if (id < 0) {
+            sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        } else {
+            qWarning("Änderung %s ungültig: %s", qPrintable(dss::messageType(message)), qPrintable(error));
+            send(socket, dss::changeResultMessage(
+                             {id, false, QUuid(), QString::fromLatin1(dss::err::kInvalidMessage), error}));
+        }
+        return;
+    }
+    const QList<dss::Overlay> before = m_store->overlays();
+    const QJsonObject listBefore = listMessage();
+    dss::ChangeResult result = applyChange(request);
+    result.requestId = request.requestId;
+    // Zuerst an alle (auch an das Fenster, das die Änderung geschickt hat), dann die Antwort:
+    // Das Fenster übernimmt den Zustand nur aus diesen Nachrichten (Teil A).
+    broadcastDifferences(before, listBefore);
+    if (m_store->hasPendingWrites())
+        m_saver->changed();
+    if (!result.ok)
+        qWarning("Änderung %s abgelehnt: %s", qPrintable(request.type), qPrintable(result.message));
+    send(socket, dss::changeResultMessage(result));
+}
+
+dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
+{
+    using namespace dss;
+    const auto fail = [](const char *code, const QString &message) {
+        return ChangeResult{0, false, QUuid(), QString::fromLatin1(code), message};
+    };
+    const auto done = [](bool ok, const QString &error, const QUuid &id = QUuid()) {
+        return ok ? ChangeResult{0, true, id, QString(), QString()}
+                  : ChangeResult{0, false, QUuid(), QString::fromLatin1(err::kRejected), error};
+    };
+    const QString type = r.type;
+    const auto is = [&type](const char *name) { return type == QLatin1String(name); };
+    const QString idText = r.overlayId.toString(QUuid::WithoutBraces);
+
+    // Kennungen zuerst prüfen, damit das Fenster den Grund unterscheiden kann.
+    const bool needsOverlay = !is(msg::kCreateOverlay) && !is(msg::kCreateFolder)
+                                  && !is(msg::kRenameFolder) && !is(msg::kRemoveFolder)
+                                  && !is(msg::kMoveFolder) && !is(msg::kSetFolderExpanded);
+    const Overlay *overlay = m_store->overlay(r.overlayId);
+    if (needsOverlay && !overlay)
+        return fail(err::kUnknownOverlay, QStringLiteral("Kein Overlay mit der Kennung %1").arg(idText));
+    const bool needsSource = is(msg::kRemoveSource) || is(msg::kMoveSource) || is(msg::kUpdateSource)
+                             || is(msg::kSetTextFont) || is(msg::kReplaceImageFile);
+    if (needsSource && sourceIndex(*overlay, r.sourceId) < 0)
+        return fail(err::kUnknownSource, QStringLiteral("Keine Quelle mit der Kennung %1 im Overlay «%2»")
+                                             .arg(r.sourceId.toString(QUuid::WithoutBraces), overlay->name));
+    const bool needsFolder = is(msg::kRenameFolder) || is(msg::kRemoveFolder) || is(msg::kMoveFolder)
+                             || is(msg::kSetFolderExpanded)
+                             || (is(msg::kMoveOverlay) && !r.folderId.isNull());
+    if (needsFolder && !m_store->layout().folder(r.folderId))
+        return fail(err::kUnknownFolder, QStringLiteral("Kein Ordner mit der Kennung %1")
+                                             .arg(r.folderId.toString(QUuid::WithoutBraces)));
+
+    QString error;
+    if (is(msg::kCreateOverlay)) {
+        const QUuid id = m_store->createOverlay(r.name, r.width, r.height, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kRenameOverlay))
+        return done(m_store->renameOverlay(r.overlayId, r.name, r.changeAddress, &error), error);
+    if (is(msg::kCopyOverlay)) {
+        const QUuid id = m_store->copyOverlay(r.overlayId, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kRemoveOverlay))
+        return done(m_store->removeOverlay(r.overlayId, &error), error);
+    if (is(msg::kMoveOverlay))
+        return done(m_store->moveOverlayInList(r.overlayId, r.folderId, r.index, &error), error);
+    if (is(msg::kCreateFolder)) {
+        const QUuid id = m_store->createFolder(r.name, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kRenameFolder))
+        return done(m_store->renameFolder(r.folderId, r.name, &error), error);
+    if (is(msg::kRemoveFolder))
+        return done(m_store->removeFolder(r.folderId, &error), error);
+    if (is(msg::kMoveFolder))
+        return done(m_store->moveFolderInList(r.folderId, r.index, &error), error);
+    if (is(msg::kSetFolderExpanded))
+        return done(m_store->setFolderExpanded(r.folderId, r.expanded, &error), error);
+    if (is(msg::kAddImageSource)) {
+        const QUuid id = m_store->addImageSource(r.overlayId, r.file, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kAddVideoSource)) {
+        // Standard «nicht wiederholen» (docs/01-festlegungen.md, «Overlay-Daten»)
+        const QUuid id = m_store->addVideoSource(r.overlayId, r.file, false, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kAddTextSource)) {
+        // Inhalt «Text», Standardschrift Be Vietnam Pro (Entscheid 4, E-11)
+        const QUuid id = m_store->addTextSource(r.overlayId, QStringLiteral("Text"),
+                                                defaultTextFontFile(), &error);
+        if (!id.isNull()) {
+            const Overlay *o = m_store->overlay(r.overlayId);
+            addMediaFont(o->sources.at(sourceIndex(*o, id)).text.fontFile);
+        }
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kRemoveSource))
+        return done(m_store->removeSource(r.overlayId, r.sourceId, &error), error);
+    if (is(msg::kMoveSource))
+        return done(m_store->moveSource(r.overlayId, r.sourceId, r.index, &error), error);
+    if (is(msg::kUpdateSource))
+        return done(m_store->updateSource(r.overlayId, r.sourceId, r.changes, &error), error);
+    if (is(msg::kSetTextFont)) {
+        int weight = r.weight.value_or(400);
+        bool italic = r.italic.value_or(false);
+        if (!r.weight || !r.italic) {
+            // Eigene Datei: Gewicht und kursiv stehen in der Datei (fc-query).
+            const QString path = validateMediaReference(r.file).isEmpty()
+                                     ? m_store->mediaFilePath(r.file) : r.file;
+            const QList<FontFace> faces = queryFontFiles({path}, FontOrigin::Media, &error);
+            if (faces.isEmpty())
+                return fail(err::kRejected, QStringLiteral("%1 ist keine lesbare Schriftdatei%2")
+                                                .arg(QFileInfo(r.file).fileName(),
+                                                     error.isEmpty() ? QString() : QStringLiteral(" (") + error + QLatin1Char(')')));
+            weight = r.weight.value_or(faces.first().weight);
+            italic = r.italic.value_or(faces.first().italic);
+            error.clear();
+        }
+        QString reference;
+        const bool ok = m_store->setTextFont(r.overlayId, r.sourceId, r.file, weight, italic, &error,
+                                             &reference);
+        if (ok)
+            addMediaFont(reference);
+        return done(ok, error);
+    }
+    if (is(msg::kReplaceImageFile))
+        return done(m_store->replaceImageFile(r.overlayId, r.sourceId, r.file, &error), error);
+    return fail(err::kUnknownType, QStringLiteral("Unbekannte Änderung «%1»").arg(type));
+}
+
+void CoreService::handleGetFonts(QLocalSocket *socket)
+{
+    if (m_fontsLoaded) {
+        send(socket, dss::fontListMessage(m_fonts, m_fontError));
+        return;
+    }
+    m_fontWaiters.append(socket);
+    startFontLoading();
+}
+
+void CoreService::startFontLoading()
+{
+    if (m_fontLoader->isRunning())
+        return;
+    // Schriftdateien, die schon im Datenordner liegen, gehören zur Auswahl (Kopien eigener Dateien).
+    QStringList files;
+    QStringList references;
+    const QString mediaDir = m_store->dataDir() + QStringLiteral("/media");
+    for (const QString &file : dss::fontFilesIn(mediaDir)) {
+        files.append(file);
+        references.append(QStringLiteral("media/") + QFileInfo(file).fileName());
+    }
+    m_fontLoader->start(files, references);
+}
+
+void CoreService::onFontsLoaded(const QList<dss::FontFace> &faces, const QString &error)
+{
+    m_fonts = faces;
+    m_fontError = error;
+    m_fontsLoaded = true;
+    if (!error.isEmpty())
+        qWarning("Schriften: %s", qPrintable(error));
+    qInfo("Schriften geladen: %lld Schnitte", static_cast<long long>(faces.size()));
+    const QJsonObject message = dss::fontListMessage(m_fonts, m_fontError);
+    if (m_broadcastFonts) {
+        m_broadcastFonts = false;
+        m_fontWaiters.clear();
+        broadcast(message);
+        return;
+    }
+    const QList<QPointer<QLocalSocket>> waiters = m_fontWaiters;
+    m_fontWaiters.clear();
+    for (const QPointer<QLocalSocket> &socket : waiters) {
+        if (socket && m_clients.contains(socket.data()))
+            send(socket.data(), message);
+    }
+}
+
+void CoreService::addMediaFont(const QString &reference)
+{
+    // Ohne geladene Liste nichts zu tun: Die Kopie kommt beim Laden mit fc-query dazu.
+    if (!m_fontsLoaded || reference.isEmpty() || dss::fontFaceForFile(m_fonts, reference))
+        return;
+    QString error;
+    QList<dss::FontFace> faces = dss::queryFontFiles({m_store->mediaFilePath(reference)},
+                                                     dss::FontOrigin::Media, &error);
+    if (faces.isEmpty()) {
+        qWarning("Schrift %s: %s", qPrintable(reference), qPrintable(error));
+        return;
+    }
+    for (dss::FontFace &f : faces)
+        f.file = reference;
+    m_fonts.append(faces);
+    dss::sortFontFaces(&m_fonts);
+    broadcast(dss::fontListMessage(m_fonts, m_fontError));
 }

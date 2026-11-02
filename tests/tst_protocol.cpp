@@ -135,7 +135,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 1);
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 2); // seit P08
     }
 
     void helloInvalid()
@@ -151,46 +151,66 @@ private slots:
         o.insert(QStringLiteral("protocol_version"), 0);
         QVERIFY(!parseHello(o, &back, &error));
         // Unbekannte Felder werden übergangen.
-        o.insert(QStringLiteral("protocol_version"), 2);
+        o.insert(QStringLiteral("protocol_version"), 3);
         o.insert(QStringLiteral("neu"), true);
         QVERIFY(parseHello(o, &back, &error));
-        QCOMPARE(back.protocolVersion, 2);
+        QCOMPARE(back.protocolVersion, 3);
     }
 
     void overlayList()
     {
+        // Seit P08 (Version 2): Einträge in der Reihenfolge der Liste, mit Ordnern.
         const QList<OverlaySummary> list = {
             summarizeOverlay(sampleOverlay()),
             {QUuid::fromString(QStringLiteral("7be08f35-6885-4a95-9c32-939c45a688ea")),
              QStringLiteral("Chat Ecke"), QStringLiteral("chat-ecke"), 800, 600, 0}};
         QCOMPARE(list.first().sourceCount, 2);
-        const QJsonObject o = roundTrip(overlayListMessage(list));
+        OverlayLayout layout = layoutFromIds({list.at(0).id});
+        ListEntry folder;
+        folder.isFolder = true;
+        folder.folder = {QUuid::fromString(QStringLiteral("5c0f9a1e-2b7d-4e43-9d5a-8f1e2c3b4a50")),
+                         QStringLiteral("Szenen"), false, {list.at(1).id}};
+        layout.entries.append(folder);
+        const QJsonObject o = roundTrip(overlayListMessage(layout, list));
         QCOMPARE(messageType(o), QStringLiteral("overlay_list"));
-        QList<OverlaySummary> back;
+        QVERIFY(o.value(QStringLiteral("list_error")).isNull());
+        OverlayListData back;
         QString error;
         QVERIFY2(parseOverlayList(o, &back, &error), qPrintable(error));
-        QCOMPARE(back, list);
+        QCOMPARE(back.overlays, list);
+        QCOMPARE(back.layout, layout);
+        QCOMPARE(back.summary(list.at(1).id)->name, QStringLiteral("Chat Ecke"));
+        QVERIFY(back.listError.isEmpty());
+        // Meldung bei kaputter liste.json
+        QVERIFY(parseOverlayList(roundTrip(overlayListMessage(layout, list, QStringLiteral("liste.json: kaputt"))),
+                                 &back, &error));
+        QCOMPARE(back.listError, QStringLiteral("liste.json: kaputt"));
         // Leere Liste
-        QVERIFY(parseOverlayList(roundTrip(overlayListMessage({})), &back, &error));
-        QVERIFY(back.isEmpty());
+        QVERIFY(parseOverlayList(roundTrip(overlayListMessage({}, {})), &back, &error));
+        QVERIFY(back.overlays.isEmpty());
+        QVERIFY(back.layout.entries.isEmpty());
     }
 
     void overlayListInvalid()
     {
-        QList<OverlaySummary> back;
+        OverlayListData back;
         QString error;
-        QJsonObject o = overlayListMessage({summarizeOverlay(sampleOverlay())});
-        QJsonArray a = o.value(QStringLiteral("overlays")).toArray();
-        QJsonObject e = a.at(0).toObject();
+        const OverlaySummary summary = summarizeOverlay(sampleOverlay());
+        QJsonObject o = overlayListMessage(layoutFromIds({summary.id}), {summary});
+        QJsonArray a = o.value(QStringLiteral("entries")).toArray();
+        QJsonObject entry = a.at(0).toObject();
+        QJsonObject e = entry.value(QStringLiteral("overlay")).toObject();
         e.insert(QStringLiteral("width"), 0);
-        a.replace(0, e);
-        o.insert(QStringLiteral("overlays"), a);
+        entry.insert(QStringLiteral("overlay"), e);
+        a.replace(0, entry);
+        o.insert(QStringLiteral("entries"), a);
         QVERIFY(!parseOverlayList(o, &back, &error));
-        QVERIFY(error.contains(QStringLiteral("overlays[0]")));
+        QVERIFY(error.contains(QStringLiteral("entries[0]")));
         e.insert(QStringLiteral("width"), 10);
         e.insert(QStringLiteral("id"), QStringLiteral("{DB7F47A9-DEE3-4DE5-B056-40B5B3507607}"));
-        a.replace(0, e);
-        o.insert(QStringLiteral("overlays"), a);
+        entry.insert(QStringLiteral("overlay"), e);
+        a.replace(0, entry);
+        o.insert(QStringLiteral("entries"), a);
         QVERIFY(!parseOverlayList(o, &back, &error));
         QVERIFY(!parseOverlayList(simpleMessage(msg::kOverlayList), &back, &error));
     }

@@ -253,6 +253,72 @@ QString setSourceGeometry(Overlay *overlay, const QUuid &sourceId, int x, int y,
     return {};
 }
 
+QString moveSource(Overlay *overlay, const QUuid &sourceId, int index)
+{
+    const int from = sourceIndex(*overlay, sourceId);
+    if (from < 0)
+        return unknownSource(sourceId);
+    if (index < 0 || index >= overlay->sources.size())
+        return QStringLiteral("Stelle %1 ungültig, erlaubt sind 0 bis %2.")
+            .arg(index).arg(overlay->sources.size() - 1);
+    overlay->sources.move(from, index);
+    return {};
+}
+
+bool SourceChanges::isEmpty() const
+{
+    return *this == SourceChanges();
+}
+
+QString applySourceChanges(Source *source, const SourceChanges &changes)
+{
+    if (changes.isEmpty())
+        return QStringLiteral("Keine Änderung angegeben.");
+    const bool textOnly = changes.content || changes.fontSize || changes.color || changes.align;
+    if (textOnly && source->kind != SourceKind::Text)
+        return QStringLiteral("Inhalt, Schriftgrösse, Farbe und Ausrichtung gibt es nur bei Quellen "
+                              "der Art Text.");
+    if (changes.loop && source->kind != SourceKind::Video)
+        return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
+    Source changed = *source;
+    if (changes.name)
+        changed.name = *changes.name;
+    if (changes.x)
+        changed.x = *changes.x;
+    if (changes.y)
+        changed.y = *changes.y;
+    if (changes.width)
+        changed.width = *changes.width;
+    if (changes.height)
+        changed.height = *changes.height;
+    if (changes.rotation)
+        changed.rotation = *changes.rotation;
+    if (changes.visible)
+        changed.visible = *changes.visible;
+    if (changes.loop)
+        changed.loop = *changes.loop;
+    if (changes.content)
+        changed.text.content = *changes.content;
+    if (changes.fontSize)
+        changed.text.fontSize = *changes.fontSize;
+    if (changes.color)
+        changed.text.color = *changes.color;
+    if (changes.align)
+        changed.text.align = *changes.align;
+    if (const QString e = validateSource(changed); !e.isEmpty())
+        return e;
+    *source = changed;
+    return {};
+}
+
+QString updateSource(Overlay *overlay, const QUuid &sourceId, const SourceChanges &changes)
+{
+    const int index = sourceIndex(*overlay, sourceId);
+    if (index < 0)
+        return unknownSource(sourceId);
+    return applySourceChanges(&overlay->sources[index], changes);
+}
+
 QString rotationDisplay(int tenthDegrees)
 {
     return QStringLiteral("%1.%2 °").arg(tenthDegrees / 10).arg(tenthDegrees % 10);

@@ -55,7 +55,13 @@ public:
     QString statusText() const { return m_statusText; }
 
     // Daten vom Kern; ohne Verbindung leer.
-    QList<OverlaySummary> overlays() const { return m_overlays; }
+    // Overlays in der Reihenfolge der Liste (seit P08 mit Ordnern, listData()).
+    QList<OverlaySummary> overlays() const { return m_list.overlays; }
+    OverlayListData listData() const { return m_list; }
+    // Schnitte zur Auswahl (Teil F) und Meldung, wenn ein Teil fehlt; leer bis zur Antwort auf
+    // requestFonts().
+    QList<FontFace> fonts() const { return m_fonts; }
+    QString fontError() const { return m_fontError; }
     // Ganzes Overlay, wenn der Kern es geschickt hat (Antwort auf requestOverlay oder Änderung).
     std::optional<Overlay> overlay(const QUuid &id) const;
     std::optional<SystemStats> lastStats() const { return m_lastStats; }
@@ -64,6 +70,19 @@ public:
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
+    void requestFonts();
+
+    // Schickt eine Änderung an den Kern (P08, Teil A); request.requestId wird hier vergeben.
+    // Den neuen Zustand übernimmt das Fenster nur aus den Nachrichten des Kerns an alle
+    // (overlay_changed, overlay_list), nie aus der eigenen Änderung.
+    // Mit coalesceKey (zum Beispiel ein Feld einer Quelle) bleibt je Schlüssel höchstens eine
+    // Änderung unterwegs: Kommt eine neue, bevor der Kern geantwortet hat, wird sie zurückgehalten
+    // und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. So überlastet
+    // eine gedrückte Pfeiltaste den Kern nicht, und der letzte Wert kommt trotzdem an.
+    // Rückgabe: request_id, 0 ohne Verbindung, -1 wenn zurückgehalten.
+    qint64 sendChange(ChangeRequest request, const QString &coalesceKey = QString());
+    // true, solange eine Änderung mit diesem Schlüssel unterwegs oder zurückgehalten ist.
+    bool isChangePending(const QString &coalesceKey) const;
 
     // Bittet den Kern, sich zu beenden (normales Schliessen des Fensters, Entscheid 1). Wartet
     // höchstens timeoutMs auf die Antwort und trennt danach die Verbindung; ohne Verbindung
@@ -80,6 +99,9 @@ signals:
     void connectionStatesChanged();
     void errorReceived(const dss::ErrorInfo &error);
     void quitReplied(const dss::QuitReply &reply);
+    void fontsChanged();
+    // Antwort auf eine Änderung (auch auf eine, die zurückgehalten war).
+    void changeFinished(const dss::ChangeResult &result);
 
 private:
     void tryConnect();
@@ -93,6 +115,7 @@ private:
     void setConnected(bool connected);
     void setStatus(const QString &text);
     void clearData();
+    qint64 transmit(ChangeRequest request, const QString &coalesceKey);
 
     Options m_options;
     QLocalSocket *m_socket = nullptr;
@@ -106,8 +129,14 @@ private:
     bool m_wasConnected = false;
     Hello m_coreHello;
     QString m_statusText;
-    QList<OverlaySummary> m_overlays;
+    OverlayListData m_list;
     QHash<QUuid, Overlay> m_overlayCache;
+    QList<FontFace> m_fonts;
+    QString m_fontError;
+    qint64 m_nextRequestId = 1;
+    QHash<qint64, QString> m_keyOfRequest;     // unterwegs: request_id → Schlüssel
+    QHash<QString, qint64> m_requestOfKey;     // unterwegs: Schlüssel → request_id
+    QHash<QString, ChangeRequest> m_heldChanges; // zurückgehalten je Schlüssel
     std::optional<SystemStats> m_lastStats;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
