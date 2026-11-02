@@ -14,6 +14,7 @@ add_library(dss_common STATIC
   windowsize.h windowsize.cpp
   configpaths.h configpaths.cpp
   datalock.h datalock.cpp
+  systemstats.h systemstats.cpp
   systemdnotify.h systemdnotify.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
