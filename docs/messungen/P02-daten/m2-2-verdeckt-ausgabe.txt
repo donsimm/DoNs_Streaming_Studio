@@ -1,0 +1,326 @@
+{
+ "name": "2-verdeckt",
+ "started": "2026-11-02 12:20:01 +0100",
+ "app_command": [
+  "/home/dominik/DoNs_Streaming_Studio/prototypes/b-web-capture/host/build/p02_b_capture",
+  "--url",
+  "http://127.0.0.1:8765/overlay.html",
+  "--count",
+  "2",
+  "--visibility",
+  "covered",
+  "--grab",
+  "framebuffer",
+  "--duration",
+  "75",
+  "--stats",
+  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-verdeckt/app-zeitstempel.json",
+  "--save-frame",
+  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-verdeckt/abgriff",
+  "--save-at",
+  "68"
+ ],
+ "commands": {
+  "mpstat": [
+   "mpstat",
+   "1",
+   "60"
+  ],
+  "pidstat": [
+   "pidstat",
+   "-h",
+   "-u",
+   "-r",
+   "-p",
+   "15655,15666,15668,15695,15686,15665,15653",
+   "1",
+   "60"
+  ],
+  "nvidia-smi": "nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv,noheader,nounits -l 1",
+  "screenshot": "ffmpeg -hide_banner -loglevel error -y -f x11grab -video_size 1920x1080 -i :0.0+0,0 -frames:v 1 /home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-bilder/m2-2-verdeckt-bildschirm.png"
+ },
+ "app_exit_code": 0,
+ "processes": {
+  "15655": "p02_b_capture",
+  "15666": "QtWebEngineProc",
+  "15668": "QtWebEngineProc",
+  "15695": "QtWebEngineProc",
+  "15686": "QtWebEngineProc",
+  "15665": "QtWebEngineProc",
+  "15653": "python3"
+ },
+ "cpu_gesamt_prozent": {
+  "min": 25.7,
+  "mittel": 27.5,
+  "max": 34.1
+ },
+ "cpu_prozesse_prozent_eines_kerns": {
+  "min": 194.0,
+  "mittel": 202.2,
+  "max": 215.0
+ },
+ "rss_prozesse_mib": {
+  "min": 845.7,
+  "mittel": 861.6,
+  "max": 869.0
+ },
+ "pss_prozesse_mib_bei_30s": 528.7,
+ "je_befehl": {
+  "python3": {
+   "cpu_mittel": 0.0,
+   "rss_max_mib": 19.3
+  },
+  "p02_b_capture": {
+   "cpu_mittel": 146.5,
+   "rss_max_mib": 436.4
+  },
+  "QtWebEngineProc": {
+   "cpu_mittel": 55.8,
+   "rss_max_mib": 413.4
+  }
+ },
+ "gpu_auslastung_prozent": {
+  "min": 22.0,
+  "mittel": 34.8,
+  "max": 40.0
+ },
+ "gpu_speicher_mib": {
+  "min": 489.0,
+  "mittel": 491.2,
+  "max": 513.0
+ },
+ "bildschirmfoto": "docs/messungen/P02-bilder/m2-2-verdeckt-bildschirm.png",
+ "kontrollbilder": [
+  "docs/messungen/P02-bilder/m2-2-verdeckt-abgriff-1.png",
+  "docs/messungen/P02-bilder/m2-2-verdeckt-uyvy-1.png",
+  "docs/messungen/P02-bilder/m2-2-verdeckt-abgriff-2.png",
+  "docs/messungen/P02-bilder/m2-2-verdeckt-uyvy-2.png"
+ ],
+ "app_info": {},
+ "overlays": [
+  {
+   "abgriffe": {
+    "bilder": 1800,
+    "bilder_pro_s": 30.0,
+    "pro_s": {
+     "min": 29,
+     "mittel": 30.0,
+     "max": 31
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 55.3,
+    "einbrueche_ueber_50ms": 281
+   },
+   "neue_bilder": {
+    "bilder": 1549,
+    "bilder_pro_s": 25.82,
+    "pro_s": {
+     "min": 23,
+     "mittel": 25.8,
+     "max": 30
+    },
+    "sekunden_unter_28": 50,
+    "abstand_max_ms": 55.3,
+    "einbrueche_ueber_50ms": 294
+   },
+   "abgriff_ms": {
+    "median": 20.64,
+    "mittel": 16.27,
+    "p95": 21.37,
+    "max": 25.47
+   },
+   "vergleich_ms": {
+    "median": 0.05,
+    "mittel": 0.36,
+    "p95": 2.52,
+    "max": 3.48
+   },
+   "umwandlung_format_ms": {
+    "median": 2.96,
+    "mittel": 3.23,
+    "p95": 4.7,
+    "max": 7.68
+   },
+   "umwandlung_uyvy_ms": {
+    "median": 3.1,
+    "mittel": 3.33,
+    "p95": 4.56,
+    "max": 8.8
+   },
+   "umwandlung_uyva_ms": {
+    "median": 3.18,
+    "mittel": 3.81,
+    "p95": 6.59,
+    "max": 10.22
+   },
+   "umwandlungen_im_fenster": 1766,
+   "verworfen_gesamt": 44,
+   "seite_bildrate": {
+    "bilder": 1801,
+    "bilder_pro_s": 30.02,
+    "pro_s": {
+     "min": 29,
+     "mittel": 30.0,
+     "max": 31
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 66.7,
+    "einbrueche_ueber_50ms": 1
+   },
+   "seite_raf": {
+    "bilder": 1829,
+    "bilder_pro_s": 30.48,
+    "pro_s": {
+     "min": 30,
+     "mittel": 30.5,
+     "max": 36
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 50.1,
+    "einbrueche_ueber_50ms": 1
+   },
+   "seite_video": {
+    "bilder": 1778,
+    "bilder_pro_s": 29.63,
+    "pro_s": {
+     "min": 27,
+     "mittel": 29.6,
+     "max": 30
+    },
+    "sekunden_unter_28": 2,
+    "abstand_max_ms": 83.5,
+    "einbrueche_ueber_50ms": 23
+   },
+   "seite_alpha": {
+    "bilder": 1710,
+    "bilder_pro_s": 28.5,
+    "pro_s": {
+     "min": 25,
+     "mittel": 28.5,
+     "max": 30
+    },
+    "sekunden_unter_28": 11,
+    "abstand_max_ms": 89.3,
+    "einbrueche_ueber_50ms": 87
+   },
+   "info": {
+    "grab_format": 18,
+    "grab_size": "1920x1080",
+    "view_children": "QVBoxLayout,QWebEnginePage,QQuickWidget"
+   },
+   "eingabeformat_umwandlung": 18
+  },
+  {
+   "abgriffe": {
+    "bilder": 1800,
+    "bilder_pro_s": 30.0,
+    "pro_s": {
+     "min": 29,
+     "mittel": 30.0,
+     "max": 31
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 71.5,
+    "einbrueche_ueber_50ms": 276
+   },
+   "neue_bilder": {
+    "bilder": 1548,
+    "bilder_pro_s": 25.8,
+    "pro_s": {
+     "min": 23,
+     "mittel": 25.8,
+     "max": 30
+    },
+    "sekunden_unter_28": 52,
+    "abstand_max_ms": 71.5,
+    "einbrueche_ueber_50ms": 520
+   },
+   "abgriff_ms": {
+    "median": 5.53,
+    "mittel": 5.76,
+    "p95": 7.24,
+    "max": 12.0
+   },
+   "vergleich_ms": {
+    "median": 0.06,
+    "mittel": 0.26,
+    "p95": 1.46,
+    "max": 2.17
+   },
+   "umwandlung_format_ms": {
+    "median": 2.85,
+    "mittel": 3.37,
+    "p95": 6.22,
+    "max": 10.52
+   },
+   "umwandlung_uyvy_ms": {
+    "median": 2.65,
+    "mittel": 3.27,
+    "p95": 5.74,
+    "max": 9.42
+   },
+   "umwandlung_uyva_ms": {
+    "median": 2.73,
+    "mittel": 3.16,
+    "p95": 5.12,
+    "max": 8.24
+   },
+   "umwandlungen_im_fenster": 1771,
+   "verworfen_gesamt": 38,
+   "seite_bildrate": {
+    "bilder": 1800,
+    "bilder_pro_s": 30.0,
+    "pro_s": {
+     "min": 29,
+     "mittel": 30.0,
+     "max": 31
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 66.7,
+    "einbrueche_ueber_50ms": 1
+   },
+   "seite_raf": {
+    "bilder": 1808,
+    "bilder_pro_s": 30.13,
+    "pro_s": {
+     "min": 30,
+     "mittel": 30.1,
+     "max": 34
+    },
+    "sekunden_unter_28": 0,
+    "abstand_max_ms": 50.1,
+    "einbrueche_ueber_50ms": 1
+   },
+   "seite_video": {
+    "bilder": 1785,
+    "bilder_pro_s": 29.75,
+    "pro_s": {
+     "min": 27,
+     "mittel": 29.8,
+     "max": 30
+    },
+    "sekunden_unter_28": 1,
+    "abstand_max_ms": 94.8,
+    "einbrueche_ueber_50ms": 15
+   },
+   "seite_alpha": {
+    "bilder": 1736,
+    "bilder_pro_s": 28.93,
+    "pro_s": {
+     "min": 25,
+     "mittel": 28.9,
+     "max": 30
+    },
+    "sekunden_unter_28": 7,
+    "abstand_max_ms": 112.3,
+    "einbrueche_ueber_50ms": 62
+   },
+   "info": {
+    "grab_format": 18,
+    "grab_size": "1920x1080",
+    "view_children": "QVBoxLayout,QWebEnginePage,QQuickWidget"
+   },
+   "eingabeformat_umwandlung": 18
+  }
+ ]
+}

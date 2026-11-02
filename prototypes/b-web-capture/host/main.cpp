@@ -2,7 +2,10 @@
 // Ausgehend von prototypes/b-web/host; Seite und Kern bleiben die aus prototypes/b-web.
 //
 //   --url URL --count 1|2 --visibility visible|covered|minimized --grab widget|framebuffer
-//   --duration S --stats DATEI
+//   --duration S --stats DATEI [--save-frame PRÄFIX --save-at S]
+//
+//   --save-frame  speichert bei Sekunde --save-at (nach dem Messfenster) je Overlay einen Abgriff
+//                 als PRÄFIX-<n>.png und dessen UYVY-Umwandlung als PRÄFIX-<n>.uyvy (Kontrolle).
 //
 // Je Overlay ein QWebEngineView mit 1920x1080. Ein Taktgeber holt alle 1/30 s von jedem
 // Overlay ein Bild in den Speicher (QImage) und gibt es an einen eigenen Arbeits-Thread,
@@ -181,7 +184,9 @@ public:
     Capture(const QCommandLineParser &p)
         : m_statsPath(p.value(QStringLiteral("stats"))),
           m_visibility(p.value(QStringLiteral("visibility"))),
-          m_useFramebuffer(p.value(QStringLiteral("grab")) == QStringLiteral("framebuffer"))
+          m_useFramebuffer(p.value(QStringLiteral("grab")) == QStringLiteral("framebuffer")),
+          m_savePrefix(p.value(QStringLiteral("save-frame"))),
+          m_saveAtNs(static_cast<qint64>(p.value(QStringLiteral("save-at")).toDouble() * 1e9))
     {
         const int count = p.value(QStringLiteral("count")).toInt();
         const int durationS = p.value(QStringLiteral("duration")).toInt();
@@ -280,6 +285,23 @@ private:
             ov.last = img;
             ov.converter->submit(img);
         }
+        if (!m_saved && !m_savePrefix.isEmpty() && monotonicNs() - m_t0 >= m_saveAtNs) {
+            m_saved = true;
+            saveFrames();
+        }
+    }
+
+    void saveFrames()
+    {
+        for (int i = 0; i < static_cast<int>(m_overlays.size()); ++i) {
+            QImage img = m_overlays[i]->last.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+            img.save(m_savePrefix + QStringLiteral("-%1.png").arg(i + 1));
+            std::vector<uint8_t> uyvy(static_cast<size_t>(img.width()) * img.height() * 2);
+            bgraToUyvy(img.constBits(), img.bytesPerLine(), img.width(), img.height(), uyvy.data());
+            QFile f(m_savePrefix + QStringLiteral("-%1.uyvy").arg(i + 1));
+            if (f.open(QIODevice::WriteOnly))
+                f.write(reinterpret_cast<const char *>(uyvy.data()), static_cast<qint64>(uyvy.size()));
+        }
     }
 
     // Feste Zeitpunkte alle 1/30 s, ohne Aufsummieren von Fehlern (wie Variante A in P01).
@@ -350,6 +372,9 @@ private:
     QJsonObject m_info;
     qint64 m_t0 = 0, m_next = 0;
     bool m_finishing = false;
+    QString m_savePrefix;
+    qint64 m_saveAtNs = 0;
+    bool m_saved = false;
     int m_pending = 0;
 
 public:
@@ -372,6 +397,8 @@ int main(int argc, char **argv)
         {QStringLiteral("grab"), QStringLiteral("widget oder framebuffer"), QStringLiteral("g"), QStringLiteral("widget")},
         {QStringLiteral("stats"), QStringLiteral("Ausgabedatei JSON"), QStringLiteral("file")},
         {QStringLiteral("duration"), QStringLiteral("Laufzeit in s"), QStringLiteral("s"), QStringLiteral("75")},
+        {QStringLiteral("save-frame"), QStringLiteral("Präfix für gespeicherte Kontrollbilder"), QStringLiteral("prefix")},
+        {QStringLiteral("save-at"), QStringLiteral("Zeitpunkt der Kontrollbilder in s"), QStringLiteral("s"), QStringLiteral("68")},
     });
     parser.process(app);
     Capture c(parser);
