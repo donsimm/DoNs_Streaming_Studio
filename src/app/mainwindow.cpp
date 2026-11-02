@@ -3,11 +3,14 @@
 #include "canvaswidget.h"
 #include "configpaths.h"
 #include "coreclient.h"
+#include "dockviews.h"
 #include "docks.h"
 #include "headerbar.h"
 #include "symbols.h"
 #include "version.h"
+#include "windowedit.h"
 
+#include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
@@ -16,7 +19,13 @@
 #include <QDoubleSpinBox>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSpinBox>
+#include <QToolButton>
+#include <QTreeWidget>
 #include <QStyle>
 #include <QLabel>
 #include <QMenuBar>
@@ -52,6 +61,11 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
     createCentralArea();
     createDocks();
     createStatusBar();
+    if (!editingAllowed()) {
+        // Nur Anzeige: nichts ziehen (Schalter DSS_APP_EDITING oder ohne Kern).
+        m_overlaysDock.tree->setDragDropMode(QAbstractItemView::NoDragDrop);
+        m_sourcesDock.list->setDragDropMode(QAbstractItemView::NoDragDrop);
+    }
     if (m_keepLayout)
         restoreLayout();
     if (m_client)
@@ -196,12 +210,29 @@ void MainWindow::connectCore()
         if (id == m_selectedOverlay)
             refreshOverlay();
     });
-    connect(m_overlaysDock.list, &QListWidget::currentItemChanged, this,
+    connect(m_client, &dss::CoreClient::errorReceived, this, &MainWindow::onCoreError);
+    connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
     connect(m_sourcesDock.list, &QListWidget::currentItemChanged, this,
             &MainWindow::onSourceItemChanged);
     m_statusMessage->setText(m_client->statusText());
     refreshGauges(dss::SystemStats());
+    if (editingAllowed())
+        connectEditing();
+    refreshActions();
+}
+
+void MainWindow::onCoreError(const dss::ErrorInfo &error)
+{
+    // Fehler des Kerns in der Statuszeile (Teil A), zum Beispiel «Speichern fehlgeschlagen».
+    showStatus(error.message);
+}
+
+void MainWindow::showStatus(const QString &text)
+{
+    // Überdeckt die Zeile «Bereit»/Zustand des Kerns für 10 s, die Anzeigen rechts bleiben.
+    // https://doc.qt.io/qt-6.8/qstatusbar.html#showMessage
+    statusBar()->showMessage(text, 10000);
 }
 
 void MainWindow::onCoreConnectedChanged(bool connected)
@@ -218,7 +249,12 @@ void MainWindow::onCoreConnectedChanged(bool connected)
         m_ramHistory.clear();
         m_lanHistory.clear();
         refreshGauges(dss::SystemStats());
+        m_selectOnResult.clear();
+    } else if (editingAllowed()) {
+        // Auswahl der Schriften für Textquellen (Teil F)
+        m_client->requestFonts();
     }
+    refreshActions();
 }
 
 void MainWindow::onStats(const dss::SystemStats &stats)
@@ -255,47 +291,98 @@ void MainWindow::refreshConnections()
 
 void MainWindow::refreshOverlayList()
 {
-    // Liste neu füllen und die Auswahl über die Kennung behalten.
+    // Baum neu füllen, wie der Kern die Liste schickt (Reihenfolge und Ordner, Teil B), und die
+    // Auswahl über die Kennung behalten.
+    const dss::OverlayListData &data = m_client->listData();
     m_filling = true;
-    QListWidget *list = m_overlaysDock.list;
-    list->clear();
-    QListWidgetItem *selected = nullptr;
-    for (const dss::OverlaySummary &o : m_client->overlays()) {
-        auto *item = new QListWidgetItem(o.name, list);
-        item->setData(Qt::UserRole, o.id);
-        item->setToolTip(QStringLiteral("%1 · %2x%3 · %4 Quelle(n)")
-                             .arg(o.address).arg(o.width).arg(o.height).arg(o.sourceCount));
-        if (o.id == m_selectedOverlay)
+    OverlayTree *tree = m_overlaysDock.tree;
+    tree->clear();
+    QTreeWidgetItem *selected = nullptr;
+    const auto overlayItem = [&](const QUuid &id) {
+        const dss::OverlaySummary *o = data.summary(id);
+        auto *item = new QTreeWidgetItem;
+        item->setText(0, o ? o->name : id.toString(QUuid::WithoutBraces));
+        item->setData(0, OverlayTree::kIdRole, id);
+        item->setData(0, OverlayTree::kFolderRole, false);
+        // Auf ein Overlay lässt sich etwas fallen lassen (es landet daneben), auf einen Ordner hinein.
+        item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled
+                       | Qt::ItemIsDropEnabled);
+        if (o)
+            item->setToolTip(0, QStringLiteral("%1 · %2x%3 · %4 Quelle(n)")
+                                    .arg(o->address).arg(o->width).arg(o->height).arg(o->sourceCount));
+        if (id == m_selectedOverlay)
+            selected = item;
+        return item;
+    };
+    QList<std::pair<QTreeWidgetItem *, bool>> folders;
+    for (const dss::ListEntry &entry : data.layout.entries) {
+        if (!entry.isFolder) {
+            tree->addTopLevelItem(overlayItem(entry.overlayId));
+            continue;
+        }
+        auto *item = new QTreeWidgetItem;
+        item->setText(0, entry.folder.name);
+        item->setData(0, OverlayTree::kIdRole, entry.folder.id);
+        item->setData(0, OverlayTree::kFolderRole, true);
+        QFont font = item->font(0);
+        font.setBold(true);
+        item->setFont(0, font);
+        item->setToolTip(0, QStringLiteral("Ordner · %1 Overlay(s)").arg(entry.folder.overlays.size()));
+        // Ordner zeigen das Aufklappzeichen auch leer, damit klar ist, dass etwas hineinpasst.
+        item->setChildIndicatorPolicy(QTreeWidgetItem::ShowIndicator);
+        for (const QUuid &id : entry.folder.overlays)
+            item->addChild(overlayItem(id));
+        tree->addTopLevelItem(item);
+        folders.append({item, entry.folder.expanded});
+        if (entry.folder.id == m_selectedFolder)
             selected = item;
     }
+    for (const auto &[item, expanded] : folders)
+        item->setExpanded(expanded);
     if (selected) {
-        list->setCurrentItem(selected);
+        tree->setCurrentItem(selected);
     } else {
         m_selectedOverlay = QUuid();
+        m_selectedFolder = QUuid();
         m_selectedSource = QUuid();
     }
     m_filling = false;
+    // Kaputte liste.json: einmal melden (Reihenfolge und Ordner lassen sich dann nicht ändern).
+    if (data.listError != m_lastListError) {
+        m_lastListError = data.listError;
+        if (!data.listError.isEmpty())
+            showStatus(data.listError);
+    }
     refreshOverlay();
 }
 
-void MainWindow::onOverlayItemChanged(QListWidgetItem *current)
+void MainWindow::onOverlayItemChanged(QTreeWidgetItem *current)
 {
     if (m_filling)
         return;
-    m_selectedOverlay = current ? current->data(Qt::UserRole).toUuid() : QUuid();
+    const bool folder = current && current->data(0, OverlayTree::kFolderRole).toBool();
+    const QUuid id = current ? current->data(0, OverlayTree::kIdRole).toUuid() : QUuid();
+    m_selectedFolder = folder ? id : QUuid();
+    m_selectedOverlay = folder ? QUuid() : id;
     m_selectedSource = QUuid();
     if (!m_selectedOverlay.isNull())
         m_client->requestOverlay(m_selectedOverlay);
     refreshOverlay();
 }
 
+std::optional<dss::Overlay> MainWindow::selectedOverlay() const
+{
+    if (!m_client || m_selectedOverlay.isNull())
+        return std::nullopt;
+    return m_client->overlay(m_selectedOverlay);
+}
+
 void MainWindow::refreshOverlay()
 {
     // Quellen und Leinwand des gewählten Overlays; ohne Overlay leer bzw. Platzhalter.
-    const std::optional<dss::Overlay> overlay =
-        m_selectedOverlay.isNull() ? std::nullopt : m_client->overlay(m_selectedOverlay);
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
     m_filling = true;
-    QListWidget *list = m_sourcesDock.list;
+    SourceList *list = m_sourcesDock.list;
     list->clear();
     QListWidgetItem *selected = nullptr;
     if (overlay) {
@@ -303,7 +390,7 @@ void MainWindow::refreshOverlay()
         const QIcon hidden = loadSymbol(QStringLiteral("auge-zu.svg"), QSize(16, 16));
         for (const dss::SourceRow &row : dss::sourceRows(*overlay)) {
             auto *item = new QListWidgetItem(row.visible ? shown : hidden, row.name, list);
-            item->setData(Qt::UserRole, row.id);
+            item->setData(SourceList::kIdRole, row.id);
             item->setToolTip(dss::visibilityToolTip(row.visible));
             if (row.id == m_selectedSource)
                 selected = item;
@@ -328,23 +415,151 @@ void MainWindow::onSourceItemChanged(QListWidgetItem *current)
 
 void MainWindow::refreshProperties()
 {
-    const std::optional<dss::Overlay> overlay =
-        m_selectedOverlay.isNull() ? std::nullopt : m_client->overlay(m_selectedOverlay);
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
     const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
-    // Nur Anzeige, die Felder bleiben ausgegraut (Bearbeiten kommt mit P08).
-    m_propertiesDock.name->setText(source ? source->name : QString());
-    m_propertiesDock.x->setValue(source ? source->x : 0);
-    m_propertiesDock.y->setValue(source ? source->y : 0);
-    m_propertiesDock.width->setValue(source ? source->width : 1);
-    m_propertiesDock.height->setValue(source ? source->height : 1);
-    m_propertiesDock.rotation->setValue(source ? dss::rotationDegrees(source->rotation) : 0.0);
-    m_propertiesDock.hint->setText(source ? QStringLiteral("Nur Anzeige")
-                                          : QStringLiteral("Keine Quelle gewählt"));
+    PropertiesDock &d = m_propertiesDock;
+    // Felder setzen ohne Änderungen auszulösen. Ein Feld, dessen Änderung noch unterwegs ist,
+    // bleibt, wie der Nutzer es eingestellt hat; es wird nach der Antwort nachgeführt
+    // (onChangeFinished). Gleiche Werte werden nicht neu gesetzt (Schreibmarke bleibt).
+    const auto pending = [this, source](const QString &field) {
+        return source && m_client->isChangePending(dss::changeKey(source->id, field));
+    };
+    const auto setSpin = [&](QSpinBox *spin, int value, const QString &field) {
+        const QSignalBlocker block(spin);
+        if (!pending(field) && spin->value() != value)
+            spin->setValue(value);
+    };
+    if (!d.name->hasFocus() || !source)
+        d.name->setText(source ? source->name : QString());
+    setSpin(d.x, source ? source->x : 0, QStringLiteral("x"));
+    setSpin(d.y, source ? source->y : 0, QStringLiteral("y"));
+    setSpin(d.width, source ? source->width : 1, QStringLiteral("width"));
+    setSpin(d.height, source ? source->height : 1, QStringLiteral("height"));
+    {
+        const QSignalBlocker block(d.rotation);
+        const double degrees = source ? dss::rotationDegrees(source->rotation) : 0.0;
+        if (!pending(QStringLiteral("rotation")) && d.rotation->value() != degrees)
+            d.rotation->setValue(degrees);
+    }
+    int page = PropertiesDock::kEmptyPage;
+    QString hint = QStringLiteral("Keine Quelle gewählt");
+    if (source) {
+        switch (source->kind) {
+        case dss::SourceKind::Image:
+            page = PropertiesDock::kImagePage;
+            hint = QStringLiteral("Bild");
+            break;
+        case dss::SourceKind::Video:
+            page = PropertiesDock::kVideoPage;
+            hint = QStringLiteral("Video");
+            break;
+        case dss::SourceKind::Text:
+            page = PropertiesDock::kTextPage;
+            hint = QStringLiteral("Text");
+            break;
+        }
+        if (!editingAllowed())
+            hint += QStringLiteral(" · nur Anzeige");
+    }
+    d.hint->setText(hint);
+    d.kindPages->setCurrentIndex(page);
+    if (source && source->kind == dss::SourceKind::Video) {
+        const QSignalBlocker block(d.loop);
+        d.loop->setChecked(source->loop);
+    }
+    if (source && source->kind == dss::SourceKind::Text) {
+        const dss::TextProperties &t = source->text;
+        {
+            const QSignalBlocker block(d.content);
+            if (!pending(QStringLiteral("content")) && d.content->toPlainText() != t.content)
+                d.content->setPlainText(t.content);
+        }
+        setSpin(d.fontSize, t.fontSize, QStringLiteral("fontSize"));
+        const QList<dss::FontFace> faces = m_client->fonts();
+        const QString family = dss::familyOfFont(faces, t.fontFile);
+        {
+            const QSignalBlocker block(d.family);
+            d.family->setCurrentIndex(family.isEmpty() ? -1 : d.family->findData(family));
+        }
+        {
+            const QSignalBlocker block(d.weight);
+            d.weight->clear();
+            for (const dss::WeightChoice &c : dss::weightChoices(faces, family))
+                d.weight->addItem(c.label, c.weight);
+            d.weight->setCurrentIndex(d.weight->findData(t.weight));
+        }
+        {
+            const QSignalBlocker block(d.italic);
+            d.italic->setChecked(t.italic);
+        }
+        d.italic->setEnabled(editingAllowed() && dss::italicSelectable(faces, family));
+        int r = 0, g = 0, b = 0, a = 0;
+        dss::colorParts(t.color, &r, &g, &b, &a);
+        QPixmap swatch(14, 14);
+        swatch.fill(QColor(r, g, b, a));
+        d.color->setIcon(QIcon(swatch));
+        d.color->setText(t.color);
+        {
+            const QSignalBlocker block(d.align);
+            d.align->setCurrentIndex(d.align->findData(int(t.align)));
+        }
+    }
+    refreshActions();
 }
 
-void MainWindow::selectOverlayRow(int row)
+void MainWindow::refreshFonts()
 {
-    m_overlaysDock.list->setCurrentRow(row);
+    // Familien wie in fontFamilies (mitgelieferte zuerst), dann «Datei wählen …» (Entscheid 5).
+    QComboBox *family = m_propertiesDock.family;
+    const QSignalBlocker block(family);
+    family->clear();
+    const QList<dss::FontFace> faces = m_client->fonts();
+    for (const QString &name : dss::fontFamilies(faces))
+        family->addItem(name, name);
+    family->insertSeparator(family->count());
+    family->addItem(QStringLiteral("Datei wählen …"));
+    if (!m_client->fontError().isEmpty())
+        showStatus(m_client->fontError());
+    refreshProperties();
+}
+
+void MainWindow::refreshActions()
+{
+    // Knöpfe und Felder nur, wenn bearbeitet werden kann und etwas gewählt ist.
+    const bool edit = editingAllowed() && m_client && m_client->isConnected();
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
+    m_overlaysDock.add->setEnabled(edit);
+    m_overlaysDock.remove->setEnabled(edit && overlay);
+    m_overlaysDock.copy->setEnabled(edit && overlay);
+    m_sourcesDock.add->setEnabled(edit && overlay);
+    m_sourcesDock.remove->setEnabled(edit && source);
+    m_sourcesDock.forward->setEnabled(
+        edit && source && dss::sourceStepIndex(*overlay, source->id, +1).has_value());
+    m_sourcesDock.backward->setEnabled(
+        edit && source && dss::sourceStepIndex(*overlay, source->id, -1).has_value());
+    const PropertiesDock &d = m_propertiesDock;
+    for (QWidget *w : std::initializer_list<QWidget *>{d.name, d.x, d.y, d.width, d.height,
+                                                       d.rotation, d.replaceImage, d.loop,
+                                                       d.content, d.family, d.weight,
+                                                       d.fontSize, d.color, d.align})
+        w->setEnabled(edit && source);
+    if (!(edit && source))
+        d.italic->setEnabled(false);
+    // Ausrichten auf der Leinwand bleibt in P08 ausgegraut.
+    for (QToolButton *b : d.alignButtons)
+        b->setEnabled(false);
+}
+
+void MainWindow::selectFirstOverlay()
+{
+    selectOverlay(dss::firstOverlay(m_client->listData().layout));
+}
+
+void MainWindow::scrollPropertiesToKindPage()
+{
+    // Oberkante der Felder je Art an den oberen Rand (nur verschieben, kein Umbau).
+    m_propertiesDock.scroll->verticalScrollBar()->setValue(m_propertiesDock.kindPages->y());
 }
 
 void MainWindow::selectSourceRow(int row)

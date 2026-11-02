@@ -5,8 +5,11 @@
 #include "theme.h"
 #include "windowdata.h"
 
+#include <QHash>
 #include <QMainWindow>
 #include <QUuid>
+
+#include <optional>
 
 class CanvasWidget;
 class HeaderBar;
@@ -14,9 +17,15 @@ class QLabel;
 class QListWidgetItem;
 class QMenu;
 class QStackedWidget;
+class QTreeWidgetItem;
 
 namespace dss {
 class CoreClient;
+enum class DropPosition;
+struct ChangeRequest;
+struct ChangeResult;
+struct ErrorInfo;
+struct SourceChanges;
 struct SystemStats;
 }
 
@@ -24,7 +33,9 @@ struct SystemStats;
 // baut die Bereiche auf und verbindet sie, mehr nicht. Meldet einmal im Protokoll,
 // wenn es zum ersten Mal gezeichnet wurde.
 // Seit P07 zeigt es die Daten vom Kern (dss::CoreClient). Eigener Zustand ist nur die Auswahl
-// (gewähltes Overlay, gewählte Quelle) und der Verlauf der Leistungswerte für die Anzeige.
+// (gewähltes Overlay, Ordner, gewählte Quelle) und der Verlauf der Leistungswerte für die Anzeige.
+// Seit P08 schickt es Änderungen an den Kern (mainwindowedit.cpp, Schalter DSS_APP_EDITING); den
+// neuen Stand zeigt es erst, wenn der Kern ihn an alle schickt.
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -36,9 +47,10 @@ public:
     explicit MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *client,
                         QWidget *parent = nullptr);
 
-    // Für --bildschirmfoto mit --verbindung: Zeile der Liste wählen wie mit der Maus.
-    void selectOverlayRow(int row);
+    // Für --bildschirmfoto mit --verbindung: wählen wie mit der Maus.
+    void selectFirstOverlay();
     void selectSourceRow(int row);
+    void scrollPropertiesToKindPage();
 
     // Zustand eines Verbindungsknopfes im Kopfbereich.
     void setConnectionState(dss::Connection connection, dss::ConnectionState state);
@@ -67,8 +79,46 @@ private:
     void refreshOverlayList();
     void refreshOverlay();
     void refreshProperties();
-    void onOverlayItemChanged(QListWidgetItem *current);
+    void refreshFonts();
+    void refreshActions();
+    void onOverlayItemChanged(QTreeWidgetItem *current);
     void onSourceItemChanged(QListWidgetItem *current);
+    void onCoreError(const dss::ErrorInfo &error);
+    void showStatus(const QString &text);
+    std::optional<dss::Overlay> selectedOverlay() const;
+
+    // Bearbeiten (mainwindowedit.cpp)
+    bool editingAllowed() const;
+    void connectEditing();
+    qint64 sendChange(const dss::ChangeRequest &request, const QString &coalesceKey = QString());
+    void onChangeFinished(const dss::ChangeResult &result);
+    void selectOverlay(const QUuid &id);
+    void addOverlay();
+    void renameOverlay(const QUuid &id);
+    void copyOverlay(const QUuid &id);
+    void removeOverlay(const QUuid &id);
+    void createFolder();
+    void renameFolder(const QUuid &id);
+    void removeFolder(const QUuid &id);
+    void showOverlayMenu(const QPoint &position);
+    void onOverlayDropped(const QUuid &id, bool isFolder, const QUuid &target, bool targetIsFolder,
+                          dss::DropPosition position);
+    void onFolderExpanded(QTreeWidgetItem *item, bool expanded);
+    void addMediaSource(bool video);
+    void addTextSource();
+    void removeSource(const QUuid &id);
+    void renameSource(const QUuid &id);
+    void stepSource(const QUuid &id, int step);
+    void toggleVisibility(const QUuid &id);
+    void showSourceMenu(const QPoint &position);
+    void onSourceDropped(const QUuid &id, int insertRow);
+    void updateSelectedSource(const dss::SourceChanges &changes, const QString &field);
+    void onNameEdited();
+    void onFamilyChosen(int index);
+    void onFontStyleChosen();
+    void chooseColor();
+    void replaceImage();
+    QString askMediaFile(const QString &title, const QString &filter);
 
     Theme m_theme;
     bool m_keepLayout = false;
@@ -86,7 +136,13 @@ private:
     dss::CoreClient *m_client = nullptr;
     // Zustand des Fensters (Regel 9): Auswahl und Verlauf der Anzeigen.
     QUuid m_selectedOverlay;
+    QUuid m_selectedFolder;
     QUuid m_selectedSource;
+    // Nach der Antwort auf diese Änderungen das neue Overlay bzw. die neue Quelle wählen.
+    enum class SelectNew { Overlay, Source };
+    QHash<qint64, SelectNew> m_selectOnResult;
+    QString m_lastListError;
+    QString m_lastMediaDir;
     bool m_filling = false; // Listen werden gerade neu gefüllt, Auswahl-Signale übergehen
     dss::ValueHistory m_cpuHistory;
     dss::ValueHistory m_ramHistory;

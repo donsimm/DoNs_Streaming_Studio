@@ -1,5 +1,7 @@
 #include "docks.h"
 
+#include "dockviews.h"
+#include "overlay.h"
 #include "symbols.h"
 
 #include <QCheckBox>
@@ -10,8 +12,11 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
+#include <QMenu>
+#include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QStackedWidget>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -46,15 +51,14 @@ QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
 }
 
 // Liste mit einer Knopfleiste darunter.
-QWidget *listWithButtons(const QList<QToolButton *> &buttons, QListWidget **list, QWidget *parent)
+QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent)
 {
     auto *box = new QWidget(parent);
     auto *column = new QVBoxLayout(box);
     column->setContentsMargins(0, 0, 0, 0);
     column->setSpacing(0);
-    *list = new QListWidget(box);
-    (*list)->setSelectionMode(QAbstractItemView::SingleSelection);
-    column->addWidget(*list, 1);
+    list->setParent(box);
+    column->addWidget(list, 1);
     auto *bar = new QWidget(box);
     bar->setObjectName(QStringLiteral("dockButtons"));
     bar->setAttribute(Qt::WA_StyledBackground);
@@ -77,6 +81,9 @@ void keepValueVisible(QAbstractSpinBox *spin)
     spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
 }
 
+// Ganze Pixel der Overlay-Auflösung (CLAUDE.md Regel 11). Ohne keyboardTracking meldet das Feld
+// einen Wert erst nach Enter, beim Verlassen oder mit den Pfeilen, nicht bei jeder Ziffer.
+// https://doc.qt.io/qt-6.8/qabstractspinbox.html#keyboardTracking-prop
 QSpinBox *pixelBox(int value, int minimum, QWidget *parent)
 {
     auto *spin = new QSpinBox(parent);
@@ -84,7 +91,25 @@ QSpinBox *pixelBox(int value, int minimum, QWidget *parent)
     spin->setRange(minimum, 100000);
     spin->setValue(value);
     spin->setSuffix(QStringLiteral(" px"));
+    spin->setKeyboardTracking(false);
     return spin;
+}
+
+// Feste Namen für den Test des Fensters (tst_fensterbearbeiten).
+void nameWidgets(std::initializer_list<std::pair<QObject *, const char *>> widgets)
+{
+    for (const auto &[w, name] : widgets)
+        w->setObjectName(QString::fromLatin1(name));
+}
+
+QWidget *page(QWidget *parent, QGridLayout **grid)
+{
+    auto *w = new QWidget(parent);
+    *grid = new QGridLayout(w);
+    (*grid)->setContentsMargins(8, 0, 8, 8);
+    (*grid)->setHorizontalSpacing(8);
+    (*grid)->setVerticalSpacing(6);
+    return w;
 }
 
 } // namespace
@@ -92,15 +117,17 @@ QSpinBox *pixelBox(int value, int minimum, QWidget *parent)
 OverlaysDock createOverlaysDock(QWidget *parent)
 {
     OverlaysDock result;
-    QWidget *content = listWithButtons(
-        {symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
-                      QStringLiteral("Overlay hinzufügen"), nullptr),
-         symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
-                      QStringLiteral("Overlay löschen"), nullptr),
-         symbolButton(QStringLiteral("kopieren.svg"), QStringLiteral("K"),
-                      QStringLiteral("Overlay kopieren"), nullptr)},
-        &result.list, nullptr);
-    result.list->setAccessibleName(QStringLiteral("Overlays"));
+    result.add = symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
+                              QStringLiteral("Overlay hinzufügen"), nullptr);
+    result.remove = symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
+                                 QStringLiteral("Overlay löschen"), nullptr);
+    result.copy = symbolButton(QStringLiteral("kopieren.svg"), QStringLiteral("K"),
+                               QStringLiteral("Overlay kopieren"), nullptr);
+    result.tree = new OverlayTree;
+    result.tree->setAccessibleName(QStringLiteral("Overlays"));
+    nameWidgets({{result.tree, "overlayTree"}, {result.add, "overlayAdd"},
+                 {result.remove, "overlayRemove"}, {result.copy, "overlayCopy"}});
+    QWidget *content = listWithButtons({result.add, result.remove, result.copy}, result.tree, nullptr);
     result.dock = dock(QStringLiteral("Overlays"), QStringLiteral("overlaysDock"), content, parent);
     return result;
 }
@@ -108,65 +135,156 @@ OverlaysDock createOverlaysDock(QWidget *parent)
 SourcesDock createSourcesDock(QWidget *parent)
 {
     SourcesDock result;
-    QWidget *content = listWithButtons(
-        {symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
-                      QStringLiteral("Quelle hinzufügen"), nullptr),
-         symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
-                      QStringLiteral("Quelle entfernen"), nullptr),
-         symbolButton(QStringLiteral("nach-oben.svg"), QStringLiteral("↑"),
-                      QStringLiteral("Quelle nach vorne"), nullptr),
-         symbolButton(QStringLiteral("nach-unten.svg"), QStringLiteral("↓"),
-                      QStringLiteral("Quelle nach hinten"), nullptr)},
-        &result.list, nullptr);
+    result.add = symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
+                              QStringLiteral("Quelle hinzufügen"), nullptr);
+    auto *menu = new QMenu(result.add);
+    result.addImage = menu->addAction(QStringLiteral("Bild …"));
+    result.addVideo = menu->addAction(QStringLiteral("Video …"));
+    result.addText = menu->addAction(QStringLiteral("Text"));
+    result.add->setMenu(menu);
+    result.add->setPopupMode(QToolButton::InstantPopup);
+    result.remove = symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
+                                 QStringLiteral("Quelle entfernen"), nullptr);
+    result.forward = symbolButton(QStringLiteral("nach-oben.svg"), QStringLiteral("↑"),
+                                  QStringLiteral("Quelle nach vorne"), nullptr);
+    result.backward = symbolButton(QStringLiteral("nach-unten.svg"), QStringLiteral("↓"),
+                                   QStringLiteral("Quelle nach hinten"), nullptr);
+    result.list = new SourceList;
     result.list->setAccessibleName(QStringLiteral("Quellen"));
+    nameWidgets({{result.list, "sourceList"}, {result.add, "sourceAdd"},
+                 {result.remove, "sourceRemove"}, {result.forward, "sourceForward"},
+                 {result.backward, "sourceBackward"}});
+    QWidget *content = listWithButtons({result.add, result.remove, result.forward, result.backward},
+                                       result.list, nullptr);
     result.dock = dock(QStringLiteral("Quellen"), QStringLiteral("sourcesDock"), content, parent);
     return result;
 }
 
 PropertiesDock createPropertiesDock(QWidget *parent)
 {
-    PropertiesDock result;
+    PropertiesDock r;
     auto *content = new QWidget;
     auto *column = new QVBoxLayout(content);
     column->setContentsMargins(0, 0, 0, 0);
     column->setSpacing(0);
 
-    auto *form = new QWidget(content);
-    auto *grid = new QGridLayout(form);
-    grid->setContentsMargins(8, 8, 8, 8);
+    // Felder in einem Bereich mit Bildlaufleiste: Bei einer Textquelle sind es mehr, als in
+    // die Höhe des Docks passen.
+    auto *scroll = new QScrollArea(content);
+    scroll->setObjectName(QStringLiteral("propertiesScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *form = new QWidget(scroll);
+    form->setObjectName(QStringLiteral("propertiesForm"));
+    auto *formColumn = new QVBoxLayout(form);
+    formColumn->setContentsMargins(0, 0, 0, 0);
+    formColumn->setSpacing(0);
+
+    auto *common = new QWidget(form);
+    auto *grid = new QGridLayout(common);
+    grid->setContentsMargins(8, 8, 8, 6);
     grid->setHorizontalSpacing(8);
     grid->setVerticalSpacing(6);
-    auto *name = new QLineEdit(form);
-    auto *x = pixelBox(0, -100000, form);
-    auto *y = pixelBox(0, -100000, form);
-    auto *width = pixelBox(1, 1, form);
-    auto *height = pixelBox(1, 1, form);
-    auto *rotation = new QDoubleSpinBox(form);
-    rotation->setDecimals(1);
-    rotation->setRange(0.0, 359.9);
-    rotation->setSuffix(QStringLiteral(" °"));
-    keepValueVisible(rotation);
-    for (QWidget *w : std::initializer_list<QWidget *>{name, x, y, width, height, rotation})
-        w->setEnabled(false);
-    grid->addWidget(new QLabel(QStringLiteral("Name"), form), 0, 0);
-    grid->addWidget(name, 0, 1, 1, 3);
-    grid->addWidget(new QLabel(QStringLiteral("X"), form), 1, 0);
-    grid->addWidget(x, 1, 1);
-    grid->addWidget(new QLabel(QStringLiteral("Y"), form), 1, 2);
-    grid->addWidget(y, 1, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Breite"), form), 2, 0);
-    grid->addWidget(width, 2, 1);
-    grid->addWidget(new QLabel(QStringLiteral("Höhe"), form), 2, 2);
-    grid->addWidget(height, 2, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Drehung"), form), 3, 0);
-    grid->addWidget(rotation, 3, 1);
-    auto *hint = new QLabel(QStringLiteral("Keine Quelle gewählt"), form);
-    hint->setObjectName(QStringLiteral("hintLabel"));
-    grid->addWidget(hint, 3, 2, 1, 2);
+    r.name = new QLineEdit(common);
+    r.x = pixelBox(0, -100000, common);
+    r.y = pixelBox(0, -100000, common);
+    r.width = pixelBox(1, 1, common);
+    r.height = pixelBox(1, 1, common);
+    // Drehung 0.0 bis 359.9 Grad, gespeichert in Zehntelgrad; das Feld läuft rundum.
+    r.rotation = new QDoubleSpinBox(common);
+    r.rotation->setDecimals(1);
+    r.rotation->setRange(0.0, 359.9);
+    r.rotation->setWrapping(true);
+    r.rotation->setSuffix(QStringLiteral(" °"));
+    r.rotation->setKeyboardTracking(false);
+    keepValueVisible(r.rotation);
+    grid->addWidget(new QLabel(QStringLiteral("Name"), common), 0, 0);
+    grid->addWidget(r.name, 0, 1, 1, 3);
+    grid->addWidget(new QLabel(QStringLiteral("X"), common), 1, 0);
+    grid->addWidget(r.x, 1, 1);
+    grid->addWidget(new QLabel(QStringLiteral("Y"), common), 1, 2);
+    grid->addWidget(r.y, 1, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Breite"), common), 2, 0);
+    grid->addWidget(r.width, 2, 1);
+    grid->addWidget(new QLabel(QStringLiteral("Höhe"), common), 2, 2);
+    grid->addWidget(r.height, 2, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Drehung"), common), 3, 0);
+    grid->addWidget(r.rotation, 3, 1);
+    r.hint = new QLabel(QStringLiteral("Keine Quelle gewählt"), common);
+    r.hint->setObjectName(QStringLiteral("hintLabel"));
+    grid->addWidget(r.hint, 3, 2, 1, 2);
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(3, 1);
-    grid->setRowStretch(4, 1);
-    column->addWidget(form, 1);
+    formColumn->addWidget(common);
+
+    // Seiten je Art der Quelle; die Seite wechselt mit der gewählten Quelle (kein Umbau des
+    // Layouts, CLAUDE.md Regel 9).
+    r.kindPages = new QStackedWidget(form);
+    r.kindPages->addWidget(new QWidget(r.kindPages)); // kEmptyPage
+
+    QGridLayout *g = nullptr;
+    QWidget *imagePage = page(r.kindPages, &g);
+    r.replaceImage = new QPushButton(QStringLiteral("Datei ersetzen …"), imagePage);
+    g->addWidget(r.replaceImage, 0, 0);
+    g->setColumnStretch(1, 1);
+    g->setRowStretch(1, 1);
+    r.kindPages->addWidget(imagePage);
+
+    QWidget *videoPage = page(r.kindPages, &g);
+    r.loop = new QCheckBox(QStringLiteral("Wiederholen"), videoPage);
+    g->addWidget(r.loop, 0, 0);
+    g->setColumnStretch(1, 1);
+    g->setRowStretch(1, 1);
+    r.kindPages->addWidget(videoPage);
+
+    QWidget *textPage = page(r.kindPages, &g);
+    r.content = new QPlainTextEdit(textPage);
+    r.content->setAccessibleName(QStringLiteral("Inhalt"));
+    r.content->setTabChangesFocus(true);
+    r.content->setFixedHeight(r.content->fontMetrics().lineSpacing() * 3 + 16);
+    r.family = new QComboBox(textPage);
+    r.family->setAccessibleName(QStringLiteral("Schrift"));
+    r.family->setPlaceholderText(QStringLiteral("Schrift unbekannt"));
+    r.family->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    r.family->setMinimumContentsLength(10);
+    r.weight = new QComboBox(textPage);
+    r.weight->setAccessibleName(QStringLiteral("Schnitt"));
+    r.weight->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    r.weight->setMinimumContentsLength(8);
+    r.italic = new QCheckBox(QStringLiteral("Kursiv"), textPage);
+    r.fontSize = pixelBox(48, 1, textPage);
+    r.color = new QToolButton(textPage);
+    r.color->setObjectName(QStringLiteral("colorButton"));
+    r.color->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    r.color->setAccessibleName(QStringLiteral("Farbe"));
+    r.color->setToolTip(QStringLiteral("Farbe mit Deckkraft wählen"));
+    r.align = new QComboBox(textPage);
+    r.align->setAccessibleName(QStringLiteral("Ausrichtung"));
+    r.align->addItem(QStringLiteral("Links"), int(dss::TextAlign::Left));
+    r.align->addItem(QStringLiteral("Mitte"), int(dss::TextAlign::Center));
+    r.align->addItem(QStringLiteral("Rechts"), int(dss::TextAlign::Right));
+    g->addWidget(new QLabel(QStringLiteral("Inhalt"), textPage), 0, 0, Qt::AlignTop);
+    g->addWidget(r.content, 0, 1, 1, 3);
+    g->addWidget(new QLabel(QStringLiteral("Schrift"), textPage), 1, 0);
+    g->addWidget(r.family, 1, 1, 1, 3);
+    g->addWidget(new QLabel(QStringLiteral("Schnitt"), textPage), 2, 0);
+    g->addWidget(r.weight, 2, 1);
+    g->addWidget(r.italic, 2, 2, 1, 2);
+    g->addWidget(new QLabel(QStringLiteral("Grösse"), textPage), 3, 0);
+    g->addWidget(r.fontSize, 3, 1);
+    g->addWidget(new QLabel(QStringLiteral("Farbe"), textPage), 4, 0);
+    g->addWidget(r.color, 4, 1, 1, 3, Qt::AlignLeft);
+    g->addWidget(new QLabel(QStringLiteral("Ausrichtung"), textPage), 5, 0);
+    g->addWidget(r.align, 5, 1);
+    g->setColumnStretch(1, 1);
+    g->setColumnStretch(3, 1);
+    g->setRowStretch(6, 1);
+    r.kindPages->addWidget(textPage);
+    formColumn->addWidget(r.kindPages);
+    formColumn->addStretch(1);
+    scroll->setWidget(form);
+    column->addWidget(scroll, 1);
 
     auto *bar = new QWidget(content);
     bar->setObjectName(QStringLiteral("dockButtons"));
@@ -182,20 +300,25 @@ PropertiesDock createPropertiesDock(QWidget *parent)
         {QStringLiteral("ausrichten-mitte-senkrecht.svg"), QStringLiteral("Senkrecht zentrieren")},
         {QStringLiteral("ausrichten-unten.svg"), QStringLiteral("Unten ausrichten")},
     };
-    for (const auto &[file, toolTip] : align)
-        row->addWidget(symbolButton(file, toolTip.left(1), toolTip, bar));
+    for (const auto &[file, toolTip] : align) {
+        r.alignButtons.append(symbolButton(file, toolTip.left(1), toolTip, bar));
+        row->addWidget(r.alignButtons.last());
+    }
     row->addStretch(1);
     column->addWidget(bar);
-    result.dock = dock(QStringLiteral("Eigenschaften"), QStringLiteral("propertiesDock"), content,
-                       parent);
-    result.name = name;
-    result.x = x;
-    result.y = y;
-    result.width = width;
-    result.height = height;
-    result.rotation = rotation;
-    result.hint = hint;
-    return result;
+    r.dock = dock(QStringLiteral("Eigenschaften"), QStringLiteral("propertiesDock"), content, parent);
+    r.scroll = scroll;
+    nameWidgets({{r.name, "propertyName"}, {r.x, "propertyX"}, {r.y, "propertyY"},
+                 {r.width, "propertyWidth"}, {r.height, "propertyHeight"},
+                 {r.rotation, "propertyRotation"}, {r.kindPages, "propertyPages"},
+                 {r.replaceImage, "imageReplace"}, {r.loop, "videoLoop"},
+                 {r.content, "textContent"}, {r.family, "textFamily"}, {r.weight, "textWeight"},
+                 {r.italic, "textItalic"}, {r.fontSize, "textSize"}, {r.align, "textAlign"}});
+    for (QWidget *w : std::initializer_list<QWidget *>{
+             r.name, r.x, r.y, r.width, r.height, r.rotation, r.replaceImage, r.loop, r.content,
+             r.family, r.weight, r.italic, r.fontSize, r.color, r.align})
+        w->setEnabled(false);
+    return r;
 }
 
 QDockWidget *createControlDock(QWidget *parent)

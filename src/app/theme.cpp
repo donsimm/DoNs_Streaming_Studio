@@ -293,6 +293,19 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #chatBotPage { background: @preview@; }
 #chatBotPage QLabel { color: @textMuted@; }
 
+/* P08: Baum der Overlays wie die Listen, mehrzeiliges Textfeld wie QLineEdit. */
+QTreeView { border-radius: 4px; padding: 2px; outline: none; }
+QTreeView::item { border-radius: 4px; border: 1px solid transparent; padding: 3px 2px; color: @text@; }
+QTreeView::item:hover { background: @input@; border: 1px solid @buttonHover@; }
+QTreeView::item:selected { background-color: @primary@; border-color: @primaryLight@; }
+QTreeView::item:selected:hover { background: @primaryLight@; border: 1px solid @primaryLighter@; }
+QPlainTextEdit { background-color: @input@; border-radius: 4px; padding: 2px 4px;
+                 border: 1px solid @input@; }
+QPlainTextEdit:hover { background-color: @inputHover@; border-color: @inputBorderHover@; }
+QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; }
+#propertiesScroll, #propertiesForm { background: transparent; border: none; }
+#dockButtons QToolButton::menu-indicator { image: none; width: 0px; }
+
 #hintLabel { color: @textMuted@; }
 #coreStatus { font-weight: bold; padding: 0 8px; }
 #coreStatus[state="disconnected"] { color: @coreDisconnected@; }

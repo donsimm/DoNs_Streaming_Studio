@@ -57,7 +57,8 @@ public:
     // Daten vom Kern; ohne Verbindung leer.
     // Overlays in der Reihenfolge der Liste (seit P08 mit Ordnern, listData()).
     QList<OverlaySummary> overlays() const { return m_list.overlays; }
-    OverlayListData listData() const { return m_list; }
+    // Referenz: Zeiger aus summary() und layout.folder() gelten bis zur nächsten overlay_list.
+    const OverlayListData &listData() const { return m_list; }
     // Schnitte zur Auswahl (Teil F) und Meldung, wenn ein Teil fehlt; leer bis zur Antwort auf
     // requestFonts().
     QList<FontFace> fonts() const { return m_fonts; }

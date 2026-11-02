@@ -51,6 +51,10 @@ int main(int argc, char *argv[])
         QStringLiteral("fenstergroesse"),
         QStringLiteral("Nur mit --bildschirmfoto: Grösse des Fensters, Standard 1280x800."),
         QStringLiteral("BREITExHOEHE"));
+    const QCommandLineOption propertiesKindOption(
+        QStringLiteral("eigenschaften-art"),
+        QStringLiteral("Nur mit --bildschirmfoto: Dock «Eigenschaften» vor dem Bild zu den "
+                       "Feldern der Art der Quelle rollen (P08)."));
     const QCommandLineOption connectionOption(
         QStringLiteral("verbindung"),
         QStringLiteral("Unix-Socket des Kerns (Standard: "
@@ -70,6 +74,7 @@ int main(int argc, char *argv[])
     parser.addOption(screenshotOption);
     parser.addOption(statesOption);
     parser.addOption(sizeOption);
+    parser.addOption(propertiesKindOption);
     // Unbekannte Optionen (zum Beispiel von Qt wie -platform) bleiben QApplication überlassen.
     parser.parse(arguments);
     if (parser.isSet(versionOption)) {
@@ -89,6 +94,11 @@ int main(int argc, char *argv[])
         QTextStream(stderr) << "Fehler: --zustaende-zeigen gilt nur mit --bildschirmfoto.\n";
         return 2;
     }
+    if (parser.isSet(propertiesKindOption) && !parser.isSet(screenshotOption)) {
+        QTextStream(stderr) << "Fehler: --eigenschaften-art gilt nur mit --bildschirmfoto.\n";
+        return 2;
+    }
+    const bool propertiesKind = parser.isSet(propertiesKindOption);
 
     QSize screenshotSize(1280, 800);
     if (parser.isSet(sizeOption)) {
@@ -166,10 +176,12 @@ int main(int argc, char *argv[])
             window.setWindowFlag(Qt::X11BypassWindowManagerHint);
         // Nur ein Bild, auch wenn Verbindung und Zeitgrenze beide auslösen.
         auto taken = std::make_shared<bool>(false);
-        const auto takeScreenshot = [&window, screenshotFile, taken] {
+        const auto takeScreenshot = [&window, screenshotFile, taken, propertiesKind] {
             if (*taken)
                 return;
             *taken = true;
+            if (propertiesKind)
+                window.scrollPropertiesToKindPage();
             const QPixmap image = window.grab();
             if (!image.save(screenshotFile)) {
                 qCritical("Bildschirmfoto konnte nicht gespeichert werden: %s",
@@ -184,10 +196,10 @@ int main(int argc, char *argv[])
         if (!client) {
             QObject::connect(&window, &MainWindow::firstPainted, &app, takeScreenshot);
         } else {
-            // Mit Daten: erstes Overlay und erste Quelle wählen wie mit der Maus, dann einige
-            // Leistungswerte abwarten, damit der Verlauf zu sehen ist.
+            // Mit Daten: erstes Overlay (auch in einem Ordner) und oberste Quelle wählen wie mit
+            // der Maus, dann einige Leistungswerte abwarten, damit der Verlauf zu sehen ist.
             QObject::connect(client.get(), &dss::CoreClient::overlayListChanged, &window,
-                             [&window] { window.selectOverlayRow(0); });
+                             [&window] { window.selectFirstOverlay(); });
             QObject::connect(client.get(), &dss::CoreClient::overlayChanged, &window,
                              [&window] { window.selectSourceRow(0); });
             QObject::connect(client.get(), &dss::CoreClient::connectedChanged, &window,
