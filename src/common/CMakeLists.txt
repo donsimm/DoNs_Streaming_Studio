@@ -17,6 +17,7 @@ add_library(dss_common STATIC
   systemstats.h systemstats.cpp
   protocol.h protocol.cpp
   coreclient.h coreclient.cpp
+  windowdata.h windowdata.cpp
   systemdnotify.h systemdnotify.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

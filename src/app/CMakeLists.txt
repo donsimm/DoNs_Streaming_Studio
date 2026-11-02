@@ -6,6 +6,7 @@ qt_add_executable(dss-app
   symbols.h symbols.cpp
   fonts.h fonts.cpp
   headerbar.h headerbar.cpp
+  gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp
 )

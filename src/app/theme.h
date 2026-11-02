@@ -67,6 +67,10 @@ struct Theme
     QColor checkerDark;
     QColor positionBack;    // Hintergrund der Anzeige «X: … Y: …» (--bg_window)
     QColor graph;           // Rahmen der Verlaufsfläche der Anzeigen CPU, RAM, LAN (--grey5)
+    // Linien der Verläufe, Farben wie auf docs/bilder/oberflaeche.png aus Yami gewählt (P07)
+    QColor graphCpu;        // --blue2
+    QColor graphRam;        // --purple1
+    QColor graphLan;        // --green1
 };
 
 // Dunkles Design nach «Yami» (OBS Studio).

@@ -45,14 +45,16 @@ QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
     return button;
 }
 
-// Leere Liste mit einer Knopfleiste darunter.
-QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *parent)
+// Liste mit einer Knopfleiste darunter.
+QWidget *listWithButtons(const QList<QToolButton *> &buttons, QListWidget **list, QWidget *parent)
 {
     auto *box = new QWidget(parent);
     auto *column = new QVBoxLayout(box);
     column->setContentsMargins(0, 0, 0, 0);
     column->setSpacing(0);
-    column->addWidget(new QListWidget(box), 1);
+    *list = new QListWidget(box);
+    (*list)->setSelectionMode(QAbstractItemView::SingleSelection);
+    column->addWidget(*list, 1);
     auto *bar = new QWidget(box);
     bar->setObjectName(QStringLiteral("dockButtons"));
     bar->setAttribute(Qt::WA_StyledBackground);
@@ -87,8 +89,9 @@ QSpinBox *pixelBox(int value, int minimum, QWidget *parent)
 
 } // namespace
 
-QDockWidget *createOverlaysDock(QWidget *parent)
+OverlaysDock createOverlaysDock(QWidget *parent)
 {
+    OverlaysDock result;
     QWidget *content = listWithButtons(
         {symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
                       QStringLiteral("Overlay hinzufügen"), nullptr),
@@ -96,12 +99,15 @@ QDockWidget *createOverlaysDock(QWidget *parent)
                       QStringLiteral("Overlay löschen"), nullptr),
          symbolButton(QStringLiteral("kopieren.svg"), QStringLiteral("K"),
                       QStringLiteral("Overlay kopieren"), nullptr)},
-        nullptr);
-    return dock(QStringLiteral("Overlays"), QStringLiteral("overlaysDock"), content, parent);
+        &result.list, nullptr);
+    result.list->setAccessibleName(QStringLiteral("Overlays"));
+    result.dock = dock(QStringLiteral("Overlays"), QStringLiteral("overlaysDock"), content, parent);
+    return result;
 }
 
-QDockWidget *createSourcesDock(QWidget *parent)
+SourcesDock createSourcesDock(QWidget *parent)
 {
+    SourcesDock result;
     QWidget *content = listWithButtons(
         {symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
                       QStringLiteral("Quelle hinzufügen"), nullptr),
@@ -111,12 +117,15 @@ QDockWidget *createSourcesDock(QWidget *parent)
                       QStringLiteral("Quelle nach vorne"), nullptr),
          symbolButton(QStringLiteral("nach-unten.svg"), QStringLiteral("↓"),
                       QStringLiteral("Quelle nach hinten"), nullptr)},
-        nullptr);
-    return dock(QStringLiteral("Quellen"), QStringLiteral("sourcesDock"), content, parent);
+        &result.list, nullptr);
+    result.list->setAccessibleName(QStringLiteral("Quellen"));
+    result.dock = dock(QStringLiteral("Quellen"), QStringLiteral("sourcesDock"), content, parent);
+    return result;
 }
 
-QDockWidget *createPropertiesDock(QWidget *parent)
+PropertiesDock createPropertiesDock(QWidget *parent)
 {
+    PropertiesDock result;
     auto *content = new QWidget;
     auto *column = new QVBoxLayout(content);
     column->setContentsMargins(0, 0, 0, 0);
@@ -177,7 +186,16 @@ QDockWidget *createPropertiesDock(QWidget *parent)
         row->addWidget(symbolButton(file, toolTip.left(1), toolTip, bar));
     row->addStretch(1);
     column->addWidget(bar);
-    return dock(QStringLiteral("Eigenschaften"), QStringLiteral("propertiesDock"), content, parent);
+    result.dock = dock(QStringLiteral("Eigenschaften"), QStringLiteral("propertiesDock"), content,
+                       parent);
+    result.name = name;
+    result.x = x;
+    result.y = y;
+    result.width = width;
+    result.height = height;
+    result.rotation = rotation;
+    result.hint = hint;
+    return result;
 }
 
 QDockWidget *createControlDock(QWidget *parent)

@@ -1,6 +1,8 @@
 #include "headerbar.h"
 
+#include "gaugewidget.h"
 #include "symbols.h"
+#include "theme.h"
 
 #include <QButtonGroup>
 #include <QGridLayout>
@@ -37,8 +39,9 @@ QToolButton *connectionButton(const QString &shortText, const QString &symbolFil
     return button;
 }
 
-// Anzeige mit Titel, Wert und Verlaufsfläche (noch ohne Verlauf).
-QWidget *gauge(const QString &title, QWidget *parent)
+// Anzeige mit Titel, Wert und Verlaufsfläche.
+QWidget *gauge(const QString &title, const QColor &line, QLabel **value, GaugeGraph **graphOut,
+               QWidget *parent)
 {
     auto *box = new QWidget(parent);
     auto *grid = new QGridLayout(box);
@@ -50,8 +53,7 @@ QWidget *gauge(const QString &title, QWidget *parent)
     auto *valueLabel = new QLabel(QStringLiteral("–"), box);
     valueLabel->setObjectName(QStringLiteral("gaugeValue"));
     valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    auto *graph = new QFrame(box);
-    graph->setObjectName(QStringLiteral("gaugeGraph"));
+    auto *graph = new GaugeGraph(line, box);
     graph->setMinimumHeight(28);
     graph->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     grid->addWidget(titleLabel, 0, 0);
@@ -59,12 +61,14 @@ QWidget *gauge(const QString &title, QWidget *parent)
     grid->addWidget(graph, 1, 0, 1, 2);
     box->setMinimumWidth(140);
     box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    *value = valueLabel;
+    *graphOut = graph;
     return box;
 }
 
 } // namespace
 
-HeaderBar::HeaderBar(QWidget *parent)
+HeaderBar::HeaderBar(const Theme &theme, QWidget *parent)
     : QFrame(parent)
 {
     setObjectName(QStringLiteral("headerBar"));
@@ -101,13 +105,30 @@ HeaderBar::HeaderBar(QWidget *parent)
         QToolButton *button = connectionButton(shortText, symbolFile, this);
         m_connections.insert(connection, button);
         row->addWidget(button);
-        // Noch keine Verbindungen (P06): alle grau.
+        // Ohne Kern: alle grau.
         setConnectionState(connection, dss::ConnectionState::Off);
     }
     row->addSpacing(16);
-    row->addWidget(gauge(QStringLiteral("CPU"), this), 1);
-    row->addWidget(gauge(QStringLiteral("RAM"), this), 1);
-    row->addWidget(gauge(QStringLiteral("LAN"), this), 1);
+    const QList<std::pair<QString, QColor>> gauges = {{QStringLiteral("CPU"), theme.graphCpu},
+                                                      {QStringLiteral("RAM"), theme.graphRam},
+                                                      {QStringLiteral("LAN"), theme.graphLan}};
+    for (const auto &[title, color] : gauges) {
+        QLabel *value = nullptr;
+        GaugeGraph *graph = nullptr;
+        row->addWidget(gauge(title, color, &value, &graph, this), 1);
+        m_gaugeValues.append(value);
+        m_gaugeGraphs.append(graph);
+    }
+}
+
+void HeaderBar::setGauge(Gauge gauge, const QString &text, const QString &toolTip,
+                         const QList<std::optional<double>> &history, int capacity,
+                         double maximum)
+{
+    m_gaugeValues.at(gauge)->setText(text);
+    m_gaugeValues.at(gauge)->setToolTip(toolTip);
+    m_gaugeGraphs.at(gauge)->setToolTip(toolTip);
+    m_gaugeGraphs.at(gauge)->setHistory(history, capacity, maximum);
 }
 
 void HeaderBar::setConnectionState(dss::Connection connection, dss::ConnectionState state)

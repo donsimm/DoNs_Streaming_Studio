@@ -8,6 +8,7 @@
 //   --grey5 #323540  --grey6 #272A33  --grey7 #1D1F26  --grey8 #13141A
 //   --blue1 #718CDC  --blue2 #476BD7  --blue3 #284CB8
 //   --white1 #FFFFFF --white3 #D2D2D2 --white5 #969696
+//   --purple1 #997FDC
 //   --green1 #59D966 --green3 #25A231 --yellow2 #E5AF24 --red1 #E85E75 --red3 #C01C37
 Theme darkTheme()
 {
@@ -54,6 +55,9 @@ Theme darkTheme()
     t.checkerDark = QColor(0x2b, 0x2e, 0x38);
     t.positionBack = t.window;
     t.graph = QColor(0x32, 0x35, 0x40);
+    t.graphCpu = QColor(0x47, 0x6b, 0xd7);
+    t.graphRam = QColor(0x99, 0x7f, 0xdc);
+    t.graphLan = QColor(0x59, 0xd9, 0x66);
     return t;
 }
 

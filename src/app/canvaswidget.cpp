@@ -36,6 +36,15 @@ CanvasWidget::CanvasWidget(const Theme &theme, QWidget *parent)
     setAccessibleName(QStringLiteral("Leinwand"));
 }
 
+void CanvasWidget::setCanvasSize(const QSize &size)
+{
+    const QSize next = size.isValid() && !size.isEmpty() ? size : QSize(1920, 1080);
+    if (next == m_canvasSize)
+        return;
+    m_canvasSize = next;
+    update();
+}
+
 void CanvasWidget::mouseMoveEvent(QMouseEvent *event)
 {
     m_pointer = event->position().toPoint();
