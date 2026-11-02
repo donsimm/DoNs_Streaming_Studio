@@ -20,6 +20,15 @@ Stand: 2026-11-02.
 14. Aus P03: Die Startprüfung beendet `dss-app` per SIGTERM (das Programm schliesst dann sein Fenster). Das Schliessen über den Schliessknopf des Fenstermanagers prüft nur der Handtest (bestanden am 2026-11-02); für eine automatische Prüfung fehlt ein Werkzeug wie `xdotool` (nicht installiert).
 15. Aus P03: Der Installationsweg von `scripts/einrichten.sh` (fehlendes Paket, `sudo apt install Name=Version`) ist nicht geprüft, weil auf dem Studio-PC alle Pakete schon installiert waren.
 16. Aus P03: Satz «Es gibt noch keinen Programmcode» in `docs/00-uebergabe.md`: erledigt (2026-11-02).
+17. Aus P04: Eigenschaften der Quelle Video (Wiederholen, Ton, Start/Stopp) sind nicht entschieden.
+18. Aus P04: Drehrichtung (im Uhrzeigersinn oder dagegen) ist nicht festgelegt; beide Zeichner brauchen dieselbe.
+19. Aus P04: Adresse aus dem Namen: `ß` und Buchstaben ohne Zerlegung in Unicode (zum Beispiel `ł`, `æ`, `ø`) werden nach der Regel zu `-` («Straße» → `stra-e`). Ob `ß` → `ss` gewünscht ist, ist offen.
+20. Aus P04: Grösse einer neuen Quelle: vorläufig Lage 0/0 in der Grösse des Overlays. Die natürliche Grösse von Bild und Video zu lesen braucht einen Dekoder; zu entscheiden, wenn der Zeichner kommt.
+21. Aus P04: Erlaubte Dateiendungen (Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`) sind eine Annahme; geprüft wird nur die Endung, nicht der Inhalt.
+22. Aus P04: Reihenfolge der Overlays in der Liste: vorläufig nach Name sortiert, nicht gespeichert.
+23. Aus P04: Be Vietnam Pro (Standardschrift, E-11) ist auf dem Studio-PC nicht installiert (`fc-list`); Tests nutzen DejaVu Sans. Herkunft und Lizenz der Schriftdatei klären, wenn der Zeichner kommt.
+24. Aus P04: Ungenutzte Kopien unter `media/` werden nicht gelöscht (Auftrag P04).
+25. Aus P04: Dass die temporäre Datei von `tokens.json` schon vor dem Schreiben des Tokens die Rechte 0600 hat, ist nicht geprüft (`strace` nicht installiert); geprüft sind die Rechte der fertigen Datei.
 
 ## Machbarkeitstests
 

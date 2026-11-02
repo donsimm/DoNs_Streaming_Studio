@@ -56,3 +56,13 @@ https://github.com/donsimm/donstv_Studio (CLAUDE.md, docs/01 bis 05)
 
 - EventSub per WebSocket: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
 - Streamer.bot: https://docs.streamer.bot/guide/actions und https://streamer.bot/features
+
+## Qt (Bau ab P03)
+
+Abgerufen in P04 (2026-11-02):
+
+- QStandardPaths (AppDataLocation unter Linux `~/.local/share/<APPNAME>`): https://doc.qt.io/qt-6.8/qstandardpaths.html
+- QSaveFile (atomares Speichern über `commit()`): https://doc.qt.io/qt-6.8/qsavefile.html
+- QRandomGenerator::system() (Zufallsquelle des Betriebssystems, kryptografisch sicher unter Linux): https://doc.qt.io/qt-6.8/qrandomgenerator.html
+
+Weitere Qt-Quellen je Baustein: `docs/berichte/`.
