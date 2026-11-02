@@ -16,6 +16,8 @@ P03 hat das Gerüst gebaut: `dss_common` (nur Qt Core), `dss-core`, `dss-app`, T
 4. **Adresse eindeutig:** Ist die Adresse schon vergeben, hängt die Software `-2`, `-3` usw. an.
 5. **Umbenennen:** Die Adresse ändert sich nur, wenn der Aufrufer es ausdrücklich verlangt (später fragt das Fenster nach, Standard «nein»). Ohne diese Angabe bleibt die Adresse gleich.
 
+6. **Token** in eigener Datei `tokens.json`, nur für den Benutzer lesbar (siehe Teil 4).
+
 ## Auftrag
 
 ### 1. Datenmodell in `dss_common`

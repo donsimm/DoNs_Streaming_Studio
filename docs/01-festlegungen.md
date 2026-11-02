@@ -85,4 +85,5 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 - Die Adresse der Browserquelle wird aus dem Namen des Overlays gebildet (Kleinbuchstaben, Umlaute als ae/oe/ue, übrige Zeichen als «-»), zum Beispiel `ueberblick-start`. Bei gleichem Namen hängt die Software eine Zahl an.
 - Beim Umbenennen fragt die Software, ob die Adresse mitgeändert werden soll. Standard «nein», damit OBS weiterläuft.
 
-Vorschlag von Claude im Prompt P04, noch nicht bestätigt: Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json` mit Dateirechten 0600.
+- Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json`, die nur der Benutzer lesen kann (Dateirechte 0600).
+- Reihenfolge: zuerst P04 (Overlay-Modell), dann P05 (Fenster-Gerüst ohne Daten).
