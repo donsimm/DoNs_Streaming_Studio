@@ -68,9 +68,17 @@ QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *parent)
     return box;
 }
 
+// Zahlenfeld nie schmaler als sein sizeHint (längster Wert mit Einheit), damit der Wert
+// neben den Pfeilknöpfen ganz sichtbar bleibt (P06). Ändert nur die Mindestbreite.
+void keepValueVisible(QAbstractSpinBox *spin)
+{
+    spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
+}
+
 QSpinBox *pixelBox(int value, int minimum, QWidget *parent)
 {
     auto *spin = new QSpinBox(parent);
+    keepValueVisible(spin);
     spin->setRange(minimum, 100000);
     spin->setValue(value);
     spin->setSuffix(QStringLiteral(" px"));
@@ -128,6 +136,7 @@ QDockWidget *createPropertiesDock(QWidget *parent)
     rotation->setDecimals(1);
     rotation->setRange(0.0, 359.9);
     rotation->setSuffix(QStringLiteral(" °"));
+    keepValueVisible(rotation);
     for (QWidget *w : std::initializer_list<QWidget *>{name, x, y, width, height, rotation})
         w->setEnabled(false);
     grid->addWidget(new QLabel(QStringLiteral("Name"), form), 0, 0);
@@ -189,6 +198,7 @@ QDockWidget *createControlDock(QWidget *parent)
     preview->setRange(1, 60);
     preview->setValue(30);
     preview->setSuffix(QStringLiteral(" Bilder/s"));
+    keepValueVisible(preview);
     auto *previewSmall = new QCheckBox(QStringLiteral("Vorschau verkleinern"), content);
     auto *snap = new QCheckBox(QStringLiteral("Einrasten"), content);
     snap->setChecked(true);
@@ -197,6 +207,7 @@ QDockWidget *createControlDock(QWidget *parent)
     gridSize->setRange(1, 1000);
     gridSize->setValue(20);
     gridSize->setSuffix(QStringLiteral(" px"));
+    keepValueVisible(gridSize);
     auto *clearGuides = new QPushButton(QStringLiteral("Hilfslinien löschen"), content);
     for (QWidget *w : std::initializer_list<QWidget *>{address, copy, output, outputState, preview,
                                                        previewSmall, snap, gridCheck, gridSize,

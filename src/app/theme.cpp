@@ -203,12 +203,34 @@ QLineEdit:focus { background-color: @inputHover@; border-color: @primary@; }
 QLineEdit:read-only, QLineEdit:read-only:hover, QLineEdit:read-only:focus {
     background-color: transparent; border-color: @input@; }
 
+/* Abweichung von Yami: ohne min-width (--spinbox_min_width 55px). Qt setzt damit eine feste
+   Mindestbreite, die den sizeHint des Feldes übersteuert; bei wenig Platz wurde der Wert neben
+   den Pfeilknöpfen abgeschnitten (P06, «20 px» in «Steuerung» bei 1280x800). */
 QSpinBox, QDoubleSpinBox { background-color: @input@; border: 1px solid @input@;
-    border-radius: 4px; padding: 4px 8px; padding-right: 2px; height: 22px;
-    max-height: 22px; min-width: 55px; }
+    border-radius: 4px; padding: 4px 8px; padding-right: 2px; height: 22px; max-height: 22px; }
 QSpinBox:hover, QDoubleSpinBox:hover { background-color: @inputHover@;
                                        border-color: @inputBorderHover@; }
 QSpinBox:focus, QDoubleSpinBox:focus { background-color: @inputHover@; border-color: @primary@; }
+/* Pfeilknöpfe der Zahlenfelder (Punkt 30): Breite --input_height 22px, Höhe
+   --spinbox_button_height = --input_height_half − 1px = 15px − 1px = 14px. */
+QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-origin: padding;
+    subcontrol-position: top right; width: 22px; height: 14px; border-left: 1px solid @base@;
+    border-bottom: 1px solid transparent; border-radius: 0px; border-top-right-radius: 2px; }
+QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: padding;
+    subcontrol-position: bottom right; width: 22px; height: 14px; border-left: 1px solid @base@;
+    border-top: 1px solid @base@; border-radius: 0px; border-bottom-right-radius: 2px; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover, QDoubleSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover { background-color: @buttonHover@; }
+QSpinBox::up-button:pressed, QSpinBox::down-button:pressed, QDoubleSpinBox::up-button:pressed,
+QDoubleSpinBox::down-button:pressed { background-color: @buttonDown@; }
+QSpinBox::up-button:disabled, QSpinBox::up-button:off, QSpinBox::down-button:disabled,
+QSpinBox::down-button:off, QDoubleSpinBox::up-button:disabled, QDoubleSpinBox::up-button:off,
+QDoubleSpinBox::down-button:disabled, QDoubleSpinBox::down-button:off {
+    background-color: @buttonDisabled@; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url("@symbols@/zahlenfeld-hoch.svg");
+                                               margin: 2px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url("@symbols@/zahlenfeld-runter.svg");
+                                                   padding: 2px; }
 
 QPushButton { background-color: @input@; color: @text@; border: 1px solid @input@;
     border-radius: 4px; height: 22px; max-height: 22px; margin-top: 2px; margin-bottom: 2px;
