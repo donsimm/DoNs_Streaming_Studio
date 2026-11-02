@@ -4,13 +4,13 @@
 
 #include <QHash>
 #include <QList>
+#include <QLocalSocket>
 #include <QObject>
 #include <QString>
 #include <QUuid>
 
 #include <optional>
 
-class QLocalSocket;
 class QProcess;
 class QTimer;
 
@@ -21,6 +21,9 @@ class QTimer;
 // Schnittstelle: docs/08-kern-schnittstelle.md
 
 namespace dss {
+
+// Grund eines gescheiterten Verbindungsversuchs auf Deutsch für die Statuszeile.
+QString socketErrorText(QLocalSocket::LocalSocketError error);
 
 class CoreClient : public QObject
 {

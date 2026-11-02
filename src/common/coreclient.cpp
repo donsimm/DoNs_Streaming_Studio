@@ -9,6 +9,25 @@
 
 namespace dss {
 
+QString socketErrorText(QLocalSocket::LocalSocketError error)
+{
+    // Qt nennt ENOENT «Invalid name» und ECONNREFUSED «Connection refused»
+    // (QLocalSocketPrivate::_q_connectToSocket und generateErrorString in
+    // https://code.qt.io/cgit/qt/qtbase.git/tree/src/network/socket/qlocalsocket_unix.cpp?h=v6.8.2).
+    switch (error) {
+    case QLocalSocket::ServerNotFoundError:
+        return QStringLiteral("keine Verbindung unter diesem Pfad");
+    case QLocalSocket::ConnectionRefusedError:
+        return QStringLiteral("Verbindung abgelehnt, Kern läuft nicht");
+    case QLocalSocket::SocketAccessError:
+        return QStringLiteral("kein Zugriff auf die Verbindung");
+    case QLocalSocket::SocketTimeoutError:
+        return QStringLiteral("Zeitüberschreitung");
+    default:
+        return QStringLiteral("Fehler %1").arg(int(error));
+    }
+}
+
 CoreClient::CoreClient(const Options &options, QObject *parent)
     : QObject(parent)
     , m_options(options)
@@ -137,7 +156,7 @@ void CoreClient::onSocketError()
     }
     if (!m_keepStartError && !m_wasConnected)
         setStatus(QStringLiteral("Kern nicht erreichbar (%1), neuer Versuch alle %2 s")
-                      .arg(m_socket->errorString())
+                      .arg(socketErrorText(m_socket->error()))
                       .arg(m_options.reconnectIntervalMs / 1000.0));
 }
 

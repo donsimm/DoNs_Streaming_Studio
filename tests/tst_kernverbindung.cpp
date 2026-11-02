@@ -406,6 +406,24 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!observer->isConnected(), 3000);
     }
 
+    void missingConnectionIsNamed()
+    {
+        // Ohne Kern und ohne Einheit: Grund auf Deutsch statt Qts «Invalid name».
+        CoreClient::Options o;
+        o.socketPath = m_run->filePath(QStringLiteral("fehlt.sock"));
+        o.program = QStringLiteral("tst_kernverbindung");
+        o.version = version();
+        o.reconnectIntervalMs = 200;
+        CoreClient c(o);
+        c.start();
+        QTRY_COMPARE_WITH_TIMEOUT(c.statusText(),
+                                  QStringLiteral("Kern nicht erreichbar (keine Verbindung unter diesem "
+                                                 "Pfad), neuer Versuch alle 0.2 s"),
+                                  3000);
+        QCOMPARE(socketErrorText(QLocalSocket::ConnectionRefusedError),
+                 QStringLiteral("Verbindung abgelehnt, Kern läuft nicht"));
+    }
+
     void unitStartFailureIsShown()
     {
         // Lässt sich der Kern nicht starten (Einheit fehlt), steht der Grund im Status.
