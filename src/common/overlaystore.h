@@ -1,6 +1,7 @@
 #pragma once
 
 #include "overlay.h"
+#include "tokenstore.h"
 
 #include <QList>
 #include <QSet>
@@ -15,6 +16,7 @@
 //
 //   <Datenordner>/overlays/<Kennung>.json   ein Overlay je Datei
 //   <Datenordner>/media/<SHA-256>.<Endung>  Kopien der Dateien des Nutzers
+//   <Datenordner>/tokens.json               Token pro Overlay, Dateirechte 0600
 //
 // Jede Änderung wird sofort atomar gespeichert. Schlägt das Speichern fehl, bleibt das
 // Overlay im Speicher unverändert.
@@ -44,12 +46,16 @@ public:
     QString mediaFilePath(const QString &reference) const;
 
     // Legt die Unterordner an und lädt alle Overlays. false nur, wenn der Datenordner
-    // nicht nutzbar ist. Kaputte Dateien stehen danach in loadErrors() (mit Dateiname),
+    // oder tokens.json nicht lesbar ist. Kaputte Dateien stehen danach in loadErrors() (mit Dateiname),
     // werden übersprungen und nie überschrieben. Fehlende Mediendateien stehen je Quelle
-    // in loadWarnings(); das Overlay wird trotzdem geladen.
+    // in loadWarnings(); das Overlay wird trotzdem geladen. Hat ein Overlay keinen Token,
+    // wird einer erzeugt und in loadWarnings() gemeldet.
     bool load(QString *error);
     QStringList loadErrors() const { return m_loadErrors; }
     QStringList loadWarnings() const { return m_loadWarnings; }
+
+    // Token des Overlays für die Browserquelle. Nie ins Protokoll schreiben (Regel 12).
+    QString token(const QUuid &overlayId) const { return m_tokens.token(overlayId); }
 
     // Overlays sortiert nach Name (ohne Gross-/Kleinschreibung), dann Adresse.
     QList<Overlay> overlays() const { return m_overlays; }
@@ -61,7 +67,7 @@ public:
     // changeAddress = false: Adresse bleibt (Entscheid 5).
     bool renameOverlay(const QUuid &overlayId, const QString &newName, bool changeAddress,
                        QString *error);
-    // Neue Kennungen für Overlay und Quellen, Name «<Name> Kopie», eigene Adresse.
+    // Neue Kennungen für Overlay und Quellen, Name «<Name> Kopie», eigene Adresse, neuer Token.
     QUuid copyOverlay(const QUuid &overlayId, QString *error);
     bool removeOverlay(const QUuid &overlayId, QString *error);
 
@@ -88,6 +94,8 @@ private:
     QString mediaDir() const;
     QSet<QString> takenAddresses(const QUuid &except = QUuid()) const;
     bool writeOverlay(const Overlay &overlay, QString *error);
+    // Speichert ein neues Overlay mit neuem Token; ohne Token wird die Datei wieder entfernt.
+    bool addNewOverlay(const Overlay &overlay, QString *error);
     // Ändert eine Kopie, prüft und speichert sie; erst danach gilt sie im Speicher.
     bool modify(const QUuid &overlayId, const std::function<QString(Overlay *)> &change,
                 QString *error);
@@ -98,6 +106,7 @@ private:
     int indexOf(const QUuid &overlayId) const;
 
     QString m_dataDir;
+    TokenStore m_tokens;
     QList<Overlay> m_overlays;
     QStringList m_loadErrors;
     QStringList m_loadWarnings;

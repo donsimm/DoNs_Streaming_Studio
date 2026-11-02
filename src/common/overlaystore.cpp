@@ -43,6 +43,7 @@ QString defaultDataDir()
 
 OverlayStore::OverlayStore(const QString &dataDir)
     : m_dataDir(QDir(dataDir).absolutePath())
+    , m_tokens(m_dataDir + QStringLiteral("/tokens.json"))
 {
 }
 
@@ -84,6 +85,12 @@ bool OverlayStore::load(QString *error)
         }
     }
 
+    QString tokenWarning;
+    if (!m_tokens.load(error, &tokenWarning))
+        return false;
+    if (!tokenWarning.isEmpty())
+        m_loadWarnings.append(tokenWarning);
+
     const QDir dir(overlaysDir());
     const QStringList files = dir.entryList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
     for (const QString &fileName : files) {
@@ -118,6 +125,13 @@ bool OverlayStore::load(QString *error)
                                           .arg(name, source.name,
                                                source.id.toString(QUuid::WithoutBraces),
                                                reference));
+        }
+        if (!m_tokens.contains(overlay.id)) {
+            QString tokenError;
+            if (m_tokens.createToken(overlay.id, &tokenError))
+                m_loadWarnings.append(QStringLiteral("%1: kein Token vorhanden, neuer Token erzeugt").arg(name));
+            else
+                m_loadErrors.append(QStringLiteral("%1: kein Token vorhanden, %2").arg(name, tokenError));
         }
         insertSorted(overlay);
     }
@@ -187,6 +201,18 @@ bool OverlayStore::writeOverlay(const Overlay &overlay, QString *error)
     return true;
 }
 
+bool OverlayStore::addNewOverlay(const Overlay &overlay, QString *error)
+{
+    if (!writeOverlay(overlay, error))
+        return false;
+    if (!m_tokens.createToken(overlay.id, error)) {
+        QFile::remove(overlayFilePath(overlay.id));
+        return false;
+    }
+    insertSorted(overlay);
+    return true;
+}
+
 static QString unknownOverlay(const QUuid &overlayId)
 {
     return QStringLiteral("Overlay %1 nicht gefunden.").arg(overlayId.toString(QUuid::WithoutBraces));
@@ -228,9 +254,8 @@ QUuid OverlayStore::createOverlay(const QString &name, int width, int height, QS
         *error = e;
         return {};
     }
-    if (!writeOverlay(overlay, error))
+    if (!addNewOverlay(overlay, error))
         return {};
-    insertSorted(overlay);
     return overlay.id;
 }
 
@@ -265,9 +290,8 @@ QUuid OverlayStore::copyOverlay(const QUuid &overlayId, QString *error)
         *error = e;
         return {};
     }
-    if (!writeOverlay(copy, error))
+    if (!addNewOverlay(copy, error))
         return {};
-    insertSorted(copy);
     return copy.id;
 }
 
@@ -285,6 +309,10 @@ bool OverlayStore::removeOverlay(const QUuid &overlayId, QString *error)
         return false;
     }
     m_overlays.removeAt(index);
+    if (!m_tokens.removeToken(overlayId, error)) {
+        *error = QStringLiteral("Overlay gelöscht, aber Token nicht entfernt: ") + *error;
+        return false;
+    }
     return true;
 }
 
