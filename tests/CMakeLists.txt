@@ -18,6 +18,8 @@ dss_add_test(tst_canvasview)
 
 dss_add_test(tst_connectionstate)
 
+dss_add_test(tst_windowsize)
+
 # Testdateien wie im Handtest (CLAUDE.md Regel 7): Bild und Video aus
 # prototypes/messung/media_erzeugen.sh, Schriftdatei aus dem System (fc-list).
 set(DSS_TEST_MEDIA_DIR "${PROJECT_SOURCE_DIR}/prototypes/media" CACHE PATH "Testdateien (Bild, Video)")
@@ -41,6 +43,14 @@ if(DSS_BUILD_APP)
   target_link_libraries(tst_fonts PRIVATE dss_warnings Qt6::Gui Qt6::Test)
   add_test(NAME tst_fonts COMMAND tst_fonts)
   set_tests_properties(tst_fonts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+  # Symbole einfarbig (P06, Punkt 28), in der X11-Sitzung; ohne X11 übersprungen (77).
+  qt_add_executable(tst_symbols tst_symbols.cpp ${PROJECT_SOURCE_DIR}/src/app/symbols.cpp)
+  target_include_directories(tst_symbols PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
+  target_compile_definitions(tst_symbols PRIVATE DSS_SYMBOL_DIR="${PROJECT_SOURCE_DIR}/src/app/symbole")
+  target_link_libraries(tst_symbols PRIVATE dss_warnings Qt6::Widgets Qt6::Test)
+  add_test(NAME tst_symbols COMMAND tst_symbols)
+  set_tests_properties(tst_symbols PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Bildschirmfoto des Fensters in der X11-Sitzung (P05). Nur mit dem Fenster (DSS_BUILD_APP).

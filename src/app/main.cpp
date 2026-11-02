@@ -8,6 +8,7 @@
 #include "logging.h"
 #include "unixsignals.h"
 #include "version.h"
+#include "windowsize.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -33,17 +34,22 @@ int main(int argc, char *argv[])
                                            QStringLiteral("Version ausgeben und beenden."));
     const QCommandLineOption screenshotOption(
         QStringLiteral("bildschirmfoto"),
-        QStringLiteral("Fenster in 1280x800 öffnen, nach dem ersten Zeichnen als Bild speichern "
-                       "und beenden."),
+        QStringLiteral("Fenster in 1280x800 (oder --fenstergroesse) öffnen, nach dem ersten "
+                       "Zeichnen als Bild speichern und beenden."),
         QStringLiteral("DATEI"));
     const QCommandLineOption statesOption(
         QStringLiteral("zustaende-zeigen"),
         QStringLiteral("Nur mit --bildschirmfoto: die vier Verbindungsknöpfe in den vier "
                        "Zuständen zeigen (Twitch grün, YouTube orange, OBS rot, NDI grau)."));
+    const QCommandLineOption sizeOption(
+        QStringLiteral("fenstergroesse"),
+        QStringLiteral("Nur mit --bildschirmfoto: Grösse des Fensters, Standard 1280x800."),
+        QStringLiteral("BREITExHOEHE"));
     parser.addOption(helpOption);
     parser.addOption(versionOption);
     parser.addOption(screenshotOption);
     parser.addOption(statesOption);
+    parser.addOption(sizeOption);
     // Unbekannte Optionen (zum Beispiel von Qt wie -platform) bleiben QApplication überlassen.
     parser.parse(arguments);
     if (parser.isSet(versionOption)) {
@@ -62,6 +68,19 @@ int main(int argc, char *argv[])
     if (parser.isSet(statesOption) && !parser.isSet(screenshotOption)) {
         QTextStream(stderr) << "Fehler: --zustaende-zeigen gilt nur mit --bildschirmfoto.\n";
         return 2;
+    }
+
+    QSize screenshotSize(1280, 800);
+    if (parser.isSet(sizeOption)) {
+        if (!parser.isSet(screenshotOption)) {
+            QTextStream(stderr) << "Fehler: --fenstergroesse gilt nur mit --bildschirmfoto.\n";
+            return 2;
+        }
+        if (!dss::parseWindowSize(parser.value(sizeOption), &screenshotSize)) {
+            QTextStream(stderr) << "Fehler: --fenstergroesse erwartet BREITExHOEHE, zum Beispiel "
+                                   "1920x1080.\n";
+            return 2;
+        }
     }
 
     QApplication app(argc, argv);
@@ -104,7 +123,12 @@ int main(int argc, char *argv[])
     if (!screenshotFile.isEmpty()) {
         // Bild des Fensters ohne Rahmen des Fenstermanagers, QWidget::grab():
         // https://doc.qt.io/qt-6.8/qwidget.html#grab
-        window.resize(1280, 800);
+        window.resize(screenshotSize);
+        // Mit --fenstergroesse am Fenstermanager vorbei, sonst begrenzt er das Fenster auf
+        // die Arbeitsfläche (1920x1080 wurde unter Xfce zu 1920x1029, P06).
+        // https://doc.qt.io/qt-6.8/qt.html#WindowType-enum
+        if (parser.isSet(sizeOption))
+            window.setWindowFlag(Qt::X11BypassWindowManagerHint);
         QObject::connect(&window, &MainWindow::firstPainted, &app, [&window, screenshotFile] {
             const QPixmap image = window.grab();
             if (!image.save(screenshotFile)) {
