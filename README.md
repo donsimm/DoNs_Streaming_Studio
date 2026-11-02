@@ -15,6 +15,7 @@ Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `d
 | `docs/03-funktionen-entwurf.md` | Funktionen je Modul (Editor priorisiert) |
 | `docs/04-offene-punkte.md` | Offene Punkte und Reihenfolge der nächsten Schritte |
 | `docs/05-quellen.md` | Quellen |
+| `docs/07-bauplan.md` | Reihenfolge der Bausteine (Prompts) |
 | `docs/06-overlay-format.md` | Format der Overlay-Datei und Aufbau des Datenordners (Vorlage für beide Zeichner) |
 | `docs/berichte/` | Berichte der Bau-Prompts (ab P03) |
 | `prompts/` | Aufträge an Claude Code, in Reihenfolge, je eine eigene Sitzung |

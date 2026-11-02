@@ -1,6 +1,6 @@
 # 00 – Übergabe an den nächsten Chat
 
-Stand: 2026-11-02. Diese Datei zuerst lesen, danach `CLAUDE.md` und die Dokumente 01 bis 05 unter `docs/`. Die Festlegungen stehen auch im Claude Doc: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13 (gleicher Inhalt wie die Dateien, Repo ist massgebend bei Abweichungen).
+Stand: 2026-11-02. Diese Datei zuerst lesen, danach `CLAUDE.md` und die Dokumente 01 bis 07 unter `docs/`. Die Festlegungen stehen auch im Claude Doc: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13 (gleicher Inhalt wie die Dateien, Repo ist massgebend bei Abweichungen).
 
 ## Kurzfassung
 
@@ -44,8 +44,15 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 ## Nächste Schritte
 
 1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P05 (`prompts/P05-fenster-geruest.md`) ausgeführt (2026-11-02): Nachträge zum Modell und Fenster-Gerüst; abgenommen, einschliesslich Handtest.
-2. Weitere Bau-Prompts, je ein Baustein, je eine eigene Claude-Code-Sitzung. Reihenfolge ist ein Vorschlag: Projektgerüst und Einrichtungsskript, Overlay-Modell, Kern, Fenster, Zeichner für den Editor, Zeichner für die Browserquelle.
+2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge ab P06 noch Vorschlag). Als Nächstes P06: Aussehen wie OBS (entschieden 2026-11-02).
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
+
+## Rolle des Chats (Vorgabe des Nutzers, 2026-11-02, bis auf Weiteres)
+
+- Der Chat arbeitet als IT-Projektplaner. Bei ihm laufen alle Informationen zusammen; seine Aufgabe ist, den Überblick zu behalten und Struktur ins Projekt zu bringen.
+- Er plant die nächsten Schritte sorgfältig und vorausschauend und schreibt daraus die Prompts und Aufträge für Claude Code.
+- Alle Änderungen und offenen Punkte bespricht er einzeln mit dem Nutzer.
+- Werkzeug dafür: `docs/07-bauplan.md` (Reihenfolge der Bausteine), `docs/04-offene-punkte.md` (offene Punkte), `docs/01-festlegungen.md` (Entscheide).
 
 ## Arbeitsweise mit dem Nutzer
 
