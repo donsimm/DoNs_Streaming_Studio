@@ -1,6 +1,7 @@
 #pragma once
 
 #include "overlay.h"
+#include "overlaylist.h"
 #include "tokenstore.h"
 
 #include <QList>
@@ -17,6 +18,7 @@
 //   <Datenordner>/overlays/<Kennung>.json   ein Overlay je Datei
 //   <Datenordner>/media/<SHA-256>.<Endung>  Kopien der Dateien des Nutzers
 //   <Datenordner>/tokens.json               Token pro Overlay, Dateirechte 0600
+//   <Datenordner>/liste.json                Reihenfolge und Ordner der Overlay-Liste (P08)
 //
 // Jede Änderung wird sofort atomar gespeichert. Schlägt das Speichern fehl, bleibt das
 // Overlay im Speicher unverändert.
@@ -62,6 +64,12 @@ public:
 
     // Overlays sortiert nach Name (ohne Gross-/Kleinschreibung), dann Adresse.
     QList<Overlay> overlays() const { return m_overlays; }
+    // Reihenfolge und Ordner der Liste (liste.json, P08 Teil B), passend zu den geladenen
+    // Overlays. Ist liste.json kaputt, steht die Meldung in layoutError() (und in loadErrors()),
+    // die Liste ist dann nach Name sortiert, und die Datei wird nicht überschrieben.
+    OverlayLayout layout() const { return m_layout; }
+    QString layoutError() const { return m_layoutError; }
+    QString layoutFilePath() const;
     const Overlay *overlay(const QUuid &overlayId) const;
     const Overlay *overlayByAddress(const QString &address) const;
 
@@ -71,8 +79,19 @@ public:
     bool renameOverlay(const QUuid &overlayId, const QString &newName, bool changeAddress,
                        QString *error);
     // Neue Kennungen für Overlay und Quellen, Name «<Name> Kopie», eigene Adresse, neuer Token.
+    // Die Kopie steht in der Liste direkt nach dem Original.
     QUuid copyOverlay(const QUuid &overlayId, QString *error);
     bool removeOverlay(const QUuid &overlayId, QString *error);
+
+    // Liste (P08, Teil B): jede Änderung wird sofort atomar in liste.json gespeichert. Ist
+    // liste.json kaputt, werden diese Änderungen abgewiesen (die Datei wird nicht überschrieben).
+    bool moveOverlayInList(const QUuid &overlayId, const QUuid &folderId, int index, QString *error);
+    bool moveFolderInList(const QUuid &folderId, int index, QString *error);
+    QUuid createFolder(const QString &name, QString *error);
+    bool renameFolder(const QUuid &folderId, const QString &name, QString *error);
+    // Die Overlays des Ordners kommen auf die oberste Ebene, sie werden nicht gelöscht.
+    bool removeFolder(const QUuid &folderId, QString *error);
+    bool setFolderExpanded(const QUuid &folderId, bool expanded, QString *error);
 
     // Kopiert eine Datei nach media/<SHA-256>.<Endung> (gleicher Inhalt → eine Kopie)
     // und gibt den Verweis "media/…" zurück, bei Fehler einen leeren Text.
@@ -109,10 +128,21 @@ private:
     QUuid addPreparedSource(const QUuid &overlayId, Source source, QString *error);
     void insertSorted(const Overlay &overlay);
     int indexOf(const QUuid &overlayId) const;
+    QList<QUuid> idsByName() const;
+    void loadLayout();
+    bool writeLayout(const OverlayLayout &layout, QString *error);
+    // Änderung der Liste durch den Nutzer: auf einer Kopie, dann speichern, dann übernehmen.
+    bool changeLayout(const std::function<QString(OverlayLayout *)> &change, QString *error);
+    // Liste nachführen, nachdem ein Overlay angelegt oder gelöscht wurde (nicht bei kaputter
+    // liste.json). done beschreibt, was schon geschehen ist, für die Meldung bei einem Fehler.
+    bool followLayout(const std::function<QString(OverlayLayout *)> &change, const QString &done,
+                      QString *error);
 
     QString m_dataDir;
     TokenStore m_tokens;
     QList<Overlay> m_overlays;
+    OverlayLayout m_layout;
+    QString m_layoutError;
     QStringList m_loadErrors;
     QStringList m_loadWarnings;
 };

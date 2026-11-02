@@ -220,11 +220,26 @@ private:
             out() << "Keine Overlays vorhanden.\n";
             return kExitOk;
         }
-        QList<QStringList> rows = {{QStringLiteral("Name"), QStringLiteral("Adresse"),
-                                    QStringLiteral("Auflösung"), QStringLiteral("Quellen")}};
-        for (const dss::Overlay &o : overlays)
-            rows.append({o.name, o.address, QStringLiteral("%1x%2").arg(o.width).arg(o.height),
-                         QString::number(o.sources.size())});
+        // Reihenfolge und Ordner wie in der Liste des Fensters (liste.json, P08 Teil B).
+        QList<QStringList> rows = {{QStringLiteral("Ordner"), QStringLiteral("Name"),
+                                    QStringLiteral("Adresse"), QStringLiteral("Auflösung"),
+                                    QStringLiteral("Quellen")}};
+        const auto addRow = [&](const QString &folder, const QUuid &id) {
+            const dss::Overlay *o = m_store->overlay(id);
+            if (!o)
+                return;
+            rows.append({folder, o->name, o->address,
+                         QStringLiteral("%1x%2").arg(o->width).arg(o->height),
+                         QString::number(o->sources.size())});
+        };
+        for (const dss::ListEntry &e : m_store->layout().entries) {
+            if (!e.isFolder) {
+                addRow(QStringLiteral("–"), e.overlayId);
+                continue;
+            }
+            for (const QUuid &id : e.folder.overlays)
+                addRow(e.folder.name, id);
+        }
         printTable(rows);
         return kExitOk;
     }

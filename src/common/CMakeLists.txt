@@ -8,6 +8,7 @@ add_library(dss_common STATIC
   address.h address.cpp
   overlayjson.h overlayjson.cpp
   overlaystore.h overlaystore.cpp
+  overlaylist.h overlaylist.cpp
   tokenstore.h tokenstore.cpp
   canvasview.h canvasview.cpp
   connectionstate.h connectionstate.cpp

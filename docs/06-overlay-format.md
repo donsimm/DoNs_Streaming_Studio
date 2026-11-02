@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-02 (P04, Nachträge P05, Test des Beispiels P07). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-02 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -12,12 +12,71 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 │   └── <Kennung>.json        ein Overlay je Datei, Name = Kennung des Overlays
 ├── media/
 │   └── <SHA-256>.<Endung>    Kopien der Dateien des Nutzers (Bild, Video, Schrift)
+├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
 - **overlays/**: Jede Datei ist JSON in UTF-8. Gespeichert wird atomar (`QSaveFile`: temporäre Datei, danach Umbenennen).
 - **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Ungenutzte Kopien werden (noch) nicht gelöscht. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
+
+## Liste (`liste.json`)
+
+Seit P08. Reihenfolge der Overlays in der Liste des Fensters und Ordner (`docs/01-festlegungen.md`, Abschnitt «Overlay-Liste»). Die Datei gehört dem Kern; massgebend ist der Code in `src/common/overlaylist.h/.cpp` und `src/common/overlaystore.cpp`.
+
+| Feld | Typ | Bereich | Bedeutung |
+|---|---|---|---|
+| `format_version` | ganze Zahl | genau `1` | Version des Formats der Liste (unabhängig von der Overlay-Datei) |
+| `entries` | Liste | 0 oder mehr Einträge | Einträge der obersten Ebene, oben zuerst |
+
+Eintrag der Art `overlay`:
+
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `kind` | Text `overlay` | Art des Eintrags |
+| `id` | Text, UUID | Kennung des Overlays (wie in der Overlay-Datei) |
+
+Eintrag der Art `folder` (Ordner):
+
+| Feld | Typ | Bereich | Bedeutung |
+|---|---|---|---|
+| `kind` | Text `folder` | | Art des Eintrags |
+| `id` | Text, UUID | eindeutig | Kennung des Ordners, ändert sich nie |
+| `name` | Text | nicht leer (nicht nur Leerzeichen) | Name des Ordners; gleiche Namen sind erlaubt |
+| `expanded` | true/false | | in der Liste aufgeklappt |
+| `overlays` | Liste von UUID | | Kennungen der Overlays im Ordner, oben zuerst. Nur Overlays: Ein Ordner im Ordner ist im Format nicht möglich (eine Ebene) |
+
+Regeln:
+
+- Gespeichert wird atomar (`QSaveFile`) bei jeder Änderung der Liste (verschieben, Ordner anlegen, umbenennen, löschen, auf- und zuklappen) und wenn ein Overlay angelegt, kopiert oder gelöscht wird. Ein neues Overlay kommt ans Ende der obersten Ebene, eine Kopie direkt nach das Original (im selben Ordner).
+- Fehlt die Datei, gilt die Reihenfolge nach Name (ohne Gross-/Kleinschreibung, dann Adresse); die Datei entsteht bei der ersten Änderung.
+- Gelesen wird streng wie die Overlay-Datei: Ein fehlendes, unbekanntes oder ungültiges Feld, eine Kennung, die mehrfach vorkommt, oder eine andere `format_version` machen die Datei ungültig.
+- Overlays, die in der Datei fehlen (zum Beispiel mit `dss-cli` bei angehaltenem Kern angelegt), kommen in der Reihenfolge nach Name ans Ende der obersten Ebene. Einträge zu Overlays, die es nicht gibt, fallen weg. Das geschieht beim Laden nur im Speicher; die Datei wird erst bei der nächsten Änderung neu geschrieben.
+- Eine ungültige Datei wird beim Laden gemeldet (`liste.json: …`) und nicht überschrieben. Die Liste fällt auf «nach Name» zurück; Änderungen der Liste werden mit einer Meldung abgewiesen, bis die Datei repariert oder entfernt und der Kern neu geladen ist (SIGHUP). Overlays anlegen, kopieren und löschen geht weiter.
+- `dss-cli overlay-liste` zeigt die Overlays in derselben Reihenfolge, mit dem Namen des Ordners (`–` auf der obersten Ebene).
+
+Beispiel: «Überblick Start» oben, darunter der Ordner «Szenen» mit einem Overlay.
+
+```json
+{
+    "entries": [
+        {
+            "id": "db7f47a9-dee3-4de5-b056-40b5b3507607",
+            "kind": "overlay"
+        },
+        {
+            "expanded": true,
+            "id": "5c0f9a1e-2b7d-4e43-9d5a-8f1e2c3b4a50",
+            "kind": "folder",
+            "name": "Szenen",
+            "overlays": [
+                "7be08f35-6885-4a95-9c32-939c45a688ea"
+            ]
+        }
+    ],
+    "format_version": 1
+}
+```
 
 ## Overlay
 

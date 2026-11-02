@@ -68,6 +68,11 @@ QString OverlayStore::mediaFilePath(const QString &reference) const
     return m_dataDir + QLatin1Char('/') + reference;
 }
 
+QString OverlayStore::layoutFilePath() const
+{
+    return m_dataDir + QLatin1Char('/') + QString::fromLatin1(kListFileName);
+}
+
 static QString relativeName(const QString &fileName)
 {
     return QStringLiteral("overlays/") + fileName;
@@ -137,6 +142,93 @@ bool OverlayStore::load(QString *error, LoadMode mode)
                 m_loadErrors.append(QStringLiteral("%1: kein Token vorhanden, %2").arg(name, tokenError));
         }
         insertSorted(overlay);
+    }
+    loadLayout(); // liest nur, schreibt auch im Modus ReadWrite nicht
+    return true;
+}
+
+QList<QUuid> OverlayStore::idsByName() const
+{
+    QList<QUuid> ids;
+    for (const Overlay &overlay : m_overlays)
+        ids.append(overlay.id);
+    return ids;
+}
+
+void OverlayStore::loadLayout()
+{
+    // Fehlt liste.json, gilt die Reihenfolge nach Name; geschrieben wird erst bei einer Änderung.
+    // Abweichungen zu den Overlay-Dateien werden nur im Speicher ausgeglichen.
+    m_layoutError.clear();
+    m_layout = layoutFromIds(idsByName());
+    QFile file(layoutFilePath());
+    if (!file.exists())
+        return;
+    OverlayLayout layout;
+    QString error;
+    if (!file.open(QIODevice::ReadOnly)) {
+        error = QStringLiteral("kann nicht gelesen werden (%1)").arg(file.errorString());
+    } else if (parseLayout(file.readAll(), &layout, &error)) {
+        // Overlays, die fehlen (zum Beispiel mit dss-cli angelegt), kommen ans Ende der obersten
+        // Ebene; Einträge zu Overlays, die es nicht gibt, fallen weg.
+        normalizeLayout(&layout, idsByName());
+        m_layout = layout;
+        return;
+    }
+    // Kaputte Datei: melden, nicht überschreiben, Liste nach Name.
+    m_layoutError = QString::fromLatin1(kListFileName) + QStringLiteral(": ") + error;
+    m_loadErrors.append(m_layoutError
+                        + QStringLiteral(" (Liste nach Name, Datei wird nicht überschrieben)"));
+}
+
+bool OverlayStore::writeLayout(const OverlayLayout &layout, QString *error)
+{
+    // Atomar wie die Overlay-Dateien. https://doc.qt.io/qt-6.8/qsavefile.html
+    QSaveFile file(layoutFilePath());
+    if (!file.open(QIODevice::WriteOnly)) {
+        *error = QStringLiteral("%1 kann nicht geschrieben werden (%2)")
+                     .arg(file.fileName(), file.errorString());
+        return false;
+    }
+    file.write(serializeLayout(layout));
+    if (!file.commit()) {
+        *error = QStringLiteral("%1 kann nicht gespeichert werden (%2)")
+                     .arg(file.fileName(), file.errorString());
+        return false;
+    }
+    return true;
+}
+
+bool OverlayStore::changeLayout(const std::function<QString(OverlayLayout *)> &change,
+                                QString *error)
+{
+    if (!m_layoutError.isEmpty()) {
+        *error = QStringLiteral("Die Liste lässt sich nicht ändern: %1. Die Datei wird nicht "
+                                "überschrieben; reparieren oder entfernen und den Kern neu laden.")
+                     .arg(m_layoutError);
+        return false;
+    }
+    OverlayLayout changed = m_layout;
+    if (const QString e = change(&changed); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    if (!writeLayout(changed, error))
+        return false;
+    m_layout = changed;
+    return true;
+}
+
+bool OverlayStore::followLayout(const std::function<QString(OverlayLayout *)> &change,
+                                const QString &done, QString *error)
+{
+    change(&m_layout);
+    if (!m_layoutError.isEmpty())
+        return true; // kaputte liste.json bleibt, wie sie ist
+    QString writeError;
+    if (!writeLayout(m_layout, &writeError)) {
+        *error = done + QStringLiteral(", aber die Liste nicht gespeichert: ") + writeError;
+        return false;
     }
     return true;
 }
@@ -259,6 +351,9 @@ QUuid OverlayStore::createOverlay(const QString &name, int width, int height, QS
     }
     if (!addNewOverlay(overlay, error))
         return {};
+    if (!followLayout([&](OverlayLayout *l) { return addOverlayToLayout(l, overlay.id); },
+                      QStringLiteral("Overlay angelegt"), error))
+        return {};
     return overlay.id;
 }
 
@@ -295,6 +390,9 @@ QUuid OverlayStore::copyOverlay(const QUuid &overlayId, QString *error)
     }
     if (!addNewOverlay(copy, error))
         return {};
+    if (!followLayout([&](OverlayLayout *l) { return addOverlayToLayout(l, copy.id, overlayId); },
+                      QStringLiteral("Kopie angelegt"), error))
+        return {};
     return copy.id;
 }
 
@@ -316,7 +414,49 @@ bool OverlayStore::removeOverlay(const QUuid &overlayId, QString *error)
         *error = QStringLiteral("Overlay gelöscht, aber Token nicht entfernt: ") + *error;
         return false;
     }
-    return true;
+    return followLayout([&](OverlayLayout *l) { return removeOverlayFromLayout(l, overlayId); },
+                        QStringLiteral("Overlay gelöscht"), error);
+}
+
+bool OverlayStore::moveOverlayInList(const QUuid &overlayId, const QUuid &folderId, int index,
+                                     QString *error)
+{
+    return changeLayout([&](OverlayLayout *l) {
+        return moveOverlayInLayout(l, overlayId, folderId, index);
+    }, error);
+}
+
+bool OverlayStore::moveFolderInList(const QUuid &folderId, int index, QString *error)
+{
+    return changeLayout([&](OverlayLayout *l) { return moveFolderInLayout(l, folderId, index); },
+                        error);
+}
+
+QUuid OverlayStore::createFolder(const QString &name, QString *error)
+{
+    const QUuid id = QUuid::createUuid();
+    if (!changeLayout([&](OverlayLayout *l) { return createFolderInLayout(l, id, name); }, error))
+        return {};
+    return id;
+}
+
+bool OverlayStore::renameFolder(const QUuid &folderId, const QString &name, QString *error)
+{
+    return changeLayout([&](OverlayLayout *l) { return renameFolderInLayout(l, folderId, name); },
+                        error);
+}
+
+bool OverlayStore::removeFolder(const QUuid &folderId, QString *error)
+{
+    return changeLayout([&](OverlayLayout *l) { return removeFolderFromLayout(l, folderId); },
+                        error);
+}
+
+bool OverlayStore::setFolderExpanded(const QUuid &folderId, bool expanded, QString *error)
+{
+    return changeLayout([&](OverlayLayout *l) {
+        return setFolderExpandedInLayout(l, folderId, expanded);
+    }, error);
 }
 
 QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString *error)
