@@ -44,7 +44,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 ## Nächste Schritte
 
 1. P03 ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P04 (Overlay-Modell und Format der Overlay-Datei, K-01) ausgeführt und abgenommen (2026-11-02), einschliesslich Handtest. P05 (`prompts/P05-fenster-geruest.md`) ausgeführt (2026-11-02): Nachträge zum Modell und Fenster-Gerüst; abgenommen, einschliesslich Handtest.
-2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge P06 bis P12 bestätigt am 2026-11-02). Als Nächstes P06: Aussehen wie OBS (entschieden 2026-11-02), Prompt `prompts/P06-aussehen-obs.md` geschrieben, wartet auf Bestätigung durch den Nutzer.
+2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge P06 bis P12 bestätigt am 2026-11-02). Als Nächstes P06: Aussehen wie OBS (entschieden 2026-11-02), Prompt `prompts/P06-aussehen-obs.md` vom Nutzer bestätigt (2026-11-02), Ausführung auf dem Studio-PC.
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
 ## Rolle des Chats (Vorgabe des Nutzers, 2026-11-02, bis auf Weiteres)
