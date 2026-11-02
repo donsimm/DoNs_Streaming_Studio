@@ -123,7 +123,12 @@ void CoreClient::onDisconnected()
 
 void CoreClient::onSocketError()
 {
-    if (m_stopped || m_socket->state() != QLocalSocket::UnconnectedState || m_connected)
+    // Bei einem gescheiterten Verbindungsversuch meldet QLocalSocket den Fehler, solange der
+    // Zustand noch «Connecting» ist; erst danach wechselt er auf «Unconnected» (Qt 6.8.2,
+    // QLocalSocketPrivate::setErrorAndEmit in
+    // https://code.qt.io/cgit/qt/qtbase.git/tree/src/network/socket/qlocalsocket_unix.cpp?h=v6.8.2).
+    // Deshalb nur der Zustand «Connected» ausschliessen.
+    if (m_stopped || m_connected || m_socket->state() == QLocalSocket::ConnectedState)
         return;
     // Verbindungsversuch gescheitert.
     if (m_options.startUnit && !m_unitStartTried) {
