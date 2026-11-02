@@ -86,8 +86,8 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 - Beim Umbenennen fragt die Software, ob die Adresse mitgeändert werden soll. Standard «nein», damit OBS weiterläuft.
 - Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn, um die Mitte der Quelle (entschieden 2026-11-02). So drehen Qt (`QPainter::rotate`) und der Browser (CSS `rotate()`, Leserichtung links nach rechts) von sich aus; keiner der Zeichner rechnet um.
 - Adresse: «ß» wird «ss», «æ» wird «ae», «ø» wird «oe», «ł» wird «l» (entschieden 2026-11-02), zum Beispiel «Straße» → `strasse`. Noch umzusetzen (P04 wandelt diese Zeichen in «-» um).
-- Video: Wiederholen am Ende ist pro Quelle wählbar, Standard «wiederholen» (entschieden 2026-11-02). Noch umzusetzen (P04 speichert nur die Datei).
-- Ton von Videos (entschieden 2026-11-02): Der Studio-PC spielt den Ton über eine Audiokarte des Systems ab; von dort geht er über das externe Mischpult zum Streaming-PC. Alle Quellen des Editors nutzen denselben Audioausgang; dieser soll wählbar sein. Später werden mehrere Audiokarten bespielt (andere Module, zum Beispiel Musikplayer). Folgerung von Claude, nicht bestätigt: Die Browserquelle in OBS spielt Videos stumm ab, sonst käme der Ton doppelt an.
+- Video: Wiederholen am Ende ist pro Quelle wählbar, Standard «nicht wiederholen» (entschieden 2026-11-02, vom Nutzer korrigiert). Noch umzusetzen (P04 speichert nur die Datei).
+- Ton von Videos (entschieden 2026-11-02): Der Studio-PC spielt den Ton über eine Audiokarte des Systems ab; von dort geht er über das externe Mischpult zum Streaming-PC. Alle Quellen des Editors nutzen denselben Audioausgang; dieser soll wählbar sein. Später werden mehrere Audiokarten bespielt (andere Module, zum Beispiel Musikplayer). Die Browserquelle in OBS spielt Videos immer stumm ab, sonst käme der Ton doppelt an (entschieden 2026-11-02).
 - Risiko (Einschätzung, nicht gemessen): Bild (über das Netz als Browserquelle) und Ton (über das Mischpult) kommen auf verschiedenen Wegen beim Streaming-PC an und können gegeneinander verschoben sein. Prüfbar erst mit T-04.
 
 - Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json`, die nur der Benutzer lesen kann (Dateirechte 0600).
@@ -96,3 +96,7 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 ## Tests und Abnahme
 
 Entschieden (2026-11-02, vom Nutzer bestätigt): Der Nutzer testet nur, was sinnvoll ist oder nur er ausführen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wird nicht ein zweites Mal von Hand geprüft. Grund: Anders als im alten Projekt wird direkt auf dem Zielgerät programmiert und getestet. Umgesetzt in `CLAUDE.md` Regel 7 und 10.
+
+## Arbeitsweise mit Claude Code
+
+- Claude Code darf am Ende eines Auftrags selbst `git push origin main` ausführen, ohne Rückfrage (entschieden 2026-11-02). Umgesetzt in `.claude/settings.json`. Gepusht wird per SSH-Schlüssel des Studio-PCs.

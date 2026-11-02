@@ -50,7 +50,7 @@ Stand: 2026-11-02.
 
 ## Entschieden nach P04 (2026-11-02)
 
-- Punkt 17 (Video): Wiederholen pro Quelle wählbar, Standard «wiederholen»; Ton über eine Audiokarte des Studio-PCs (E-20, E-21). Siehe `docs/01-festlegungen.md`, Abschnitt «Overlay-Daten».
+- Punkt 17 (Video): Wiederholen pro Quelle wählbar, Standard «nicht wiederholen»; Browserquelle immer stumm; Ton über eine Audiokarte des Studio-PCs (E-20, E-21). Siehe `docs/01-festlegungen.md`, Abschnitt «Overlay-Daten».
 - Punkt 18 (Drehrichtung): im Uhrzeigersinn.
 - Punkt 19 (ß in der Adresse): «ß» → «ss», «æ» → «ae», «ø» → «oe», «ł» → «l».
 - Umsetzung von Punkt 17 (Feld für Wiederholen) und 19 im Modell: mit P05.
