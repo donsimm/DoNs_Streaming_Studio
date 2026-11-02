@@ -12,7 +12,7 @@ Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach k
 | P03 | Projektgerüst, Einrichtungsskript | `dss-core`, `dss-app`, `dss_common`, Tests |
 | P04 | Overlay-Modell, Format der Overlay-Datei | Speichern/Laden, Token-Datei, `dss-cli` |
 | P05 | Nachträge Modell, Fenster-Gerüst | Fenster nach Bild, ohne Daten |
-| P06 | Aussehen wie OBS | Design «Yami», Open Sans, Zahlenfelder mit Pfeilen, Verbindungsknöpfe mit vier Zuständen; ausgeführt (2026-11-02), Handtest offen; Bericht `docs/berichte/P06-bericht.md` |
+| P06 | Aussehen wie OBS | Design «Yami», Open Sans, Zahlenfelder mit Pfeilen, Verbindungsknöpfe mit vier Zuständen; abgenommen (2026-11-02), einschliesslich Handtest; Bericht `docs/berichte/P06-bericht.md` |
 
 ## Geplant
 

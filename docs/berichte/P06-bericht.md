@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Xfce/xfwm4 unter X11, `DISPLAY=:0.0`, `XDG_SESSION_TYPE=x11`, `Xft.dpi: 96`). Kein Xvfb; offscreen nur im Schrifttest, der laut Auftrag ohne Fenster läuft.
 
-Abnahme Punkt 5 (Handtest durch den Nutzer): **offen**.
+Abnahme Punkt 5 (Handtest durch den Nutzer): erledigt am 2026-11-02, alle 3 Schritte in Ordnung, Vergleich mit OBS auf dem Streaming-PC «passt» (Rückmeldung des Nutzers im Chat). Dabei hat der Nutzer die vier Kürzel-Symbole auf dem Studio-PC durch eigene Dateien ersetzt; sie erscheinen einfarbig wie vorgesehen.
 
 ## Kurzfassung
 
@@ -12,7 +12,7 @@ Abnahme Punkt 5 (Handtest durch den Nutzer): **offen**.
 | 2. `ctest --test-dir build` | 11 von 11 bestanden (neu: `tst_connectionstate`, `tst_windowsize`, `tst_fonts`, `tst_symbols`; `bildschirmfoto` erweitert) |
 | 3. Startprüfung `scripts/startpruefung.py --runs 20` | 20/20 sauber in allen drei Fällen |
 | 4. Bildschirmfotos im Bericht, Änderungen und Auffälligkeiten aufgelistet | ja: `P06-bilder/fenster-1280x800.png`, `fenster-1920x1080.png`, `zustaende.png`; Vergleich unten |
-| 5. Handtest durch den Nutzer | offen, 3 Schritte (Abschnitt «Handtest») |
+| 5. Handtest durch den Nutzer | ja: 3 Schritte in Ordnung, Vergleich mit OBS passt (2026-11-02) |
 
 **Es wurde kein Paket installiert.** Für SVG wird weiter `qt6-svg-plugins` 6.8.2-3 genutzt (seit P05 in `scripts/pakete.txt`).
 
