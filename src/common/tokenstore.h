@@ -23,8 +23,9 @@ public:
 
     // Fehlt die Datei, gibt es noch keine Token. Eine kaputte Datei ist ein Fehler und wird
     // nicht überschrieben. Andere Dateirechte als 0600 werden auf 0600 gesetzt und in
-    // *warning gemeldet.
-    bool load(QString *error, QString *warning);
+    // *warning gemeldet; mit readOnly = true nur gemeldet, nicht geändert (dss-cli bei
+    // laufendem Kern, P07).
+    bool load(QString *error, QString *warning, bool readOnly = false);
 
     bool contains(const QUuid &overlayId) const { return m_tokens.contains(overlayId); }
     QString token(const QUuid &overlayId) const { return m_tokens.value(overlayId); }

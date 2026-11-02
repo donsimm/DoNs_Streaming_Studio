@@ -1,7 +1,12 @@
 // dss-cli: Werkzeug ohne Fenster für den Handtest des Overlay-Modells (P04).
 // Enthält keine Logik ausser dem Lesen der Befehlszeile und der Ausgabe; alles andere
 // steckt in dss_common (OverlayStore). Gibt nie einen Token aus (CLAUDE.md Regel 12).
+// Seit P07 (Entscheid 2): Solange der Kern läuft, ändert nur er die Overlay-Dateien. Anzeige-
+// Befehle lesen dann nur (nichts wird geschrieben); Änderungs-Befehle nehmen die Sperre im
+// Datenordner und brechen ab, wenn sie belegt ist.
 
+#include "configpaths.h"
+#include "datalock.h"
 #include "overlaystore.h"
 #include "version.h"
 
@@ -16,6 +21,10 @@ namespace {
 constexpr int kExitOk = 0;
 constexpr int kExitError = 1;
 constexpr int kExitUsage = 2;
+constexpr int kExitLocked = 3;
+
+// Befehle, die nur anzeigen; alle anderen ändern den Datenordner.
+const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringLiteral("quelle-liste")};
 
 QTextStream &out()
 {
@@ -48,7 +57,10 @@ const char *const kUsage =
     "NR: Nummer der Quelle aus quelle-liste (1 = ganz hinten).\n"
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/dons-streaming-studio).\n"
-    "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf.\n";
+    "overlay-liste und quelle-liste gehen immer. Alle anderen Befehle ändern Overlays und gehen\n"
+    "nur, wenn der Kern angehalten ist (systemctl --user stop dss-core.service).\n"
+    "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
+    "gesperrt).\n";
 
 struct Arguments
 {
@@ -411,8 +423,29 @@ int main(int argc, char *argv[])
         return kExitUsage;
     }
 
-    dss::OverlayStore store(args.dataDir.isEmpty() ? dss::defaultDataDir() : args.dataDir);
-    if (!store.load(&error)) {
+    const QString dataDir = args.dataDir.isEmpty() ? dss::defaultDataDir() : args.dataDir;
+    const bool readOnly = kReadOnlyCommands.contains(args.positional.first());
+    // Änderungen nur mit der Sperre, die sonst der Kern hält (bis zum Ende des Befehls).
+    dss::DataLock lock(dataDir);
+    if (!readOnly) {
+        qint64 pid = 0;
+        if (!lock.tryLock(&error, &pid)) {
+            err() << "Fehler: " << error << ".\n"
+                  << "Solange der Kern läuft, ändert nur er die Overlays; dss-cli darf dann nur "
+                     "anzeigen (overlay-liste, quelle-liste).\n"
+                  << "Kern anhalten:  systemctl --user stop " << dss::kCoreUnitName << '\n'
+                  << "Danach den Befehl wiederholen und den Kern wieder starten:  "
+                     "systemctl --user start "
+                  << dss::kCoreUnitName << '\n';
+            if (pid > 0)
+                err() << "(Läuft der Kern ohne Dienst, mit «kill " << pid << "» beenden.)\n";
+            return kExitLocked;
+        }
+    }
+
+    dss::OverlayStore store(dataDir);
+    if (!store.load(&error, readOnly ? dss::OverlayStore::LoadMode::ReadOnly
+                                     : dss::OverlayStore::LoadMode::ReadWrite)) {
         err() << "Fehler: Datenordner " << store.dataDir() << ": " << error << '\n';
         return kExitError;
     }

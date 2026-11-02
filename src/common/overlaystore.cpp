@@ -73,20 +73,21 @@ static QString relativeName(const QString &fileName)
     return QStringLiteral("overlays/") + fileName;
 }
 
-bool OverlayStore::load(QString *error)
+bool OverlayStore::load(QString *error, LoadMode mode)
 {
+    const bool readOnly = mode == LoadMode::ReadOnly;
     m_overlays.clear();
     m_loadErrors.clear();
     m_loadWarnings.clear();
     for (const QString &dir : {overlaysDir(), mediaDir()}) {
-        if (!QDir().mkpath(dir)) {
+        if (!readOnly && !QDir().mkpath(dir)) {
             *error = QStringLiteral("Ordner %1 kann nicht angelegt werden.").arg(dir);
             return false;
         }
     }
 
     QString tokenWarning;
-    if (!m_tokens.load(error, &tokenWarning))
+    if (!m_tokens.load(error, &tokenWarning, readOnly))
         return false;
     if (!tokenWarning.isEmpty())
         m_loadWarnings.append(tokenWarning);
@@ -126,7 +127,9 @@ bool OverlayStore::load(QString *error)
                                                source.id.toString(QUuid::WithoutBraces),
                                                reference));
         }
-        if (!m_tokens.contains(overlay.id)) {
+        if (!m_tokens.contains(overlay.id) && readOnly) {
+            m_loadWarnings.append(QStringLiteral("%1: kein Token vorhanden (nur gelesen, keiner erzeugt)").arg(name));
+        } else if (!m_tokens.contains(overlay.id)) {
             QString tokenError;
             if (m_tokens.createToken(overlay.id, &tokenError))
                 m_loadWarnings.append(QStringLiteral("%1: kein Token vorhanden, neuer Token erzeugt").arg(name));

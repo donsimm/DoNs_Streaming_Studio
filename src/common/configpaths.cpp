@@ -17,6 +17,12 @@ QString userSymbolDir()
     return configDir() + QStringLiteral("/symbole");
 }
 
+QString defaultConnectionPath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
+           + QStringLiteral("/dons-streaming-studio/kern.sock");
+}
+
 QString findSymbolFile(const QString &fileName, const QStringList &dirs)
 {
     if (fileName.isEmpty() || fileName.contains(QLatin1Char('/')))

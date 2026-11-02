@@ -50,7 +50,10 @@ public:
     // werden übersprungen und nie überschrieben. Fehlende Mediendateien stehen je Quelle
     // in loadWarnings(); das Overlay wird trotzdem geladen. Hat ein Overlay keinen Token,
     // wird einer erzeugt und in loadWarnings() gemeldet.
-    bool load(QString *error);
+    // LoadMode::ReadOnly schreibt nichts: keine Ordner anlegen, keinen Token erzeugen,
+    // keine Dateirechte ändern (dss-cli bei laufendem Kern, Entscheid 2 in P07).
+    enum class LoadMode { ReadWrite, ReadOnly };
+    bool load(QString *error, LoadMode mode = LoadMode::ReadWrite);
     QStringList loadErrors() const { return m_loadErrors; }
     QStringList loadWarnings() const { return m_loadWarnings; }
 

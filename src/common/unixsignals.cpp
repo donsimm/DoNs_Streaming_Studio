@@ -25,8 +25,8 @@ void handleSignal(int signalNumber)
 
 } // namespace
 
-UnixSignalWatcher::UnixSignalWatcher(QObject *parent)
-    : QObject(parent)
+UnixSignalWatcher::UnixSignalWatcher(QObject *parent, bool handleHangup)
+    : QObject(parent), m_hangup(handleHangup)
 {
     if (g_fds[0] != -1)
         return; // schon ein Objekt aktiv
@@ -44,7 +44,8 @@ UnixSignalWatcher::UnixSignalWatcher(QObject *parent)
     sigemptyset(&action.sa_mask);
     action.sa_flags = SA_RESTART;
     m_valid = ::sigaction(SIGINT, &action, nullptr) == 0
-        && ::sigaction(SIGTERM, &action, nullptr) == 0;
+        && ::sigaction(SIGTERM, &action, nullptr) == 0
+        && (!m_hangup || ::sigaction(SIGHUP, &action, nullptr) == 0);
 }
 
 UnixSignalWatcher::~UnixSignalWatcher()
@@ -56,6 +57,8 @@ UnixSignalWatcher::~UnixSignalWatcher()
     sigemptyset(&action.sa_mask);
     ::sigaction(SIGINT, &action, nullptr);
     ::sigaction(SIGTERM, &action, nullptr);
+    if (m_hangup)
+        ::sigaction(SIGHUP, &action, nullptr);
     delete m_notifier;
     ::close(g_fds[0]);
     ::close(g_fds[1]);
@@ -65,7 +68,11 @@ UnixSignalWatcher::~UnixSignalWatcher()
 void UnixSignalWatcher::readSignal()
 {
     char byte = 0;
-    if (::read(g_fds[1], &byte, 1) == 1)
+    if (::read(g_fds[1], &byte, 1) != 1)
+        return;
+    if (static_cast<unsigned char>(byte) == SIGHUP)
+        emit hangupReceived();
+    else
         emit terminationRequested(static_cast<unsigned char>(byte));
 }
 

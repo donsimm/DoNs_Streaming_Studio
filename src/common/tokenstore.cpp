@@ -33,14 +33,16 @@ QString TokenStore::generateToken()
         bytes.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
 }
 
-bool TokenStore::load(QString *error, QString *warning)
+bool TokenStore::load(QString *error, QString *warning, bool readOnly)
 {
     m_tokens.clear();
     warning->clear();
     QFile file(m_filePath);
     if (!file.exists())
         return true;
-    if ((file.permissions() & kUnixBits) != kOwnerOnly) {
+    if ((file.permissions() & kUnixBits) != kOwnerOnly && readOnly) {
+        *warning = QStringLiteral("tokens.json: Dateirechte sind nicht 0600 (nur gelesen, nicht geändert)");
+    } else if ((file.permissions() & kUnixBits) != kOwnerOnly) {
         if (!file.setPermissions(kOwnerOnly)) {
             *error = QStringLiteral("tokens.json: Dateirechte lassen sich nicht auf 0600 setzen (%1)")
                          .arg(file.errorString());
