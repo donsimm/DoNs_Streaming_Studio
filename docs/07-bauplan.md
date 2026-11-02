@@ -2,7 +2,7 @@
 
 Stand: 2026-11-02. Reihenfolge der Bausteine (Prompts für Claude Code). Je Baustein ein Prompt unter `prompts/`, eine eigene Claude-Code-Sitzung, ein Bericht unter `docs/berichte/`. Gepflegt vom Chat (Projektplanung), Änderungen nur nach Absprache mit dem Nutzer.
 
-Status: **Vorschlag**, Reihenfolge ab P06 noch nicht bestätigt.
+Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach kommt, ist noch offen.
 
 ## Erledigt
 
