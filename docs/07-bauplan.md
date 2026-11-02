@@ -21,7 +21,7 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P08 | Bearbeiten im Fenster | Docks Overlays, Quellen, Eigenschaften bedienbar: Overlays anlegen/umbenennen (mit Rückfrage zur Adresse)/kopieren/löschen, Quellen hinzufügen/entfernen/Reihenfolge/ein-ausblenden, Zahleneingabe für Lage, Grösse, Drehung, Eigenschaften von Text (TX-01 bis TX-05) und Video (Wiederholen). Alle Änderungen gehen an den Kern | P07 | E-01, E-03 (Daten), E-07, E-08 (Zahlen) |
+| P08 | Bearbeiten im Fenster | Docks Overlays, Quellen, Eigenschaften bedienbar: Overlays anlegen/umbenennen (mit Rückfrage zur Adresse)/kopieren/löschen, per Maus verschieben, Ordner mit einer Ebene, Quellen hinzufügen/entfernen/Reihenfolge/ein-ausblenden, Zahleneingabe für Lage, Grösse, Drehung, Eigenschaften von Text (TX-01 bis TX-05) und Video (Wiederholen). Alle Änderungen gehen an den Kern | P07 | E-01, E-03 (Daten), E-07, E-08 (Zahlen) |
 | P09 | Zeichner im Editor | Leinwand zeichnet Bild, Text (Schriftdatei), Video und WebM mit Alpha (libavcodec, libvpx); Quelle mit der Maus wählen, verschieben, skalieren, drehen | P08 | E-03 bis E-05, E-08 (Maus), E-09, E-11 |
 | P10 | Browserquelle | Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
 | P11 | Bildvergleich der zwei Zeichner | K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen | P10 | (Voraussetzung für K-07) |

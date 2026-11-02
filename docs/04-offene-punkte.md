@@ -91,3 +91,4 @@ Stand: 2026-11-02 (nach P07).
 - Punkt 43: erledigt durch den Handtest P07 (Schliessen mit dem Schliessknopf, Kern danach `inactive`).
 - Punkt 39: so lassen. Das Handy per USB ist eine Übergangslösung, bis das Heimnetz per Kabel besteht; die Anzeige wechselt von selbst aufs Kabel, sobald es die Standardroute ist.
 - Punkt 40: entschieden, vorderste Quelle oben wie in OBS. Datei und `dss-cli` bleiben bei «Nr. 1 = hinterste».
+- Punkt 37 (und 22): entschieden, Overlays sind per Maus frei verschiebbar, Reihenfolge wird gespeichert; dazu Ordner mit einer Ebene (keine Unterordner). Umsetzung in P08. Siehe `docs/01-festlegungen.md`, Abschnitt «Overlay-Liste».
