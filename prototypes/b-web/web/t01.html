@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>P01 T-01 B</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f0f0f0; font: 16px "DejaVu Sans", sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+<div>T-01 Variante B (Kern + Web-Oberfläche)</div>
+<script>
+  // Zwei rAF hintereinander: das erste Bild ist dann gezeichnet.
+  requestAnimationFrame(() => requestAnimationFrame(() => console.log("FIRST_FRAME")));
+</script>
+</body>
+</html>

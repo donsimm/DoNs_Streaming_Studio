@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>P01 T-02 B</title>
+<!--
+  Messprototyp Variante B: Overlay 1920x1080, gleicher Aufbau wie A und C.
+  Animationen laufen per requestAnimationFrame, gedrosselt auf Ziel 30 Bilder/s.
+  Quellen:
+    requestVideoFrameCallback: https://developer.mozilla.org/en-US/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback
+    WEBGL_debug_renderer_info: https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_debug_renderer_info
+    paint-order / -webkit-text-stroke: https://developer.mozilla.org/en-US/docs/Web/CSS/paint-order
+-->
+<style>
+  html, body { margin: 0; overflow: hidden; background: #000; }
+  #stage {
+    position: relative; width: 1920px; height: 1080px;
+    background-color: #fff;
+    background-image: conic-gradient(#ccc 25%, #fff 0 50%, #ccc 0 75%, #fff 0);
+    background-size: 32px 32px;
+  }
+  #stage > * { position: absolute; }
+  .txt {
+    font: bold 64px "DejaVu Sans", sans-serif; color: #fff; white-space: nowrap;
+    -webkit-text-stroke: 6px rgba(0, 0, 0, 0.78); paint-order: stroke fill;
+    transform-origin: 0 0; line-height: 1; will-change: transform;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="video" src="/media/video.webm" muted loop autoplay playsinline style="left:60px;top:60px;width:960px;height:540px"></video>
+  <video id="alpha" src="/media/alpha.webm" muted loop autoplay playsinline style="left:1340px;top:480px;width:512px;height:512px"></video>
+  <img src="/media/bild1.png" style="left:60px;top:780px">
+  <img src="/media/bild2.png" style="left:360px;top:780px">
+  <img src="/media/bild3.png" style="left:660px;top:780px">
+  <img src="/media/bild4.png" style="left:960px;top:780px">
+  <img src="/media/bild5.png" style="left:1260px;top:780px">
+  <div id="t1" class="txt" style="left:1100px;top:80px">Schweben</div>
+  <div id="t2" class="txt" style="left:1100px;top:220px">Atmen</div>
+  <div id="t3" class="txt" style="left:1100px;top:360px">DoNs Studio</div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const durationMs = (Number(params.get("duration")) || 70) * 1000;
+  const epoch = () => performance.timeOrigin + performance.now();
+  const stats = { variant: "B", frames: [], raf: [], video_frames: [], alpha_frames: [], info: {} };
+
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    const ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    stats.info.webgl_renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : (gl ? "ohne Erweiterung" : "kein WebGL");
+  } catch (e) { stats.info.webgl_renderer = "Fehler: " + e; }
+
+  for (const [id, key] of [["video", "video_frames"], ["alpha", "alpha_frames"]]) {
+    const v = document.getElementById(id);
+    v.addEventListener("error", () => { stats.info[id + "_error"] = String(v.error && v.error.message); });
+    if ("requestVideoFrameCallback" in v) {
+      const cb = () => { stats[key].push(epoch()); v.requestVideoFrameCallback(cb); };
+      v.requestVideoFrameCallback(cb);
+    } else {
+      stats.info.rvfc = "nicht vorhanden";
+    }
+  }
+
+  const t1 = document.getElementById("t1"), t2 = document.getElementById("t2"), t3 = document.getElementById("t3");
+  const start = performance.now();
+  const interval = 1000 / 30;
+  let next = start;
+  function tick(now) {
+    stats.raf.push(performance.timeOrigin + now);
+    // Ziel 30 Bilder/s: nur aktualisieren, wenn der nächste 1/30-s-Zeitpunkt erreicht ist
+    // (Toleranz 2 ms, da rAF an die 60-Hz-Bildwiederholung gebunden ist).
+    if (now >= next - 2) {
+      next += interval;
+      if (now - next > interval) next = now + interval;
+      stats.frames.push(performance.timeOrigin + now);
+      const t = (now - start) / 1000;
+      const floatY = 12 * Math.sin(2 * Math.PI * t / 3);
+      const breath = 1 + 0.06 * Math.sin(2 * Math.PI * t / 2.5);
+      t1.style.transform = `translateY(${floatY}px)`;
+      t2.style.transform = `scale(${breath})`;
+      t3.style.transform = `translateY(${floatY}px) scale(${breath})`;
+    }
+    if (now - start < durationMs) {
+      requestAnimationFrame(tick);
+    } else {
+      console.log("STATS " + JSON.stringify(stats));
+    }
+  }
+  requestAnimationFrame(tick);
+</script>
+</body>
+</html>
