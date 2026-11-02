@@ -90,3 +90,4 @@ Stand: 2026-11-02 (nach P07).
 - Punkt 35: so lassen. Wird der Kern bei offenem Fenster absichtlich angehalten, startet das Fenster ihn nicht wieder. Neu starten durch Schliessen und Öffnen des Fensters.
 - Punkt 43: erledigt durch den Handtest P07 (Schliessen mit dem Schliessknopf, Kern danach `inactive`).
 - Punkt 39: so lassen. Das Handy per USB ist eine Übergangslösung, bis das Heimnetz per Kabel besteht; die Anzeige wechselt von selbst aufs Kabel, sobald es die Standardroute ist.
+- Punkt 40: entschieden, vorderste Quelle oben wie in OBS. Datei und `dss-cli` bleiben bei «Nr. 1 = hinterste».
