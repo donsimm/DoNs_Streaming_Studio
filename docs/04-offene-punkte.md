@@ -4,7 +4,7 @@ Stand: 2026-11-02.
 
 ## Offen
 
-1. Betriebssystem: entschieden (2026-11-02), Debian 13 mit Xfce unter X11. Technik: entschieden (2026-11-02), C++ mit Qt 6 und eigener Leinwand (Variante A); siehe `docs/01-festlegungen.md`. Offen bleibt die Sprache des Kerns, das Konzept gegen das Auseinanderlaufen der zwei Zeichner (Vorschlag in 01) und die Weiterverwendung der Messungen zu B nur noch als Referenz.
+1. Betriebssystem: entschieden (2026-11-02), Debian 13 mit Xfce unter X11. Technik: entschieden (2026-11-02), C++ mit Qt 6 und eigener Leinwand (Variante A); siehe `docs/01-festlegungen.md`. Sprache des Kerns: entschieden (2026-11-02), C++. Offen bleibt das Konzept gegen das Auseinanderlaufen der zwei Zeichner (Vorschlag in 01) und die Weiterverwendung der Messungen zu B nur noch als Referenz.
 2. NDI-SDK: Lizenzbedingungen für die private Nutzung und der Bezug für Linux sind nicht geprüft.
 3. Chat-Bot: Umfang und Streamer.bot-Import werden geklärt, wenn das Modul an der Reihe ist. Die Daten der alten Installation sind vorhanden.
 4. Live-Modul: Inhalt wird später geklärt.
