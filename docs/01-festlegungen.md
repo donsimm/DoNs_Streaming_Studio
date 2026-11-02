@@ -113,3 +113,26 @@ Entschieden (2026-11-02, vom Nutzer bestätigt): Vier Verbindungen werden angeze
 | Grau | nicht eingerichtet oder abgeschaltet |
 
 Offen: Was die Software mit YouTube tun soll (Chat, Ereignisse); wird mit dem Chat-Bot-Modul geklärt.
+
+## Aussehen des Fensters
+
+Entschieden (2026-11-02, Wunsch des Nutzers): Das Fenster soll so ähnlich wie möglich wie OBS Studio aussehen (Schrift und Farben). Aufbau und Docks bleiben wie auf `docs/bilder/oberflaeche.png`.
+
+Vorlage ist das Standard-Design von OBS Studio, «Yami» in der Variante «Default» (Datei `frontend/data/themes/Yami.obt` im Repo https://github.com/obsproject/obs-studio, gelesen am 2026-11-02, Commit `65c320b46e1af5c7a555161aea6182cdf7a8c524`). OBS ist wie dieses Projekt eine Qt-Anwendung; das Design ist ein Qt-Stylesheet mit Variablen.
+
+- Schrift: OBS nennt als erste Schrift «Open Sans» (danach Helvetica, Arial, sans-serif). In diesem Repo-Stand liefert OBS keine Schriftdatei mit (nicht gefunden unter `frontend/data`). Für dieses Projekt: Open Sans als Datei laden, nicht auf eine Installation hoffen.
+- Grundfarben (Variablen aus `Yami.obt`):
+
+| Rolle in OBS | Variable | Wert |
+|---|---|---|
+| Fensterhintergrund | `--bg_window` = `--grey7` | `#1D1F26` |
+| Hintergrund von Flächen | `--bg_base` = `--grey6` | `#272A33` |
+| Hintergrund der Vorschau | `--bg_preview` = `--grey8` | `#13141A` |
+| Hauptfarbe (Auswahl, Knöpfe) | `--primary` = `--blue3` | `#284CB8` |
+| Hauptfarbe hell | `--primary_light` = `--blue2` | `#476BD7` |
+| Text | `--text` = `--white1` | `#FFFFFF` |
+| Text gedämpft, ausgegraut | `--text_muted` = `--white5` | `#969696` |
+| weitere Grautöne | `--grey1` … `--grey5` | `#5B6273`, `#4E5566`, `#464B59`, `#3C404D`, `#323540` |
+| Farben für Zustände (Vorschlag für die Verbindungsknöpfe) | `--green3`, `--yellow2`, `--red3` | `#25A231`, `#E5AF24`, `#C01C37` |
+
+- Lizenz: OBS Studio steht unter GPL Version 2 (Datei `COPYING`). Farbwerte zu übernehmen ist unkritisch. Wird mehr übernommen (Stylesheet-Teile, Symbole), gilt die GPL für diese Teile; solange die Software privat bleibt und nicht weitergegeben wird, entstehen daraus keine Pflichten (Einschätzung, keine Rechtsberatung).
