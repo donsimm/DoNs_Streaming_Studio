@@ -1,6 +1,7 @@
-// dss-app: Fenster. In P03 nur ein leeres Hauptfenster.
+// dss-app: Fenster nach docs/bilder/oberflaeche.png, in P05 noch ohne Daten.
 
 #include "mainwindow.h"
+#include "theme.h"
 
 #include "logging.h"
 #include "unixsignals.h"
@@ -44,7 +45,14 @@ int main(int argc, char *argv[])
     QApplication::setApplicationVersion(dss::version());
     dss::setupLogging();
 
-    MainWindow window;
+    // Fusion: derselbe Grundstil unabhängig von der Desktop-Umgebung.
+    // https://doc.qt.io/qt-6.8/qstylefactory.html
+    QApplication::setStyle(QStringLiteral("Fusion"));
+    const Theme theme = darkTheme();
+    QApplication::setPalette(palette(theme));
+    app.setStyleSheet(styleSheet(theme));
+
+    MainWindow window(theme);
 
     // SIGINT/SIGTERM schliessen das Fenster, also derselbe Weg wie beim Schliessen von Hand.
     dss::UnixSignalWatcher signalWatcher;
