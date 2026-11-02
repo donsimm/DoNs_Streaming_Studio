@@ -7,6 +7,7 @@ project(DoNsStreamingStudio VERSION 0.1.0 LANGUAGES CXX)
 # Schalter (CLAUDE.md Regel 8). Der Kern wird immer gebaut.
 option(DSS_BUILD_APP "Fenster dss-app bauen" ON)
 option(DSS_BUILD_TESTS "Tests bauen (ctest)" ON)
+option(DSS_BUILD_CLI "Werkzeug dss-cli bauen" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +33,9 @@ target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
 add_subdirectory(src/common)
 add_subdirectory(src/core)
+if(DSS_BUILD_CLI)
+  add_subdirectory(src/cli)
+endif()
 if(DSS_BUILD_APP)
   add_subdirectory(src/app)
 endif()
