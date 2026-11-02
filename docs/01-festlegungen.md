@@ -75,3 +75,14 @@ Entschieden (2026-11-02, vom Nutzer bestätigt). Grundidee: Der Kern ist die ein
 Nicht geprüft: Ob Chromium auf dem Studio-PC gleich zeichnet wie die Browserquelle in OBS auf dem Streaming-PC (zeigt erst T-04).
 
 Zu K-04, entschieden (2026-11-02, vom Nutzer bestätigt): Den automatischen Zeilenumbruch (TX-11) rechnet nur der Kern und schickt die fertigen Zeilen; die Zeichner brechen nie selbst um.
+
+## Overlay-Daten
+
+Entschieden (2026-11-02, vom Nutzer bestätigt):
+
+- Bilder, Videos und Schriftdateien werden beim Hinzufügen als Kopie im Datenordner der Software abgelegt. Das Overlay verweist nur auf die Kopie.
+- Drehung wird als ganze Zahl in Zehntelgrad gespeichert (0 bis 3599), angezeigt mit einer Nachkommastelle.
+- Die Adresse der Browserquelle wird aus dem Namen des Overlays gebildet (Kleinbuchstaben, Umlaute als ae/oe/ue, übrige Zeichen als «-»), zum Beispiel `ueberblick-start`. Bei gleichem Namen hängt die Software eine Zahl an.
+- Beim Umbenennen fragt die Software, ob die Adresse mitgeändert werden soll. Standard «nein», damit OBS weiterläuft.
+
+Vorschlag von Claude im Prompt P04, noch nicht bestätigt: Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json` mit Dateirechten 0600.
