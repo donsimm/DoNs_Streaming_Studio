@@ -1,0 +1,3 @@
+prototypes/media/
+prototypes/**/build/
+__pycache__/
