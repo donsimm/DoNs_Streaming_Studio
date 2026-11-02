@@ -9,6 +9,7 @@ add_library(dss_common STATIC
   overlayjson.h overlayjson.cpp
   overlaystore.h overlaystore.cpp
   overlaylist.h overlaylist.cpp
+  fontcatalog.h fontcatalog.cpp
   tokenstore.h tokenstore.cpp
   canvasview.h canvasview.cpp
   connectionstate.h connectionstate.cpp
@@ -22,5 +23,8 @@ add_library(dss_common STATIC
   systemdnotify.h systemdnotify.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}")
+# Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und
+# Fenster (Auswahl) finden sie hier im Quellbaum, wie die Symbole des Fensters (P05).
+target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}"
+  DSS_BUILTIN_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/schriften/be-vietnam-pro")
 target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network PRIVATE dss_warnings)
