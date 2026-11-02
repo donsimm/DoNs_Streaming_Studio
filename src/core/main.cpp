@@ -1,9 +1,10 @@
 // dss-core: Kern ohne Fenster (P07): hält die Overlays aus dem Datenordner, nimmt die Sperre
-// im Datenordner (einziger, der schreibt). Die Verbindung zu den Fenstern folgt in Teil D.
+// im Datenordner (einziger, der schreibt) und bedient die Fenster über einen Unix-Socket.
 // Läuft als Benutzerdienst von systemd (scripts/dienst-einrichten.sh), lässt sich aber auch
 // direkt starten. Schnittstelle: docs/08-kern-schnittstelle.md
 
 #include "configpaths.h"
+#include "coreservice.h"
 #include "datalock.h"
 #include "logging.h"
 #include "overlaystore.h"
@@ -93,13 +94,29 @@ int main(int argc, char *argv[])
     qInfo("Datenordner %s: %lld Overlays geladen", qPrintable(store.dataDir()),
           static_cast<long long>(store.overlays().size()));
 
+    CoreService service(&store, socketPath);
+    switch (service.listen(&error)) {
+    case CoreService::ListenResult::Ok:
+        break;
+    case CoreService::ListenResult::InUse:
+        qCritical("Kern startet nicht: %s", qPrintable(error));
+        return kExitAlreadyRunning;
+    case CoreService::ListenResult::Failed:
+        qCritical("Kern startet nicht: %s", qPrintable(error));
+        return kExitError;
+    }
+
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,
                      [](int signalNumber) {
                          qInfo("%s erhalten, beende",
                                signalNumber == SIGINT ? "SIGINT" : "SIGTERM");
                          QCoreApplication::quit();
                      });
-    Q_UNUSED(socketPath);
+    QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::hangupReceived, &service, [&service] {
+        qInfo("SIGHUP erhalten, lade Datenordner neu");
+        service.reload();
+    });
+    QObject::connect(&service, &CoreService::quitRequested, &app, &QCoreApplication::quit);
 
     // Bereit: erst jetzt kehrt «systemctl --user start» zurück (Type=notify).
     if (dss::notifySystemd("READY=1"))

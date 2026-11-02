@@ -24,6 +24,16 @@ QString connectionName(Connection connection);
 // «off», «error», «connecting», «connected».
 QString connectionStateKey(ConnectionState state);
 
+// Umkehrung von connectionStateKey; false bei unbekanntem Wert (Schnittstelle zum Kern, P07).
+bool connectionStateFromKey(const QString &key, ConnectionState *state);
+
+// Alle vier Verbindungen in der Reihenfolge des Kopfbereichs.
+inline constexpr Connection kAllConnections[] = {Connection::Twitch, Connection::YouTube,
+                                                 Connection::Obs, Connection::Ndi};
+
+// Feldname in der Schnittstelle zum Kern: «twitch», «youtube», «obs», «ndi».
+QString connectionKey(Connection connection);
+
 // Text für Tooltip und Bildschirmleser, zum Beispiel «Twitch: verbunden»,
 // «NDI: Ausgabe läuft».
 QString connectionStateText(Connection connection, ConnectionState state);

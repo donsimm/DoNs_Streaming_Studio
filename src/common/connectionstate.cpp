@@ -32,6 +32,23 @@ QString connectionStateKey(ConnectionState state)
     return QStringLiteral("connected");
 }
 
+bool connectionStateFromKey(const QString &key, ConnectionState *state)
+{
+    for (ConnectionState s : {ConnectionState::Off, ConnectionState::Error,
+                              ConnectionState::Connecting, ConnectionState::Connected}) {
+        if (connectionStateKey(s) == key) {
+            *state = s;
+            return true;
+        }
+    }
+    return false;
+}
+
+QString connectionKey(Connection connection)
+{
+    return connectionName(connection).toLower();
+}
+
 QString connectionStateText(Connection connection, ConnectionState state)
 {
     QString text;
