@@ -141,6 +141,6 @@ Vorlage ist das Standard-Design von OBS Studio, «Yami» in der Variante «Defau
 
 Entschieden (2026-11-02, vom Nutzer bestätigt):
 
-- Der Kern startet automatisch bei der Anmeldung des Nutzers und startet nach einem Absturz von selbst neu.
+- Das Fenster startet den Kern (geändert am 2026-11-02, vorher: Start bei der Anmeldung). Beim normalen Schliessen des Fensters wird der Kern mit beendet. Stürzt das Fenster ab, läuft der Kern weiter. Stürzt der Kern ab, startet er von selbst neu, solange er nicht ordentlich beendet wurde. Folge: Ohne offenes Fenster zeigen die Browserquellen in OBS nichts an.
 - Solange der Kern läuft, ändert nur der Kern die Overlay-Dateien; `dss-cli` darf dann nur anzeigen.
 - Die LAN-Anzeige zeigt automatisch die Netzwerkverbindung der Standardroute (beim Studio-PC das Kabel).
