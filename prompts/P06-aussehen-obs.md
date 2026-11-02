@@ -24,9 +24,9 @@ P05 hat das Fenster-Gerüst gebaut, mit eigenem dunklem Design, Systemschrift (D
 - Schriftgrösse wie in OBS: In `Yami.obt` ist `--font_base` = `1pt × obsFontScale`. Den Standardwert von `obsFontScale` setzt OBS im Quellcode, nicht in `Yami.obt` (vom Chat nicht geprüft). Suche ihn im Quellcode von OBS und nenne Datei und Zeile im Bericht.
 - Prüfe danach, dass keine Beschriftung abgeschnitten wird (Bildschirmfoto in 1280x800 und in 1920x1080).
 
-### 3. Zahlenfelder mit Pfeilen (Punkt 30)
+### 3. Pfeile der Zahlenfelder gut sichtbar (Punkt 30)
 
-- Die Zahlenfelder in «Eigenschaften» und «Steuerung» zeigen Pfeile nach oben und unten, wie in OBS. Die Pfeile kommen als SVG aus `src/app/symbole/` (eigene einfache Pfeile oder die von OBS mit Herkunft und Lizenz wie oben).
+- Die Zahlenfelder in «Eigenschaften» und «Steuerung» haben schon Pfeilknöpfe, aber die Pfeile sind kaum zu sehen (Rückmeldung des Nutzers, Bildschirmfoto vom 2026-11-02). Sie sollen deutlich sichtbar sein, wie in OBS. Die Pfeile kommen als SVG aus `src/app/symbole/` (eigene einfache Pfeile oder die von OBS mit Herkunft und Lizenz wie oben).
 
 ### 4. Verbindungsknöpfe mit vier Zuständen (Punkt 27)
 
