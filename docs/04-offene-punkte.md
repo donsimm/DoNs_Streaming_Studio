@@ -30,6 +30,14 @@ Stand: 2026-11-02.
 24. Aus P04: Ungenutzte Kopien unter `media/` werden nicht gelöscht (Auftrag P04).
 25. Aus P04: Dass die temporäre Datei von `tokens.json` schon vor dem Schreiben des Tokens die Rechte 0600 hat, ist nicht geprüft (`strace` nicht installiert); geprüft sind die Rechte der fertigen Datei.
 
+26. Aus P05: Der X-Bildschirmschoner startet nach 600 s ohne Eingabe (`xset q`), danach sperrt `light-locker` die Sitzung (Wechsel zum Anmeldebildschirm auf VT 8). Gesperrt bleiben neue Fenster ungezeichnet (`IsUnMapped`); die Startprüfung meldet dann «nicht sauber». Ob der Bildschirmschoner während langer Prüfungen abgeschaltet werden soll, entscheidet der Nutzer; geändert wurde nichts.
+27. Aus P05: Farbe der Verbindungsknöpfe je Zustand ist eine Annahme (rot = nicht verbunden, grün = verbunden, nach dem Bild). Was das graue YouTube-Symbol auf dem Bild bedeutet (zum Beispiel «nicht eingerichtet»), ist offen.
+28. Aus P05: Die Symbole unter `src/app/symbole/` enthalten ihre Farbe selbst (SVG); sie folgen einem späteren hellen Design (E-16) nicht von allein.
+29. Aus P05: Schrift des Fensters ist die Standardschrift von Qt auf dem Studio-PC (DejaVu Sans); das Bild des Nutzers zeigt eine andere Schrift (nicht bestimmt). Welche Schrift das Fenster nutzen soll, ist offen.
+30. Aus P05: Die Zahlenfelder (Eigenschaften, Steuerung) zeigen wegen des Stylesheets keine Pfeile wie auf dem Bild.
+31. Aus P05: Ändern von «Wiederholen» bei einer bestehenden Video-Quelle gibt es im Modell noch nicht (nur beim Hinzufügen); kommt mit den Eigenschaften im Fenster.
+32. Aus P05: Werte der ausgegrauten Bedienelemente in «Steuerung» (30 Bilder/s, Raster 20 px, Einrasten an) sind vom Bild übernommen und nicht entschieden (E-10, E-13).
+
 ## Machbarkeitstests
 
 | Nr. | Test | Entscheidet über | Stand |
@@ -53,4 +61,4 @@ Stand: 2026-11-02.
 - Punkt 17 (Video): Wiederholen pro Quelle wählbar, Standard «nicht wiederholen»; Browserquelle immer stumm; Ton über eine Audiokarte des Studio-PCs (E-20, E-21). Siehe `docs/01-festlegungen.md`, Abschnitt «Overlay-Daten».
 - Punkt 18 (Drehrichtung): im Uhrzeigersinn.
 - Punkt 19 (ß in der Adresse): «ß» → «ss», «æ» → «ae», «ø» → «oe», «ł» → «l».
-- Umsetzung von Punkt 17 (Feld für Wiederholen) und 19 im Modell: mit P05.
+- Umsetzung von Punkt 17 (Feld für Wiederholen) und 19 im Modell: mit P05, erledigt (2026-11-02).

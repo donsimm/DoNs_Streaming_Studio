@@ -65,4 +65,11 @@ Abgerufen in P04 (2026-11-02):
 - QSaveFile (atomares Speichern über `commit()`): https://doc.qt.io/qt-6.8/qsavefile.html
 - QRandomGenerator::system() (Zufallsquelle des Betriebssystems, kryptografisch sicher unter Linux): https://doc.qt.io/qt-6.8/qrandomgenerator.html
 
+Genannt in P05 (2026-11-02, nicht abgerufen, siehe Bericht P05):
+
+- Qt Style Sheets, Referenz: https://doc.qt.io/qt-6.8/stylesheet-reference.html
+- QMainWindow (saveState/restoreState, Docks): https://doc.qt.io/qt-6.8/qmainwindow.html
+- QWidget::grab: https://doc.qt.io/qt-6.8/qwidget.html#grab
+- PNG, IHDR-Block: https://www.w3.org/TR/png-3/#11IHDR
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.
