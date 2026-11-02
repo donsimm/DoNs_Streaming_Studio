@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     QApplication::setPalette(palette(theme));
     app.setStyleSheet(styleSheet(theme));
 
-    MainWindow window(theme);
+    MainWindow window(theme, true);
 
     // SIGINT/SIGTERM schliessen das Fenster, also derselbe Weg wie beim Schliessen von Hand.
     dss::UnixSignalWatcher signalWatcher;

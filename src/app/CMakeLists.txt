@@ -6,6 +6,7 @@ qt_add_executable(dss-app
   symbols.h symbols.cpp
   headerbar.h headerbar.cpp
   canvaswidget.h canvaswidget.cpp
+  docks.h docks.cpp
 )
 # Symbole werden zur Laufzeit aus dem Quellordner geladen, damit der Nutzer sie ohne neuen
 # Bau ersetzen kann (Auftrag P05). SVG braucht zur Laufzeit qt6-svg-plugins.
