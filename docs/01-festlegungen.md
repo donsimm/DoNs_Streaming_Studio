@@ -154,3 +154,13 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 - Die Adresse der Browserquelle hängt nicht vom Ordner ab; Verschieben ändert nichts in OBS.
 - Reihenfolge und Ordner speichert der Kern in einer eigenen Datei, nicht in den Overlay-Dateien.
 - Umsetzung in P08.
+
+## Bearbeiten im Fenster
+
+Entschieden (2026-11-02, vom Nutzer bestätigt), umgesetzt mit P08:
+
+- Löschen von Overlays, Ordnern und Quellen mit Rückfrage.
+- Änderungen wirken sofort (gespeichert und verteilt), ohne Knopf «Übernehmen», wie in OBS.
+- Rückgängig und Wiederholen: neue Funktion E-22, SOLL, nach den MUSS-Punkten.
+- Be Vietnam Pro liegt als Datei im Repo und ist Standardschrift neuer Textquellen.
+- Schriftauswahl: alle installierten Schriften des Studio-PCs, Be Vietnam Pro und eigene Dateien. Die gewählte Schriftdatei wird wie ein Bild in den Datenordner kopiert. Grund: Die Browserquelle zeichnet auf dem Streaming-PC, wo die Schriften des Studio-PCs fehlen.
