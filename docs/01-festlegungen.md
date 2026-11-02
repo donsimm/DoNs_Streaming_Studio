@@ -87,3 +87,7 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 
 - Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json`, die nur der Benutzer lesen kann (Dateirechte 0600).
 - Reihenfolge: zuerst P04 (Overlay-Modell), dann P05 (Fenster-Gerüst ohne Daten).
+
+## Tests und Abnahme
+
+Entschieden (2026-11-02, vom Nutzer bestätigt): Der Nutzer testet nur, was sinnvoll ist oder nur er ausführen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wird nicht ein zweites Mal von Hand geprüft. Grund: Anders als im alten Projekt wird direkt auf dem Zielgerät programmiert und getestet. Umgesetzt in `CLAUDE.md` Regel 7 und 10.

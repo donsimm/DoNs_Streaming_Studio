@@ -20,10 +20,10 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 4. Externe Aussagen (Programmverhalten, Protokolle, Paketversionen) gegen die aktuelle Dokumentation prüfen und die Quelle (URL) im Bericht oder Code-Kommentar nennen. Immer alle Quellen nennen.
 5. Pakete: Versionen festhalten. Neue Pakete nur mit Begründung im Bericht installieren (`sudo apt install` fragt den Nutzer). Keine Pakete im System ändern, die der Prompt nicht verlangt.
 6. Tests laufen mit echtem Fenstersystem (X11-Sitzung), nicht nur offscreen. Wo ein Start geprüft wird: mindestens 20 Starts, Exit-Code und sauberes Beenden prüfen.
-7. Prüfung mit denselben Daten wie der Handtest (Kopie der echten Daten).
+7. Tests nutzen echte Daten (Kopie davon) und, wo es einen Handtest gibt, dieselben Daten wie dieser.
 8. Ein Commit pro Funktion. Neue grössere Teile lassen sich per Schalter abschalten.
 9. Logik und Daten laufen ohne die Oberflächen-Bibliothek und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern.
-10. Abnahme erst nach Messung auf dem Studio-PC und Handtest durch den Nutzer.
+10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
 11. Lage und Grösse von Quellen sind ganze Pixel der Overlay-Auflösung, keine Prozentwerte.
 12. Zugangsdaten (Twitch-Token, OBS-Passwort) nie im Klartext in Konfiguration, Protokoll oder Tests.
 13. Oberflächentexte und Dokumentation auf Deutsch in Schweizer Rechtschreibung (kein «ß», «Grösse», «ss»). Bezeichner im Code auf Englisch, Kommentare auf Deutsch.
