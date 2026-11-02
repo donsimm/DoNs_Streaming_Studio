@@ -39,7 +39,9 @@ Testdateien (Bilder, Video, WebM mit Alpha) erzeugst du selbst, soweit möglich;
 
 ## Pakete
 
-Es sind nur diese Pakete und ihre Abhängigkeiten vorgesehen: `build-essential`, `cmake`, `qt6-base-dev`, `qt6-webengine-dev`, `python3-pyqt6`, `python3-pyqt6.qtwebengine`, `ffmpeg`, `sysstat`. Alles andere nur mit Begründung. Installationen laufen über `sudo apt install` und der Nutzer bestätigt sie. Halte die installierten Versionen im Bericht fest.
+Es sind nur diese Pakete und ihre Abhängigkeiten vorgesehen: `build-essential`, `cmake`, `qt6-base-dev`, `qt6-webengine-dev`, `qt6-multimedia-dev`, `python3-pyqt6`, `python3-pyqt6.qtwebengine`, `python3-pyqt6.qtmultimedia`, `ffmpeg`, `sysstat`. Alles andere nur mit Begründung.
+
+`qt6-multimedia-dev` (A) und `python3-pyqt6.qtmultimedia` (C) wurden während der Ausführung ergänzt (vom Nutzer bestätigt am 2026-11-02): Ohne Chromium braucht Qt für Video und WebM das Modul Qt Multimedia. Sonst hätten A und C in T-02 kein Video und keine WebM mit Alpha. Installationen laufen über `sudo apt install` und der Nutzer bestätigt sie. Halte die installierten Versionen im Bericht fest.
 
 ## Abnahme
 
