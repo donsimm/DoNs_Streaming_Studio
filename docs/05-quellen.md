@@ -78,4 +78,15 @@ Abgerufen in P06 (2026-11-02):
 - Open Sans 3.003, Commit `bd7e37632246368c60fdcbd374dbf9bad11969b6`: https://github.com/googlefonts/opensans (Lizenz `OFL.txt`, SIL Open Font License 1.1)
 - Qt 6.8.2, `qstylesheetstyle.cpp`: https://raw.githubusercontent.com/qt/qtbase/v6.8.2/src/widgets/styles/qstylesheetstyle.cpp
 
+Abgerufen in P07 (2026-11-02):
+
+- QLocalServer, QLocalSocket (Unix-Socket, `UserAccessOption`, `removeServer`): https://doc.qt.io/qt-6.8/qlocalserver.html, https://doc.qt.io/qt-6.8/qlocalsocket.html
+- Qt 6.8.2, `qlocalsocket_unix.cpp` (Fehler vor Zustandswechsel, Fehlertexte): https://code.qt.io/cgit/qt/qtbase.git/tree/src/network/socket/qlocalsocket_unix.cpp?h=v6.8.2
+- QLockFile (`setStaleLockTime`): https://doc.qt.io/qt-6.8/qlockfile.html
+- unix(7) (Länge des Socket-Pfads): https://man7.org/linux/man-pages/man7/unix.7.html
+- proc_stat(5), proc_meminfo(5), proc_pid_net(5): https://man7.org/linux/man-pages/man5/proc_stat.5.html, https://man7.org/linux/man-pages/man5/proc_meminfo.5.html, https://man7.org/linux/man-pages/man5/proc_pid_net.5.html
+- `RTF_UP` aus `/usr/include/linux/route.h` (Paket linux-libc-dev 6.12.113-1, lokal gelesen)
+- systemd: systemd.service(5), systemd.unit(5), systemctl(1), sd_notify(3), systemd-system.conf(5), D-Bus-Eigenschaften der Einheiten: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html, https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html, https://www.freedesktop.org/software/systemd/man/latest/systemctl.html, https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html, https://www.freedesktop.org/software/systemd/man/latest/systemd-system.conf.html, https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
+- NDI-Markenhinweis: https://docs.ndi.video/docs/sdk/licensing
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.

@@ -22,8 +22,8 @@ Ablauf:
 Zeiten: time.monotonic() im Skript; die Abfrage von systemctl alle 20 ms, das Journal alle 50 ms.
 Eigenschaften der Einheit (MainPID, ActiveState, NRestarts, UnitFileState, Result):
 https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
-Startbegrenzung (StartLimitIntervalSec=10s, StartLimitBurst=5 als Vorgabe):
-https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html
+Startbegrenzung (Vorgabe DefaultStartLimitIntervalSec=10s, DefaultStartLimitBurst=5):
+https://www.freedesktop.org/software/systemd/man/latest/systemd-system.conf.html
 Zwischen zwei kill -9 wartet das Skript deshalb mindestens 3 s.
 
   python3 scripts/dienstpruefung.py [--kills 5] [--build build] [--out docs/berichte/P07-daten]

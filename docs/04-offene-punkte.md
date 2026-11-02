@@ -1,6 +1,6 @@
 # 04 – Offene Punkte und nächste Schritte
 
-Stand: 2026-11-02.
+Stand: 2026-11-02 (nach P07).
 
 ## Offen
 
@@ -37,8 +37,17 @@ Stand: 2026-11-02.
 30. Aus P05: Die Zahlenfelder (Eigenschaften, Steuerung) zeigen wegen des Stylesheets keine Pfeile wie auf dem Bild. Erledigt in P06 (2026-11-02): Pfeile aus OBS, gut sichtbar; Feldbreite so, dass der Wert nicht abgeschnitten wird.
 31. Aus P05: Ändern von «Wiederholen» bei einer bestehenden Video-Quelle gibt es im Modell noch nicht (nur beim Hinzufügen); kommt mit den Eigenschaften im Fenster.
 32. Aus P05: Werte der ausgegrauten Bedienelemente in «Steuerung» (30 Bilder/s, Raster 20 px, Einrasten an) sind vom Bild übernommen und nicht entschieden (E-10, E-13).
-33. Aus P06: `tst_overlaystore` (Fall `formatDocExample`) schlägt in einem frischen Checkout fehl. `media_vorbereiten` erzeugt `prototypes/media/` dort neu, und das neue `alpha.webm` hat eine andere Prüfsumme als die Datei, auf die das Beispiel in `docs/06-overlay-format.md` verweist. Besteht schon vor P06; im Arbeitsordner des Studio-PCs besteht der Test.
+33. Aus P06: `tst_overlaystore` (Fall `formatDocExample`) schlägt in einem frischen Checkout fehl. `media_vorbereiten` erzeugt `prototypes/media/` dort neu, und das neue `alpha.webm` hat eine andere Prüfsumme als die Datei, auf die das Beispiel in `docs/06-overlay-format.md` verweist. Besteht schon vor P06; im Arbeitsordner des Studio-PCs besteht der Test. Erledigt in P07 (2026-11-02): Der Test kopiert die Testdateien unter den Namen, die das Beispiel nennt, und verlangt die Prüfsumme nicht; im frischen Klon besteht er (`docs/berichte/P07-bericht.md`).
 34. Aus P06: Die Bilder im Stylesheet (Pfeile der Zahlenfelder und der Auswahlliste, Kontrollkästchen, Knöpfe im Dock-Titel) sind die Dateien des dunklen OBS-Designs und werden nicht eingefärbt. Für ein helles Design (E-16) braucht es eigene Dateien.
+35. Aus P07: Das Fenster startet die Einheit `dss-core.service` nur einmal je Start des Fensters (beim ersten gescheiterten Verbindungsversuch). Hält der Nutzer den Kern bei offenem Fenster an (`systemctl --user stop`), versucht das Fenster nur noch die Verbindung, startet den Dienst aber nicht wieder. Ob es das tun soll, ist offen.
+36. Aus P07: systemd startet einen abgestürzten Kern höchstens 5 Mal in 10 s neu (Vorgabe `DefaultStartLimitBurst=5`, `DefaultStartLimitIntervalSec=10s`, https://www.freedesktop.org/software/systemd/man/latest/systemd-system.conf.html; am Studio-PC `systemctl --user show dss-core.service -p StartLimitIntervalUSec -p StartLimitBurst` → 10s, 5). Danach bleibt die Einheit «failed», bis das Fenster neu gestartet wird. Dieses Verhalten ist nicht geprüft.
+37. Aus P07: Die Liste der Overlays sortiert nach Codepunkten, nicht nach deutscher Sortierung: «Überblick» steht nach «Zuschauer» (ergänzt Punkt 22).
+38. Aus P07: CPU-Auslastung ohne die Felder `guest` und `guest_nice` aus `/proc/stat` (Annahme: der Kernel zählt sie schon in `user`/`nice`). Der Verlauf LAN im Kopfbereich zeigt die Summe aus Empfangen und Senden (Annahme); der Text zeigt beide getrennt.
+39. Aus P07: LAN misst die Netzwerkkarte der Standardroute. Auf dem Studio-PC ist das zurzeit `enx2aea2d88f6c1` (USB-Tethering), nicht das Kabel `enp3s0`. Ob die Anzeige eine feste Karte zeigen soll, ist offen.
+40. Aus P07: Reihenfolge der Quellen im Dock: vorderste Quelle oben wie in OBS (Annahme); in der Datei und in `dss-cli` ist Nr. 1 die hinterste.
+41. Aus P07: Der Kern meldet sich bei systemd nur mit `READY=1` und `STOPPING=1`, ohne Watchdog. Ein hängender Kern (läuft, antwortet aber nicht) wird nicht erkannt und nicht neu gestartet.
+42. Aus P07: Die Einheit startet `build/src/core/dss-core` aus dem Repo. Nach dem Verschieben des Repos oder einem Bau in einen anderen Ordner muss `scripts/dienst-einrichten.sh` neu laufen. Ein Installationsort ausserhalb des Repos ist nicht entschieden.
+43. Aus P07: Normales Schliessen über den Schliessknopf des Fenstermanagers (Kern beendet sich) prüft nur der Handtest; automatisch geprüft ist der Weg über SIGTERM, der dasselbe `close()` auslöst (siehe Punkt 14).
 
 ## Machbarkeitstests
 
@@ -68,10 +77,10 @@ Stand: 2026-11-02.
 ## Entschieden vor P06 (2026-11-02)
 
 - Symbole der Verbindungsknöpfe: P06 zeichnet jede Symboldatei einfarbig in Textfarbe. Der Nutzer ersetzt die Kürzel-Dateien später selbst durch eigene Dateien (zum Beispiel die einfarbigen Symbole aus seinem alten Repo `donstv_Studio`, `assets/icons/connections/`, Herkunft Simple Icons). Claude legt keine Markenlogos ab.
-- Offen: Markenhinweis für NDI («NDI® is a registered trademark of Vizrt NDI AB», laut README des alten Repos) in «Hilfe → Über», sobald der Nutzer ein NDI-Symbol einsetzt oder NDI gebaut wird.
+- Offen: Markenhinweis für NDI («NDI® is a registered trademark of Vizrt NDI AB», laut README des alten Repos) in «Hilfe → Über», sobald der Nutzer ein NDI-Symbol einsetzt oder NDI gebaut wird. Erledigt in P07 (2026-11-02): «Hilfe → Über» zeigt den Hinweis, wenn `~/.config/dons-streaming-studio/symbole/ndi.svg` vorhanden ist (Wortlaut: https://docs.ndi.video/docs/sdk/licensing). Wird NDI gebaut, gilt der Hinweis immer; das kommt mit dem NDI-Baustein.
 
 ## Entschieden nach P06 (2026-11-02)
 
-- Eigene Symbole des Nutzers liegen ausserhalb des Repos in `~/.config/dons-streaming-studio/symbole/`. Das Fenster sucht Symbole zuerst dort und nimmt nur, wenn dort keine Datei mit dem Namen liegt, die Datei aus `src/app/symbole/`. Grund: Das Repo ist öffentlich, und Claude Code committet am Ende jedes Auftrags (Regel 17). Umsetzung als erster Teil von P07.
+- Eigene Symbole des Nutzers liegen ausserhalb des Repos in `~/.config/dons-streaming-studio/symbole/`. Das Fenster sucht Symbole zuerst dort und nimmt nur, wenn dort keine Datei mit dem Namen liegt, die Datei aus `src/app/symbole/`. Grund: Das Repo ist öffentlich, und Claude Code committet am Ende jedes Auftrags (Regel 17). Umsetzung als erster Teil von P07, erledigt (2026-11-02).
 - Punkt 33 (Test `formatDocExample` schlägt in frischem Checkout fehl): wird als kleiner Teil von P07 behoben; der Test darf nicht von zufällig erzeugten Testdateien abhängen.
 - Punkt 34 (helle Fassungen der Bilder im Design): erledigt, weil es kein helles Design gibt (E-16 gestrichen, Entscheid des Nutzers 2026-11-02).

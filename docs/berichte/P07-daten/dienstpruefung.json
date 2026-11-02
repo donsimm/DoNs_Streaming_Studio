@@ -1,0 +1,138 @@
+{
+ "datum": "2026-11-02 20:16:38 +0100",
+ "einheit": "dss-core-pruefung.service",
+ "datenordner": "/tmp/dss-dienstpruefung-f1mc399w/daten",
+ "verbindung": "/run/user/1000/dss-u3nk4q_9/kern.sock",
+ "kills": [
+  {
+   "alte_pid": 55851,
+   "neue_pid": 55905,
+   "neustart_s": 1.067,
+   "wieder_verbunden_s": 1.844
+  },
+  {
+   "alte_pid": 55905,
+   "neue_pid": 55976,
+   "neustart_s": 1.116,
+   "wieder_verbunden_s": 2.725
+  },
+  {
+   "alte_pid": 55976,
+   "neue_pid": 56048,
+   "neustart_s": 1.073,
+   "wieder_verbunden_s": 1.734
+  },
+  {
+   "alte_pid": 56048,
+   "neue_pid": 56113,
+   "neustart_s": 1.077,
+   "wieder_verbunden_s": 2.709
+  },
+  {
+   "alte_pid": 56113,
+   "neue_pid": 56184,
+   "neustart_s": 1.087,
+   "wieder_verbunden_s": 1.699
+  }
+ ],
+ "start_durch_fenster_s": {
+  "active": 0.187,
+  "verbunden": 0.191
+ },
+ "ende_nach_schliessen_s": 0.025,
+ "journal": [
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:39.295 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:39.296 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:39.296 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:39.297 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:39.298 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "dss-core-pruefung.service: Main process exited, code=killed, status=9/KILL",
+  "dss-core-pruefung.service: Failed with result 'signal'.",
+  "dss-core-pruefung.service: Scheduled restart job, restart counter is at 1.",
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:40.376 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:40.377 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:40.377 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:40.377 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:41.145 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "dss-core-pruefung.service: Main process exited, code=killed, status=9/KILL",
+  "dss-core-pruefung.service: Failed with result 'signal'.",
+  "dss-core-pruefung.service: Scheduled restart job, restart counter is at 2.",
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:43.423 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:43.424 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:43.425 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:43.425 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:45.056 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "dss-core-pruefung.service: Main process exited, code=killed, status=9/KILL",
+  "dss-core-pruefung.service: Failed with result 'signal'.",
+  "dss-core-pruefung.service: Scheduled restart job, restart counter is at 3.",
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:46.403 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:46.404 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:46.404 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:46.405 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:47.056 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "dss-core-pruefung.service: Main process exited, code=killed, status=9/KILL",
+  "dss-core-pruefung.service: Failed with result 'signal'.",
+  "dss-core-pruefung.service: Scheduled restart job, restart counter is at 4.",
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:49.416 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:49.417 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:49.417 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:49.418 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:51.057 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "dss-core-pruefung.service: Main process exited, code=killed, status=9/KILL",
+  "dss-core-pruefung.service: Failed with result 'signal'.",
+  "dss-core-pruefung.service: Scheduled restart job, restart counter is at 5.",
+  "Starting dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core)...",
+  "2026-11-02 20:16:52.437 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+  "2026-11-02 20:16:52.438 info Datenordner /tmp/dss-dienstpruefung-f1mc399w/daten: 2 Overlays geladen",
+  "2026-11-02 20:16:52.439 info Verbindung offen: /run/user/1000/dss-u3nk4q_9/kern.sock",
+  "2026-11-02 20:16:52.439 info systemd: bereit gemeldet",
+  "Started dss-core-pruefung.service - DoNs Streaming Studio – Kern (dss-core).",
+  "2026-11-02 20:16:53.056 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+  "2026-11-02 20:16:54.394 info Verbindung getrennt: dss-app (noch 0)",
+  "2026-11-02 20:16:57.563 info Verbunden: dss-app 0.1.0 (2 Verbindungen)",
+  "2026-11-02 20:16:57.564 info Verbunden: dss-app 0.1.0 (2 Verbindungen)",
+  "2026-11-02 20:16:57.621 info Beenden erbeten von dss-app, abgelehnt: 1 andere Fenster verbunden",
+  "2026-11-02 20:16:57.621 info Verbindung getrennt: dss-app (noch 1)",
+  "2026-11-02 20:16:58.668 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+  "2026-11-02 20:16:58.668 info beendet, Exit-Code 0"
+ ],
+ "fenster": {
+  "app1.log": [
+   "2026-11-02 20:16:39.232 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+   "2026-11-02 20:16:39.270 info Fenster gezeichnet"
+  ],
+  "app2.log": [
+   "2026-11-02 20:16:57.534 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+   "2026-11-02 20:16:57.579 info Fenster gezeichnet",
+   "2026-11-02 20:16:57.620 info SIGTERM erhalten, schliesse Fenster",
+   "2026-11-02 20:16:57.622 info Kern läuft weiter: 1 andere Fenster verbunden",
+   "2026-11-02 20:16:57.622 info beendet, Exit-Code 0"
+  ],
+  "app3.log": [
+   "2026-11-02 20:16:57.533 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+   "2026-11-02 20:16:57.577 info Fenster gezeichnet",
+   "2026-11-02 20:16:58.667 info SIGTERM erhalten, schliesse Fenster",
+   "2026-11-02 20:16:58.669 info Kern beendet sich",
+   "2026-11-02 20:16:58.669 info beendet, Exit-Code 0"
+  ]
+ },
+ "neustart_s": {
+  "min": 1.067,
+  "max": 1.116
+ },
+ "wieder_verbunden_s": {
+  "min": 1.699,
+  "max": 2.725
+ },
+ "ergebnis": "bestanden"
+}

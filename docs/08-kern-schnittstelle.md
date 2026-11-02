@@ -235,4 +235,4 @@ Auf der Fenster-Seite gibt es keine Fehlermeldungen an den Kern: Ungültige Nach
 
 Quellen: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html (`Type=`, `Restart=`, `RestartSec=`, `RestartPreventExitStatus=`, `NotifyAccess=`), https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html, https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html (`READY=1`, `STOPPING=1`, `NOTIFY_SOCKET`, eigene Umsetzung ohne libsystemd), https://doc.qt.io/qt-6.8/qlockfile.html.
 
-Exit-Codes von `dss-core`: 0 = beendet (auch nach SIGTERM/SIGINT oder `quit_request`), 1 = Fehler (zum Beispiel Datenordner nicht lesbar, Pfad der Verbindung zu lang), 2 = falscher Aufruf (Qt-Befehlszeile), 3 = anderer Kern läuft.
+Exit-Codes von `dss-core`: 0 = beendet (auch nach SIGTERM/SIGINT oder `quit_request`), 1 = Fehler (zum Beispiel Datenordner nicht lesbar, Pfad der Verbindung zu lang), 3 = anderer Kern läuft. Ein falscher Aufruf (unbekannte Option) endet ebenfalls mit 1 (geprüft 2026-11-02: `build/src/core/dss-core --gibt-es-nicht; echo $?` → 1).
