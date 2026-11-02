@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -481,16 +482,33 @@ private slots:
         QVERIFY(QDir().mkpath(dataDir() + QStringLiteral("/overlays")));
         QVERIFY(writeFile(dataDir() + QStringLiteral("/overlays/") + id + QStringLiteral(".json"),
                           block.toUtf8()));
-        // Die Dateien unter media/ wie beim Hinzufügen anlegen. Ohne Token in tokens.json
-        // bekommt das Overlay beim ersten Laden einen neuen (Warnung).
+        // Die Dateien unter media/ unter genau den Namen aus dem Beispiel anlegen (Punkt 33):
+        // Der Inhalt kommt von den Testdateien, die Prüfsumme im Namen muss nicht dazu passen.
+        // media_erzeugen.sh erzeugt alpha.webm nicht jedes Mal gleich (libvpx), deshalb darf
+        // der Test nicht von der Prüfsumme abhängen. Ob ein Verweis die Form
+        // media/<SHA-256>.<Endung> hat, prüft das Laden selbst.
+        static const QRegularExpression reference(
+            QStringLiteral("\"(media/[0-9a-f]{64}\\.([a-z0-9]+))\""));
+        const QHash<QString, QString> testFileFor = {
+            {QStringLiteral("png"), kImage},
+            {QStringLiteral("webm"), kAlphaVideo},
+            {QStringLiteral("ttf"), kFont},
+        };
+        QVERIFY(QDir().mkpath(dataDir() + QStringLiteral("/media")));
+        int references = 0;
+        for (const QRegularExpressionMatch &m : reference.globalMatch(block)) {
+            const QString source = testFileFor.value(m.captured(2));
+            QVERIFY2(!source.isEmpty(), qPrintable(m.captured(1)));
+            QVERIFY2(QFile::copy(source, dataDir() + QLatin1Char('/') + m.captured(1)),
+                     qPrintable(m.captured(1)));
+            ++references;
+        }
+        QCOMPARE(references, 3);
+        // Ohne Token in tokens.json bekommt das Overlay beim ersten Laden einen neuen (Warnung).
         {
             auto store = openStore();
             QCOMPARE(store->loadErrors(), QStringList());
             QVERIFY(store->loadWarnings().join(QLatin1Char('\n')).contains(QStringLiteral("neuer Token")));
-            QString error;
-            QVERIFY2(!store->importMedia(kImage, MediaUse::Image, &error).isEmpty(), qPrintable(error));
-            QVERIFY2(!store->importMedia(kAlphaVideo, MediaUse::Video, &error).isEmpty(), qPrintable(error));
-            QVERIFY2(!store->importMedia(kFont, MediaUse::Font, &error).isEmpty(), qPrintable(error));
         }
         auto store = openStore();
         QCOMPARE(store->loadErrors(), QStringList());
@@ -507,7 +525,7 @@ private slots:
         QCOMPARE(o->sources[2].kind, SourceKind::Text);
         QCOMPARE(o->sources[2].text.content, QStringLiteral("Willkommen\nZweite Zeile"));
         QCOMPARE(o->sources[2].text.align, TextAlign::Center);
-        // Keine Warnung: Die Verweise im Beispiel passen zu den Testdateien, der Token ist da.
+        // Keine Warnung: Die Dateien zu den Verweisen liegen unter media/, der Token ist da.
         QCOMPARE(store->loadWarnings(), QStringList());
         QVERIFY(!store->token(o->id).isEmpty());
         // Wieder geschrieben ergibt sich dasselbe Overlay.

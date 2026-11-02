@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-02 (P04, Nachträge P05). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-02 (P04, Nachträge P05, Test des Beispiels P07). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -102,7 +102,7 @@ Beim Umbenennen bleibt die Adresse gleich, ausser der Aufrufer verlangt ausdrüc
 
 ## Vollständiges Beispiel
 
-Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `text` (vorne). Die Verweise zeigen auf die Testdateien `bild1.png`, `alpha.webm` (beide aus `prototypes/messung/media_erzeugen.sh`) und `DejaVuSans.ttf` (Paket `fonts-dejavu-core`).
+Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `text` (vorne). Die Prüfsummen in den Verweisen sind die der Testdateien `bild1.png`, `alpha.webm` (beide aus `prototypes/messung/media_erzeugen.sh`) und `DejaVuSans.ttf` (Paket `fonts-dejavu-core`) im Arbeitsordner des Studio-PCs. `media_erzeugen.sh` erzeugt `alpha.webm` nicht jedes Mal mit demselben Inhalt; der Test legt deshalb die Testdateien unter genau den Namen aus dem Beispiel ab und hängt nicht von den Prüfsummen ab (Punkt 33, P07).
 
 <!-- beispiel-anfang -->
 ```json
