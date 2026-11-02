@@ -46,7 +46,7 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 - Der Studio-PC hängt per Kabel am Netz und bekommt am Router eine feste Adresse. (entschieden)
 - Zielwerte für die Last: 1080p30, bis zu 2 NDI-Ausgänge, bis zu 10 Quellen pro Overlay. (entschieden)
 - Spenden und Tip Jar aus dem alten Entwurf sind nicht Teil des Neustarts. (entschieden)
-- Funktionsprioritäten (MUSS, SOLL, KANN) werden pro Modul festgelegt, wenn das Modul an der Reihe ist. Der Editor beginnt zuerst. (entschieden)
+- Funktionsprioritäten (MUSS, SOLL, KANN) werden pro Modul festgelegt, wenn das Modul an der Reihe ist. Der Editor beginnt zuerst. (entschieden) Editor: entschieden (2026-11-02), siehe `docs/03-funktionen-entwurf.md`, E-01 bis E-19.
 
 ## Betriebssystem und Technik
 
