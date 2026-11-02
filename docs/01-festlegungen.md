@@ -51,5 +51,8 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 ## Betriebssystem und Technik
 
 - Betriebssystem: entschieden (2026-11-02, vom Nutzer bestätigt): Debian 13 mit Xfce unter X11. Grundlage: Messung P01, alle drei Prototypen starteten dort 20 von 20 Mal sauber. Debian 13 ist von den drei geprüften Systemen (Debian 13, Ubuntu 26.04 LTS, Fedora 44) das einzige mit X11-Sitzung. Andere Systeme wurden nicht untersucht.
-- Technik: offen. Zwei Varianten werden gemessen: (A) C++ mit Qt 6, nativ; (B) ein unabhängiger Kern mit Web-Oberfläche. Python mit PyQt6 bleibt nur im Rennen, wenn es die Messungen besteht. Das ist eine Einschätzung von Claude, nicht belegt.
+- Technik: entschieden (2026-11-02, vom Nutzer bestätigt): C++ mit Qt 6, eigene Leinwand (frühere Variante A). Der Editor zeichnet die Leinwand selbst in C++. Für die Browserquelle in OBS braucht es einen zweiten Zeichner als Webseite. Begründung des Nutzers: Aufwand ist zweitrangig, Kontrolle und Flexibilität zählen. Python/PyQt6 (Variante C) und Qt WebEngine als Editor-Zeichner (Variante B) werden nicht weiterverfolgt. Grundlage: `docs/messungen/P01-bericht.md`, `docs/messungen/P02-bericht.md`.
+- Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen sind ein Vorschlag, noch nicht bestätigt: eine gemeinsame Beschreibung der Leinwand (eine Datenquelle für beide Zeichner), ein fester Funktionsumfang pro Quelle und automatische Bildvergleiche beider Zeichner.
+- Video mit Alpha in der eigenen Leinwand: eigener Dekodierweg über libavcodec mit `libvpx-vp9` (gemessen in P02, M1). Qt Multimedia 6.8.2 liefert den Alpha nicht.
+- Sprache des Kerns (Hintergrundprogramm): offen.
 - Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket).
