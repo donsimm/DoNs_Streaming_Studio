@@ -10,7 +10,7 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 |---|---|---|---|
 | E-01 | Overlays anlegen, umbenennen, kopieren, löschen; Auflösung pro Overlay | MUSS | Grundlage für alles |
 | E-02 | Overlays speichern und beim Start wieder laden | MUSS | Ohne geht alles bei jedem Neustart verloren |
-| E-03 | Quelle Text | MUSS | Vom Nutzer genannt. Umfang von «komplett anpassbar» ist noch offen |
+| E-03 | Quelle Text | MUSS | Vom Nutzer genannt. Umfang: Tabelle TX-01 bis TX-16 unten |
 | E-04 | Quelle Bild | MUSS | Vom Nutzer genannt |
 | E-05 | Quelle Video und WebM mit Alpha | MUSS | Vom Nutzer genannt; Dekodierweg in P02 (M1) gemessen |
 | E-06 | Quelle GIF | SOLL | Bild und Video zuerst |
@@ -27,6 +27,29 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-17 | Spezialquellen: Chat-Box, Alert-Box, Ereignisliste, Zielbalken | KANN | Brauchen die Twitch-Anbindung, kommen mit dem Chat-Bot |
 | E-18 | Quellen an die aktive OBS-Szene koppeln | KANN | Braucht obs-websocket, wartet auf T-05 |
 | E-19 | NDI, höchstens 2 Ausgänge | KANN | Bereits als «später» entschieden, wartet auf T-03 und das NDI-SDK |
+
+### Quelle Text (E-03)
+
+Umfang entschieden (2026-11-02, vom Nutzer bestätigt). Stufen wie beim Editor. Alle Werte in ganzen Pixeln der Overlay-Auflösung (CLAUDE.md Regel 11). Animationen gehören zu E-14.
+
+| Nr. | Eigenschaft | Stufe | Grund |
+|---|---|---|---|
+| TX-01 | Inhalt mehrzeilig, Zeilenwechsel von Hand (Enter) | MUSS | Grundfunktion |
+| TX-02 | Schriftdatei und Schnitt (Gewicht, kursiv) | MUSS | Baut auf E-11 auf |
+| TX-03 | Schriftgrösse in Pixeln | MUSS | Grundfunktion |
+| TX-04 | Textfarbe mit Deckkraft | MUSS | Grundfunktion |
+| TX-05 | Ausrichtung waagrecht: links, Mitte, rechts | MUSS | Grundfunktion |
+| TX-06 | Ausrichtung senkrecht in der Box: oben, Mitte, unten | SOLL | Nützlich bei fester Boxgrösse |
+| TX-07 | Zeilenabstand und Zeichenabstand | SOLL | Feinarbeit |
+| TX-08 | Umriss (Farbe, Breite) | SOLL | Lesbarkeit im Stream |
+| TX-09 | Schatten (Farbe, Versatz X/Y, Unschärfe) | SOLL | Lesbarkeit im Stream |
+| TX-10 | Hintergrundfläche hinter dem Text (Farbe, Innenabstand, runde Ecken) | SOLL | Ersetzt eine separate Bildquelle |
+| TX-11 | Automatischer Zeilenumbruch an der Breite der Box | SOLL | Grösstes Risiko für Abweichungen zwischen Qt und Browser (Einschätzung, nicht gemessen); Lösung gehört zum Konzept der zwei Zeichner |
+| TX-12 | Verhalten bei zu langem Text: abschneiden oder Schrift verkleinern | KANN | Erst nach TX-11 sinnvoll |
+| TX-13 | Farbverlauf als Füllung | KANN | Gestaltung |
+| TX-14 | Unterschiedliche Formate in einem Text (einzelnes Wort fett oder farbig) | KANN | Aufwendig in beiden Zeichnern |
+| TX-15 | Umwandlung in Gross- oder Kleinbuchstaben | KANN | Gestaltung |
+| TX-16 | Platzhalter im Text, zum Beispiel letzter Follower | KANN | Braucht die Twitch-Anbindung, kommt mit dem Chat-Bot |
 
 ## Kopfbereich und Allgemeines
 
