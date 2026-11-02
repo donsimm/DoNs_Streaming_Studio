@@ -1,0 +1,2 @@
+[libvpx-vp9 @ 0x7fe420002f80] v1.15.0
+[libvpx-vp9 @ 0x7fe420002f80] v1.15.0
