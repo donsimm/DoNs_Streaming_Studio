@@ -29,7 +29,8 @@ target_compile_definitions(dss_app_ui PUBLIC DSS_APP_EDITING=$<BOOL:${DSS_APP_ED
 
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
 if(DSS_APP_RENDERER)
-  target_sources(dss_app_ui PRIVATE sourcerenderer.h sourcerenderer.cpp)
+  target_sources(dss_app_ui PRIVATE sourcerenderer.h sourcerenderer.cpp
+                                    canvasmeasurement.h canvasmeasurement.cpp)
   target_link_libraries(dss_app_ui PUBLIC dss_media)
 endif()
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_RENDERER=$<BOOL:${DSS_APP_RENDERER}>

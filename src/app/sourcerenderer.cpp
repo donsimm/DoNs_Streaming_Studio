@@ -22,7 +22,9 @@
 
 namespace {
 
-constexpr int kFrameIntervalMs = 33; // 30 Bilder pro Sekunde, solange ein Video läuft
+// 30 Bilder pro Sekunde, solange ein Video läuft (Auftrag P09). Genau 1/30 s, nicht 33 ms:
+// sonst läuft der Takt gegen die 30 Bilder/s der Videos und zeigt ab und zu ein Bild doppelt.
+constexpr std::chrono::nanoseconds kFrameInterval(1'000'000'000 / 30);
 
 bool playing(const dss::VideoPlayer &player)
 {
@@ -35,7 +37,7 @@ bool playing(const dss::VideoPlayer &player)
 SourceRenderer::SourceRenderer(QObject *parent) : QObject(parent)
 {
     m_timer.setTimerType(Qt::PreciseTimer);
-    m_timer.setInterval(kFrameIntervalMs);
+    m_timer.setSingleShot(true);
     connect(&m_timer, &QTimer::timeout, this, &SourceRenderer::onTick);
     m_loader.setMaxThreadCount(2);
 }
@@ -113,8 +115,22 @@ void SourceRenderer::setOverlay(const dss::Overlay *overlay)
             it = m_images.erase(it);
     }
     if (!m_videos.empty() && !m_timer.isActive())
-        m_timer.start();
+        startTicks();
     emit changed();
+}
+
+void SourceRenderer::startTicks()
+{
+    m_tickStart = std::chrono::steady_clock::now();
+    m_tick = 0;
+    scheduleNextTick();
+}
+
+void SourceRenderer::scheduleNextTick()
+{
+    const auto next = m_tickStart + (m_tick + 1) * kFrameInterval;
+    const auto wait = std::chrono::ceil<std::chrono::milliseconds>(next - std::chrono::steady_clock::now());
+    m_timer.start(std::max<qint64>(0, wait.count()));
 }
 
 void SourceRenderer::requestImage(const QString &reference)
@@ -143,12 +159,23 @@ void SourceRenderer::requestImage(const QString &reference)
 
 void SourceRenderer::onTick()
 {
+    ++m_tick;
+    const auto now = std::chrono::steady_clock::now();
+    // War die Oberfläche lange beschäftigt, nicht nachholen, sondern ab jetzt weiterzählen.
+    if (now - (m_tickStart + m_tick * kFrameInterval) > 4 * kFrameInterval) {
+        m_tickStart = now;
+        m_tick = 0;
+    }
+    // Bild jedes Videos für den geplanten Zeitpunkt dieses Takts
+    const auto sampleTime = m_tickStart + m_tick * kFrameInterval;
     bool any = false;
-    for (const auto &[id, entry] : m_videos)
+    for (auto &[id, entry] : m_videos) {
+        entry.frame = entry.player->frameAt(sampleTime);
         any = any || playing(*entry.player);
+    }
     // Noch ein Bild nach dem Ende, damit «leer» bzw. das letzte Bild sicher gezeichnet ist.
-    if (!any)
-        m_timer.stop();
+    if (any)
+        scheduleNextTick();
     emit changed();
 }
 
@@ -200,8 +227,8 @@ void SourceRenderer::paint(QPainter *painter, const dss::Overlay &overlay,
             const auto it = m_videos.find(s.id);
             if (it == m_videos.end())
                 break;
-            // frame hält den Puffer, solange das QImage darüber gezeichnet wird.
-            const std::shared_ptr<const dss::VideoFrame> frame = it->second.player->currentFrame();
+            // Bild des letzten Takts; frame hält den Puffer, solange das QImage darüber gezeichnet wird.
+            const std::shared_ptr<const dss::VideoFrame> frame = it->second.frame;
             if (frame) {
                 const QImage image(frame->data.data(), frame->width, frame->height, frame->stride,
                                    QImage::Format_ARGB32_Premultiplied);
@@ -274,8 +301,10 @@ QList<SourceRenderer::VideoInfo> SourceRenderer::videoInfo() const
         info.decoded = st.decoded;
         info.late = st.late;
         info.loops = st.loops;
-        info.hasFrame = entry.player->currentFrame() != nullptr;
+        info.dropped = st.dropped;
+        info.hasFrame = entry.frame != nullptr;
         info.state = static_cast<int>(entry.player->state());
+        info.serial = entry.player->frameSerial();
         result.append(info);
     }
     return result;

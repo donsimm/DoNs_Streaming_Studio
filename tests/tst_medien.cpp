@@ -23,6 +23,7 @@
 #include <QThread>
 
 #include <memory>
+#include <thread>
 
 using namespace dss;
 
@@ -250,8 +251,13 @@ private slots:
         const double at5 = hold.currentFrame()->pts;
         qInfo("nach %lld ms: pts %.3f s", t.elapsed(), at5);
         QVERIFY2(std::abs(at5 - t.elapsed() / 1000.0) < 0.3, qPrintable(QString::number(at5)));
-        QVERIFY(waitFor([&] { return empty.state() == VideoPlayer::State::Ended
-                                     && hold.state() == VideoPlayer::State::Holding; }, 8000));
+        // Abholen wie die Leinwand; der Zustand beschreibt, was gezeigt wird.
+        QVERIFY(waitFor([&] {
+            empty.currentFrame();
+            hold.currentFrame();
+            loop.currentFrame();
+            return empty.state() == VideoPlayer::State::Ended && hold.state() == VideoPlayer::State::Holding;
+        }, 8000));
         qInfo("Ende nach %lld ms", t.elapsed());
         QVERIFY(t.elapsed() >= 9800);
         // Ohne Einstellung: leer
@@ -260,20 +266,49 @@ private slots:
         QVERIFY(hold.currentFrame() != nullptr);
         QVERIFY2(hold.currentFrame()->pts > 9.9, qPrintable(QString::number(hold.currentFrame()->pts)));
         // Wiederholen: läuft weiter, wieder am Anfang
-        QVERIFY(waitFor([&] { return loop.statistics().loops >= 1; }, 2000));
+        QVERIFY(waitFor([&] { loop.currentFrame(); return loop.statistics().loops >= 1; }, 2000));
         QThread::msleep(500);
         QCOMPARE(loop.state(), VideoPlayer::State::Playing);
         QVERIFY(loop.currentFrame() != nullptr);
         QVERIFY2(loop.currentFrame()->pts < 2.0, qPrintable(QString::number(loop.currentFrame()->pts)));
         for (VideoPlayer *p : {&empty, &hold, &loop}) {
             const VideoPlayer::Statistics st = p->statistics();
-            qInfo("dekodiert %llu, verspätet (> 50 ms) %llu, Wiederholungen %llu",
+            qInfo("dekodiert %llu, verspätet (> 50 ms) %llu, verworfen %llu, Wiederholungen %llu",
                   static_cast<unsigned long long>(st.decoded), static_cast<unsigned long long>(st.late),
-                  static_cast<unsigned long long>(st.loops));
+                  static_cast<unsigned long long>(st.dropped), static_cast<unsigned long long>(st.loops));
             QVERIFY(st.decoded >= 300);
             QCOMPARE(st.late, 0ULL);
         }
         QCOMPARE(empty.statistics().decoded, 300ULL);
+    }
+
+    // Takt wie die Leinwand (geplante Zeitpunkte n/30 s, Abfrage etwas später wie beim Zeichnen):
+    // jeder Takt bekommt genau ein neues Bild, keines doppelt, keines verworfen.
+    void oneFramePerTick()
+    {
+        using Clock = VideoPlayer::Clock;
+        VideoPlayer p(media("alpha.webm"), true, false);
+        QVERIFY(waitFor([&] { return p.currentFrame() != nullptr; }, 3000));
+        const Clock::time_point start = Clock::now();
+        const auto period = std::chrono::nanoseconds(1'000'000'000 / 30);
+        uint64_t last = p.frameSerial();
+        int same = 0;
+        int skipped = 0;
+        for (int n = 1; n <= 150; ++n) {
+            const Clock::time_point due = start + n * period;
+            std::this_thread::sleep_until(due + std::chrono::milliseconds(n % 7)); // Schwanken
+            p.frameAt(due);
+            const uint64_t serial = p.frameSerial();
+            if (serial == last)
+                ++same;
+            else if (serial > last + 1)
+                ++skipped;
+            last = serial;
+        }
+        qInfo("150 Takte: %d ohne neues Bild, %d mit mehr als einem", same, skipped);
+        QCOMPARE(same, 0);
+        QCOMPARE(skipped, 0);
+        QCOMPARE(p.statistics().dropped, 0ULL);
     }
 
 #ifdef DSS_CLI_BIN

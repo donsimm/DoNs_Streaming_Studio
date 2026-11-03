@@ -1,0 +1,8 @@
+2026-11-03 10:01:36.938 info dss-core 0.1.0 gestartet, Qt 6.8.2
+2026-11-03 10:01:36.939 info Datenordner /tmp/dss-p09-leistung-0xmi6y7p/daten: 1 Overlays geladen
+2026-11-03 10:01:36.939 info Verbindung offen: /run/user/1000/dss-p09-dag0o2l5/kern.sock
+2026-11-03 10:01:37.582 info Verbunden: dss-app 0.1.0 (1 Verbindungen)
+2026-11-03 10:01:37.599 info Schriften geladen: 132 Schnitte
+2026-11-03 10:02:53.067 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende
+2026-11-03 10:02:53.067 info Verbindung getrennt: dss-app (noch 0)
+2026-11-03 10:02:53.067 info beendet, Exit-Code 0

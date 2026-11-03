@@ -10,7 +10,7 @@
 //   AV_PIX_FMT_FLAG_ALPHA: https://ffmpeg.org/doxygen/7.1/pixdesc_8h.html
 //   AV_PIX_FMT_BGRA ist auf Little Endian dieselbe Byte-Folge wie QImage::Format_ARGB32
 //     (0xAARRGGBB als 32-Bit-Wert): https://doc.qt.io/qt-6.8/qimage.html#Format-enum
-//   std::condition_variable::wait_until: https://en.cppreference.com/w/cpp/thread/condition_variable/wait_until
+//   std::condition_variable::wait: https://en.cppreference.com/w/cpp/thread/condition_variable/wait
 
 #include "videoplayer.h"
 
@@ -21,13 +21,9 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include <chrono>
-
 namespace dss {
 
 namespace {
-
-using Clock = std::chrono::steady_clock;
 
 constexpr auto kLateLimit = std::chrono::milliseconds(50);
 
@@ -57,6 +53,11 @@ double alphaMean(const VideoFrame &frame)
     return sum / (static_cast<double>(frame.width) * frame.height);
 }
 
+VideoPlayer::Clock::duration seconds(double s)
+{
+    return std::chrono::duration_cast<VideoPlayer::Clock::duration>(std::chrono::duration<double>(s));
+}
+
 } // namespace
 
 VideoPlayer::VideoPlayer(const QString &path, bool loop, bool holdAtEnd)
@@ -76,10 +77,38 @@ VideoPlayer::~VideoPlayer()
         m_thread.join();
 }
 
-std::shared_ptr<const VideoFrame> VideoPlayer::currentFrame() const
+std::shared_ptr<const VideoFrame> VideoPlayer::frameAt(Clock::time_point t)
+{
+    bool advanced = false;
+    std::shared_ptr<const VideoFrame> result;
+    {
+        const std::lock_guard lock(m_mutex);
+        while (!m_queue.empty() && m_queue.front().due <= t) {
+            m_frame = std::move(m_queue.front().frame);
+            m_queue.pop_front();
+            m_shown = true;
+            advanced = true;
+            ++m_serial;
+        }
+        if (advanced)
+            m_refillAt = Clock::now() + kRefillDelay;
+        result = m_frame;
+    }
+    if (advanced)
+        m_wake.notify_all(); // Platz für den Decoder
+    return result;
+}
+
+VideoPlayer::State VideoPlayer::state() const
 {
     const std::lock_guard lock(m_mutex);
-    return m_frame;
+    if (m_failed)
+        return State::Failed;
+    if (!m_shown)
+        return State::Starting;
+    if (m_decoderDone && m_queue.empty())
+        return m_frame ? State::Holding : State::Ended;
+    return State::Playing;
 }
 
 QString VideoPlayer::error() const
@@ -100,20 +129,38 @@ VideoPlayer::Statistics VideoPlayer::statistics() const
     return m_stats;
 }
 
-void VideoPlayer::publish(std::shared_ptr<const VideoFrame> frame)
-{
-    {
-        const std::lock_guard lock(m_mutex);
-        m_frame = std::move(frame);
-    }
-    ++m_serial;
-}
-
-template <typename TimePoint>
-bool VideoPlayer::waitUntil(const TimePoint &due)
+bool VideoPlayer::push(std::shared_ptr<const VideoFrame> frame, Clock::time_point due)
 {
     std::unique_lock lock(m_mutex);
-    return !m_wake.wait_until(lock, due, [this] { return m_stop; });
+    for (;;) {
+        if (m_stop)
+            return false;
+        if (m_queue.size() < kQueueSize) {
+            // Mit Vorrat erst nach kRefillDelay nachfüllen; ohne Vorrat sofort (Decoder im Rückstand).
+            if (m_queue.empty() || Clock::now() >= m_refillAt)
+                break;
+            m_wake.wait_until(lock, m_refillAt);
+            continue;
+        }
+        const Clock::time_point overdue = m_queue.front().due + kDropAfter;
+        if (Clock::now() >= overdue) {
+            // Niemand hat es abgeholt: gilt als gezeigt, aber verworfen.
+            m_frame = std::move(m_queue.front().frame);
+            m_queue.pop_front();
+            m_shown = true;
+            ++m_serial;
+            ++m_stats.dropped;
+            continue;
+        }
+        m_wake.wait_until(lock, overdue);
+    }
+    if (frame) {
+        ++m_stats.decoded;
+        if (Clock::now() > due + kLateLimit)
+            ++m_stats.late;
+    }
+    m_queue.push_back({std::move(frame), due});
+    return true;
 }
 
 void VideoPlayer::run()
@@ -123,7 +170,8 @@ void VideoPlayer::run()
     if (!input.open(m_path, &error)) {
         const std::lock_guard lock(m_mutex);
         m_error = error;
-        m_state = State::Failed;
+        m_failed = true;
+        m_decoderDone = true;
         return;
     }
     {
@@ -174,24 +222,20 @@ void VideoPlayer::run()
                 break;
             if (r == AVERROR_EOF) {
                 // Ende der Datei: Das letzte Bild steht noch eine Bilddauer.
-                const auto lastEnd = base + std::chrono::duration_cast<Clock::duration>(
-                                                std::chrono::duration<double>(
-                                                    loopOffset + lastPts - firstPts + frameDuration));
+                const double played = lastPts - firstPts + frameDuration;
                 if (m_loop) {
-                    loopOffset += lastPts - firstPts + frameDuration;
-                    av_seek_frame(input.format, input.stream, stream->start_time == AV_NOPTS_VALUE ? 0 : stream->start_time,
+                    loopOffset += played;
+                    av_seek_frame(input.format, input.stream,
+                                  stream->start_time == AV_NOPTS_VALUE ? 0 : stream->start_time,
                                   AVSEEK_FLAG_BACKWARD);
                     avcodec_flush_buffers(input.codec);
                     draining = false;
                     const std::lock_guard lock(m_mutex);
                     ++m_stats.loops;
-                } else if (m_holdAtEnd) {
-                    m_state = State::Holding;
-                    ended = true;
                 } else {
-                    if (waitUntil(lastEnd))
-                        publish(nullptr);
-                    m_state = State::Ended;
+                    // Ohne holdAtEnd ab dem Ende des letzten Bildes leer.
+                    if (!m_holdAtEnd)
+                        push(nullptr, base + seconds(loopOffset + played));
                     ended = true;
                 }
                 break;
@@ -199,7 +243,7 @@ void VideoPlayer::run()
             if (r < 0) {
                 const std::lock_guard lock(m_mutex);
                 m_error = QStringLiteral("Fehler beim Dekodieren");
-                m_state = State::Failed;
+                m_failed = true;
                 ended = true;
                 break;
             }
@@ -207,6 +251,8 @@ void VideoPlayer::run()
             const auto format = static_cast<AVPixelFormat>(frame->format);
             const int w = frame->width;
             const int h = frame->height;
+            if (w <= 0 || h <= 0)
+                continue; // Bild ohne Grösse: überspringen
             std::shared_ptr<VideoFrame> out;
             for (const std::shared_ptr<VideoFrame> &f : pool) {
                 if (f.use_count() == 1 && f->width == w && f->height == h) {
@@ -219,7 +265,9 @@ void VideoPlayer::run()
                 out->width = w;
                 out->height = h;
                 out->stride = 4 * w;
-                out->data.resize(static_cast<size_t>(out->stride) * h);
+                // assign statt resize: GCC 14 meldet bei resize im Release-Bau -Warray-bounds
+                // (in __builtin_memset), obwohl die Grösse positiv ist.
+                out->data.assign(static_cast<size_t>(out->stride) * h, 0);
                 pool.push_back(out);
             }
             sws = sws_getCachedContext(sws, w, h, format, w, h, AV_PIX_FMT_BGRA, SWS_BILINEAR,
@@ -242,31 +290,23 @@ void VideoPlayer::run()
                           : frame->best_effort_timestamp * timeBase;
             out->pts = lastPts;
             if (!started) {
+                // Beginn: das erste Bild ist sofort fällig.
                 base = Clock::now();
                 firstPts = lastPts;
                 started = true;
             }
-            const auto due = base + std::chrono::duration_cast<Clock::duration>(
-                                        std::chrono::duration<double>(loopOffset + lastPts - firstPts));
-            const auto now = Clock::now();
-            if (now > due + kLateLimit) {
-                const std::lock_guard lock(m_mutex);
-                ++m_stats.late;
-            }
-            if (!waitUntil(due)) {
+            if (!push(out, base + seconds(loopOffset + lastPts - firstPts))) {
                 ended = true;
                 break;
             }
-            publish(out);
-            m_state = State::Playing;
-            const std::lock_guard lock(m_mutex);
-            ++m_stats.decoded;
         }
     }
 
     sws_freeContext(sws);
     av_packet_free(&packet);
     av_frame_free(&frame);
+    const std::lock_guard lock(m_mutex);
+    m_decoderDone = true;
 }
 
 } // namespace dss

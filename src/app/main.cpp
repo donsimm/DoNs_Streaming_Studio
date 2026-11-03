@@ -3,6 +3,9 @@
 
 #include "fonts.h"
 #include "mainwindow.h"
+#if DSS_APP_RENDERER
+#include "canvasmeasurement.h"
+#endif
 #include "symbols.h"
 #include "theme.h"
 #include "translation.h"
@@ -68,6 +71,16 @@ int main(int argc, char *argv[])
         QStringLiteral("Benutzerdienst, der gestartet wird, wenn der Kern nicht antwortet "
                        "(Standard: dss-core.service)."),
         QStringLiteral("NAME"));
+    const QCommandLineOption measureOption(
+        QStringLiteral("leinwand-messung"),
+        QStringLiteral("Nur mit --verbindung (P09): erstes Overlay wählen, Zeitstempel der Leinwand "
+                       "und der Videobilder --messdauer Sekunden lang messen, als JSON in DATEI "
+                       "schreiben und beenden."),
+        QStringLiteral("DATEI"));
+    const QCommandLineOption measureSecondsOption(
+        QStringLiteral("messdauer"),
+        QStringLiteral("Nur mit --leinwand-messung: Dauer in Sekunden ab dem Start, Standard 75."),
+        QStringLiteral("SEKUNDEN"));
     parser.addOption(helpOption);
     parser.addOption(connectionOption);
     parser.addOption(unitOption);
@@ -76,6 +89,8 @@ int main(int argc, char *argv[])
     parser.addOption(statesOption);
     parser.addOption(sizeOption);
     parser.addOption(propertiesKindOption);
+    parser.addOption(measureOption);
+    parser.addOption(measureSecondsOption);
     // Unbekannte Optionen (zum Beispiel von Qt wie -platform) bleiben QApplication überlassen.
     parser.parse(arguments);
     if (parser.isSet(versionOption)) {
@@ -100,6 +115,23 @@ int main(int argc, char *argv[])
         return 2;
     }
     const bool propertiesKind = parser.isSet(propertiesKindOption);
+    const QString measureFile = parser.value(measureOption);
+    int measureSeconds = 75;
+    if (parser.isSet(measureOption)) {
+        bool ok = true;
+        if (parser.isSet(measureSecondsOption))
+            measureSeconds = parser.value(measureSecondsOption).toInt(&ok);
+        if (measureFile.isEmpty() || !parser.isSet(connectionOption) || !ok || measureSeconds < 1
+            || parser.isSet(screenshotOption) || !DSS_APP_RENDERER) {
+            QTextStream(stderr) << "Fehler: --leinwand-messung braucht DATEI und --verbindung, "
+                                   "--messdauer ganze Sekunden ab 1, nicht mit --bildschirmfoto, "
+                                   "und den Zeichner (DSS_APP_RENDERER).\n";
+            return 2;
+        }
+    } else if (parser.isSet(measureSecondsOption)) {
+        QTextStream(stderr) << "Fehler: --messdauer gilt nur mit --leinwand-messung.\n";
+        return 2;
+    }
 
     QSize screenshotSize(1280, 800);
     if (parser.isSet(sizeOption)) {
@@ -223,6 +255,15 @@ int main(int argc, char *argv[])
                              });
         }
     }
+
+#if DSS_APP_RENDERER
+    if (!measureFile.isEmpty()) {
+        // Messung (P09): erstes Overlay wählen wie mit der Maus, dann messen.
+        QObject::connect(client.get(), &dss::CoreClient::overlayListChanged, &window,
+                         [&window] { window.selectFirstOverlay(); });
+        new CanvasMeasurement(&window, measureFile, measureSeconds);
+    }
+#endif
 
     qInfo().noquote() << dss::startLine(name);
     window.show();

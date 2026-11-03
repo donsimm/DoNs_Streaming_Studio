@@ -11,6 +11,7 @@
 #include <QTimer>
 #include <QUuid>
 
+#include <chrono>
 #include <map>
 #include <memory>
 
@@ -18,6 +19,7 @@ class QPainter;
 
 namespace dss {
 class VideoPlayer;
+struct VideoFrame;
 }
 
 // Zeichner der Leinwand im Editor (P09, Teil B, Schalter DSS_APP_RENDERER). Zeichnet die
@@ -25,6 +27,9 @@ class VideoPlayer;
 // aus sourcegeometry.h. Bilder werden in einem Thread des Pools geladen, Videos in je einem
 // eigenen Thread dekodiert (dss::VideoPlayer); im Thread der Oberfläche wird nur gezeichnet.
 // Während ein Video läuft, meldet er 30 Mal pro Sekunde changed(), sonst nur bei Änderungen.
+// Der Takt läuft nach geplanten Zeitpunkten (Beginn + n * 1/30 s), und jedes Video liefert das
+// Bild für den geplanten Zeitpunkt (VideoPlayer::frameAt): So kommt bei 30 Bildern/s in jedem
+// Takt genau ein neues Videobild, auch wenn der Timer um einige Millisekunden schwankt.
 class SourceRenderer : public QObject
 {
     Q_OBJECT
@@ -56,8 +61,10 @@ public:
         quint64 decoded = 0;
         quint64 late = 0;
         quint64 loops = 0;
+        quint64 dropped = 0;
         bool hasFrame = false;
         int state = 0; // dss::VideoPlayer::State als int
+        quint64 serial = 0; // zählt bei jedem neuen Bild (VideoPlayer::frameSerial)
     };
     QList<VideoInfo> videoInfo() const;
     bool imagesLoaded() const; // alle Bilder des Overlays geladen (oder mit Fehler)
@@ -77,6 +84,7 @@ private:
         bool loop = false;
         bool holdAtEnd = false;
         std::unique_ptr<dss::VideoPlayer> player;
+        std::shared_ptr<const dss::VideoFrame> frame; // gezeigtes Bild, im Takt nachgeführt
     };
     struct FontEntry
     {
@@ -98,6 +106,11 @@ private:
     QHash<QString, ImageEntry> m_images; // nach Verweis media/…
     std::map<QUuid, VideoEntry> m_videos; // nach Kennung der Quelle
     mutable QHash<QString, FontEntry> m_fonts; // nach Verweis media/…
-    QTimer m_timer;
+    void startTicks();
+    void scheduleNextTick();
+
+    QTimer m_timer; // einmalig, für jeden Takt neu gestellt
+    std::chrono::steady_clock::time_point m_tickStart;
+    qint64 m_tick = 0;
     QThreadPool m_loader; // Bilder laden; der Destruktor wartet auf ihn
 };

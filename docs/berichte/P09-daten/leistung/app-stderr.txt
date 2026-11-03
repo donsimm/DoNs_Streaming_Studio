@@ -1,0 +1,5 @@
+2026-11-03 10:00:20.562 info dss-app 0.1.0 gestartet, Qt 6.8.2
+2026-11-03 10:00:20.598 info Fenster gezeichnet
+2026-11-03 10:01:36.064 info Messung geschrieben: /tmp/dss-p09-leistung-4lc9aoih/zeitstempel.json (2267 Bilder der Leinwand)
+2026-11-03 10:01:36.074 info Kern beendet sich
+2026-11-03 10:01:36.074 info beendet, Exit-Code 0
