@@ -43,6 +43,10 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QFileInfo>
+#include <QElapsedTimer>
+#include <QSignalSpy>
+#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QScrollArea>
 #include <QSpinBox>
@@ -53,6 +57,7 @@
 #include <QTimer>
 #include <QToolButton>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 
@@ -1269,6 +1274,102 @@ private slots:
         QCOMPARE(m_check->settings()->settings.port, 9000);
     }
 #endif
+
+    // P10-vor, Teil A 1 (Punkt 67): Während der Kern eine grosse Datei übernimmt, bleibt das
+    // Fenster bedienbar: Hinweis in der Statuszeile, Änderungen kommen an, der Kern antwortet.
+    // Grösse 1 GiB (Auftrag); DSS_TEST_GROSS_MIB setzt eine andere (Wiederholungsläufe). Die Datei
+    // (Zufallszahlen mit festem Startwert) liegt im Bauordner auf der Platte und wird
+    // wiederverwendet; die Kopie des Kerns landet im Datenordner des Tests.
+    void usableWhileImportingLargeFile()
+    {
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        const qint64 mib = qEnvironmentVariableIsSet("DSS_TEST_GROSS_MIB")
+                               ? qEnvironmentVariableIntValue("DSS_TEST_GROSS_MIB") : 1024;
+        QVERIFY(mib > 0);
+        QVERIFY(QDir().mkpath(QStringLiteral(DSS_TEST_LARGE_DIR)));
+        const QString big = QStringLiteral(DSS_TEST_LARGE_DIR "/gross-%1mib.png").arg(mib);
+        if (QFileInfo(big).size() != mib << 20) {
+            QFile f(big);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            QRandomGenerator random(67);
+            QByteArray chunk(1 << 20, Qt::Uninitialized);
+            for (qint64 i = 0; i < mib; ++i) {
+                random.fillRange(reinterpret_cast<quint32 *>(chunk.data()), chunk.size() / 4);
+                QCOMPARE(f.write(chunk), chunk.size());
+            }
+        }
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        const qsizetype sourcesBefore = checked(m_scene).sources.size();
+        selectSourceRow(0);
+        auto *x = child<QSpinBox>("propertyX");
+        auto *importStatus = child<QLabel>("importStatus");
+        QVERIFY(x && importStatus);
+
+        // Ereignisschleife des Fensters: grösste Lücke zwischen zwei Takten von 10 ms
+        QElapsedTimer tick;
+        qint64 maxGap = 0;
+        QTimer ticker;
+        ticker.setInterval(10);
+        connect(&ticker, &QTimer::timeout, this, [&] {
+            maxGap = std::max(maxGap, tick.restart());
+        });
+        tick.start();
+        ticker.start();
+
+        QSignalSpy finished(m_client.get(), &CoreClient::changeFinished);
+        ChangeRequest add;
+        add.type = QString::fromLatin1(msg::kAddImageSource);
+        add.overlayId = m_scene;
+        add.file = big;
+        QElapsedTimer importTimer;
+        importTimer.start();
+        const qint64 id = m_client->sendChange(add);
+        QVERIFY(id > 0);
+        QTRY_VERIFY_WITH_TIMEOUT(importStatus->text().contains(QFileInfo(big).fileName()), 2000);
+
+        QList<qint64> replies;   // Antwortzeit des Kerns auf get_overlay_list (ms)
+        QList<qint64> edits;     // Pfeiltaste im Feld X bis zur Ankunft beim Kern (ms)
+        QSignalSpy lists(m_check.get(), &CoreClient::overlayListChanged);
+        while (!m_client->pendingImports().isEmpty() && importTimer.elapsed() < 300000) {
+            lists.clear();
+            QElapsedTimer t;
+            t.start();
+            m_check->requestOverlayList();
+            QVERIFY(lists.wait(2000));
+            replies.append(t.elapsed());
+            if (replies.size() % 5 == 1 && !m_client->pendingImports().isEmpty()) {
+                const int before = sourceAtRow(0).x;
+                x->setFocus();
+                t.restart();
+                QTest::keyClick(x, Qt::Key_Up);
+                QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).x, before + 1, 2000);
+                edits.append(t.elapsed());
+            }
+            QTest::qWait(100);
+        }
+        const qint64 importMs = importTimer.elapsed();
+        ticker.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(finished.cbegin(), finished.cend(), [id](const QList<QVariant> &a) {
+                                     return a.at(0).value<ChangeResult>().requestId == id;
+                                 }), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).sources.size(), sourcesBefore + 1, 5000);
+        QVERIFY(importStatus->text().isEmpty());
+        std::sort(replies.begin(), replies.end());
+        std::sort(edits.begin(), edits.end());
+        qInfo("Übernehmen %lld MiB: %lld ms; %lld Antworten des Kerns min %lld / Median %lld / max %lld ms; "
+              "%lld Änderungen im Fenster max %lld ms; grösste Lücke der Ereignisschleife %lld ms",
+              static_cast<long long>(mib), static_cast<long long>(importMs),
+              static_cast<long long>(replies.size()), static_cast<long long>(replies.value(0)),
+              static_cast<long long>(replies.value(replies.size() / 2)),
+              static_cast<long long>(replies.value(replies.size() - 1)),
+              static_cast<long long>(edits.size()), static_cast<long long>(edits.value(edits.size() - 1)),
+              static_cast<long long>(maxGap));
+        QVERIFY2(replies.size() >= 3, "Übernehmen zu kurz für eine Messung");
+        QVERIFY(!edits.isEmpty());
+        QVERIFY2(replies.last() < 500, qPrintable(QString::number(replies.last())));
+        QVERIFY2(maxGap < 500, qPrintable(QString::number(maxGap)));
+    }
 };
 
 int main(int argc, char *argv[])

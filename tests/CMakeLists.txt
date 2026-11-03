@@ -133,7 +133,8 @@ if(DSS_BUILD_APP)
   qt_add_executable(tst_fensterbearbeiten tst_fensterbearbeiten.cpp)
   target_link_libraries(tst_fensterbearbeiten PRIVATE dss_app_ui dss_warnings Qt6::Test)
   target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
-    DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}")
+    DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
+    DSS_TEST_LARGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/gross-daten")
   # Kern liest die Originalgrösse nur mit DSS_MEDIA_SIZE (P09b, Seitenverhältnis an den Ecken)
   if(DSS_MEDIA_SIZE)
     target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_MEDIA_SIZE=1)
