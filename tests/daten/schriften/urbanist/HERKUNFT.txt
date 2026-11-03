@@ -1,0 +1,6 @@
+Urbanist[wght].ttf und OFL.txt: variable Schrift (Achse wght 100 bis 900) für die Tests von P09
+(Punkt 45), Lizenz SIL Open Font License 1.1 (OFL.txt).
+Quelle: https://github.com/google/fonts, Commit c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1,
+Ordner ofl/urbanist. Geladen am 2026-11-03.
+Git-Blob Urbanist[wght].ttf a867bdd9cbfb5a0cd30a7c5a06f0d71c3db62192 (84840 Bytes),
+OFL.txt 828d6f7cb00f110ebfeffb0bcf1fe43312f53d3f.

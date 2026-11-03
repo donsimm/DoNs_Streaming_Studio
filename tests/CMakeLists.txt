@@ -127,3 +127,48 @@ if(DSS_BUILD_APP)
     FIXTURES_REQUIRED dss_media
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/fenster-config")
 endif()
+
+# P09: Rechnungen des Zeichners und des Bearbeitens auf der Leinwand, ohne Qt Gui.
+dss_add_test(tst_sourcegeometry)
+target_compile_definitions(tst_sourcegeometry PRIVATE
+  DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften" DSS_TEST_FONT="${DSS_TEST_FONT}")
+dss_add_test(tst_canvasedit)
+
+# P09: Übersetzung von Qt ohne «ß» (Punkt 44), ohne Qt Gui.
+dss_add_test(tst_qmfile)
+if(DSS_BUILD_APP)
+  target_compile_definitions(tst_qmfile PRIVATE DSS_QT_TRANSLATION="${DSS_QT_TRANSLATION}"
+    DSS_BUILT_TRANSLATION="${CMAKE_BINARY_DIR}/src/app/uebersetzung/qtbase_de.qm")
+  add_dependencies(tst_qmfile dss_uebersetzung)
+else()
+  target_compile_definitions(tst_qmfile PRIVATE
+    DSS_QT_TRANSLATION="${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}/qtbase_de.qm")
+endif()
+
+# P09: Bilder und Videos (dss_media): Grösse, Videospieler mit Ende, dss-cli. Ohne Qt Gui.
+if(TARGET dss_media)
+  dss_add_test(tst_medien)
+  target_link_libraries(tst_medien PRIVATE dss_media)
+  # prozesshilfe.h braucht DSS_CORE_BIN, auch wenn hier nur dss-cli läuft.
+  target_compile_definitions(tst_medien PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
+    DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+  if(DSS_BUILD_CLI AND DSS_MEDIA_SIZE)
+    target_compile_definitions(tst_medien PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
+    add_dependencies(tst_medien dss-cli)
+  endif()
+  set_tests_properties(tst_medien PROPERTIES FIXTURES_REQUIRED dss_media)
+endif()
+
+# P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
+# variable Schrift); ohne X11 übersprungen (77). Nur mit dem Zeichner (DSS_APP_RENDERER).
+if(DSS_BUILD_APP AND DSS_APP_RENDERER)
+  qt_add_executable(tst_leinwand tst_leinwand.cpp)
+  target_link_libraries(tst_leinwand PRIVATE dss_app_ui dss_media dss_warnings Qt6::Test)
+  target_compile_definitions(tst_leinwand PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
+    DSS_TEST_FONT="${DSS_TEST_FONT}"
+    DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf")
+  add_test(NAME tst_leinwand COMMAND tst_leinwand)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/leinwand-config)
+  set_tests_properties(tst_leinwand PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/leinwand-config")
+endif()

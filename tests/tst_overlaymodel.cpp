@@ -212,6 +212,8 @@ private slots:
         QTest::newRow("Schriftdatei fehlt") << 18 << QStringLiteral("Schriftdatei");
         QTest::newRow("Wiederholen bei Bild") << 19 << QStringLiteral("nur bei Quellen der Art Video");
         QTest::newRow("Wiederholen bei Text") << 20 << QStringLiteral("nur bei Quellen der Art Video");
+        QTest::newRow("Am Ende anhalten bei Bild") << 21 << QStringLiteral("Am Ende anhalten gibt es nur");
+        QTest::newRow("Am Ende anhalten bei Text") << 22 << QStringLiteral("Am Ende anhalten gibt es nur");
     }
 
     void invalidValuesRejected()
@@ -240,6 +242,8 @@ private slots:
         case 18: o.sources[2].text.fontFile.clear(); break;
         case 19: o.sources[0].loop = true; break;
         case 20: o.sources[2].loop = true; break;
+        case 21: o.sources[0].holdAtEnd = true; break;
+        case 22: o.sources[2].holdAtEnd = true; break;
         }
         const QString error = validateOverlay(o);
         QVERIFY2(error.contains(expectedPart), qPrintable(error));
@@ -308,6 +312,89 @@ private slots:
         QCOMPARE(loaded, original);
         QCOMPARE(loaded.sources[1].loop, true);
         QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 2);
+    }
+
+    // P09, Entscheid 9: «Am Ende anhalten» in Modell und Datei (format_version 2).
+    void holdAtEnd()
+    {
+        Overlay original = makeOverlay();
+        original.sources[1].loop = false;
+        original.sources[1].holdAtEnd = true;
+        const QJsonObject json = overlayToJson(original);
+        const QJsonObject video = json.value(QStringLiteral("sources")).toArray().at(1).toObject()
+                                      .value(QStringLiteral("video")).toObject();
+        QCOMPARE(video.value(QStringLiteral("hold_at_end")).toBool(), true);
+        QCOMPARE(video.value(QStringLiteral("loop")).toBool(), false);
+        // Bild und Text haben kein Feld hold_at_end.
+        QVERIFY(!json.value(QStringLiteral("sources")).toArray().at(0).toObject()
+                     .value(QStringLiteral("image")).toObject().contains(QStringLiteral("hold_at_end")));
+        Overlay loaded;
+        QString error;
+        QVERIFY2(parseOverlay(serializeOverlay(original), &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded.sources[1].holdAtEnd, true);
+
+        // Ändern über SourceChanges; bei Bild abgewiesen, ohne Änderung
+        SourceChanges c;
+        c.holdAtEnd = false;
+        QCOMPARE(updateSource(&loaded, loaded.sources[1].id, c), QString());
+        QCOMPARE(loaded.sources[1].holdAtEnd, false);
+        const Overlay before = loaded;
+        c.holdAtEnd = true;
+        QVERIFY(updateSource(&loaded, loaded.sources[0].id, c).contains(QStringLiteral("Am Ende anhalten")));
+        QCOMPARE(loaded, before);
+    }
+
+    // Alte Dateien (format_version 1, P04 bis P08) laden weiter: ohne hold_at_end, Wert false.
+    void formatVersion1Loads()
+    {
+        const Overlay original = makeOverlay();
+        QJsonObject o = overlayToJson(original);
+        o.insert(QStringLiteral("format_version"), 1);
+        QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
+        QJsonObject s = sources.at(1).toObject();
+        QJsonObject video = s.value(QStringLiteral("video")).toObject();
+        video.remove(QStringLiteral("hold_at_end"));
+        s.insert(QStringLiteral("video"), video);
+        sources[1] = s;
+        o.insert(QStringLiteral("sources"), sources);
+        Overlay loaded;
+        QString error;
+        QVERIFY2(parseOverlay(QJsonDocument(o).toJson(), &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded, original);
+        QCOMPARE(loaded.sources[1].holdAtEnd, false);
+
+        // In Version 1 gibt es hold_at_end nicht; in Version 2 muss es da sein.
+        video.insert(QStringLiteral("hold_at_end"), true);
+        s.insert(QStringLiteral("video"), video);
+        sources[1] = s;
+        o.insert(QStringLiteral("sources"), sources);
+        QVERIFY(!parseOverlay(QJsonDocument(o).toJson(), &loaded, &error));
+        QVERIFY2(error.contains(QStringLiteral("hold_at_end")), qPrintable(error));
+        QJsonObject v2 = overlayToJson(original);
+        QJsonArray sources2 = v2.value(QStringLiteral("sources")).toArray();
+        QJsonObject s2 = sources2.at(1).toObject();
+        QJsonObject video2 = s2.value(QStringLiteral("video")).toObject();
+        video2.remove(QStringLiteral("hold_at_end"));
+        s2.insert(QStringLiteral("video"), video2);
+        sources2[1] = s2;
+        v2.insert(QStringLiteral("sources"), sources2);
+        QVERIFY(!parseOverlay(QJsonDocument(v2).toJson(), &loaded, &error));
+        QVERIFY2(error.contains(QStringLiteral("hold_at_end")), qPrintable(error));
+    }
+
+    // P09, Entscheid 5: Auflösung ändern, die Quellen behalten ihre Pixelwerte.
+    void overlaySize()
+    {
+        Overlay o = makeOverlay();
+        const QList<Source> sources = o.sources;
+        QCOMPARE(setOverlaySize(&o, 1280, 720), QString());
+        QCOMPARE(o.width, 1280);
+        QCOMPARE(o.height, 720);
+        QCOMPARE(o.sources, sources);
+        const Overlay before = o;
+        QVERIFY(!setOverlaySize(&o, 0, 720).isEmpty());
+        QVERIFY(!setOverlaySize(&o, 1280, 4321).isEmpty());
+        QCOMPARE(o, before);
     }
 
     void jsonRejected_data()

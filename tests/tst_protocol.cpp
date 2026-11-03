@@ -53,6 +53,7 @@ Overlay sampleOverlay()
     video.width = 512;
     video.height = 512;
     video.loop = true;
+    video.holdAtEnd = true; // P09; mit loop ohne Wirkung, bleibt aber gespeichert
     video.file =
         QStringLiteral("media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm");
     o.sources = {video, text};
@@ -136,6 +137,18 @@ private slots:
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
         QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 3); // seit P09
+        QVERIFY(!o.contains(QStringLiteral("data_dir")));
+
+        // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
+        const Hello core{QStringLiteral("dss-core"), QStringLiteral("0.1.0"), kProtocolVersion,
+                         QStringLiteral("/home/nutzer/.local/share/dons-streaming-studio")};
+        const QJsonObject withDir = roundTrip(helloMessage(core));
+        QCOMPARE(withDir.value(QStringLiteral("data_dir")).toString(), core.dataDir);
+        QVERIFY2(parseHello(withDir, &back, &error), qPrintable(error));
+        QCOMPARE(back, core);
+        QJsonObject bad = withDir;
+        bad.insert(QStringLiteral("data_dir"), 5);
+        QVERIFY(!parseHello(bad, &back, &error));
     }
 
     void helloInvalid()

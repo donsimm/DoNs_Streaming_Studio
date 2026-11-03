@@ -9,24 +9,29 @@
 // tst_windowedit.
 // Daten wie im Handtest: Bild und Video aus prototypes/media, Be Vietnam Pro.
 
+#include "canvaswidget.h"
 #include "coreclient.h"
 #include "dockviews.h"
 #include "fontcatalog.h"
+#include "headerbar.h"
 #include "mainwindow.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
 #include "symbols.h"
 #include "theme.h"
 #include "version.h"
+#include "windowedit.h"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
+#include <QDockWidget>
 #include <QDoubleSpinBox>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -78,6 +83,23 @@ void doubleClick(QAbstractItemView *view, const QPoint &position)
     QTest::mouseDClick(view->viewport(), Qt::LeftButton, {}, position);
 }
 
+// Maus auf der Leinwand mit Umschalttasten (QTest::mouseMove kennt keine Umschalttasten).
+void sendMouse(QWidget *w, QEvent::Type type, QPointF pos, Qt::MouseButton button,
+               Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers)
+{
+    QMouseEvent e(type, pos, w->mapToGlobal(pos), button, buttons, modifiers);
+    QApplication::sendEvent(w, &e);
+}
+
+// Ziehen von a nach b (Pixel des Widgets) in einigen Schritten.
+void drag(QWidget *w, QPointF a, QPointF b, Qt::KeyboardModifiers modifiers = {})
+{
+    sendMouse(w, QEvent::MouseButtonPress, a, Qt::LeftButton, Qt::LeftButton, modifiers);
+    for (int i = 1; i <= 4; ++i)
+        sendMouse(w, QEvent::MouseMove, a + (b - a) * i / 4.0, Qt::NoButton, Qt::LeftButton, modifiers);
+    sendMouse(w, QEvent::MouseButtonRelease, b, Qt::LeftButton, Qt::NoButton, modifiers);
+}
+
 void clickButton(QWidget *dialog, const QString &text)
 {
     for (QPushButton *b : dialog->findChildren<QPushButton *>()) {
@@ -125,6 +147,18 @@ private:
     {
         const Overlay o = checked(m_scene);
         return o.sources.value(o.sources.size() - 1 - row);
+    }
+
+    void selectOverlayNamed(const QString &name)
+    {
+        auto *tree = child<OverlayTree>("overlayTree");
+        for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+            if ((*it)->text(0) == name) {
+                tree->setCurrentItem(*it);
+                break;
+            }
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(child<SourceList>("sourceList")->count() > 0, 3000);
     }
 
     void selectSourceRow(int row)
@@ -328,6 +362,84 @@ private slots:
         QVERIFY(child<QPushButton>("imageReplace")->isEnabled());
     }
 
+    // P09 Entscheid 1 (E-23): Kopfbereich über die ganze Breite, links angedockte Docks darunter.
+    void headerAboveLeftDock()
+    {
+        const QByteArray state = m_window->saveState();
+        auto *dock = child<QDockWidget>("overlaysDock");
+        m_window->addDockWidget(Qt::LeftDockWidgetArea, dock);
+        QTRY_VERIFY_WITH_TIMEOUT(m_window->dockWidgetArea(dock) == Qt::LeftDockWidgetArea, 2000);
+        QCoreApplication::processEvents();
+        auto *header = m_window->findChild<HeaderBar *>();
+        QVERIFY(header);
+        const QRect headerRect(header->mapTo(m_window.get(), QPoint(0, 0)), header->size());
+        const QRect dockRect(dock->mapTo(m_window.get(), QPoint(0, 0)), dock->size());
+        QVERIFY2(headerRect.bottom() < dockRect.top(),
+                 qPrintable(QStringLiteral("Kopf %1..%2, Dock ab %3")
+                                .arg(headerRect.top()).arg(headerRect.bottom()).arg(dockRect.top())));
+        QCOMPARE(m_window->menuWidget()->width(), m_window->width());
+        QVERIFY(m_window->restoreState(state));
+        QTRY_VERIFY_WITH_TIMEOUT(m_window->dockWidgetArea(dock) == Qt::BottomDockWidgetArea, 2000);
+    }
+
+    // P09 Entscheid 9: «Am Ende anhalten» kommt beim Kern an und ist mit «Wiederholen» ausgegraut.
+    void videoHoldAtEnd()
+    {
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(1); // Video
+        auto *loop = child<QCheckBox>("videoLoop");
+        auto *hold = child<QCheckBox>("videoHoldAtEnd");
+        if (!loop->isChecked()) {
+            QTest::mouseClick(loop, Qt::LeftButton, {}, QPoint(8, loop->height() / 2));
+            QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).loop, true, 3000);
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(!hold->isEnabled(), 3000);
+        QTest::mouseClick(loop, Qt::LeftButton, {}, QPoint(8, loop->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).loop, false, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(hold->isEnabled(), 3000);
+        QVERIFY(!hold->isChecked());
+        QTest::mouseClick(hold, Qt::LeftButton, {}, QPoint(8, hold->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).holdAtEnd, true, 3000);
+        QVERIFY(hold->isChecked());
+    }
+
+    // P09 Entscheid 5: Auflösung im Dock «Steuerung»; Quellen behalten ihre Pixelwerte.
+    void overlayResolution()
+    {
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        auto *width = child<QSpinBox>("overlayWidth");
+        auto *height = child<QSpinBox>("overlayHeight");
+        QTRY_VERIFY_WITH_TIMEOUT(width->isEnabled() && height->isEnabled(), 3000);
+        QCOMPARE(width->value(), 1920);
+        QCOMPARE(height->value(), 1080);
+        const QList<Source> before = checked(m_scene).sources;
+        width->setFocus();
+        width->selectAll();
+        QTest::keyClicks(width, QStringLiteral("1280"));
+        QTest::keyClick(width, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).width, 1280, 3000);
+        height->setFocus();
+        height->selectAll();
+        QTest::keyClicks(height, QStringLiteral("720"));
+        QTest::keyClick(height, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).height, 720, 3000);
+        const QList<Source> after = checked(m_scene).sources;
+        QCOMPARE(after.size(), before.size());
+        for (qsizetype i = 0; i < after.size(); ++i) {
+            QCOMPARE(after.at(i).x, before.at(i).x);
+            QCOMPARE(after.at(i).width, before.at(i).width);
+        }
+        // Zurück, damit die übrigen Fälle 1920x1080 sehen.
+        width->setValue(1920);
+        height->setValue(1080);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).width, 1920, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).height, 1080, 3000);
+    }
+
     void sourceList()
     {
         if (!DSS_APP_EDITING)
@@ -451,6 +563,153 @@ private slots:
         folder->setExpanded(false);
         QTRY_COMPARE_WITH_TIMEOUT(m_check->listData().layout.folder(m_folder)->expanded, false, 3000);
         QTRY_VERIFY_WITH_TIMEOUT(!tree->topLevelItem(0)->isExpanded(), 3000);
+    }
+    // P09 Teil C: Wählen und Bearbeiten auf der Leinwand. Lage der Quellen über die zweite
+    // Verbindung, damit sie sich nicht überdecken.
+    void canvasSelectAndEdit()
+    {
+        if (!DSS_APP_EDITING || !DSS_APP_CANVAS_EDIT)
+            QSKIP("Schalter DSS_APP_EDITING oder DSS_APP_CANVAS_EDIT ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        const Source image = sourceAtRow(2);
+        const Source video = sourceAtRow(1);
+        const Source text = sourceAtRow(0);
+        const auto place = [&](const Source &s, int x, int y, int w, int h) {
+            SourceChanges c;
+            c.x = x;
+            c.y = y;
+            c.width = w;
+            c.height = h;
+            c.rotation = 0;
+            m_check->sendChange(sourceUpdate(m_scene, s.id, c));
+        };
+        place(image, 100, 100, 400, 200);
+        place(video, 1200, 600, 300, 300);
+        place(text, 1500, 100, 300, 100);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).sources.first().x, 100, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).x, 1500, 3000);
+        CanvasWidget *canvas = m_window->canvas();
+        QTRY_COMPARE_WITH_TIMEOUT(canvas->toWidget(QPointF(0, 0)) != canvas->toWidget(QPointF(1, 1)), true, 2000);
+        auto *list = child<SourceList>("sourceList");
+        auto *x = child<QSpinBox>("propertyX");
+        const auto at = [canvas](double ox, double oy) { return canvas->toWidget(QPointF(ox, oy)).toPoint(); };
+
+        // Klick wählt die Quelle unter dem Zeiger, wie im Dock «Quellen»
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, at(300, 200));
+        QTRY_COMPARE_WITH_TIMEOUT(list->currentRow(), 2, 2000);
+        QCOMPARE(x->value(), 100);
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, at(1350, 750));
+        QTRY_COMPARE_WITH_TIMEOUT(list->currentRow(), 1, 2000);
+        // Klick daneben hebt die Auswahl auf
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, at(900, 900));
+        QTRY_VERIFY_WITH_TIMEOUT(list->currentItem() == nullptr, 2000);
+        // Auswahl im Dock wählt auch auf der Leinwand: Ziehen am Griff der Quelle geht sofort
+        selectSourceRow(2);
+
+        // Verschieben: Weg in Pixeln des Overlays, auf ganze Pixel
+        {
+            const QPoint a = at(300, 200);
+            const QPoint b = at(340, 230);
+            const QPointF d = canvas->overlayPoint(b) - canvas->overlayPoint(a);
+            drag(canvas, a, b);
+            const int ex = 100 + int(std::lround(d.x()));
+            const int ey = 100 + int(std::lround(d.y()));
+            QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, ex, 3000);
+            QCOMPARE(sourceAtRow(2).y, ey);
+            QCOMPARE(x->value(), ex); // Eigenschaften zeigen den Wert
+            place(image, 100, 100, 400, 200);
+            QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, 100, 3000);
+        }
+        // Ecke ohne Shift: Verhältnis 2:1 bleibt; mit Shift frei
+        drag(canvas, at(500, 300), at(700, 500));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width != 400, true, 3000);
+        {
+            const Source s = sourceAtRow(2);
+            QCOMPARE(s.x, 100);
+            QCOMPARE(s.y, 100);
+            QVERIFY2(std::abs(s.width - 2 * s.height) <= 1, qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
+            QVERIFY(std::abs(s.height - 400) <= 3);
+        }
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
+        drag(canvas, at(500, 300), at(700, 500), Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width != 400, true, 3000);
+        {
+            const Source s = sourceAtRow(2);
+            QVERIFY(std::abs(s.width - 600) <= 3);
+            QVERIFY(std::abs(s.height - 400) <= 3);
+        }
+        // Kante: nur die Breite
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
+        drag(canvas, at(500, 200), at(600, 260));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width != 400, true, 3000);
+        QVERIFY(std::abs(sourceAtRow(2).width - 500) <= 3);
+        QCOMPARE(sourceAtRow(2).height, 200);
+        QCOMPARE(sourceAtRow(2).y, 100);
+        // Drehen am Drehgriff mit Shift: Zeiger rechts der Mitte → 90°
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
+        {
+            const QPointF handle = canvas->toWidget(QPointF(300, 100)) - QPointF(0, 30);
+            drag(canvas, handle, at(600, 190), Qt::ShiftModifier);
+            QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).rotation, 900, 3000);
+            QCOMPARE(sourceAtRow(2).x, 100);
+            QCOMPARE(child<QDoubleSpinBox>("propertyRotation")->value(), 90.0);
+        }
+        // Ohne Shift: Zehntelgrad, nicht eingerastet
+        {
+            const QPointF handle = canvas->toWidget(QPointF(400, 200)) + QPointF(30, 0); // gedreht: rechts
+            drag(canvas, handle, at(450, 250));
+            QTRY_VERIFY_WITH_TIMEOUT(sourceAtRow(2).rotation != 900, 3000);
+            const int r = sourceAtRow(2).rotation;
+            QVERIFY2(r > 900 && r < 1800 && r % 150 != 0, qPrintable(QString::number(r)));
+        }
+        // Pfeiltasten: 1 Pixel, mit Shift 10
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).rotation, 0, 3000);
+        canvas->setFocus();
+        QTest::keyClick(canvas, Qt::Key_Right);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, 101, 3000);
+        QTest::keyClick(canvas, Qt::Key_Down, Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).y, 110, 3000);
+        QTest::keyClick(canvas, Qt::Key_Left, Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, 91, 3000);
+        QCOMPARE(x->value(), 91);
+
+        // Zeigerformen über Griffen
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, 100, 3000);
+        const auto hover = [&](QPointF p) {
+            sendMouse(canvas, QEvent::MouseMove, p, Qt::NoButton, Qt::NoButton, {});
+            return canvas->cursor().shape();
+        };
+        QCOMPARE(hover(at(300, 200)), Qt::SizeAllCursor);
+        QCOMPARE(hover(at(500, 300)), Qt::SizeFDiagCursor);
+        QCOMPARE(hover(at(500, 100)), Qt::SizeBDiagCursor);
+        QCOMPARE(hover(at(500, 200)), Qt::SizeHorCursor);
+        QCOMPARE(hover(at(300, 300)), Qt::SizeVerCursor);
+        QCOMPARE(hover(canvas->toWidget(QPointF(300, 100)) - QPointF(0, 30)), Qt::OpenHandCursor);
+        QCOMPARE(hover(at(900, 900)), Qt::ArrowCursor);
+    }
+
+    // Während des Ziehens zeigen Leinwand und Eigenschaften die neue Lage, bevor losgelassen ist.
+    void canvasPreviewWhileDragging()
+    {
+        if (!DSS_APP_EDITING || !DSS_APP_CANVAS_EDIT)
+            QSKIP("Schalter DSS_APP_EDITING oder DSS_APP_CANVAS_EDIT ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(2);
+        CanvasWidget *canvas = m_window->canvas();
+        auto *x = child<QSpinBox>("propertyX");
+        const QPointF a = canvas->toWidget(QPointF(300, 200));
+        const QPointF b = canvas->toWidget(QPointF(500, 200));
+        sendMouse(canvas, QEvent::MouseButtonPress, a, Qt::LeftButton, Qt::LeftButton, {});
+        sendMouse(canvas, QEvent::MouseMove, b, Qt::NoButton, Qt::LeftButton, {});
+        QVERIFY(std::abs(x->value() - 300) <= 2);
+        sendMouse(canvas, QEvent::MouseButtonRelease, b, Qt::LeftButton, Qt::NoButton, {});
+        QTRY_VERIFY_WITH_TIMEOUT(std::abs(sourceAtRow(2).x - 300) <= 2, 3000);
+        QCOMPARE(x->value(), sourceAtRow(2).x);
     }
 };
 

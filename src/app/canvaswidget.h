@@ -40,6 +40,9 @@ public:
     // P09 Teil C: gewählte Quelle (Rahmen und Griffe) und ob gezogen werden darf.
     void setSelectedSource(const QUuid &id);
     void setEditable(bool editable);
+    // Punkt des Overlays in Pixeln dieses Widgets und zurück (auch für Prüfungen).
+    QPointF toWidget(QPointF overlayPoint) const;
+    QPointF overlayPoint(QPointF widgetPoint) const;
 
 signals:
     // Nach jedem Zeichnen (Leistungsmessung, P09).
@@ -62,7 +65,6 @@ private:
     // Fläche ohne Lineale und eingepasste Leinwand für die aktuelle Grösse des Widgets.
     QRect area() const;
     dss::CanvasFit fit() const;
-    QPointF overlayPoint(QPointF widgetPoint) const;
     const dss::Source *selectedSource() const;
     void updateDrag(bool shift);
     void updateCursor();

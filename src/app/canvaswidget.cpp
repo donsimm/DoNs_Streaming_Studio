@@ -61,6 +61,11 @@ QPointF CanvasWidget::overlayPoint(QPointF widgetPoint) const
     return dss::areaToOverlay(fit(), widgetPoint - QPointF(area().topLeft()));
 }
 
+QPointF CanvasWidget::toWidget(QPointF overlayPoint) const
+{
+    return QPointF(area().topLeft()) + dss::overlayToArea(fit(), overlayPoint);
+}
+
 const dss::Source *CanvasWidget::selectedSource() const
 {
     if (!m_overlay || m_selected.isNull())

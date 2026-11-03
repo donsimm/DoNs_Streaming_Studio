@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <numbers>
 
 namespace dss {
@@ -101,6 +102,29 @@ double alignedLineX(TextAlign align, double boxWidth, double lineWidth)
         break;
     }
     return 0.0;
+}
+
+QByteArray sfntTable(const QByteArray &fontFile, const char *tag)
+{
+    // Kopf: sfntVersion u32, numTables u16, searchRange u16, entrySelector u16, rangeShift u16;
+    // danach je Tabelle: tableTag Tag(4), checksum u32, offset u32, length u32 (16 Bytes).
+    if (fontFile.size() < 12)
+        return {};
+    const auto *d = reinterpret_cast<const uchar *>(fontFile.constData());
+    const quint16 count = qFromBigEndian<quint16>(d + 4);
+    if (12 + static_cast<qsizetype>(count) * 16 > fontFile.size())
+        return {};
+    for (int i = 0; i < count; ++i) {
+        const uchar *record = d + 12 + i * 16;
+        if (std::memcmp(record, tag, 4) != 0)
+            continue;
+        const quint32 offset = qFromBigEndian<quint32>(record + 8);
+        const quint32 length = qFromBigEndian<quint32>(record + 12);
+        if (static_cast<qsizetype>(offset) + length > fontFile.size())
+            return {};
+        return fontFile.mid(offset, length);
+    }
+    return {};
 }
 
 QList<FontAxis> parseFvarAxes(const QByteArray &fvar)

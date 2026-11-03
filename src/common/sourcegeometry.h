@@ -63,6 +63,9 @@ struct FontAxis
     bool operator==(const FontAxis &) const = default;
 };
 
+// Tabelle tag (zum Beispiel "fvar") aus einer OpenType-/TrueType-Datei, leer ohne sie.
+// Aufbau des Tabellenverzeichnisses: https://learn.microsoft.com/en-us/typography/opentype/spec/otff
+QByteArray sfntTable(const QByteArray &fontFile, const char *tag);
 // Achsen aus der Tabelle 'fvar' einer OpenType-Datei (leer, wenn die Tabelle fehlt oder
 // ungültig ist). Aufbau: https://learn.microsoft.com/en-us/typography/opentype/spec/fvar
 QList<FontAxis> parseFvarAxes(const QByteArray &fvar);

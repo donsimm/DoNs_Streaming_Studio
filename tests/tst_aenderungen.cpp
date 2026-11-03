@@ -297,12 +297,14 @@ private slots:
         c.rotation = 3599;
         c.visible = false;
         c.loop = true;
+        c.holdAtEnd = true; // P09
         c.content = QStringLiteral("a\nb");
         c.fontSize = 72;
         c.color = QStringLiteral("#11223344");
         c.align = TextAlign::Center;
         const QJsonObject o = sourceChangesToJson(c);
         QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("loop")).toBool(), true);
+        QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("hold_at_end")).toBool(), true);
         QCOMPARE(o.value(QStringLiteral("text")).toObject().value(QStringLiteral("font_size")).toInt(), 72);
         QCOMPARE(o.value(QStringLiteral("text")).toObject().value(QStringLiteral("align")).toString(),
                  QStringLiteral("center"));
@@ -340,6 +342,16 @@ private slots:
         QVERIFY(!parseChangeResult(o, &back, &error));
         o.remove(QStringLiteral("ok"));
         QVERIFY(!parseChangeResult(o, &back, &error));
+
+        // P09: Warnung bei gelungener Änderung (Grösse der Datei nicht lesbar)
+        ChangeResult warned{.requestId = 9, .ok = true, .id = QUuid::createUuid(), .code = {},
+                            .message = {}, .warning = QStringLiteral("Grösse nicht lesbar")};
+        o = roundTrip(changeResultMessage(warned));
+        QCOMPARE(o.value(QStringLiteral("warning")).toString(), QStringLiteral("Grösse nicht lesbar"));
+        QVERIFY2(parseChangeResult(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, warned);
+        o = roundTrip(changeResultMessage(ok));
+        QVERIFY(o.value(QStringLiteral("warning")).isNull());
     }
 
     void fontListMessages()
