@@ -157,4 +157,5 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 
 - Verbindungsknöpfe waagrecht in der Mitte des Kopfbereichs, mittig zwischen den Reitern «Overlays / Chat-Bot» und der Leistungsanzeige.
 - Logos in den Verbindungsknöpfen etwa zwei Drittel der heutigen Grösse, ohne eigenen Rand ums Logo; der Rahmen des Knopfes (Farbe des Zustands) bleibt die einzige Umrandung.
+- Dock «Eigenschaften», Bereich «Transformation»: drei kleine Symbolknöpfe in der Titelzeile, am rechten Rand des Docks (nicht direkt neben dem Titel): Kopieren, Einfügen, Zurücksetzen. Hinweis beim Darüberfahren; «Einfügen» ausgegraut, solange nichts kopiert ist; Wirkung wie die Befehle aus E-25.
 - Umsetzung: mit dem nächsten Baustein (P10), Teil «Vorab».
