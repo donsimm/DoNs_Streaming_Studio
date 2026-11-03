@@ -174,3 +174,11 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 63: so lassen, kein eigener Dialog «Transformation bearbeiten»; die Werte stehen im Dock «Eigenschaften».
 - Punkt 64: so lassen, Rundung auf ganze Pixel nach Regel 11.
 - Punkt 65: Der Editor beachtet die Drehung aus den Metadaten von Videos (zum Beispiel Display-Matrix in MP4), wie bei der EXIF-Ausrichtung von Bildern (K-07). Umsetzung im Vorab-Teil von P10; P10 prüft mit einem Testvideo, ob die Browserquelle in OBS sie ebenfalls beachtet.
+
+## Entschieden nach P10a (2026-11-03)
+
+- Punkt 67 (Übernehmen grosser Dateien in der Hauptschleife): Das Übernehmen (Kopie, SHA-256) kommt in einen eigenen Thread des Kerns, damit der Kern während des Übernehmens weiter Nachrichten beantwortet und die Browserquelle versorgt. Umsetzung in P10, zusammen mit dem Webserver.
+
+## Wünsche nach P10a (2026-11-03)
+
+- Neues Dock für die Mediendateien (`media/` im Datenordner): zeigt die Dateien mit Dateityp und Grösse; die Dateien lassen sich in Ordner einteilen. Umfang, Priorität und Baustein noch offen (werden einzeln mit dem Nutzer besprochen). Zu beachten: Die Dateien in `media/` heissen nach dem SHA-256 ihres Inhalts (`docs/06-overlay-format.md`), der ursprüngliche Dateiname wird bisher nicht gespeichert.
