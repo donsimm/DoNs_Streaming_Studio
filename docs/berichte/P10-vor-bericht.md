@@ -15,7 +15,7 @@ Auftrag: `prompts/P10-vor-vorarbeiten-browserquelle.md`. Teil A: Kern (Übernehm
 | `tst_medien` und `tst_fensterbearbeiten` je 50 Mal | `tst_medien` 50 von 50. `tst_fensterbearbeiten` zuerst 48 von 50; beide Fehler im neuen Test für 1 GiB (Fehler im Test, siehe «Punkt 72»), nach der Korrektur `5728e96` (2026-11-03 22:22 bis 22:39): **50 von 50** |
 | Startprüfung `--runs 20` | **20 von 20** in allen 4 Fällen (`core-sigterm`, `core-sigint`, `app-sigterm`, `app-kern-sigterm`), Exit-Code 0, Fenster sichtbar, keine Reste, keine unerwarteten Zeilen, neue Zeile «Einstellungen: » erwartet und vorhanden |
 | Dokumente | nachgeführt: `docs/01-festlegungen.md` (Tabelle der Orte: `kern.ini`, Port, Bilder), `docs/04-offene-punkte.md` (67 bis 70 und 72 erledigt, neu 73 bis 77), `docs/07-bauplan.md`, `docs/08-kern-schnittstelle.md` (Version 5, «Übernehmen von Dateien», «Einstellungen», Watchdog), `README.md` (Ordner `src/render/`, Schalter, `kern.ini`, Optionen) |
-| Handtest | offen, 3 Prüfungen und Aufräumen (Abschnitt «Handtest») |
+| Handtest | **bestanden** (2026-11-03, 22:59 bis 23:11), Prüfungen 1 bis 3 und Aufräumen; Ergebnis unter «Handtest» |
 
 ## Teil A – Kern
 
@@ -234,6 +234,15 @@ cd ~/DoNs_Streaming_Studio && systemctl --user stop dss-core-entwicklung.service
 ```
 
 Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` und in `~/.config/`) und gegebenenfalls `dons-streaming-studio-sicherungen`. Die Bilder aus Prüfung 2 liegen in `~/Bilder/DoNs Streaming Studio/`; nicht mehr gebraucht: `rm -r ~/Bilder/DoNs\ Streaming\ Studio`.
+
+### Ergebnis des Handtests (2026-11-03)
+
+| Prüfung | Ergebnis |
+|---|---|
+| 1 – Dialog «Einstellungen» | bestanden (23:05). Im ersten Versuch gab der Nutzer in Schritt 4 `192.168.1.1` ein (die Adresse des Routers): richtig geschrieben, deshalb vom Kern angenommen, Dialog schloss sich. Das entspricht dem Auftrag (geprüft wird nur die Schreibweise), ist aber eine Falle: neuer Punkt 78, Umsetzung in P10 (nur Adressen dieses PCs annehmen). Wiederholt mit `192.168.1`: abgewiesen mit Meldung, Dialog bleibt offen. `dss-cli einstellung-port 8081` und `kern.ini` (`port=8081`, `adresse-im-heimnetz=192.168.1.9`) wie erwartet |
+| 2 – Bild der Leinwand | bestanden (23:08) |
+| 3 – Grosse Datei, Fenster bedienen | bestanden (23:10) |
+| 4 – Aufräumen | bestanden (23:11). Es bleiben `dons-streaming-studio` (in `~/.local/share/` und `~/.config/`) und `dons-streaming-studio-sicherungen` |
 
 ## Commits
 
