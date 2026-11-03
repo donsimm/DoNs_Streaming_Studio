@@ -444,6 +444,7 @@ void MainWindow::refreshOverlay()
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
     m_canvas->setOverlay(overlay);
+    m_canvas->setMediaSizes(m_client ? m_client->mediaSizes() : dss::MediaSizes());
     m_canvas->setSelectedSource(m_selectedSource);
 #if DSS_APP_RENDERER
     m_renderer->setOverlay(overlay ? &*overlay : nullptr);

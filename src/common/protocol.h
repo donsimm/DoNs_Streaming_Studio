@@ -24,7 +24,8 @@ namespace dss {
 // Version der Schnittstelle; steht in der Begrüssung beider Seiten. 2 seit P08: Änderungen vom
 // Fenster an den Kern, overlay_list mit Ordnern in der Reihenfolge der Liste. 3 seit P09: Overlays
 // im Format 2 der Overlay-Datei (video.hold_at_end), set_overlay_size
-// 4 seit P09b: Overlays im Format 3 (flip_horizontal, flip_vertical)
+// 4 seit P09b: Overlays im Format 3 (flip_horizontal, flip_vertical); overlay und
+//   overlay_changed mit media_sizes (Originalgrösse der Dateien)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
 inline constexpr int kProtocolVersion = 4;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
@@ -157,8 +158,11 @@ bool parseOverlayList(const QJsonObject &message, OverlayListData *data, QString
 
 // type: msg::kOverlay (Antwort auf get_overlay) oder msg::kOverlayChanged. Das Overlay steht im
 // Feld «overlay» im Format der Overlay-Datei (docs/06-overlay-format.md), ohne Token.
-QJsonObject overlayMessage(const char *type, const Overlay &overlay);
-bool parseOverlayMessage(const QJsonObject &message, Overlay *overlay, QString *error);
+// Seit Version 4 (P09b) steht im Feld «media_sizes» die Originalgrösse der Bild- und
+// Videodateien des Overlays: {"media/…": {"width": …, "height": …}}; Pflicht, darf leer sein.
+QJsonObject overlayMessage(const char *type, const Overlay &overlay, const MediaSizes &sizes);
+bool parseOverlayMessage(const QJsonObject &message, Overlay *overlay, MediaSizes *sizes,
+                         QString *error);
 
 // overlay_removed und get_overlay: nur die Kennung im Feld «id».
 QJsonObject overlayIdMessage(const char *type, const QUuid &id);

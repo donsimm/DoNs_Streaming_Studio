@@ -138,7 +138,7 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
         const auto old = std::find_if(before.begin(), before.end(),
                                       [&o](const dss::Overlay &b) { return b.id == o.id; });
         if (old == before.end() || !(*old == o)) {
-            broadcast(dss::overlayMessage(dss::msg::kOverlayChanged, o));
+            broadcast(dss::overlayMessage(dss::msg::kOverlayChanged, o, m_store->mediaSizes(o)));
             ++changed;
         }
     }
@@ -294,7 +294,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
                       type);
             return;
         }
-        send(socket, dss::overlayMessage(dss::msg::kOverlay, *o));
+        send(socket, dss::overlayMessage(dss::msg::kOverlay, *o, m_store->mediaSizes(*o)));
     } else if (type == QLatin1String(dss::msg::kQuitRequest)) {
         int otherWindows = 0;
         for (auto it = m_clients.cbegin(); it != m_clients.cend(); ++it) {

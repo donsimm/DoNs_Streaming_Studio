@@ -567,6 +567,40 @@ QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QSt
     return source.id;
 }
 
+std::optional<QSize> OverlayStore::mediaSize(const QString &reference, QString *reason) const
+{
+    auto it = m_mediaSizeCache.constFind(reference);
+    if (it == m_mediaSizeCache.constEnd()) {
+        CachedSize cached;
+        int width = 0;
+        int height = 0;
+        if (m_mediaSizeReader(mediaFilePath(reference), &width, &height, &cached.reason)
+            && width >= kSourceMinSize && height >= kSourceMinSize) {
+            cached.size = QSize(width, height);
+        } else if (cached.reason.isEmpty()) {
+            cached.reason = QStringLiteral("Grösse %1x%2").arg(width).arg(height);
+        }
+        it = m_mediaSizeCache.insert(reference, cached);
+    }
+    if (reason)
+        *reason = it->reason;
+    return it->size;
+}
+
+MediaSizes OverlayStore::mediaSizes(const Overlay &overlay) const
+{
+    MediaSizes sizes;
+    if (!m_mediaSizeReader)
+        return sizes;
+    for (const Source &source : overlay.sources) {
+        if (source.kind == SourceKind::Text || sizes.contains(source.file))
+            continue;
+        if (const std::optional<QSize> size = mediaSize(source.file, nullptr))
+            sizes.insert(source.file, *size);
+    }
+    return sizes;
+}
+
 QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
                                    bool loop, bool holdAtEnd, QString *error, QString *warning)
 {
@@ -587,15 +621,12 @@ QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePa
     // Grösse der Datei (Entscheid 6), gelesen aus der Kopie im Datenordner.
     std::optional<std::pair<int, int>> size;
     if (m_mediaSizeReader) {
-        int width = 0;
-        int height = 0;
+        // Frisch kopiert: neu lesen, falls die Datei vorher fehlte oder unlesbar war.
+        m_mediaSizeCache.remove(reference);
         QString reason;
-        if (m_mediaSizeReader(mediaFilePath(reference), &width, &height, &reason)
-            && width >= kSourceMinSize && height >= kSourceMinSize) {
-            size = std::pair(width, height);
+        if (const std::optional<QSize> read = mediaSize(reference, &reason)) {
+            size = std::pair(read->width(), read->height());
         } else {
-            if (reason.isEmpty())
-                reason = QStringLiteral("Grösse %1x%2").arg(width).arg(height);
             const Overlay *target = overlay(overlayId);
             const QString text = QStringLiteral("Grösse von «%1» nicht lesbar (%2), die Quelle "
                                                 "bekommt die Grösse des Overlays %3x%4.")

@@ -70,7 +70,7 @@ private slots:
     void lineHasNoInnerNewline()
     {
         // Zeilenwechsel im Text eines Overlays wird im JSON als \n geschrieben, nie als Byte 0x0A.
-        const QByteArray line = encodeMessage(overlayMessage(msg::kOverlay, sampleOverlay()));
+        const QByteArray line = encodeMessage(overlayMessage(msg::kOverlay, sampleOverlay(), {}));
         QCOMPARE(line.count('\n'), 1);
         QVERIFY(line.endsWith('\n'));
         QVERIFY(line.contains("Willkommen\\nZweite Zeile"));
@@ -240,20 +240,68 @@ private slots:
         QFETCH(QString, type);
         const Overlay overlay = sampleOverlay();
         const QByteArray typeLatin = type.toLatin1();
-        const QJsonObject o = roundTrip(overlayMessage(typeLatin.constData(), overlay));
+        const MediaSizes sizes{{QStringLiteral("media/a.png"), QSize(640, 480)},
+                               {QStringLiteral("media/b.webm"), QSize(1920, 1080)}};
+        const QJsonObject o = roundTrip(overlayMessage(typeLatin.constData(), overlay, sizes));
         QCOMPARE(messageType(o), type);
         // Im Format der Overlay-Datei, also mit format_version.
         QCOMPARE(o.value(QStringLiteral("overlay")).toObject(), overlayToJson(overlay));
+        QCOMPARE(o.value(QStringLiteral("media_sizes")).toObject().value(QStringLiteral("media/a.png")),
+                 QJsonValue(QJsonObject{{QStringLiteral("width"), 640}, {QStringLiteral("height"), 480}}));
         Overlay back;
+        MediaSizes backSizes;
         QString error;
-        QVERIFY2(parseOverlayMessage(o, &back, &error), qPrintable(error));
+        QVERIFY2(parseOverlayMessage(o, &back, &backSizes, &error), qPrintable(error));
         QCOMPARE(back, overlay);
+        QCOMPARE(backSizes, sizes);
+        // Leer ist erlaubt (Kern ohne MediaSizeReader, nur Text).
+        QVERIFY2(parseOverlayMessage(roundTrip(overlayMessage(typeLatin.constData(), overlay, {})),
+                                     &back, &backSizes, &error),
+                 qPrintable(error));
+        QVERIFY(backSizes.isEmpty());
+    }
+
+    void overlayMediaSizesInvalid_data()
+    {
+        QTest::addColumn<QJsonValue>("value");
+        QTest::newRow("fehlt") << QJsonValue(QJsonValue::Undefined);
+        QTest::newRow("Liste") << QJsonValue(QJsonArray());
+        const auto entry = [](const QJsonValue &width, const QJsonValue &height) {
+            return QJsonValue(QJsonObject{
+                {QStringLiteral("media/a.png"),
+                 QJsonObject{{QStringLiteral("width"), width}, {QStringLiteral("height"), height}}}});
+        };
+        QTest::newRow("Breite 0") << entry(0, 10);
+        QTest::newRow("Höhe negativ") << entry(10, -1);
+        QTest::newRow("Bruchteil") << entry(10.5, 10);
+        QTest::newRow("Text") << entry(QStringLiteral("10"), 10);
+        QTest::newRow("kein Objekt")
+            << QJsonValue(QJsonObject{{QStringLiteral("media/a.png"), 10}});
+        QTest::newRow("Feld zu viel") << QJsonValue(QJsonObject{
+            {QStringLiteral("media/a.png"),
+             QJsonObject{{QStringLiteral("width"), 1}, {QStringLiteral("height"), 1},
+                         {QStringLiteral("depth"), 1}}}});
+    }
+
+    void overlayMediaSizesInvalid()
+    {
+        QFETCH(QJsonValue, value);
+        QJsonObject o = overlayMessage(msg::kOverlay, sampleOverlay(), {});
+        if (value.isUndefined())
+            o.remove(QStringLiteral("media_sizes"));
+        else
+            o.insert(QStringLiteral("media_sizes"), value);
+        Overlay back;
+        MediaSizes sizes;
+        QString error;
+        QVERIFY(!parseOverlayMessage(o, &back, &sizes, &error));
+        QVERIFY(error.contains(QStringLiteral("media_sizes")));
     }
 
     void overlayHasNoToken()
     {
         // Regel 12: kein Feld für einen Token, an keiner Stelle des Overlays.
-        const QByteArray line = encodeMessage(overlayMessage(msg::kOverlay, sampleOverlay()));
+        const QByteArray line = encodeMessage(overlayMessage(msg::kOverlay, sampleOverlay(), {}));
         QVERIFY(!line.contains("token"));
     }
 
@@ -261,12 +309,13 @@ private slots:
     {
         Overlay back;
         QString error;
-        QJsonObject o = overlayMessage(msg::kOverlay, sampleOverlay());
+        MediaSizes sizes;
+        QJsonObject o = overlayMessage(msg::kOverlay, sampleOverlay(), {});
         QJsonObject inner = o.value(QStringLiteral("overlay")).toObject();
         inner.insert(QStringLiteral("token"), QStringLiteral("x")); // unbekanntes Feld der Datei
         o.insert(QStringLiteral("overlay"), inner);
-        QVERIFY(!parseOverlayMessage(o, &back, &error));
-        QVERIFY(!parseOverlayMessage(simpleMessage(msg::kOverlay), &back, &error));
+        QVERIFY(!parseOverlayMessage(o, &back, &sizes, &error));
+        QVERIFY(!parseOverlayMessage(simpleMessage(msg::kOverlay), &back, &sizes, &error));
     }
 
     void overlayIdMessages_data()

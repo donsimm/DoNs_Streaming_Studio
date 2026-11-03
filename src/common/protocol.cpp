@@ -344,14 +344,21 @@ bool parseOverlayList(const QJsonObject &message, OverlayListData *data, QString
     return true;
 }
 
-QJsonObject overlayMessage(const char *type, const Overlay &overlay)
+QJsonObject overlayMessage(const char *type, const Overlay &overlay, const MediaSizes &sizes)
 {
     QJsonObject o = typed(type);
     o.insert(QStringLiteral("overlay"), overlayToJson(overlay));
+    QJsonObject sizeObject;
+    for (auto it = sizes.constBegin(); it != sizes.constEnd(); ++it) {
+        sizeObject.insert(it.key(), QJsonObject{{QStringLiteral("width"), it->width()},
+                                                {QStringLiteral("height"), it->height()}});
+    }
+    o.insert(QStringLiteral("media_sizes"), sizeObject);
     return o;
 }
 
-bool parseOverlayMessage(const QJsonObject &message, Overlay *overlay, QString *error)
+bool parseOverlayMessage(const QJsonObject &message, Overlay *overlay, MediaSizes *sizes,
+                         QString *error)
 {
     const QJsonValue v = message.value(QStringLiteral("overlay"));
     if (!v.isObject()) {
@@ -364,6 +371,31 @@ bool parseOverlayMessage(const QJsonObject &message, Overlay *overlay, QString *
         *error = QStringLiteral("overlay: ") + overlayError;
         return false;
     }
+    const QJsonValue sizeValue = message.value(QStringLiteral("media_sizes"));
+    if (!sizeValue.isObject()) {
+        *error = QStringLiteral("Feld media_sizes fehlt oder ist kein Objekt");
+        return false;
+    }
+    MediaSizes result;
+    const QJsonObject sizeObject = sizeValue.toObject();
+    for (auto it = sizeObject.constBegin(); it != sizeObject.constEnd(); ++it) {
+        const QJsonObject entry = it.value().toObject();
+        const QJsonValue width = entry.value(QStringLiteral("width"));
+        const QJsonValue height = entry.value(QStringLiteral("height"));
+        const auto isSize = [](const QJsonValue &value) {
+            return value.isDouble() && value.toDouble() == std::floor(value.toDouble())
+                   && value.toDouble() >= kSourceMinSize && value.toDouble() <= 1e9;
+        };
+        if (!it.value().isObject() || entry.size() != 2 || !isSize(width) || !isSize(height)) {
+            *error = QStringLiteral("media_sizes: Eintrag «%1» ist keine Grösse {width, height} "
+                                    "in ganzen Pixeln ab %2")
+                         .arg(it.key())
+                         .arg(kSourceMinSize);
+            return false;
+        }
+        result.insert(it.key(), QSize(width.toInt(), height.toInt()));
+    }
+    *sizes = result;
     return true;
 }
 

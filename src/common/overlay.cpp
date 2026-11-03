@@ -343,4 +343,14 @@ QString rotationDisplay(int tenthDegrees)
     return QStringLiteral("%1.%2 °").arg(tenthDegrees / 10).arg(tenthDegrees % 10);
 }
 
+std::optional<QSize> originalSize(const Source &source, const MediaSizes &sizes)
+{
+    if (source.kind == SourceKind::Text)
+        return std::nullopt;
+    const auto it = sizes.constFind(source.file);
+    if (it == sizes.constEnd() || it->width() < kSourceMinSize || it->height() < kSourceMinSize)
+        return std::nullopt;
+    return *it;
+}
+
 } // namespace dss

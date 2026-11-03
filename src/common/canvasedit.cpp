@@ -172,7 +172,7 @@ SourceGeometry moveGeometry(const Source &start, QPointF startPointer, QPointF p
 }
 
 SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF pointer,
-                              bool freeAspect)
+                              bool freeAspect, std::optional<QSize> originalSize)
 {
     SourceGeometry g = geometryOf(start);
     const Sides s = sidesOf(handle);
@@ -198,7 +198,9 @@ SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF 
         // Wie ClampAspect in OBS: Ist das Verhältnis (mit Vorzeichen) kleiner, folgt die Breite
         // der Höhe, sonst die Höhe der Breite; jede Seite behält ihr Vorzeichen. Mit verschiedenen
         // Vorzeichen ist das Verhältnis negativ, dann folgt immer die Breite (wie OBS).
-        const double aspect = w / h;
+        // OBSBasicPreview.cpp, StretchItem: baseSize = Grösse der Quelle, nicht des Kastens.
+        const double aspect = originalSize ? double(originalSize->width()) / originalSize->height()
+                                           : w / h;
         if (sizeX / sizeY < aspect)
             sizeX = std::copysign(std::abs(sizeY) * aspect, sizeX);
         else

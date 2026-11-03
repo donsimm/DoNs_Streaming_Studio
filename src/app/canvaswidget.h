@@ -37,6 +37,8 @@ public:
     // P09: Zeichner der Quellen (nullptr = keine Quellen zeichnen) und das gezeigte Overlay.
     void setRenderer(SourceRenderer *renderer);
     void setOverlay(const std::optional<dss::Overlay> &overlay);
+    // P09b: Originalgrösse der Dateien (Seitenverhältnis an den Ecken).
+    void setMediaSizes(const dss::MediaSizes &sizes) { m_mediaSizes = sizes; }
     // P09 Teil C: gewählte Quelle (Rahmen und Griffe) und ob gezogen werden darf.
     void setSelectedSource(const QUuid &id);
     void setEditable(bool editable);
@@ -74,6 +76,7 @@ private:
     QSize m_canvasSize{1920, 1080};
     SourceRenderer *m_renderer = nullptr;
     std::optional<dss::Overlay> m_overlay;
+    dss::MediaSizes m_mediaSizes;
     QUuid m_selected;
     bool m_editable = false;
     // Ziehen (Teil C): Griff, Quelle und Zeiger beim Beginn, letzte gemeldete Lage.

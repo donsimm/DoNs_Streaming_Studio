@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
+#include <QSize>
 #include <QString>
 #include <QUuid>
 
@@ -145,5 +147,12 @@ QString updateSource(Overlay *overlay, const QUuid &sourceId, const SourceChange
 
 // Drehung als Text mit einer Nachkommastelle, zum Beispiel 125 → "12.5 °"
 QString rotationDisplay(int tenthDegrees);
+
+// Originalgrösse der Dateien (P09b, Entscheid 3): Verweis "media/…" → Grösse in Pixeln, so wie
+// die Datei angezeigt wird (Bild mit EXIF-Ausrichtung). Liest der Kern und schickt sie mit dem
+// Overlay mit (docs/08-kern-schnittstelle.md); nicht Teil der Overlay-Datei.
+using MediaSizes = QHash<QString, QSize>;
+// Originalgrösse einer Quelle: Bild und Video aus sizes, Text und unbekannte Dateien nullopt.
+std::optional<QSize> originalSize(const Source &source, const MediaSizes &sizes);
 
 } // namespace dss

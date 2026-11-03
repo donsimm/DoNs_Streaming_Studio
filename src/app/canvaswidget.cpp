@@ -185,7 +185,8 @@ void CanvasWidget::updateDrag(bool shift)
         g = dss::rotateGeometry(d.start, d.pointer, shift);
         break;
     default:
-        g = dss::resizeGeometry(d.start, d.handle, d.pointer, shift);
+        g = dss::resizeGeometry(d.start, d.handle, d.pointer, shift,
+                                dss::originalSize(d.start, m_mediaSizes));
         break;
     }
     if (g == d.last)

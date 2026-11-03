@@ -652,16 +652,41 @@ private slots:
             place(image, 100, 100, 400, 200);
             QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).x, 100, 3000);
         }
-        // Ecke ohne Shift: Verhältnis 2:1 bleibt; mit Shift frei
+        // Ecke ohne Shift: Verhältnis der Datei bleibt (P09b, Entscheid 3: bild1.png ist
+        // 256x256, der Kasten 400x200), mit Shift frei. Der Kern schickt die Originalgrösse mit;
+        // ohne DSS_MEDIA_SIZE kennt er sie nicht, dann gilt das Verhältnis des Kastens.
+#if DSS_MEDIA_SIZE
+        QTRY_COMPARE_WITH_TIMEOUT(m_check->mediaSizes().value(image.file), QSize(256, 256), 3000);
+        const int aspectWidth = 1; // Breite : Höhe
+        const int aspectHeight = 1;
+        const int expectedWidth = 600;
+#else
+        QVERIFY(m_check->mediaSizes().isEmpty());
+        const int aspectWidth = 2;
+        const int aspectHeight = 1;
+        const int expectedWidth = 800;
+#endif
         drag(canvas, at(500, 300), at(700, 500));
         QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width != 400, true, 3000);
         {
             const Source s = sourceAtRow(2);
             QCOMPARE(s.x, 100);
             QCOMPARE(s.y, 100);
-            QVERIFY2(std::abs(s.width - 2 * s.height) <= 1, qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
-            QVERIFY(std::abs(s.height - 400) <= 3);
+            QVERIFY2(std::abs(s.width * aspectHeight - s.height * aspectWidth) <= 1,
+                     qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
+            QVERIFY(std::abs(s.width - expectedWidth) <= 3);
         }
+        // Text hat keine Originalgrösse: Verhältnis des Kastens beim Beginn (300x100 = 3:1)
+        selectSourceRow(0);
+        drag(canvas, at(1800, 200), at(1860, 260));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).width != 300, true, 3000);
+        {
+            const Source s = sourceAtRow(0);
+            QVERIFY2(std::abs(s.width - 3 * s.height) <= 1 && std::abs(s.width - 480) <= 3,
+                     qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
+        }
+        place(text, 1500, 100, 300, 100);
+        selectSourceRow(2);
         place(image, 100, 100, 400, 200);
         QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
         drag(canvas, at(500, 300), at(700, 500), Qt::ShiftModifier);

@@ -170,6 +170,29 @@ private slots:
         QCOMPARE(findSource(o, image)->x, 0);
         QCOMPARE(findSource(o, image)->rotation, 0);
 
+        // P09b: Originalgrösse für die Nachrichten an die Fenster (media_sizes). Jede Datei wird
+        // nur einmal gelesen, auch eine unlesbare; unlesbare Dateien fehlen.
+        {
+            OverlayStore again(data.path());
+            QVERIFY(again.load(&error));
+            int calls = 0;
+            again.setMediaSizeReader([&calls](const QString &path, int *w, int *h, QString *e) {
+                ++calls;
+                return readMediaSize(path, w, h, e);
+            });
+            const MediaSizes sizes = again.mediaSizes(*again.overlay(id));
+            QCOMPARE(calls, 4);
+            QCOMPARE(sizes.size(), 3);
+            QCOMPARE(sizes.value(findSource(o, image)->file), QSize(256, 256));
+            QCOMPARE(sizes.value(findSource(o, video)->file), QSize(512, 512));
+            QCOMPARE(sizes.value(findSource(o, mp4)->file), QSize(960, 540));
+            QVERIFY(!sizes.contains(findSource(o, bad)->file));
+            QCOMPARE(again.mediaSizes(*again.overlay(id)), sizes);
+            QCOMPARE(calls, 4);
+            again.setMediaSizeReader({});
+            QVERIFY(again.mediaSizes(*again.overlay(id)).isEmpty());
+        }
+
         // Ohne Leser (Schalter DSS_MEDIA_SIZE aus): Grösse des Overlays wie in P08
         store.setMediaSizeReader({});
         warning.clear();

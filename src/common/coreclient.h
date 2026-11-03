@@ -65,6 +65,8 @@ public:
     QString fontError() const { return m_fontError; }
     // Ganzes Overlay, wenn der Kern es geschickt hat (Antwort auf requestOverlay oder Änderung).
     std::optional<Overlay> overlay(const QUuid &id) const;
+    // Originalgrösse der Dateien aus den Overlay-Nachrichten (P09b, media_sizes).
+    const MediaSizes &mediaSizes() const { return m_mediaSizes; }
     std::optional<SystemStats> lastStats() const { return m_lastStats; }
     ConnectionStates connectionStates() const { return m_connectionStates; }
 
@@ -132,6 +134,7 @@ private:
     QString m_statusText;
     OverlayListData m_list;
     QHash<QUuid, Overlay> m_overlayCache;
+    MediaSizes m_mediaSizes;
     QList<FontFace> m_fonts;
     QString m_fontError;
     qint64 m_nextRequestId = 1;

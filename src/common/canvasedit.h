@@ -3,6 +3,7 @@
 #include "overlay.h"
 
 #include <QPointF>
+#include <QSize>
 #include <QUuid>
 
 #include <optional>
@@ -21,8 +22,10 @@
 //   - Drehgriff: HANDLE_RADIUS * HANDLE_SEL_RADIUS * 1.5 - HANDLE_SEL_RADIUS = 30 Bildschirm-Pixel
 //     über der Mitte der oberen Kante, mit der Quelle gedreht; gedreht wird um die Mitte
 //     (Zeilen 446-452)
-//   - Ecken: Seitenverhältnis bleibt, mit Shift frei; ClampAspect (Zeile 1362): Ist das neue
-//     Verhältnis kleiner als das alte, folgt die Breite der Höhe, sonst die Höhe der Breite
+//   - Ecken: Seitenverhältnis bleibt, mit Shift frei; ClampAspect (Zeilen 1362-1413): Ist das
+//     neue Verhältnis kleiner als das alte, folgt die Breite der Höhe, sonst die Höhe der Breite.
+//     Das alte Verhältnis ist das der Quelle selbst (StretchItem, Zeilen 1582-1666: baseSize =
+//     obs_source_get_width/height), nicht das des Kastens (P09b, Entscheid 3)
 //   - Drehen (RotateItem, Zeile 1668): Winkel = atan2 zur Mitte + 90°; Shift rastet auf 15° ein
 //     (hier auf 1°, Entscheid des Nutzers im Handtest P09, umgesetzt in P09b)
 //   - Zeiger (UpdateCursor, Zeile 688): Drehgriff OpenHandCursor, beim Drehen ClosedHandCursor,
@@ -98,13 +101,15 @@ bool applyGeometry(Overlay *overlay, const QUuid &sourceId, const SourceGeometry
 SourceGeometry moveGeometry(const Source &start, QPointF startPointer, QPointF pointer);
 
 // Skalieren an einem Ecken- oder Kantengriff. Der Gegengriff bleibt stehen (auch gedreht).
-// Ecken: Seitenverhältnis des Kastens beim Beginn bleibt, freeAspect (Shift) = frei.
+// Ecken: Seitenverhältnis der Originalgrösse der Datei (P09b, Entscheid 3, wie OBS: ClampAspect
+// mit der Grösse der Quelle), ohne Originalgrösse (Text, Datei unlesbar) das des Kastens beim
+// Beginn; freeAspect (Shift) = frei.
 // Kanten: nur Breite bzw. Höhe (Entscheid 7). Mindestgrösse kSourceMinSize.
 // Über die Gegenseite hinaus (P09b, Entscheid 4, wie OBS): Der Kasten liegt dann auf der anderen
 // Seite des Gegengriffs, und die Quelle wird in dieser Richtung gespiegelt (gegenüber dem Beginn
 // umgeschaltet). Breite und Höhe bleiben positiv.
 SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF pointer,
-                              bool freeAspect);
+                              bool freeAspect, std::optional<QSize> originalSize = std::nullopt);
 
 // Drehen am Drehgriff: Winkel des Zeigers um die Mitte, 0° = Zeiger über der Mitte, positiv im
 // Uhrzeigersinn; snap (Shift) = auf ganze Grad einrasten (P09b), sonst Zehntelgrad.

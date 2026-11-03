@@ -108,6 +108,12 @@ public:
         std::function<bool(const QString &path, int *width, int *height, QString *error)>;
     void setMediaSizeReader(MediaSizeReader reader) { m_mediaSizeReader = std::move(reader); }
 
+    // Originalgrösse aller Bild- und Videodateien eines Overlays (P09b, Entscheid 3), für die
+    // Nachrichten an die Fenster. Die Dateien in media/ sind nach Inhalt benannt und ändern sich
+    // nie, darum liest der MediaSizeReader jede Datei nur einmal (auch eine unlesbare). Ohne
+    // MediaSizeReader leer.
+    MediaSizes mediaSizes(const Overlay &overlay) const;
+
     // Quellen (E-07). Neue Quellen liegen zuoberst an Lage 0/0. Bild und Video bekommen die
     // Grösse der Datei (P09, Entscheid 6), wenn ein MediaSizeReader gesetzt ist; kann er sie
     // nicht lesen, gilt die Grösse des Overlays und *warning (falls nicht nullptr) nennt den
@@ -182,7 +188,16 @@ private:
                       QString *error);
 
     QString m_dataDir;
+    // Grösse einer Datei aus dem Zwischenspeicher oder vom MediaSizeReader; nullopt mit Grund.
+    std::optional<QSize> mediaSize(const QString &reference, QString *reason) const;
+
     MediaSizeReader m_mediaSizeReader;
+    struct CachedSize
+    {
+        std::optional<QSize> size;
+        QString reason;
+    };
+    mutable QHash<QString, CachedSize> m_mediaSizeCache;
     TokenStore m_tokens;
     QList<Overlay> m_overlays;
     OverlayLayout m_layout;

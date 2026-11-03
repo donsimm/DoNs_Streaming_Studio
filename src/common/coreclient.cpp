@@ -299,11 +299,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         emit overlayListChanged();
     } else if (type == QLatin1String(msg::kOverlay) || type == QLatin1String(msg::kOverlayChanged)) {
         Overlay o;
-        if (!parseOverlayMessage(message, &o, &error)) {
+        MediaSizes sizes;
+        if (!parseOverlayMessage(message, &o, &sizes, &error)) {
             qWarning("Kern: %s ungültig: %s", qPrintable(type), qPrintable(error));
             return;
         }
         m_overlayCache.insert(o.id, o);
+        // Dateien sind nach Inhalt benannt: Eine Grösse gilt für alle Overlays.
+        m_mediaSizes.insert(sizes);
         // Eintrag der Liste nachführen (Name, Auflösung, Anzahl Quellen).
         bool listChanged = false;
         for (OverlaySummary &s : m_list.overlays) {
@@ -416,6 +419,7 @@ void CoreClient::clearData()
     m_coreHello = Hello();
     m_list = OverlayListData();
     m_overlayCache.clear();
+    m_mediaSizes.clear();
     m_fonts.clear();
     m_fontError.clear();
     m_keyOfRequest.clear();

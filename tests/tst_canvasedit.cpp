@@ -162,6 +162,53 @@ private slots:
         QCOMPARE(g, geo(100, 100, 233, 78));
     }
 
+    void resizeOriginalAspect()
+    {
+        // P09b, Entscheid 3: Ecken halten das Verhältnis der Datei, nicht des Kastens (wie OBS).
+        const Source s = box(100, 100, 200, 100); // Kasten 2:1
+        const QSize square(256, 256);
+        // Rechts unten nach (400, 150): 300x50, Verhältnis 6 > 1 → Höhe folgt der Breite
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(400, 150), false, square),
+                 geo(100, 100, 300, 300));
+        // Nach (250, 300): 150x200, Verhältnis 0.75 < 1 → Breite folgt der Höhe
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(250, 300), false, square),
+                 geo(100, 100, 200, 200));
+        // Links oben: rechts unten (300, 200) bleibt stehen; 16:9 aus einem Video.
+        // 160x200, Verhältnis 0.8 < 1.78 → Breite 200 * 16/9 = 355.6 → 356
+        QCOMPARE(resizeGeometry(s, CanvasHandle::TopLeft, QPointF(140, 0), false, QSize(1920, 1080)),
+                 geo(-56, 0, 356, 200));
+        // Mit Shift frei, auch mit Originalgrösse
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(400, 150), true, square),
+                 geo(100, 100, 300, 50));
+        // Kanten ändern weiter nur eine Seite
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Right, QPointF(350, 500), false, square),
+                 geo(100, 100, 250, 100));
+        // Gedreht und gespiegelt: gleiche Grösse wie ohne Drehung im Rahmen der Quelle
+        Source turned = s;
+        turned.rotation = 900;
+        turned.flipHorizontal = true;
+        const QPointF corner = sourceToOverlay(turned, QPointF(300, 50));
+        const SourceGeometry g = resizeGeometry(turned, CanvasHandle::BottomRight, corner, false, square);
+        QCOMPARE(g.width, 300);
+        QCOMPARE(g.height, 300);
+        QCOMPARE(g.flipHorizontal, true);
+        QCOMPARE(g.rotation, 900);
+    }
+
+    void originalSizeOfSource()
+    {
+        const MediaSizes sizes{{QStringLiteral("media/a.png"), QSize(640, 480)}};
+        Source image = box(0, 0, 10, 10);
+        image.kind = SourceKind::Image;
+        image.file = QStringLiteral("media/a.png");
+        QCOMPARE(originalSize(image, sizes), std::optional<QSize>(QSize(640, 480)));
+        image.file = QStringLiteral("media/b.png");
+        QCOMPARE(originalSize(image, sizes), std::nullopt);
+        Source text = box(0, 0, 10, 10);
+        text.kind = SourceKind::Text;
+        QCOMPARE(originalSize(text, sizes), std::nullopt);
+    }
+
     void resizeEdge()
     {
         const Source s = box(100, 100, 200, 100);
