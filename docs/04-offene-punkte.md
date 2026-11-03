@@ -132,4 +132,4 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 
 - Einrasten beim Drehen mit Umschalttaste in 1°-Schritten statt 15° (entschieden, siehe `docs/01-festlegungen.md`). Umsetzung mit dem nächsten Baustein.
 - Leistungsanzeige (CPU, RAM, LAN) im Kopfbereich: feste Grösse, höchstens ein Drittel der Fensterbreite. Noch zu besprechen.
-- Symbole fehlten im Handtest-Fenster, weil `handtest.sh` ein eigenes `XDG_CONFIG_HOME` nutzt; kein Fehler der Software. Prüfung im normalen Fenster nach dem Handtest.
+- Symbole fehlten im Handtest-Fenster, weil `handtest.sh` ein eigenes `XDG_CONFIG_HOME` nutzt; kein Fehler der Software. Im normalen Fenster geprüft, in Ordnung (2026-11-03).

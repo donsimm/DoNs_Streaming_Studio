@@ -4,7 +4,7 @@ Stand: 2026-11-03. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.
 
 Auftrag: `prompts/P09-zeichner-editor.md`. Entscheide des Nutzers (2026-11-03): 1 Kopfbereich fest, 2 Fläche neben Einträgen im Ordner frei, 3 Qt-Texte deutsch ohne «ß», 4 variable Schriften mit Achse `wght`, 5 Auflösung im Dock «Steuerung», 6 Bild und Video gestreckt, neue Quellen in Originalgrösse, 7 Ecke mit Seitenverhältnis (Shift frei), Kante nur Breite oder Höhe, 8 Drehgriff, Shift rastet auf 15° ein, Drehung um die Mitte im Uhrzeigersinn, 9 Ende eines Videos leer / «Am Ende anhalten» / «Wiederholen», 10 Video läuft ab dem Wählen des Overlays.
 
-Abnahme Handtest: offen (Abschnitt «Handtest»).
+Abnahme Handtest: erledigt am 2026-11-03, alle 5 Prüfungen in Ordnung (Rückmeldung des Nutzers im Chat). Zusätzlich im normalen Fenster geprüft: eigene Symbole des Nutzers erscheinen (im Handtest-Fenster fehlten sie wegen des eigenen `XDG_CONFIG_HOME`, kein Fehler). Wünsche aus dem Handtest: Einrasten beim Drehen mit Umschalttaste in 1°-Schritten statt 15°; Leistungsanzeige mit fester Grösse, höchstens ein Drittel der Fensterbreite (`docs/04-offene-punkte.md`, «Wünsche aus dem Handtest P09»).
 
 ## Kurzfassung
 
@@ -15,7 +15,7 @@ Abnahme Handtest: offen (Abschnitt «Handtest»).
 | Startprüfung `--runs 20` | 20/20 sauber in allen vier Fällen (nach Behebung eines Lesefehlers im Prüfskript, siehe «Startprüfung») |
 | Leistung wie T-02 (1920x1080, 10 Quellen, 2 Videos, 60 s), Ziel 30 Bilder/s ohne Einbrüche über 50 ms | erreicht: Leinwand, Video und WebM-Alpha je 30,0 Bilder/s, 0 Einbrüche, grösster Abstand 40,2 ms (Debug) bzw. 40,1 ms (Release); `dss-app` 60,2 % (Debug) bzw. 49,6 % (Release) eines Kerns |
 | `docs/06-overlay-format.md`, `docs/08-kern-schnittstelle.md` | nachgeführt: Overlay-Format 2 mit `video.hold_at_end` (06), Schnittstelle Version 3 mit `set_overlay_size`, `data_dir`, `warning` (08) |
-| Handtest | offen, 5 Prüfungen (unten) |
+| Handtest | ja: 5 Prüfungen in Ordnung (2026-11-03) |
 
 **Es wurde kein Paket installiert.** FFmpeg (libavformat, libavcodec, libswscale, libavutil 7.1.5) und libvpx sind seit P02 vorhanden; `pkg-config` findet sie.
 
