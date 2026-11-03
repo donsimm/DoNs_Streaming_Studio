@@ -47,6 +47,33 @@ private slots:
         QVERIFY(!parseWindowSize(text, &size));
         QCOMPARE(size, QSize(7, 7));
     }
+
+    // Leistungsanzeige im Kopfbereich (P09b, Entscheid 2): 600 px, höchstens ein Drittel.
+    void headerGauges()
+    {
+        QCOMPARE(headerGaugesWidth(1920), 600);
+        QCOMPARE(headerGaugesWidth(1800), 600); // genau ein Drittel
+        QCOMPARE(headerGaugesWidth(1799), 599);
+        QCOMPARE(headerGaugesWidth(1280), 426);
+        QCOMPARE(headerGaugesWidth(3840), 600);
+        QCOMPARE(headerGaugesWidth(2), 0);
+        QCOMPARE(headerGaugesWidth(0), 0);
+        QCOMPARE(headerGaugesWidth(-5), 0);
+        for (int i = 0; i < 3; ++i)
+            QCOMPARE(headerGaugeWidth(600, i), 200);
+        QCOMPARE(headerGaugeWidth(426, 0), 142);
+        QCOMPARE(headerGaugeWidth(427, 0), 143);
+        QCOMPARE(headerGaugeWidth(427, 1), 142);
+        QCOMPARE(headerGaugeWidth(428, 1), 143);
+        QCOMPARE(headerGaugeWidth(428, 2), 142);
+        QCOMPARE(headerGaugeWidth(600, 3), 0);
+        for (int total : {0, 1, 2, 425, 599, 600}) {
+            int sum = 0;
+            for (int i = 0; i < kHeaderGaugeCount; ++i)
+                sum += headerGaugeWidth(total, i);
+            QCOMPARE(sum, total);
+        }
+    }
 };
 
 QTEST_GUILESS_MAIN(TestWindowSize)

@@ -21,6 +21,7 @@
 #include "theme.h"
 #include "version.h"
 #include "windowedit.h"
+#include "windowsize.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -380,6 +381,35 @@ private slots:
         QCOMPARE(m_window->menuWidget()->width(), m_window->width());
         QVERIFY(m_window->restoreState(state));
         QTRY_VERIFY_WITH_TIMEOUT(m_window->dockWidgetArea(dock) == Qt::BottomDockWidgetArea, 2000);
+    }
+
+    // P09b Entscheid 2: Leistungsanzeige 600 px (200 je Anzeige) rechts im Kopfbereich, höchstens
+    // ein Drittel der Fensterbreite; zwischen Knöpfen und Anzeige bleibt Platz frei.
+    void headerGaugesWidth()
+    {
+        const QSize before = m_window->size();
+        auto *header = m_window->findChild<HeaderBar *>();
+        QVERIFY(header);
+        for (const auto &[windowWidth, total] : {std::pair{1920, 600}, std::pair{1280, 426}}) {
+            m_window->resize(windowWidth, 800);
+            QTRY_COMPARE_WITH_TIMEOUT(m_window->width(), windowWidth, 2000);
+            QCoreApplication::processEvents();
+            const auto *cpu = header->findChild<QWidget *>(QStringLiteral("gaugeCpu"));
+            const auto *ram = header->findChild<QWidget *>(QStringLiteral("gaugeRam"));
+            const auto *lan = header->findChild<QWidget *>(QStringLiteral("gaugeLan"));
+            const auto *left = header->findChild<QWidget *>(QStringLiteral("headerLeft"));
+            QVERIFY(cpu && ram && lan && left);
+            QCOMPARE(cpu->width() + ram->width() + lan->width(), total);
+            QCOMPARE(cpu->width(), dss::headerGaugeWidth(total, 0));
+            QCOMPARE(ram->x(), cpu->x() + cpu->width());
+            QCOMPARE(lan->x(), ram->x() + ram->width());
+            // rechts bündig mit dem Innenrand des Kopfbereichs (Rahmen, dann 8 px)
+            QCOMPARE(lan->x() + lan->width(), header->contentsRect().right() + 1 - 8);
+            QVERIFY2(left->x() + left->width() <= cpu->x(),
+                     qPrintable(QStringLiteral("links bis %1, Anzeige ab %2")
+                                    .arg(left->x() + left->width()).arg(cpu->x())));
+        }
+        m_window->resize(before);
     }
 
     // P09 Entscheid 9: «Am Ende anhalten» kommt beim Kern an und ist mit «Wiederholen» ausgegraut.

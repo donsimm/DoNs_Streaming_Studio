@@ -2,6 +2,8 @@
 
 #include <QRegularExpression>
 
+#include <algorithm>
+
 namespace dss {
 
 bool parseWindowSize(const QString &text, QSize *size)
@@ -16,6 +18,20 @@ bool parseWindowSize(const QString &text, QSize *size)
         return false;
     *size = QSize(width, height);
     return true;
+}
+
+int headerGaugesWidth(int windowWidth)
+{
+    if (windowWidth <= 0)
+        return 0;
+    return std::min(kHeaderGaugesWidth, windowWidth / 3);
+}
+
+int headerGaugeWidth(int total, int index)
+{
+    if (total <= 0 || index < 0 || index >= kHeaderGaugeCount)
+        return 0;
+    return total / kHeaderGaugeCount + (index < total % kHeaderGaugeCount ? 1 : 0);
 }
 
 } // namespace dss
