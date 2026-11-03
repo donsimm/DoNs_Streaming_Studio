@@ -181,6 +181,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 68 (Reste von `QSaveFile` nach Absturz): Der Kern löscht beim Start die vorläufigen Dateien von `QSaveFile` in `media/` (beim Start läuft keine Übernahme, die Sperre hält nur ein Kern). Umsetzung in P10, zusammen mit Punkt 67.
 - Punkt 69 (alte Dateien nach `cmake --install`): `installieren.sh` leert `<Ziel>/bin/` und `<Ziel>/share/dons-streaming-studio/` erst nach erfolgreichem Bau und Prüfen des Formats, direkt vor dem Kopieren. Die Daten sind nicht betroffen. Umsetzung in P10.
 - Punkt 70 (Zurückschreiben beim Umwandeln ungeprüft): `convertDataFormat` bekommt eine Testmöglichkeit, die nur im Test greift (Scheitern beim Schreiben der n-ten Datei); ein Test prüft, dass danach alle Dateien wie vorher sind. Umsetzung in P10.
+- Anker gegen das Ruckeln (Annahme im Bericht P10a, Punkt 66): übernommen. Ein Video beginnt im Editor, wenn die Leinwand das erste Bild abholt, also beim Anzeigen von vorne (wie «Video beim Einblenden von vorne» in der Browserquelle, K-07). Nicht geprüft: Verhalten beim Wechsel auf ein anderes Overlay und zurück (läuft weiter oder beginnt neu). P10 prüft das und legt es für beide Zeichner gleich fest.
 
 ## Wünsche nach P10a (2026-11-03)
 
