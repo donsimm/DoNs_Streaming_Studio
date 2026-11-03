@@ -97,24 +97,44 @@ def window_visible():
 
 
 def read_until(proc, pattern, timeout_s, lines):
-    """Liest stderr zeilenweise, bis pattern vorkommt. Gibt CLOCK_MONOTONIC-ns der Zeile zurück."""
+    """Liest stderr zeilenweise, bis pattern vorkommt. Gibt CLOCK_MONOTONIC-ns der Zeile zurück.
+
+    Liest selbst vom Dateideskriptor (os.read) statt mit readline(): readline() holt oft mehrere
+    Zeilen in den Puffer des Textstroms; select() sieht diese nicht und wartet bis zur Zeitgrenze,
+    und communicate() liest danach am Puffer vorbei (P09: zwei Zeilen des Kerns fehlten). Was nach
+    der gesuchten Zeile schon gelesen ist, kommt als ganze Zeilen in lines, eine angefangene Zeile
+    nach proc.pending_stderr (siehe stderr_rest)."""
+    fd = proc.stderr.fileno()
     sel = selectors.DefaultSelector()
-    sel.register(proc.stderr, selectors.EVENT_READ)
+    sel.register(fd, selectors.EVENT_READ)
     deadline = time.monotonic() + timeout_s
+    buf = getattr(proc, "pending_stderr", b"")
+    found = None
     try:
         while True:
+            while b"\n" in buf:
+                raw, buf = buf.split(b"\n", 1)
+                line = raw.decode(errors="replace")
+                lines.append(line)
+                if found is None and pattern in line:
+                    found = time.monotonic_ns()
+            if found is not None:
+                return found
             remaining = deadline - time.monotonic()
             if remaining <= 0 or not sel.select(remaining):
                 return None
-            line = proc.stderr.readline()
-            if not line:
+            chunk = os.read(fd, 65536)
+            if not chunk:
                 return None
-            t = time.monotonic_ns()
-            lines.append(line.rstrip("\n"))
-            if pattern in line:
-                return t
+            buf += chunk
     finally:
+        proc.pending_stderr = buf
         sel.close()
+
+
+def stderr_rest(proc, err):
+    """Rest von stderr nach communicate(): angefangene Zeile aus read_until davor."""
+    return getattr(proc, "pending_stderr", b"").decode(errors="replace") + (err or "")
 
 
 def start_core(build, data_dir, socket_path, env):
@@ -160,7 +180,7 @@ def one_run(build, case, idx, env=None, data_dir=None, socket_path=None):
         p.kill()
         out, err = p.communicate()
     t_end = time.monotonic_ns()
-    lines += [l for l in err.splitlines()]
+    lines += [l for l in stderr_rest(p, err).splitlines()]
     lines = [l for l in lines if l.strip()]
 
     leftovers = session_members(p.pid)
@@ -183,7 +203,7 @@ def one_run(build, case, idx, env=None, data_dir=None, socket_path=None):
             core.kill()
             _, core_err = core.communicate()
             core_ok = False
-        core_lines += [l for l in core_err.splitlines() if l.strip()]
+        core_lines += [l for l in stderr_rest(core, core_err).splitlines() if l.strip()]
         core_exit = core.returncode
         core_ok = (core_ok and core_exit == 0
                    and any("Beenden erbeten von dss-app" in l for l in core_lines))
