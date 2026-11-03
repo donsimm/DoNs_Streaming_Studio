@@ -25,6 +25,24 @@ bool hasUserSymbol(const QString &fileName)
     return !dss::findSymbolFile(fileName, {dss::userSymbolDir()}).isEmpty();
 }
 
+QList<int> appIconSizes()
+{
+    return {16, 22, 24, 32, 48, 64, 128, 256, 512};
+}
+
+QIcon appIcon(const QString &dir)
+{
+    QIcon icon;
+    for (const int size : appIconSizes()) {
+        const QString path = dir + QStringLiteral("/dons-streaming-studio-%1.png").arg(size);
+        if (QFileInfo(path).isFile())
+            icon.addFile(path, QSize(size, size));
+    }
+    if (icon.isNull())
+        qWarning("Programm-Symbol fehlt: %s", qPrintable(dir));
+    return icon;
+}
+
 QImage tintedSymbol(const QString &path, const QSize &size, const QColor &color)
 {
     // SVG über QIcon (Paket qt6-svg-plugins). CompositionMode_SourceIn: Farbe von color,

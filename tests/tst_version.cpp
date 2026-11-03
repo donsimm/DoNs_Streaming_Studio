@@ -23,8 +23,11 @@ private slots:
 
     void versionLine()
     {
+        // Tests laufen nur im Bau aus dem Repo (Version in Arbeit, ohne DSS_COMMIT).
+        QCOMPARE(dss::commit(), QString());
         QCOMPARE(dss::versionLine(QStringLiteral("dss-core")),
-                 QStringLiteral("dss-core ") + QStringLiteral(DSS_EXPECTED_VERSION));
+                 QStringLiteral("dss-core ") + QStringLiteral(DSS_EXPECTED_VERSION)
+                     + QStringLiteral(" (Entwicklung)"));
     }
 };
 

@@ -6,7 +6,8 @@ Vorlage: prototypes/messung/t01.py (nicht verändert, Hilfsfunktionen hierher ü
 Je Start:
 - Dauer bis zum Start: Zeit vor Popen bis zur Protokollzeile «… gestartet, Qt …» (dss-core)
   bzw. «Fenster gezeichnet» (dss-app), gemessen im Skript mit CLOCK_MONOTONIC beim Lesen der Zeile.
-- dss-app: zusätzlich, ob xwininfo ein sichtbares Fenster «DoNs Streaming Studio» findet.
+- dss-app: zusätzlich, ob xwininfo ein sichtbares Fenster «DoNs Streaming Studio» findet, seit
+  P10a im Bau aus dem Repo «DoNs Streaming Studio – Entwicklung» (aus «dss-app --version»).
   Seit P05 läuft dss-app mit eigenem XDG_CONFIG_HOME (ein temporärer Ordner je Fall), damit
   die Prüfung die Fenstereinstellungen des Nutzers nicht ändert. Ab dem zweiten Start lädt
   dss-app also die beim vorigen Beenden gespeicherte Anordnung.
@@ -90,9 +91,16 @@ def comm(pid):
         return "?"
 
 
+def window_title(build):
+    """Titel des Fensters je Version (P10a): mit « – Entwicklung» im Bau aus dem Repo."""
+    r = subprocess.run([os.path.join(build, "src/app/dss-app"), "--version"],
+                       capture_output=True, text=True)
+    return WINDOW_TITLE + (" – Entwicklung" if "(Entwicklung" in r.stdout else "")
+
+
 def window_visible():
     """xwininfo(1): sucht das Fenster nach Titel, True wenn «Map State: IsViewable»."""
-    r = subprocess.run(["xwininfo", "-name", WINDOW_TITLE], capture_output=True, text=True)
+    r = subprocess.run(["xwininfo", "-name", window_visible.title], capture_output=True, text=True)
     return r.returncode == 0 and "IsViewable" in r.stdout
 
 
@@ -244,6 +252,8 @@ def main():
         return 2
 
     os.makedirs(args.out, exist_ok=True)
+    window_visible.title = window_title(args.build)
+    print(f"Fenstertitel: {window_visible.title}", flush=True)
     all_ok = True
     for case in args.cases:
         started = time.strftime("%Y-%m-%d %H:%M:%S %z")

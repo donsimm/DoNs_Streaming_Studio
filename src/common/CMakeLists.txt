@@ -31,7 +31,17 @@ add_library(dss_common STATIC
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und
-# Fenster (Auswahl) finden sie hier im Quellbaum, wie die Symbole des Fensters (P05).
+# Fenster (Auswahl) finden sie in Arbeit hier im Quellbaum, wie die Symbole des Fensters (P05),
+# im Einsatz im Installationsordner (P10a).
+if(DSS_INSTALLED_EDITION)
+  set(DSS_BUILTIN_FONT_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/be-vietnam-pro")
+  install(DIRECTORY schriften/be-vietnam-pro/ DESTINATION ${DSS_INSTALL_SHARE_DIR}/be-vietnam-pro)
+else()
+  set(DSS_BUILTIN_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/schriften/be-vietnam-pro")
+endif()
 target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}"
-  DSS_BUILTIN_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/schriften/be-vietnam-pro")
+  DSS_COMMIT="${DSS_COMMIT}" DSS_BUILTIN_FONT_DIR="${DSS_BUILTIN_FONT_DIR}")
 target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network PRIVATE dss_warnings)
+# Version in Arbeit oder im Einsatz (P10a, Teil B, Schalter in der obersten CMakeLists.txt)
+target_compile_definitions(dss_common PRIVATE
+  DSS_INSTALLED_EDITION=$<BOOL:${DSS_INSTALLED_EDITION}>)

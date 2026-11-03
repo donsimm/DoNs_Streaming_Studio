@@ -70,7 +70,8 @@ if(DSS_BUILD_APP)
   # Symbole einfarbig (P06, Punkt 28), in der X11-Sitzung; ohne X11 übersprungen (77).
   qt_add_executable(tst_symbols tst_symbols.cpp ${PROJECT_SOURCE_DIR}/src/app/symbols.cpp)
   target_include_directories(tst_symbols PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
-  target_compile_definitions(tst_symbols PRIVATE DSS_SYMBOL_DIR="${PROJECT_SOURCE_DIR}/src/app/symbole")
+  target_compile_definitions(tst_symbols PRIVATE DSS_SYMBOL_DIR="${PROJECT_SOURCE_DIR}/src/app/symbole"
+    DSS_TEST_APP_ICON_DIR="${PROJECT_SOURCE_DIR}/assets/branding/symbol")
   target_link_libraries(tst_symbols PRIVATE dss_common dss_warnings Qt6::Widgets Qt6::Test)
   add_test(NAME tst_symbols COMMAND tst_symbols)
   # Eigener Ordner der Einstellungen, damit nie die Symbole des Nutzers gelesen werden (P07).

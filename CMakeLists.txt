@@ -19,6 +19,21 @@ option(DSS_APP_CANVAS_EDIT "Quellen auf der Leinwand bearbeiten (P09)" ON)
 # P10a (Punkt 65): Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner.
 # Aus: Videos wie gespeichert, Originalgrösse ohne Drehung (wie P09b).
 option(DSS_VIDEO_ROTATION "Drehung aus den Metadaten von Videos beachten (P10a)" ON)
+# P10a (Teil B): Version im Einsatz bauen (nur scripts/installieren.sh). Ein: echte Daten
+# ~/.local/share/dons-streaming-studio, Einheit dss-core.service, Laufzeit-Dateien (Symbole,
+# Schriften, Übersetzung) aus dem Installationsordner. Aus (Standard): Version in Arbeit mit
+# Entwicklungsordner, Einheit dss-core-entwicklung.service, Laufzeit-Dateien aus dem Repo.
+option(DSS_INSTALLED_EDITION "Version im Einsatz bauen (scripts/installieren.sh, P10a)" OFF)
+# P10a (Teil B): Commit, aus dem gebaut wird; setzt scripts/installieren.sh. Leer: kein Commit
+# in --version.
+set(DSS_COMMIT "" CACHE STRING "Commit des Baus für --version (scripts/installieren.sh)")
+
+# Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
+# https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html
+include(GNUInstallDirs)
+# Laufzeit-Dateien der Version im Einsatz: <Präfix>/share/dons-streaming-studio
+set(DSS_INSTALL_SHARE_DIR "${CMAKE_INSTALL_DATADIR}/dons-streaming-studio")
+set(DSS_INSTALL_FULL_SHARE_DIR "${CMAKE_INSTALL_FULL_DATADIR}/dons-streaming-studio")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

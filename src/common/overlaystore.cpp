@@ -29,14 +29,14 @@ QStringList allowedMediaSuffixes(MediaUse use)
     return {};
 }
 
-QString defaultDataDir()
+QString defaultDataDir(Edition edition)
 {
     // AppDataLocation hängt den Programmnamen an (<APPNAME>). Kern, Fenster und dss-cli
     // haben verschiedene Namen, sollen aber denselben Ordner nutzen; deshalb wird der Name
     // nur für diese Abfrage gesetzt. Ein Organisationsname ist nicht gesetzt.
     // https://doc.qt.io/qt-6.8/qstandardpaths.html
     const QString previous = QCoreApplication::applicationName();
-    QCoreApplication::setApplicationName(QString::fromLatin1(kDataDirName));
+    QCoreApplication::setApplicationName(appDirName(edition));
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QCoreApplication::setApplicationName(previous);
     return dir;

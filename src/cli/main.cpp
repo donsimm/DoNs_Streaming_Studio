@@ -41,7 +41,7 @@ QTextStream &err()
     return stream;
 }
 
-const char *const kUsage =
+const char *const kUsageTemplate =
     "Aufruf: dss-cli [--datenordner PFAD] BEFEHL [ARGUMENTE]\n"
     "\n"
     "Befehle:\n"
@@ -64,11 +64,17 @@ const char *const kUsage =
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
     "--waagrecht-gespiegelt, --senkrecht-gespiegelt: Inhalt im Kasten spiegeln (ohne: nicht\n"
     "gespiegelt). Breite und Höhe bleiben positiv.\n"
-    "Ohne --datenordner: Datenordner des Programms (~/.local/share/dons-streaming-studio).\n"
+    "Ohne --datenordner: Datenordner des Programms (~/.local/share/%1).\n"
     "overlay-liste und quelle-liste gehen immer. Alle anderen Befehle ändern Overlays und gehen\n"
-    "nur, wenn der Kern angehalten ist (systemctl --user stop dss-core.service).\n"
+    "nur, wenn der Kern angehalten ist (systemctl --user stop %2).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
     "gesperrt).\n";
+
+// Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
+QString usageText()
+{
+    return QString::fromUtf8(kUsageTemplate).arg(dss::appDirName(), dss::coreUnitName());
+}
 
 struct Arguments
 {
@@ -229,7 +235,7 @@ public:
 private:
     int usage(const QString &message)
     {
-        err() << "Fehler: " << message << "\n\n" << kUsage;
+        err() << "Fehler: " << message << "\n\n" << usageText();
         return kExitUsage;
     }
 
@@ -472,7 +478,7 @@ int main(int argc, char *argv[])
 
     const QStringList rawArgs = QCoreApplication::arguments();
     if (rawArgs.contains(QLatin1String("--help")) || rawArgs.contains(QLatin1String("-h"))) {
-        out() << kUsage;
+        out() << usageText();
         return kExitOk;
     }
     if (rawArgs.contains(QLatin1String("--version"))) {
@@ -483,11 +489,11 @@ int main(int argc, char *argv[])
     Arguments args;
     QString error;
     if (!parseArguments(rawArgs, &args, &error)) {
-        err() << "Fehler: " << error << "\n\n" << kUsage;
+        err() << "Fehler: " << error << "\n\n" << usageText();
         return kExitUsage;
     }
     if (args.positional.isEmpty()) {
-        err() << "Fehler: Befehl fehlt.\n\n" << kUsage;
+        err() << "Fehler: Befehl fehlt.\n\n" << usageText();
         return kExitUsage;
     }
 
@@ -501,10 +507,10 @@ int main(int argc, char *argv[])
             err() << "Fehler: " << error << ".\n"
                   << "Solange der Kern läuft, ändert nur er die Overlays; dss-cli darf dann nur "
                      "anzeigen (overlay-liste, quelle-liste).\n"
-                  << "Kern anhalten:  systemctl --user stop " << dss::kCoreUnitName << '\n'
+                  << "Kern anhalten:  systemctl --user stop " << dss::coreUnitName() << '\n'
                   << "Danach den Befehl wiederholen und den Kern wieder starten:  "
                      "systemctl --user start "
-                  << dss::kCoreUnitName << '\n';
+                  << dss::coreUnitName() << '\n';
             if (pid > 0)
                 err() << "(Läuft der Kern ohne Dienst, mit «kill " << pid << "» beenden.)\n";
             return kExitLocked;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "configpaths.h"
 #include "overlay.h"
 #include "overlaylist.h"
 #include "tokenstore.h"
@@ -33,11 +34,11 @@ enum class MediaUse { Image, Video, Font };
 // Erlaubte Endungen (Kleinbuchstaben), siehe docs/06-overlay-format.md
 QStringList allowedMediaSuffixes(MediaUse use);
 
-// Datenordner nach QStandardPaths::AppDataLocation mit dem Programmnamen kDataDirName,
-// unter Linux ~/.local/share/dons-streaming-studio (bzw. $XDG_DATA_HOME/dons-streaming-studio).
+// Datenordner nach QStandardPaths::AppDataLocation mit dem Programmnamen appDirName(edition),
+// unter Linux ~/.local/share/dons-streaming-studio (bzw. $XDG_DATA_HOME/…) im Einsatz und
+// ~/.local/share/dons-streaming-studio-entwicklung in Arbeit (P10a, Teil B).
 // https://doc.qt.io/qt-6.8/qstandardpaths.html
-inline constexpr char kDataDirName[] = "dons-streaming-studio";
-QString defaultDataDir();
+QString defaultDataDir(Edition edition = buildEdition());
 
 class OverlayStore
 {

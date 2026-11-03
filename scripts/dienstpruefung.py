@@ -134,8 +134,8 @@ def main():
     cli = os.path.join(build, "src/cli/dss-cli")
     app_bin = os.path.join(build, "src/app/dss-app")
     unit = args.unit
-    if unit == "dss-core.service":
-        sys.exit("FEHLER: die echte Einheit wird hier nicht geprüft")
+    if unit in ("dss-core.service", "dss-core-entwicklung.service"):
+        sys.exit("FEHLER: die Einheiten der beiden Versionen werden hier nicht geprüft")
     if not os.environ.get("DISPLAY"):
         sys.exit("FEHLER: DISPLAY fehlt, die Prüfung braucht die X11-Sitzung")
 

@@ -172,6 +172,35 @@ private slots:
                           QColor(0x12, 0x34, 0x56));
         qputenv("XDG_CONFIG_HOME", previous);
     }
+
+    // P10a: Programm-Symbol aus assets/branding/symbol, alle Grössen von 16 bis 512, in Farbe
+    void appIconSizes()
+    {
+        const QIcon icon = appIcon(QStringLiteral(DSS_TEST_APP_ICON_DIR));
+        QVERIFY(!icon.isNull());
+        QCOMPARE(icon.availableSizes().size(), ::appIconSizes().size());
+        for (const int size : ::appIconSizes()) {
+            QVERIFY2(icon.availableSizes().contains(QSize(size, size)), qPrintable(QString::number(size)));
+            const QImage image = icon.pixmap(QSize(size, size)).toImage();
+            QCOMPARE(image.size(), QSize(size, size));
+            // Ecken fast durchsichtig (kleine Grössen: Lanczos verwischt den Rahmen etwas)
+            QVERIFY2(qAlpha(image.pixel(0, 0)) < 16, qPrintable(QString::number(size)));
+            QVERIFY2(qAlpha(image.pixel(size - 1, size - 1)) < 16, qPrintable(QString::number(size)));
+        }
+        // Quadrat um den Fernseher: oberste und unterste Zeile ganz durchsichtig, links in der
+        // Mitte der Rahmen deckend
+        const QImage large = icon.pixmap(QSize(512, 512)).toImage();
+        for (int x = 0; x < 512; ++x) {
+            QCOMPARE(qAlpha(large.pixel(x, 0)), 0);
+            QCOMPARE(qAlpha(large.pixel(x, 511)), 0);
+        }
+        QCOMPARE(qAlpha(large.pixel(12, 256)), 255);
+        // nicht einfarbig: Gehäuse rot-braun, Knöpfe heller
+        QVERIFY(qRed(large.pixel(12, 256)) > qBlue(large.pixel(12, 256)) + 40);
+        // Ordner ohne Dateien: leeres Symbol
+        QTest::ignoreMessage(QtWarningMsg, "Programm-Symbol fehlt: /gibt/es/nicht");
+        QVERIFY(appIcon(QStringLiteral("/gibt/es/nicht")).isNull());
+    }
 };
 
 int main(int argc, char *argv[])

@@ -111,11 +111,14 @@ private slots:
         const QByteArray previous = qgetenv("XDG_DATA_HOME");
         qputenv("XDG_DATA_HOME", dataDir().toUtf8());
         const QString dir = dss::defaultDataDir();
+        const QString installed = dss::defaultDataDir(dss::Edition::Installed);
         if (previous.isEmpty())
             qunsetenv("XDG_DATA_HOME");
         else
             qputenv("XDG_DATA_HOME", previous);
-        QCOMPARE(dir, dataDir() + QStringLiteral("/dons-streaming-studio"));
+        // P10a: in Arbeit der Entwicklungsordner, im Einsatz die echten Daten wie bis P09b
+        QCOMPARE(dir, dataDir() + QStringLiteral("/dons-streaming-studio-entwicklung"));
+        QCOMPARE(installed, dataDir() + QStringLiteral("/dons-streaming-studio"));
         // Der Programmname wird nur für die Abfrage gesetzt.
         QCOMPARE(QCoreApplication::applicationName(), QStringLiteral("tst_overlaystore"));
     }

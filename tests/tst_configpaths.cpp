@@ -1,4 +1,5 @@
-// Prüft den Ordner der Einstellungen und die Suche der Symbole ohne Qt Gui (P07, Teil A).
+// Prüft den Ordner der Einstellungen und die Suche der Symbole ohne Qt Gui (P07, Teil A),
+// seit P10a die Orte und Namen je Version (in Arbeit, im Einsatz).
 // Jeder Fall hat einen eigenen Ordner als XDG_CONFIG_HOME; die echten Symbole des Nutzers
 // unter ~/.config/dons-streaming-studio/symbole/ werden nie gelesen oder verändert.
 
@@ -38,8 +39,43 @@ private slots:
 
     void configDirFollowsXdgConfigHome()
     {
-        QCOMPARE(configDir(), m_config.path() + QStringLiteral("/dons-streaming-studio"));
+        // Tests laufen im Bau aus dem Repo: Version in Arbeit.
+        QCOMPARE(buildEdition(), Edition::Development);
+        QCOMPARE(configDir(), m_config.path() + QStringLiteral("/dons-streaming-studio-entwicklung"));
+        QCOMPARE(configDir(Edition::Installed), m_config.path() + QStringLiteral("/dons-streaming-studio"));
+        // Eigene Symbole: derselbe Ordner für beide Versionen
         QCOMPARE(userSymbolDir(), m_config.path() + QStringLiteral("/dons-streaming-studio/symbole"));
+    }
+
+    // P10a, Teil B: Orte und Namen je Version. Die Version im Einsatz hat dieselben wie bis P09b.
+    void editions()
+    {
+        QTemporaryDir runtime;
+        QVERIFY(runtime.isValid());
+        // QStandardPaths verlangt für XDG_RUNTIME_DIR die Rechte 0700 (QTemporaryDir hat sie).
+        const QByteArray previous = qgetenv("XDG_RUNTIME_DIR");
+        qputenv("XDG_RUNTIME_DIR", runtime.path().toLocal8Bit());
+        const QString development = defaultConnectionPath();
+        const QString installed = defaultConnectionPath(Edition::Installed);
+        if (previous.isEmpty())
+            qunsetenv("XDG_RUNTIME_DIR");
+        else
+            qputenv("XDG_RUNTIME_DIR", previous);
+        QCOMPARE(development, runtime.path() + QStringLiteral("/dons-streaming-studio-entwicklung/kern.sock"));
+        QCOMPARE(installed, runtime.path() + QStringLiteral("/dons-streaming-studio/kern.sock"));
+
+        QCOMPARE(appDirName(Edition::Installed), QStringLiteral("dons-streaming-studio"));
+        QCOMPARE(appDirName(Edition::Development), QStringLiteral("dons-streaming-studio-entwicklung"));
+        QCOMPARE(appDirName(), appDirName(Edition::Development));
+        QCOMPARE(coreUnitName(Edition::Installed), QStringLiteral("dss-core.service"));
+        QCOMPARE(coreUnitName(), QStringLiteral("dss-core-entwicklung.service"));
+        QCOMPARE(windowTitle(Edition::Installed), QStringLiteral("DoNs Streaming Studio"));
+        QCOMPARE(windowTitle(), QStringLiteral("DoNs Streaming Studio – Entwicklung"));
+        QCOMPARE(editionLabel(Edition::Installed), QStringLiteral("Einsatz"));
+        QCOMPARE(editionLabel(), QStringLiteral("Entwicklung"));
+        // Keine zwei Versionen teilen einen Ort
+        QVERIFY(development != installed);
+        QVERIFY(configDir() != configDir(Edition::Installed));
     }
 
     void builtinWhenUserDirMissing()

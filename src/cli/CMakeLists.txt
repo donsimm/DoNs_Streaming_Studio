@@ -6,3 +6,7 @@ if(DSS_MEDIA_SIZE)
   target_link_libraries(dss-cli PRIVATE dss_media)
   target_compile_definitions(dss-cli PRIVATE DSS_MEDIA_SIZE=1)
 endif()
+# Version im Einsatz (P10a): <Präfix>/bin
+if(DSS_INSTALLED_EDITION)
+  install(TARGETS dss-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()

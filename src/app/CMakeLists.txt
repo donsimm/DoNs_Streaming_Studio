@@ -18,9 +18,23 @@ add_library(dss_app_ui STATIC
 target_include_directories(dss_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Symbole werden zur Laufzeit aus dem Quellordner geladen, damit der Nutzer sie ohne neuen
 # Bau ersetzen kann (Auftrag P05). SVG braucht zur Laufzeit qt6-svg-plugins.
-# Die Schrift (Open Sans, P06) kommt ebenso aus dem Quellordner.
-target_compile_definitions(dss_app_ui PRIVATE DSS_SYMBOL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/symbole"
-                                              DSS_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/schriften")
+# Die Schrift (Open Sans, P06) kommt ebenso aus dem Quellordner, das Programm-Symbol (P10a) aus
+# assets/branding/symbol. Im Einsatz (P10a) liegen alle drei im Installationsordner.
+if(DSS_INSTALLED_EDITION)
+  set(DSS_SYMBOL_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/symbole")
+  set(DSS_FONT_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/schriften")
+  set(DSS_APP_ICON_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/branding")
+  install(DIRECTORY symbole/ DESTINATION ${DSS_INSTALL_SHARE_DIR}/symbole)
+  install(DIRECTORY schriften/ DESTINATION ${DSS_INSTALL_SHARE_DIR}/schriften)
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets/branding/symbol/
+          DESTINATION ${DSS_INSTALL_SHARE_DIR}/branding)
+else()
+  set(DSS_SYMBOL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/symbole")
+  set(DSS_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/schriften")
+  set(DSS_APP_ICON_DIR "${PROJECT_SOURCE_DIR}/assets/branding/symbol")
+endif()
+target_compile_definitions(dss_app_ui PRIVATE DSS_SYMBOL_DIR="${DSS_SYMBOL_DIR}"
+                                              DSS_FONT_DIR="${DSS_FONT_DIR}")
 target_link_libraries(dss_app_ui PUBLIC dss_common Qt6::Widgets PRIVATE dss_warnings)
 
 # Bearbeiten im Fenster (P08, CLAUDE.md Regel 8). Aus: Docks nur zur Anzeige wie in P07.
@@ -44,16 +58,27 @@ target_compile_definitions(dss_app_ui PUBLIC DSS_APP_RENDERER=$<BOOL:${DSS_APP_R
 # Quelle: Paket qt6-translations-l10n (Ordner der Übersetzungen von Qt, QtInstallPaths.cmake).
 set(DSS_QT_TRANSLATION "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}/qtbase_de.qm"
     CACHE FILEPATH "Übersetzung von Qt, die ohne «ß» kopiert wird")
-set(DSS_TRANSLATION_DIR "${CMAKE_CURRENT_BINARY_DIR}/uebersetzung")
+set(DSS_TRANSLATION_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/uebersetzung")
+if(DSS_INSTALLED_EDITION)
+  set(DSS_TRANSLATION_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/uebersetzung")
+  install(FILES ${DSS_TRANSLATION_BUILD_DIR}/qtbase_de.qm DESTINATION ${DSS_INSTALL_SHARE_DIR}/uebersetzung)
+else()
+  set(DSS_TRANSLATION_DIR "${DSS_TRANSLATION_BUILD_DIR}")
+endif()
 qt_add_executable(dss-qm-ohne-ss qm-ohne-ss.cpp)
 target_link_libraries(dss-qm-ohne-ss PRIVATE dss_common dss_warnings)
-add_custom_command(OUTPUT ${DSS_TRANSLATION_DIR}/qtbase_de.qm
-  COMMAND dss-qm-ohne-ss ${DSS_QT_TRANSLATION} ${DSS_TRANSLATION_DIR}/qtbase_de.qm
+add_custom_command(OUTPUT ${DSS_TRANSLATION_BUILD_DIR}/qtbase_de.qm
+  COMMAND dss-qm-ohne-ss ${DSS_QT_TRANSLATION} ${DSS_TRANSLATION_BUILD_DIR}/qtbase_de.qm
   DEPENDS dss-qm-ohne-ss ${DSS_QT_TRANSLATION}
   COMMENT "Übersetzung von Qt ohne «ß»")
-add_custom_target(dss_uebersetzung ALL DEPENDS ${DSS_TRANSLATION_DIR}/qtbase_de.qm)
+add_custom_target(dss_uebersetzung ALL DEPENDS ${DSS_TRANSLATION_BUILD_DIR}/qtbase_de.qm)
 add_dependencies(dss_app_ui dss_uebersetzung)
 target_compile_definitions(dss_app_ui PRIVATE DSS_TRANSLATION_DIR="${DSS_TRANSLATION_DIR}")
 
 qt_add_executable(dss-app main.cpp)
 target_link_libraries(dss-app PRIVATE dss_app_ui dss_warnings)
+# Programm-Symbol als Fenstersymbol beider Versionen (P10a)
+target_compile_definitions(dss-app PRIVATE DSS_APP_ICON_DIR="${DSS_APP_ICON_DIR}")
+if(DSS_INSTALLED_EDITION)
+  install(TARGETS dss-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()

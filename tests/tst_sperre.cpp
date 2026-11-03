@@ -203,7 +203,7 @@ private slots:
                                                     QStringLiteral("X")}}) {
             r = runCli(data.path(), args);
             QCOMPARE(r.exitCode, 3);
-            QVERIFY2(r.err.contains(QStringLiteral("systemctl --user stop dss-core.service")),
+            QVERIFY2(r.err.contains(QStringLiteral("systemctl --user stop dss-core-entwicklung.service")),
                      qPrintable(r.err));
             QVERIFY(r.err.contains(QStringLiteral("gesperrt von dss-core")));
         }

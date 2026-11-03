@@ -14,8 +14,8 @@ void setupLogging()
 
 QString startLine(const QString &programName)
 {
-    return QStringLiteral("%1 %2 gestartet, Qt %3")
-        .arg(programName, version(), QString::fromLatin1(qVersion()));
+    return QStringLiteral("%1 %2 (%3) gestartet, Qt %4")
+        .arg(programName, version(), buildDetails(), QString::fromLatin1(qVersion()));
 }
 
 } // namespace dss

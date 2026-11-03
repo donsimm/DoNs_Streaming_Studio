@@ -61,7 +61,7 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
                        QWidget *parent)
     : QMainWindow(parent), m_theme(theme), m_keepLayout(keepLayout), m_client(client)
 {
-    setWindowTitle(QStringLiteral("DoNs Streaming Studio"));
+    setWindowTitle(dss::windowTitle());
     resize(1280, 800);
     createMenus();
     createHeader();

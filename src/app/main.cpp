@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFont>
+#include <QIcon>
 #include <QPixmap>
 #include <QTextStream>
 #include <QTimer>
@@ -37,7 +38,8 @@ int main(int argc, char *argv[])
     for (int i = 0; i < argc; ++i)
         arguments << QString::fromLocal8Bit(argv[i]);
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("DoNs Streaming Studio – Fenster"));
+    parser.setApplicationDescription(QStringLiteral("DoNs Streaming Studio – Fenster (%1)")
+                                         .arg(dss::editionLabel()));
     const QCommandLineOption helpOption(QStringList{QStringLiteral("h"), QStringLiteral("help")},
                                         QStringLiteral("Hilfe ausgeben und beenden."));
     const QCommandLineOption versionOption(QStringLiteral("version"),
@@ -61,15 +63,16 @@ int main(int argc, char *argv[])
                        "Feldern der Art der Quelle rollen (P08)."));
     const QCommandLineOption connectionOption(
         QStringLiteral("verbindung"),
-        QStringLiteral("Unix-Socket des Kerns (Standard: "
-                       "$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock). Mit --bildschirmfoto: "
-                       "erst nach Verbindung, erstem Overlay und 3.5 s Leistungswerten speichern, "
-                       "ohne Kern nach 10 s."),
+        QStringLiteral("Unix-Socket des Kerns (Standard: $XDG_RUNTIME_DIR/%1/kern.sock). Mit "
+                       "--bildschirmfoto: erst nach Verbindung, erstem Overlay und 3.5 s "
+                       "Leistungswerten speichern, ohne Kern nach 10 s.")
+            .arg(dss::appDirName()),
         QStringLiteral("PFAD"));
     const QCommandLineOption unitOption(
         QStringLiteral("einheit"),
         QStringLiteral("Benutzerdienst, der gestartet wird, wenn der Kern nicht antwortet "
-                       "(Standard: dss-core.service)."),
+                       "(Standard: %1).")
+            .arg(dss::coreUnitName()),
         QStringLiteral("NAME"));
     const QCommandLineOption measureOption(
         QStringLiteral("leinwand-messung"),
@@ -148,6 +151,14 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
     QApplication::setApplicationName(name);
+    // Programm-Symbol des Nutzers als Fenstersymbol beider Versionen (P10a, Teil B), alle Grössen
+    // aus assets/branding/symbol bzw. dem Installationsordner.
+    // https://doc.qt.io/qt-6.8/qguiapplication.html#windowIcon-prop
+    QApplication::setWindowIcon(appIcon(QStringLiteral(DSS_APP_ICON_DIR)));
+    // Im Einsatz gehört das Fenster zum Menüeintrag dons-streaming-studio.desktop.
+    // https://doc.qt.io/qt-6.8/qguiapplication.html#desktopFileName-prop
+    if (dss::buildEdition() == dss::Edition::Installed)
+        QGuiApplication::setDesktopFileName(QStringLiteral("dons-streaming-studio"));
     QApplication::setApplicationVersion(dss::version());
     dss::setupLogging();
     // Texte von Qt selbst deutsch, ohne «ß» (P09, Punkt 44).
@@ -175,7 +186,7 @@ int main(int argc, char *argv[])
         options.program = name;
         options.version = dss::version();
         options.unitName = parser.isSet(unitOption) ? parser.value(unitOption)
-                                                    : QString::fromLatin1(dss::kCoreUnitName);
+                                                    : dss::coreUnitName();
         options.startUnit = screenshotFile.isEmpty();
         client = std::make_unique<dss::CoreClient>(options);
     }

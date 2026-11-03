@@ -40,18 +40,20 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationVersion(dss::version());
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("DoNs Streaming Studio – Kern"));
+    parser.setApplicationDescription(QStringLiteral("DoNs Streaming Studio – Kern (%1)")
+                                         .arg(dss::editionLabel()));
     parser.addHelpOption();
     const QCommandLineOption versionOption(QStringLiteral("version"),
                                            QStringLiteral("Version ausgeben und beenden."));
     const QCommandLineOption dataDirOption(
         QStringLiteral("datenordner"),
-        QStringLiteral("Datenordner mit den Overlays (Standard: ~/.local/share/dons-streaming-studio)."),
+        QStringLiteral("Datenordner mit den Overlays (Standard: ~/.local/share/%1).")
+            .arg(dss::appDirName()),
         QStringLiteral("PFAD"));
     const QCommandLineOption connectionOption(
         QStringLiteral("verbindung"),
-        QStringLiteral("Unix-Socket für die Fenster (Standard: "
-                       "$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock)."),
+        QStringLiteral("Unix-Socket für die Fenster (Standard: $XDG_RUNTIME_DIR/%1/kern.sock).")
+            .arg(dss::appDirName()),
         QStringLiteral("PFAD"));
     parser.addOption(versionOption);
     parser.addOption(dataDirOption);

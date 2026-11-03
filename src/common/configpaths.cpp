@@ -6,21 +6,53 @@
 
 namespace dss {
 
-QString configDir()
+Edition buildEdition()
+{
+#if DSS_INSTALLED_EDITION
+    return Edition::Installed;
+#else
+    return Edition::Development;
+#endif
+}
+
+QString editionLabel(Edition edition)
+{
+    return edition == Edition::Installed ? QStringLiteral("Einsatz") : QStringLiteral("Entwicklung");
+}
+
+QString appDirName(Edition edition)
+{
+    return edition == Edition::Installed ? QStringLiteral("dons-streaming-studio")
+                                         : QStringLiteral("dons-streaming-studio-entwicklung");
+}
+
+QString configDir(Edition edition)
 {
     return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
-           + QStringLiteral("/dons-streaming-studio");
+           + QLatin1Char('/') + appDirName(edition);
 }
 
 QString userSymbolDir()
 {
-    return configDir() + QStringLiteral("/symbole");
+    return configDir(Edition::Installed) + QStringLiteral("/symbole");
 }
 
-QString defaultConnectionPath()
+QString defaultConnectionPath(Edition edition)
 {
-    return QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)
-           + QStringLiteral("/dons-streaming-studio/kern.sock");
+    return QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + QLatin1Char('/')
+           + appDirName(edition) + QStringLiteral("/kern.sock");
+}
+
+QString coreUnitName(Edition edition)
+{
+    return edition == Edition::Installed ? QStringLiteral("dss-core.service")
+                                         : QStringLiteral("dss-core-entwicklung.service");
+}
+
+QString windowTitle(Edition edition)
+{
+    return edition == Edition::Installed ? QStringLiteral("DoNs Streaming Studio")
+                                         : QStringLiteral("DoNs Streaming Studio – Entwicklung");
 }
 
 QString findSymbolFile(const QString &fileName, const QStringList &dirs)

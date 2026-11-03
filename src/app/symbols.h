@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QIcon>
 #include <QImage>
+#include <QList>
 #include <QSize>
 #include <QString>
 
@@ -29,3 +30,9 @@ QString symbolPath(const QString &fileName);
 
 // true, wenn der Nutzer eine eigene Datei fileName in seinem Symbolordner hat.
 bool hasUserSymbol(const QString &fileName);
+
+// Programm-Symbol (P10a): alle Dateien dons-streaming-studio-<Grösse>.png aus dir, in Farbe
+// (nicht eingefärbt). Fehlt jede Datei, steht eine Warnung im Protokoll und das Symbol ist leer.
+QIcon appIcon(const QString &dir);
+// Grössen des Programm-Symbols wie die Ordner «apps» im Thema hicolor (16 bis 512).
+QList<int> appIconSizes();
