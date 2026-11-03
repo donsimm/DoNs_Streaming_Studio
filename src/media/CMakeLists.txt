@@ -2,11 +2,13 @@
 # Regel 9). P09: Grösse neuer Bild- und Videoquellen (Kern, dss-cli) und Dekodieren der Videos
 # für den Zeichner im Editor (dss-app).
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED) # std::thread der Videos
 pkg_check_modules(DSS_FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswscale)
 
 add_library(dss_media STATIC
   avsupport.h avsupport.cpp
   mediainfo.h mediainfo.cpp
+  videoplayer.h videoplayer.cpp
 )
 target_include_directories(dss_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(dss_media PUBLIC Qt6::Core PRIVATE PkgConfig::DSS_FFMPEG dss_warnings)
+target_link_libraries(dss_media PUBLIC Qt6::Core Threads::Threads PRIVATE PkgConfig::DSS_FFMPEG dss_warnings)

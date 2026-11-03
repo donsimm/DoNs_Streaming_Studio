@@ -7,6 +7,9 @@
 #include "docks.h"
 #include "headerbar.h"
 #include "symbols.h"
+#if DSS_APP_RENDERER
+#include "sourcerenderer.h"
+#endif
 #include "version.h"
 #include "windowedit.h"
 
@@ -124,6 +127,10 @@ void MainWindow::createCentralArea()
     m_modules = new QStackedWidget(central);
     m_canvas = new CanvasWidget(m_theme, m_modules);
     m_modules->addWidget(m_canvas);
+#if DSS_APP_RENDERER
+    m_renderer = new SourceRenderer(this);
+    m_canvas->setRenderer(m_renderer);
+#endif
 
     auto *chatBotPage = new QWidget(m_modules);
     chatBotPage->setObjectName(QStringLiteral("chatBotPage"));
@@ -276,6 +283,12 @@ void MainWindow::onCoreConnectedChanged(bool connected)
         // Auswahl der Schriften für Textquellen (Teil F)
         m_client->requestFonts();
     }
+#if DSS_APP_RENDERER
+    // Dateien der Quellen liegen im Datenordner des Kerns (hello.data_dir, P09).
+    if (connected)
+        m_renderer->setDataDir(m_client->coreHello().dataDir);
+    refreshOverlay();
+#endif
     refreshActions();
 }
 
@@ -424,6 +437,10 @@ void MainWindow::refreshOverlay()
         m_selectedSource = QUuid();
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
+    m_canvas->setOverlay(overlay);
+#if DSS_APP_RENDERER
+    m_renderer->setOverlay(overlay ? &*overlay : nullptr);
+#endif
     // Auflösung im Dock «Steuerung» (P09); während eine Änderung unterwegs ist, bleibt der Wert.
     if (!m_client || !m_client->isChangePending(dss::overlaySizeKey(m_selectedOverlay))) {
         const QSignalBlocker blockWidth(m_controlDock.overlayWidth);

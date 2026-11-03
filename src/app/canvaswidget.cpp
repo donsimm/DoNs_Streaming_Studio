@@ -1,6 +1,9 @@
 #include "canvaswidget.h"
 
 #include "canvasview.h"
+#if DSS_APP_RENDERER
+#include "sourcerenderer.h"
+#endif
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -45,6 +48,22 @@ void CanvasWidget::setCanvasSize(const QSize &size)
     update();
 }
 
+void CanvasWidget::setRenderer(SourceRenderer *renderer)
+{
+    m_renderer = renderer;
+#if DSS_APP_RENDERER
+    if (renderer)
+        connect(renderer, &SourceRenderer::changed, this, qOverload<>(&QWidget::update));
+#endif
+    update();
+}
+
+void CanvasWidget::setOverlay(const std::optional<dss::Overlay> &overlay)
+{
+    m_overlay = overlay;
+    update();
+}
+
 void CanvasWidget::mouseMoveEvent(QMouseEvent *event)
 {
     m_pointer = event->position().toPoint();
@@ -80,6 +99,15 @@ void CanvasWidget::paintEvent(QPaintEvent *)
             p.fillRect(start.x() + x, start.y() + y, kCheckerSize, kCheckerSize,
                        m_theme.checkerLight);
     }
+#if DSS_APP_RENDERER
+    // Quellen des Overlays (P09, Teil B), beschnitten auf die Leinwand.
+    if (m_renderer && m_overlay) {
+        p.save();
+        p.translate(area.topLeft());
+        m_renderer->paint(&p, *m_overlay, fit);
+        p.restore();
+    }
+#endif
     p.restore();
 
     // Lineale oben und links, in Pixeln der Leinwand.
@@ -128,4 +156,5 @@ void CanvasWidget::paintEvent(QPaintEvent *)
     p.setPen(m_theme.text);
     p.drawText(box.adjusted(6, 0, -6, 0), Qt::AlignLeft | Qt::AlignVCenter,
                dss::pointerPositionText(inside, pixel));
+    emit painted();
 }

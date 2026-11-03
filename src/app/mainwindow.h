@@ -13,6 +13,7 @@
 
 class CanvasWidget;
 class HeaderBar;
+class SourceRenderer;
 class QLabel;
 class QListWidgetItem;
 class QMenu;
@@ -52,6 +53,10 @@ public:
     void selectFirstOverlay();
     void selectSourceRow(int row);
     void scrollPropertiesToKindPage();
+    // P09: Zeichner der Leinwand (nullptr ohne DSS_APP_RENDERER) und die Leinwand, für
+    // Bildschirmfotos, Prüfungen und die Leistungsmessung.
+    SourceRenderer *renderer() const { return m_renderer; }
+    CanvasWidget *canvas() const { return m_canvas; }
 
     // Zustand eines Verbindungsknopfes im Kopfbereich.
     void setConnectionState(dss::Connection connection, dss::ConnectionState state);
@@ -130,6 +135,7 @@ private:
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     CanvasWidget *m_canvas = nullptr;
+    SourceRenderer *m_renderer = nullptr; // P09, nur mit DSS_APP_RENDERER
     OverlaysDock m_overlaysDock;
     SourcesDock m_sourcesDock;
     PropertiesDock m_propertiesDock;

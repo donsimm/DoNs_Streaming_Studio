@@ -27,6 +27,14 @@ target_link_libraries(dss_app_ui PUBLIC dss_common Qt6::Widgets PRIVATE dss_warn
 option(DSS_APP_EDITING "Bearbeiten im Fenster (P08)" ON)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_EDITING=$<BOOL:${DSS_APP_EDITING}>)
 
+# Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
+if(DSS_APP_RENDERER)
+  target_sources(dss_app_ui PRIVATE sourcerenderer.h sourcerenderer.cpp)
+  target_link_libraries(dss_app_ui PUBLIC dss_media)
+endif()
+target_compile_definitions(dss_app_ui PUBLIC DSS_APP_RENDERER=$<BOOL:${DSS_APP_RENDERER}>
+                                             DSS_APP_CANVAS_EDIT=$<BOOL:${DSS_APP_CANVAS_EDIT}>)
+
 # Übersetzung von Qt ohne «ß» (P09, Punkt 44): qtbase_de.qm beim Bau kopieren, «ß» → «ss».
 # Quelle: Paket qt6-translations-l10n (Ordner der Übersetzungen von Qt, QtInstallPaths.cmake).
 set(DSS_QT_TRANSLATION "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}/qtbase_de.qm"

@@ -11,6 +11,11 @@ option(DSS_BUILD_CLI "Werkzeug dss-cli bauen" ON)
 # P09: Kern und dss-cli lesen die Grösse neuer Bild- und Videoquellen aus der Datei (Entscheid 6).
 # Aus: neue Quellen bekommen die Grösse des Overlays wie in P08.
 option(DSS_MEDIA_SIZE "Grösse neuer Bild- und Videoquellen aus der Datei lesen (P09)" ON)
+# P09: Fenster zeichnet die Quellen auf der Leinwand (Teil B). Aus: leere Leinwand wie in P08.
+option(DSS_APP_RENDERER "Quellen auf der Leinwand zeichnen (P09)" ON)
+# P09: Quellen auf der Leinwand wählen, verschieben, skalieren, drehen (Teil C).
+# Aus: Leinwand nur zur Anzeige.
+option(DSS_APP_CANVAS_EDIT "Quellen auf der Leinwand bearbeiten (P09)" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,7 +40,7 @@ add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
 add_subdirectory(src/common)
-if(DSS_MEDIA_SIZE)
+if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER))
   add_subdirectory(src/media)
 endif()
 add_subdirectory(src/core)
