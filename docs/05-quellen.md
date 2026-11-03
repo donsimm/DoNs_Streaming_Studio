@@ -111,4 +111,13 @@ Abgerufen in P09 (2026-11-03):
 - std::condition_variable: https://en.cppreference.com/w/cpp/thread/condition_variable/wait
 - sysstat (pidstat, mpstat) 12.7.5: https://sysstat.github.io/
 
+Abgerufen in P09b (2026-11-03):
+
+- OBS Studio, Quellcode Commit `65c320b46e1af5c7a555161aea6182cdf7a8c524` (Menü «Transformieren», Spiegeln durch Ziehen, Seitenverhältnis der Quelle): https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/widgets/OBSBasic_SceneItems.cpp, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/widgets/OBSBasic_Scenes.cpp, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/widgets/OBSBasic_Clipboard.cpp, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/forms/OBSBasic.ui, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/data/locale/de-DE.ini, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/libobs/obs-scene.c
+- EXIF 2.32 (CIPA DC-008-2019), Tag Orientation: https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf
+- PNG Third Edition, Chunk `eXIf`: https://www.w3.org/TR/png-3/
+- CSS `image-orientation`: https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation
+- Chromium, `eXIf` in PNG: https://chromium.googlesource.com/chromium/src/+/694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6
+- Qt 6.8: QImageReader::setAutoTransform https://doc.qt.io/qt-6.8/qimagereader.html#setAutoTransform, eigenes Layout https://doc.qt.io/qt-6.8/layout.html#how-to-write-a-custom-layout-manager
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.

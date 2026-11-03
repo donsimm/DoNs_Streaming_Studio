@@ -2,7 +2,7 @@
 
 Private Software für den Twitch-Stream von Dominik Simmen. Sie übernimmt alles, was nicht zum Haupt-OBS gehört. Hauptfokus ist der Editor: pro Overlay eine eigene Leinwand, die als Browserquelle (später auch per NDI) an OBS ausgegeben wird.
 
-Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an. Seit P08 lassen sich Overlays (mit Ordnern), Quellen und ihre Eigenschaften im Fenster bearbeiten. Seit P09 zeichnet die Leinwand Bild, Text, Video und WebM mit Alpha, und Quellen lassen sich dort mit der Maus wählen, verschieben, skalieren und drehen. Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
+Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an. Seit P08 lassen sich Overlays (mit Ordnern), Quellen und ihre Eigenschaften im Fenster bearbeiten. Seit P09 zeichnet die Leinwand Bild, Text, Video und WebM mit Alpha, und Quellen lassen sich dort mit der Maus wählen, verschieben, skalieren und drehen. Seit P09b lassen sich Quellen spiegeln und über «Bearbeiten» → «Transformieren» (auch per Rechtsklick) wie in OBS drehen, einpassen, zentrieren, zurücksetzen, kopieren und einfügen; Bilder erscheinen mit ihrer EXIF-Ausrichtung. Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
 
 ## Inhalt
 
@@ -67,6 +67,7 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_MEDIA_SIZE` | `ON` | Kern und `dss-cli` lesen die Grösse neuer Bild- und Videoquellen aus der Datei (P09, FFmpeg); aus: Grösse des Overlays wie in P08 |
 | `DSS_APP_RENDERER` | `ON` | Leinwand zeichnet die Quellen (P09); aus: leere Leinwand wie in P08 |
 | `DSS_APP_CANVAS_EDIT` | `ON` | Quellen auf der Leinwand mit Maus und Pfeiltasten bearbeiten (P09); aus: Leinwand zeigt nur an |
+| `DSS_APP_TRANSFORM` | `ON` | Befehle «Transformieren» im Menü «Bearbeiten» und per Rechtsklick (P09b); aus: kein Menü «Transformieren» |
 
 Das Fenster speichert Grösse, Lage und Anordnung der Docks beim Beenden in `~/.config/dons-streaming-studio/fenster.ini` (bzw. `$XDG_CONFIG_HOME/…`). Löschen der Datei stellt die Standardanordnung her.
 

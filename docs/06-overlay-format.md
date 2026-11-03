@@ -82,7 +82,7 @@ Beispiel: «Überblick Start» oben, darunter der Ordner «Szenen» mit einem Ov
 
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
-| `format_version` | ganze Zahl | `1` oder `2` | Version des Formats. Geschrieben wird immer `2`. Eine höhere Zahl wird abgewiesen, nicht geraten. Version 1 (P04 bis P08) wird weiter gelesen, siehe «Versionen». |
+| `format_version` | ganze Zahl | `1`, `2` oder `3` | Version des Formats. Geschrieben wird immer `3`. Eine höhere Zahl wird abgewiesen, nicht geraten. Versionen 1 (P04 bis P08) und 2 (P09) werden weiter gelesen, siehe «Versionen». |
 | `id` | Text | UUID, Kleinbuchstaben, ohne Klammern | Kennung, ändert sich nie. Bestimmt den Dateinamen. |
 | `name` | Text | nicht leer (nicht nur Leerzeichen) | frei wählbarer Name |
 | `address` | Text | `a-z`, `0-9`, einzelne `-` dazwischen | Adresse für die Browserquelle, siehe «Adresse» |
@@ -102,10 +102,14 @@ Gemeinsame Felder aller Arten:
 | `x`, `y` | ganze Zahl | beliebig (auch negativ) | linke obere Ecke der ungedrehten Quelle in Pixeln der Leinwand; negativ = teilweise ausserhalb |
 | `width`, `height` | ganze Zahl | ab 1 | Grösse in Pixeln |
 | `rotation` | ganze Zahl | 0 bis 3599 | Drehung in Zehntelgrad um die Mitte der Quelle (125 = 12.5 °), Anzeige mit einer Nachkommastelle |
+| `flip_horizontal` | true/false | | seit Version 3 (P09b): Inhalt waagrecht gespiegelt (links ↔ rechts); beim Hinzufügen `false` |
+| `flip_vertical` | true/false | | seit Version 3 (P09b): Inhalt senkrecht gespiegelt (oben ↔ unten); beim Hinzufügen `false` |
 | `visible` | true/false | | eingeblendet |
 | `text` / `image` / `video` | Objekt | genau das zur Art passende | Eigenschaften der Art |
 
 Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn um die Mitte der Quelle (entschieden 2026-11-02, `docs/01-festlegungen.md`). Das Format speichert nur den Winkel.
+
+Spiegeln (Entscheid 4, P09b, wie OBS): Der Inhalt wird in seinem Kasten um dessen Mitte gespiegelt, und zwar vor der Drehung, also in der Richtung der Quelle selbst (wie ein negativer Massstab in OBS, `libobs/obs-scene.c`, `update_item_transform`). `x`, `y`, `width`, `height` beschreiben weiter den ungedrehten, ungespiegelten Kasten; Breite und Höhe bleiben positiv. Für die Browserquelle (P10) entspricht das CSS `transform: rotate(<Winkel>) scale(-1, 1)` bzw. `scale(1, -1)` um die Mitte. Gilt für alle Arten, auch Text.
 
 ### Art `text` (TX-01 bis TX-05)
 
@@ -125,6 +129,8 @@ Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn um die Mitte der Quell
 |---|---|---|---|
 | `file` | Text | Verweis `media/<SHA-256>.<Endung>` | Bilddatei |
 
+EXIF-Ausrichtung (Entscheid 7, P09b): Ein Bild wird so gezeigt, wie seine EXIF-Ausrichtung (Tag 0x0112, Werte 1 bis 8) es verlangt, wie im Browser mit dem Anfangswert `image-orientation: from-image` (https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation). Gelesen wird sie bei JPEG aus dem APP1-Segment «Exif», bei PNG aus dem Chunk `eXIf` vor dem ersten `IDAT` (EXIF 2.32, https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf, Abschnitt 4.6.4; PNG Third Edition, https://www.w3.org/TR/png-3/#eXIf). Die Datei selbst bleibt unverändert. Die Grösse der Datei (beim Hinzufügen, Zurücksetzen und Seitenverhältnis an den Ecken) ist die angezeigte: Bei den Werten 5 bis 8 sind Breite und Höhe gegenüber den gespeicherten Pixeln vertauscht. Die Ausrichtung kommt vor dem Strecken in den Kasten, dem Spiegeln und der Drehung der Quelle.
+
 ### Art `video`
 
 | Feld | Typ | Bereich | Bedeutung |
@@ -143,8 +149,9 @@ Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und
 |---|---|---|
 | 1 | P04 | `video.loop` kam in P05 ohne neue Version dazu (auf dem Studio-PC gab es noch keine Overlay-Dateien, geprüft 2026-11-02, Bericht P05) |
 | 2 | P09 | neues Pflichtfeld `video.hold_at_end`. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 1 gibt (geprüft 2026-11-03, Bericht P09) |
+| 3 | P09b | neue Pflichtfelder `flip_horizontal` und `flip_vertical` je Quelle. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 2 gibt (geprüft 2026-11-03, Bericht P09b) |
 
-Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, in Version 2 Pflicht. Beim nächsten Speichern wird die Datei als Version 2 geschrieben.
+Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. Beim nächsten Speichern wird die Datei als Version 3 geschrieben.
 
 ## Regeln beim Lesen
 
@@ -178,7 +185,7 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
 <!-- beispiel-anfang -->
 ```json
 {
-    "format_version": 2,
+    "format_version": 3,
     "id": "db7f47a9-dee3-4de5-b056-40b5b3507607",
     "name": "Überblick Start",
     "address": "ueberblick-start",
@@ -194,6 +201,8 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "width": 640,
             "height": 360,
             "rotation": 125,
+            "flip_horizontal": true,
+            "flip_vertical": false,
             "visible": true,
             "image": {
                 "file": "media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png"
@@ -208,6 +217,8 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "width": 512,
             "height": 512,
             "rotation": 0,
+            "flip_horizontal": false,
+            "flip_vertical": false,
             "visible": false,
             "video": {
                 "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm",
@@ -224,6 +235,8 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "width": 800,
             "height": 140,
             "rotation": 0,
+            "flip_horizontal": false,
+            "flip_vertical": false,
             "visible": true,
             "text": {
                 "content": "Willkommen\nZweite Zeile",

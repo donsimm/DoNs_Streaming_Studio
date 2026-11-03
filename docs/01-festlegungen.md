@@ -170,7 +170,13 @@ Entschieden (2026-11-02, vom Nutzer bestätigt), umgesetzt mit P08:
 Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09:
 
 - Bild und Video füllen die Box der Quelle (Breite × Höhe) und werden dafür gestreckt. Eine neu hinzugefügte Bild- oder Videoquelle bekommt die Originalgrösse der Datei (ersetzt Annahme 2 aus P04 für Bild und Video).
-- Ziehen mit der Maus wie OBS: an einer Ecke bleibt das Seitenverhältnis, mit Umschalttaste frei; an einer Kante nur Breite oder Höhe.
+- Ziehen mit der Maus wie OBS: an einer Ecke bleibt das Seitenverhältnis, mit Umschalttaste frei; an einer Kante nur Breite oder Höhe. Seit P09b ist es an der Ecke das Verhältnis der Originalgrösse der Datei (wie OBS), bei Text das des Kastens beim Beginn. Zieht man über die Gegenseite hinaus, wird die Quelle in dieser Richtung gespiegelt (wie OBS).
 - Drehen mit der Maus über einen Griff oberhalb der gewählten Quelle wie in OBS; mit Umschalttaste rastet der Winkel in 1°-Schritten ein (geändert vom Nutzer im Handtest P09, 2026-11-03; vorher 15°). Ohne Umschalttaste Zehntelgrad.
 - Ende eines Videos: ohne Einstellung wird die Quelle leer (durchsichtig). Neues Kästchen «Am Ende anhalten» in den Eigenschaften des Videos: das letzte Bild bleibt stehen. Mit «Wiederholen» beginnt das Video von vorne; «Am Ende anhalten» ist dann ausgegraut. Neues Feld im Modell und in der Overlay-Datei. Gilt gleich für Editor und Browserquelle.
 - Im Editor läuft ein Video ab dem Wählen des Overlays. Wann ein Video in der Browserquelle startet, wird mit P10 entschieden.
+
+Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09b:
+
+- **Spiegeln:** Jede Quelle kann waagrecht und senkrecht gespiegelt sein (Felder `flip_horizontal`, `flip_vertical`, Format 3, `docs/06-overlay-format.md`). Der Inhalt wird in seinem Kasten um dessen Mitte gespiegelt, vor der Drehung; Breite und Höhe bleiben positiv.
+- **EXIF-Ausrichtung:** Bilder werden so gezeigt, wie ihre EXIF-Ausrichtung es verlangt (wie der Browser mit `image-orientation: from-image`); die Originalgrösse ist die angezeigte Grösse.
+- **Zweiter Zeichner (P10, K-07):** Die Browserquelle muss Spiegeln und EXIF-Ausrichtung genauso umsetzen wie der Editor: Reihenfolge Ausrichtung des Bildes → Strecken in den Kasten → Spiegeln um die Mitte → Drehung um die Mitte (CSS etwa `transform: rotate(<Winkel>) scale(-1, 1)`), EXIF bei JPEG und bei PNG (`eXIf` vor `IDAT`). Ob die Chromium-Version der Browserquelle in OBS die EXIF-Ausrichtung von PNG beachtet, ist nicht geprüft (Chromium unterstützt sie seit dem Commit 694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6 vom 2024-02-05, https://chromium.googlesource.com/chromium/src/+/694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6); das klärt der Bildvergleich (K-08) bzw. T-04.

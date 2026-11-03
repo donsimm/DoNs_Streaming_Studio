@@ -1,0 +1,630 @@
+{
+ "summary": {
+  "case": "app-kern-sigterm",
+  "started": "2026-11-03 13:26:46 +0100",
+  "command": "/home/dominik/DoNs_Streaming_Studio/build/src/app/dss-app",
+  "with_core": true,
+  "signal": "SIGTERM",
+  "display": ":0.0",
+  "config_saved": true,
+  "runs": 20,
+  "clean": 20,
+  "start_ms_min": 201.1,
+  "start_ms_median": 216.6,
+  "start_ms_max": 227.0,
+  "exit_ms_min": 14.1,
+  "exit_ms_median": 15.8,
+  "exit_ms_max": 19.1
+ },
+ "runs": [
+  {
+   "run": 1,
+   "exit_code": 0,
+   "start_ms": 214.3,
+   "exit_ms": 16.4,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:46.873 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:46.909 info Fenster gezeichnet",
+    "2026-11-03 13:26:47.912 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:47.914 info Kern beendet sich",
+    "2026-11-03 13:26:47.915 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:46.694 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:46.694 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:46.695 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:46.894 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:46.907 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:47.913 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:47.913 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:26:47.913 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 2,
+   "exit_code": 0,
+   "start_ms": 227.0,
+   "exit_ms": 17.0,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:48.661 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:48.698 info Fenster gezeichnet",
+    "2026-11-03 13:26:49.700 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:49.702 info Kern beendet sich",
+    "2026-11-03 13:26:49.703 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:48.470 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:48.471 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:48.471 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:48.679 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:48.693 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:49.701 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:49.701 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 3,
+   "exit_code": 0,
+   "start_ms": 215.9,
+   "exit_ms": 16.0,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:50.444 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:50.479 info Fenster gezeichnet",
+    "2026-11-03 13:26:51.484 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:51.486 info Kern beendet sich",
+    "2026-11-03 13:26:51.487 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:50.263 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:50.263 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:50.264 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:50.461 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:50.475 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:51.485 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:51.485 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 4,
+   "exit_code": 0,
+   "start_ms": 219.0,
+   "exit_ms": 18.0,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:52.226 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:52.263 info Fenster gezeichnet",
+    "2026-11-03 13:26:53.268 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:53.270 info Kern beendet sich",
+    "2026-11-03 13:26:53.271 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:52.043 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:52.044 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:52.044 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:52.246 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:52.306 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:53.269 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:53.269 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 5,
+   "exit_code": 0,
+   "start_ms": 216.6,
+   "exit_ms": 15.8,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:54.009 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:54.045 info Fenster gezeichnet",
+    "2026-11-03 13:26:55.049 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:55.051 info Kern beendet sich",
+    "2026-11-03 13:26:55.052 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:53.828 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:53.828 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:53.829 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:54.030 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:54.078 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:55.050 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:55.050 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:26:55.050 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 6,
+   "exit_code": 0,
+   "start_ms": 217.9,
+   "exit_ms": 16.6,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:55.794 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:55.826 info Fenster gezeichnet",
+    "2026-11-03 13:26:56.829 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:56.830 info Kern beendet sich",
+    "2026-11-03 13:26:56.831 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:55.607 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:55.608 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:55.608 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:55.812 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:55.853 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:56.829 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:56.829 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 7,
+   "exit_code": 0,
+   "start_ms": 220.9,
+   "exit_ms": 15.1,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:57.579 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:57.611 info Fenster gezeichnet",
+    "2026-11-03 13:26:58.615 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:26:58.617 info Kern beendet sich",
+    "2026-11-03 13:26:58.617 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:57.389 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:57.390 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:57.390 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:57.596 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:57.643 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:26:58.615 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:26:58.616 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:26:58.616 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 8,
+   "exit_code": 0,
+   "start_ms": 216.1,
+   "exit_ms": 14.5,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:26:59.360 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:59.391 info Fenster gezeichnet",
+    "2026-11-03 13:27:00.396 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:00.398 info Kern beendet sich",
+    "2026-11-03 13:27:00.398 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:26:59.174 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:26:59.174 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:26:59.175 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:26:59.373 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:26:59.387 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:00.397 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:00.397 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:00.397 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 9,
+   "exit_code": 0,
+   "start_ms": 206.6,
+   "exit_ms": 15.0,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:01.129 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:01.163 info Fenster gezeichnet",
+    "2026-11-03 13:27:02.165 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:02.167 info Kern beendet sich",
+    "2026-11-03 13:27:02.168 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:00.956 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:00.956 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:00.956 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:01.148 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:01.198 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:02.166 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:02.166 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:02.166 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 10,
+   "exit_code": 0,
+   "start_ms": 226.3,
+   "exit_ms": 15.1,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:02.914 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:02.949 info Fenster gezeichnet",
+    "2026-11-03 13:27:03.953 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:03.955 info Kern beendet sich",
+    "2026-11-03 13:27:03.955 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:02.722 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:02.722 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:02.722 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:02.932 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:02.979 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:03.954 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:03.954 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 11,
+   "exit_code": 0,
+   "start_ms": 206.4,
+   "exit_ms": 15.2,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:04.694 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:04.723 info Fenster gezeichnet",
+    "2026-11-03 13:27:05.726 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:05.728 info Kern beendet sich",
+    "2026-11-03 13:27:05.729 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:04.516 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:04.517 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:04.517 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:04.706 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:04.754 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:05.727 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:05.727 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 12,
+   "exit_code": 0,
+   "start_ms": 226.8,
+   "exit_ms": 19.1,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:06.478 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:06.512 info Fenster gezeichnet",
+    "2026-11-03 13:27:07.514 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:07.516 info Kern beendet sich",
+    "2026-11-03 13:27:07.517 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:06.284 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:06.284 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:06.285 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:06.496 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:06.509 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:07.515 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:07.515 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 13,
+   "exit_code": 0,
+   "start_ms": 221.0,
+   "exit_ms": 14.1,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:08.261 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:08.298 info Fenster gezeichnet",
+    "2026-11-03 13:27:09.301 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:09.303 info Kern beendet sich",
+    "2026-11-03 13:27:09.303 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:08.076 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:08.076 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:08.077 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:08.281 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:08.339 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:09.302 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:09.302 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 14,
+   "exit_code": 0,
+   "start_ms": 201.1,
+   "exit_ms": 15.9,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:10.033 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:10.066 info Fenster gezeichnet",
+    "2026-11-03 13:27:11.072 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:11.074 info Kern beendet sich",
+    "2026-11-03 13:27:11.075 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:09.864 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:09.865 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:09.865 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:10.050 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:10.091 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:11.073 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:11.073 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 15,
+   "exit_code": 0,
+   "start_ms": 213.2,
+   "exit_ms": 15.2,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:11.811 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:11.848 info Fenster gezeichnet",
+    "2026-11-03 13:27:12.851 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:12.853 info Kern beendet sich",
+    "2026-11-03 13:27:12.853 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:11.634 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:11.634 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:11.635 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:11.830 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:11.888 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:12.852 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:12.852 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 16,
+   "exit_code": 0,
+   "start_ms": 217.4,
+   "exit_ms": 17.5,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:13.598 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:13.633 info Fenster gezeichnet",
+    "2026-11-03 13:27:14.636 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:14.637 info Kern beendet sich",
+    "2026-11-03 13:27:14.638 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:13.415 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:13.416 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:13.416 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:13.616 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:13.662 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:14.637 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:14.637 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:14.637 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 17,
+   "exit_code": 0,
+   "start_ms": 217.0,
+   "exit_ms": 18.3,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:15.378 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:15.415 info Fenster gezeichnet",
+    "2026-11-03 13:27:16.420 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:16.422 info Kern beendet sich",
+    "2026-11-03 13:27:16.423 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:15.197 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:15.198 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:15.198 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:15.397 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:15.455 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:16.421 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:16.421 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:16.421 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 18,
+   "exit_code": 0,
+   "start_ms": 202.9,
+   "exit_ms": 15.4,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:17.160 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:17.191 info Fenster gezeichnet",
+    "2026-11-03 13:27:18.193 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:18.195 info Kern beendet sich",
+    "2026-11-03 13:27:18.196 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:16.987 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:16.987 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:16.988 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:17.175 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:17.225 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:18.194 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:18.194 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:18.194 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 19,
+   "exit_code": 0,
+   "start_ms": 211.4,
+   "exit_ms": 15.0,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:18.928 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:18.963 info Fenster gezeichnet",
+    "2026-11-03 13:27:19.966 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:19.967 info Kern beendet sich",
+    "2026-11-03 13:27:19.968 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:18.751 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:18.751 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:18.752 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:18.946 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:18.959 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:19.966 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:19.966 info Verbindung getrennt: dss-app (noch 0)",
+    "2026-11-03 13:27:19.966 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  },
+  {
+   "run": 20,
+   "exit_code": 0,
+   "start_ms": 209.6,
+   "exit_ms": 15.3,
+   "window_visible": true,
+   "timeout": false,
+   "leftover_processes": [],
+   "unexpected_lines": [],
+   "missing_lines": [],
+   "stdout": "",
+   "log": [
+    "2026-11-03 13:27:20.696 info dss-app 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:20.740 info Fenster gezeichnet",
+    "2026-11-03 13:27:21.745 info SIGTERM erhalten, schliesse Fenster",
+    "2026-11-03 13:27:21.747 info Kern beendet sich",
+    "2026-11-03 13:27:21.747 info beendet, Exit-Code 0"
+   ],
+   "core_exit_code": 0,
+   "core_log": [
+    "2026-11-03 13:27:20.529 info dss-core 0.1.0 gestartet, Qt 6.8.2",
+    "2026-11-03 13:27:20.530 info Datenordner /tmp/dss-startpruefung-daten-6ffkj8xe: 0 Overlays geladen",
+    "2026-11-03 13:27:20.530 info Verbindung offen: /run/user/1000/dss-sp-po2f3guy/kern.sock",
+    "2026-11-03 13:27:20.713 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
+    "2026-11-03 13:27:20.730 info Schriften geladen: 131 Schnitte",
+    "2026-11-03 13:27:21.746 info Beenden erbeten von dss-app, kein anderes Fenster verbunden: beende",
+    "2026-11-03 13:27:21.746 info beendet, Exit-Code 0"
+   ],
+   "clean": true
+  }
+ ]
+}

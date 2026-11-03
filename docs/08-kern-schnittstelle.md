@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-03 (P09). Version der Schnittstelle: **3**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
+Stand: 2026-11-03 (P09b). Version der Schnittstelle: **4**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays wird nie übertragen, weder gelesen noch geändert (kommt mit P10; CLAUDE.md Regel 12).
+
+### Version 4 (P09b)
+
+Die Version stieg von 3 auf 4, weil `overlay` und `overlay_changed` jetzt Overlays im Dateiformat 3 tragen (Pflichtfelder `flip_horizontal` und `flip_vertical` je Quelle, `docs/06-overlay-format.md`), die ein Fenster der Version 3 als ungültig verwerfen würde. Dazu kommen das Pflichtfeld `media_sizes` in `overlay` und `overlay_changed` (Originalgrösse der Dateien) und die Felder `changes.flip_horizontal` und `changes.flip_vertical` in `update_source` (ein Kern der Version 3 weist sie als unbekannt ab).
 
 ### Version 3 (P09)
 
@@ -65,7 +69,7 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 3 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 3».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 4 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 4».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `connections` und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
@@ -97,11 +101,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `3` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `4` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":3,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":4,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -142,9 +146,10 @@ Ein ganzes Overlay. `overlay` ist die Antwort auf `get_overlay`, `overlay_change
 | Feld | Typ | Inhalt |
 |---|---|---|
 | `overlay` | Objekt | Overlay **im Format der Overlay-Datei** (`docs/06-overlay-format.md`), mit allen Feldern einschliesslich `format_version`; gelesen wird es genauso streng wie die Datei. **Ohne Token.** |
+| `media_sizes` | Objekt | seit Version 4 (P09b), Pflicht, darf leer sein: Originalgrösse der Bild- und Videodateien des Overlays, Schlüssel = Verweis `media/…`, Wert = `{"width": …, "height": …}` (ganze Pixel ab 1). Bild: so, wie es angezeigt wird (mit EXIF-Ausrichtung, 5 bis 8 vertauscht), Video: Grösse des ersten Bildes. Fehlt eine Datei darin, ist ihre Grösse nicht lesbar (oder der Kern ist ohne `DSS_MEDIA_SIZE` gebaut). Das Fenster braucht sie für das Seitenverhältnis an den Ecken, «Transformation zurücksetzen» und «Auf Leinwand einpassen» (P09b, Entscheide 3 und 5). Der Kern liest jede Datei einmal (die Dateien in `media/` sind nach Inhalt benannt und ändern sich nicht) |
 
 ```json
-{"overlay":{"address":"test-eins","format_version":2,"height":720,"id":"7be08f35-6885-4a95-9c32-939c45a688ea","name":"Test Eins","sources":[{"height":720,"id":"0c1d2b7e-8a43-4c1e-9d47-1b5e6f3a2c90","image":{"file":"media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png"},"kind":"image","name":"bild1.png","rotation":0,"visible":true,"width":1280,"x":0,"y":0}],"width":1280},"type":"overlay"}
+{"media_sizes":{"media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png":{"height":256,"width":256}},"overlay":{"address":"test-eins","format_version":3,"height":720,"id":"7be08f35-6885-4a95-9c32-939c45a688ea","name":"Test Eins","sources":[{"flip_horizontal":true,"flip_vertical":false,"height":720,"id":"0c1d2b7e-8a43-4c1e-9d47-1b5e6f3a2c90","image":{"file":"media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png"},"kind":"image","name":"bild1.png","rotation":0,"visible":true,"width":1280,"x":0,"y":0}],"width":1280},"type":"overlay"}
 ```
 
 ### `overlay_removed`
@@ -266,7 +271,7 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `3`) | `overlay_list`, `connections`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `4`) | `overlay_list`, `connections`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -274,7 +279,7 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":3,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":4,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -319,6 +324,7 @@ Objekt `changes` (nur angegebene Felder ändern sich, mindestens eines; unbekann
 | `x`, `y` | ganze Zahl | Lage in Pixeln der Overlay-Auflösung, auch negativ |
 | `width`, `height` | ganze Zahl | Grösse in Pixeln, ab 1 |
 | `rotation` | ganze Zahl | Drehung in Zehntelgrad, 0 bis 3599 |
+| `flip_horizontal`, `flip_vertical` | true/false | seit Version 4 (P09b): Inhalt waagrecht bzw. senkrecht gespiegelt |
 | `visible` | true/false | sichtbar |
 | `video.loop` | true/false | nur Video: wiederholen |
 | `video.hold_at_end` | true/false | nur Video, seit Version 3: am Ende anhalten |
@@ -348,7 +354,7 @@ Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `r
 
 Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele Änderungen pro Sekunde. Zwei Stufen verhindern, dass der Kern überlastet wird oder die Datei bei jedem Schritt schreibt:
 
-1. **Fenster** (`CoreClient::sendChange` mit Schlüssel, zum Beispiel Feld und Quelle; beim Ziehen auf der Leinwand seit P09 ein `update_source` mit `x`, `y`, `width`, `height`, `rotation` unter dem Schlüssel «<Quelle>/geometry», Auflösung unter «<Overlay>/size»): Je Schlüssel ist höchstens eine Änderung unterwegs. Eine neue Änderung, bevor `change_result` da ist, wird zurückgehalten und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. Gemessen in `tst_bearbeiten` (2026-11-03): 200 Schritte → 3 Änderungen an den Kern, der letzte Wert kommt an.
+1. **Fenster** (`CoreClient::sendChange` mit Schlüssel, zum Beispiel Feld und Quelle; beim Ziehen auf der Leinwand seit P09 ein `update_source` mit `x`, `y`, `width`, `height`, `rotation` (seit P09b auch `flip_horizontal`, `flip_vertical`; ebenso die Befehle «Transformieren») unter dem Schlüssel «<Quelle>/geometry», Auflösung unter «<Overlay>/size»): Je Schlüssel ist höchstens eine Änderung unterwegs. Eine neue Änderung, bevor `change_result` da ist, wird zurückgehalten und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. Gemessen in `tst_bearbeiten` (2026-11-03): 200 Schritte → 3 Änderungen an den Kern, der letzte Wert kommt an.
 2. **Kern** (Abschnitt «Speichern»): Jede Änderung gilt sofort im Speicher und geht sofort an alle Fenster; die Datei schreibt er später.
 
 ### Speichern
