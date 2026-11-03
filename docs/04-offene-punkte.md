@@ -178,6 +178,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 ## Entschieden nach P10a (2026-11-03)
 
 - Punkt 67 (Übernehmen grosser Dateien in der Hauptschleife): Das Übernehmen (Kopie, SHA-256) kommt in einen eigenen Thread des Kerns, damit der Kern während des Übernehmens weiter Nachrichten beantwortet und die Browserquelle versorgt. Umsetzung in P10, zusammen mit dem Webserver.
+- Punkt 68 (Reste von `QSaveFile` nach Absturz): Der Kern löscht beim Start die vorläufigen Dateien von `QSaveFile` in `media/` (beim Start läuft keine Übernahme, die Sperre hält nur ein Kern). Umsetzung in P10, zusammen mit Punkt 67.
 
 ## Wünsche nach P10a (2026-11-03)
 
