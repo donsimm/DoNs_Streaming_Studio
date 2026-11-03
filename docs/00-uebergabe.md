@@ -53,6 +53,8 @@ P10a ist abgenommen, einschliesslich Handtest (5 von 5 Prüfungen). Die erste ec
 
 **Echte Daten:** Laut Nutzer (2026-11-03) ist im Datenordner noch nichts Wichtiges; ein Verlust wäre zurzeit ohne Folgen. Der Nutzer meldet, ab wann die Software offiziell im Einsatz ist. Ab dann gelten die echten Daten als wichtig (siehe `docs/04-offene-punkte.md`, «Entschieden nach P10a»). Die Regeln zum Schutz der echten Daten (CLAUDE.md, Regel 18) gelten unabhängig davon schon jetzt.
 
+**Netzwerk:** besteht seit 2026-11-03 (Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`, beide Kabel, reserviert; `docs/02-umgebung.md`). T-03 bis T-05 sind damit möglich; Prüfungen auf dem Streaming-PC macht der Nutzer.
+
 **Als Nächstes, in dieser Reihenfolge:**
 
 1. Offene Punkte aus P10a: 67 bis 70 entschieden (alle Umsetzung in P10), 71 erledigt. Neu entschieden am 2026-11-03: Dock «Medien» (E-28, MUSS) als Baustein P10b nach P10, Einzelheiten in `docs/04-offene-punkte.md`, «Wünsche nach P10a». Die zwei Beobachtungen aus dem Bericht sind ebenfalls entschieden (Anker übernommen; neuer Punkt 72). Alles aus P10a ist besprochen («Entschieden nach P10a»).

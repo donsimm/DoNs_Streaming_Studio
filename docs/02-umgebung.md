@@ -68,8 +68,8 @@ Streaming-PC (Ausgabe von `ip -br addr && ip route && ping -c 4 192.168.1.9` auf
 
 | Angabe | Streaming-PC |
 |---|---|
-| Netzwerkkarte | `eno2`, `UP` (Kabel: nach dem Namen eine eingebaute Karte, nicht bestätigt); `wlo1` (WLAN) `DOWN` |
-| Adresse IPv4 | `192.168.1.116/24`, vom Router per DHCP; ob reserviert: nicht geprüft |
+| Netzwerkkarte | `eno2` (Kabel, Angabe des Nutzers), `UP`; `wlo1` (WLAN) `DOWN` |
+| Adresse IPv4 | `192.168.1.116/24`, vom Router per DHCP, am Router fest reserviert (Angabe des Nutzers) |
 | Router (Standardroute) | `192.168.1.1` über `eno2` |
 | IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten) |
 | Ping zum Studio-PC `192.168.1.9` | 4 von 4, 0 % Verlust, Zeit min/Mittel/max 0,139 / 0,313 / 0,582 ms, TTL 64 (gleiches Netz, kein Router dazwischen) |

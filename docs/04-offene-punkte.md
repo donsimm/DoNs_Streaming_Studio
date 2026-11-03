@@ -84,9 +84,9 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 |---|---|---|---|
 | T-01 | Oberfläche: Start mit echtem Fenstersystem, mindestens 20 Mal, Exit-Code und Beenden prüfen | Technik der Oberfläche | Prompt P01 |
 | T-02 | Overlay 1920x1080 mit Animationen und WebM mit Alpha rendern, CPU und Bildrate messen | Rendern der Vorschau | Prompt P01 |
-| T-03 | NDI mit Alpha senden (1080p30, dann 1080p60, dann zwei Ausgänge), CPU, Verluste und Verzögerung am OBS-PC messen | NDI, Technikwahl | wartet auf Netzwerk |
-| T-04 | OBS-PC lädt ein Overlay als Browserquelle vom Studio-PC über das Heimnetz, Live-Aktualisierung prüfen | Hauptweg der Ausgabe | wartet auf Netzwerk |
-| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | wartet auf Netzwerk |
+| T-03 | NDI mit Alpha senden (1080p30, dann 1080p60, dann zwei Ausgänge), CPU, Verluste und Verzögerung am OBS-PC messen | NDI, Technikwahl | Netzwerk besteht (2026-11-03), offen |
+| T-04 | OBS-PC lädt ein Overlay als Browserquelle vom Studio-PC über das Heimnetz, Live-Aktualisierung prüfen | Hauptweg der Ausgabe | Netzwerk besteht (2026-11-03), offen |
+| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | Netzwerk besteht (2026-11-03), offen |
 
 ## Reihenfolge
 
@@ -203,4 +203,4 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Token pro Overlay bleibt (erneut bestätigt 2026-11-03, nach Rückfrage zu Aufwand und Leistung: Vergleich von 43 Zeichen pro Anfrage, nicht messbar gegenüber Zeichnen und Dekodieren). Der Nutzer kopiert pro Overlay einmal die ganze Adresse (Knopf «Kopieren» im Dock «Steuerung») ins Feld «URL» der Browserquelle in OBS.
 - Form der Adresse: `http://<Adresse des Studio-PCs>:<Port>/o/<adresse>/<token>/`. Alles, was die Seite nachlädt (Bilder, Videos, Schriften, Verbindung für Änderungen), liegt unter diesem Pfad. Der Kern schreibt die Adresse nie mit Token ins Protokoll (CLAUDE.md, Regel 12).
 - Alte Adresse (neue Adresse beim Umbenennen, neuer Token, gelöschtes Overlay): sofort ungültig. Der Server antwortet mit einer leeren, durchsichtigen Seite statt einer Fehlerseite (sonst wäre in OBS ein Kasten mit Text im Stream sichtbar). Der Kern protokolliert «unbekannte Adresse» ohne Token; das Fenster zeigt einen Hinweis, dass eine Browserquelle eine ungültige Adresse benutzt.
-- Netzwerk (Angabe des Nutzers 2026-11-03, 19:51): Das Netzwerk zwischen Studio-PC und Streaming-PC ist eingerichtet und funktioniert, beide Systeme sind im Netz. Einzelheiten (Adressen, Kabel oder WLAN, feste Adresse) werden noch erhoben; danach werden `CLAUDE.md` (Abschnitt «Umgebung»), `docs/02-umgebung.md` und die Machbarkeitstests T-03 bis T-05 nachgeführt.
+- Netzwerk (Angabe des Nutzers 2026-11-03, 19:51): Das Netzwerk zwischen Studio-PC und Streaming-PC ist eingerichtet und funktioniert, beide Systeme sind im Netz. Erhoben und nachgeführt (2026-11-03): `docs/02-umgebung.md` («Netzwerk»), `CLAUDE.md` («Umgebung»), Stand von T-03 bis T-05. Beide PCs per Kabel, Adressen am Router reserviert, Ping 4 von 4. Noch offen für P10: Verhalten bei IPv6 (öffentliche Adressen auf beiden PCs, Sperre des Routers nicht geprüft).

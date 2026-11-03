@@ -9,7 +9,7 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 ## Umgebung (Zielsystem = Entwicklungssystem)
 
 - Claude Code läuft direkt auf dem Studio-PC: Debian 13 (trixie), Xfce unter X11, Kernel 6.12, Intel i7-4771 (4 Kerne / 8 Threads, AVX2), 32 GB DDR3, NVIDIA GTX 1660 SUPER mit Treiber 550.163.01, Bildschirm 1920x1080 bei 60 Hz. Gemessene Ist-Werte: `docs/02-umgebung.md`.
-- OBS läuft auf einem anderen Rechner (Streaming-PC, Nobara). Das Netzwerk dazwischen besteht noch nicht. Tests, die es brauchen (NDI, Browserquelle in OBS, obs-websocket), sind zurückgestellt und werden nicht erfunden.
+- OBS läuft auf einem anderen Rechner (Streaming-PC, zurzeit Zorin OS, Wechsel zu Nobara geplant). Seit 2026-11-03 besteht das Netzwerk: Studio-PC `192.168.1.9` (Kabel `enp3s0`), Streaming-PC `192.168.1.116` (Kabel), beide am Router fest reserviert (`docs/02-umgebung.md`, «Netzwerk»). Claude Code hat keinen Zugang zum Streaming-PC: Prüfungen dort (Browserquelle in OBS, NDI, obs-websocket) macht der Nutzer im Handtest; Ergebnisse werden nicht erfunden.
 - Technik und Betriebssystem sind noch nicht endgültig entschieden. Das Betriebssystem ist vorläufig Debian 13 mit X11.
 
 ## Regeln
