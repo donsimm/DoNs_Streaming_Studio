@@ -3,6 +3,7 @@
 // und die Optionen --format-pruefen und --umwandeln von dss-core.
 
 #include "dataformat.h"
+#include "dataformattesting.h"
 #include "datalock.h"
 #include "overlayjson.h"
 #include "overlaystore.h"
@@ -17,6 +18,8 @@
 #include <QProcess>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <sys/stat.h>
 
 using namespace dss;
 
@@ -60,6 +63,25 @@ QByteArray readAll(const QString &path)
 {
     QFile f(path);
     return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+}
+
+// Inhalt jeder Datei im Ordner Byte für Byte (ohne Sperrdatei)
+QMap<QString, QByteArray> contents(const QString &dir)
+{
+    QMap<QString, QByteArray> result;
+    QDirIterator it(dir, QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString file = it.next();
+        if (!file.endsWith(QStringLiteral(".lock")))
+            result.insert(QDir(dir).relativeFilePath(file), readAll(file));
+    }
+    return result;
+}
+
+ino_t inode(const QString &path)
+{
+    struct stat st {};
+    return ::stat(QFile::encodeName(path).constData(), &st) == 0 ? st.st_ino : 0;
 }
 
 int formatVersion(const QString &path)
@@ -209,6 +231,49 @@ private slots:
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
         QCOMPARE(converted.size(), 2);
         QCOMPARE(readAll(broken), QByteArray("{ kaputt"));
+    }
+
+    // P10-vor, Punkt 70: Scheitert das Schreiben der n-ten Datei, sind danach alle Dateien
+    // Byte für Byte wie vorher (die schon geschriebenen zurückgeschrieben).
+    void failedWriteRestoresFiles_data()
+    {
+        QTest::addColumn<int>("failAt");
+        QTest::newRow("erste Datei") << 1;
+        QTest::newRow("zweite Datei") << 2;
+    }
+
+    void failedWriteRestoresFiles()
+    {
+        QFETCH(int, failAt);
+        const QMap<QString, QByteArray> before = contents(dataDir());
+        QCOMPARE(checkDataFormat(dataDir()).older.size(), 2);
+        // Erste umzuwandelnde Datei (older ist nach Name sortiert: Format 2 vor Format 1)
+        const QString first = dataDir() + QLatin1Char('/') + kFormatTwo;
+        const ino_t firstInode = inode(first);
+        testing::setConvertFailWriteAt(failAt);
+        QStringList converted;
+        QString error;
+        const bool ok = convertDataFormat(dataDir(), &converted, &error);
+        testing::setConvertFailWriteAt(0);
+        QVERIFY(!ok);
+        QVERIFY2(error.contains(QStringLiteral("Testfehler")), qPrintable(error));
+        QVERIFY2(!error.contains(QStringLiteral("nicht zurückgeschrieben")), qPrintable(error));
+        QVERIFY(converted.isEmpty());
+        const QMap<QString, QByteArray> after = contents(dataDir());
+        QCOMPARE(after.keys(), before.keys());
+        for (auto it = before.cbegin(); it != before.cend(); ++it)
+            QVERIFY2(after.value(it.key()) == it.value(), qPrintable(it.key()));
+        // Beim Fehler an der zweiten Datei wurde die erste geschrieben und zurückgeschrieben
+        // (QSaveFile benennt um: neue Inode), an der ersten gar nichts.
+        if (failAt == 2)
+            QVERIFY(inode(first) != firstInode);
+        else
+            QCOMPARE(inode(first), firstInode);
+        // Gegenprobe: Beim zweiten Mal (ohne Testfehler) wurde die erste Datei wirklich
+        // geschrieben und danach zurückgeschrieben; ohne Testmöglichkeit gelingt das Umwandeln.
+        QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
+        QCOMPARE(converted.size(), 2);
+        QVERIFY(contents(dataDir()) != before);
     }
 
     void missingDataDir()

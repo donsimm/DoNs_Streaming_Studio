@@ -28,7 +28,7 @@ add_library(dss_common STATIC
   canvasedit.h canvasedit.cpp
   imageorientation.h imageorientation.cpp
   transform.h transform.cpp
-  dataformat.h dataformat.cpp
+  dataformat.h dataformat.cpp dataformattesting.h
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und

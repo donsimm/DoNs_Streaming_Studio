@@ -3,6 +3,7 @@
 //   QJsonDocument::fromJson: https://doc.qt.io/qt-6.8/qjsondocument.html
 
 #include "dataformat.h"
+#include "dataformattesting.h"
 
 #include "datalock.h"
 #include "overlayjson.h"
@@ -18,6 +19,10 @@
 namespace dss {
 
 namespace {
+
+// Testmöglichkeit (P10-vor, Punkt 70): 0 = aus. Nur tst_datenformat setzt sie über
+// dataformattesting.h; im Programm bleibt sie 0 und hat keine Wirkung.
+int g_failWriteAt = 0;
 
 struct FileFormat
 {
@@ -161,7 +166,11 @@ bool convertDataFormat(const QString &dataDir, QStringList *converted, QString *
         return false;
     }
     for (qsizetype i = 0; i < s.older.size(); ++i) {
-        if (!writeFile(s.older.at(i).path, s.converted.at(i), error)) {
+        const bool testFailure = g_failWriteAt == i + 1;
+        if (testFailure)
+            *error = QStringLiteral("%1 kann nicht geschrieben werden (Testfehler)")
+                         .arg(s.older.at(i).path);
+        if (testFailure || !writeFile(s.older.at(i).path, s.converted.at(i), error)) {
             // Schon geschriebene Dateien zurück auf den alten Inhalt
             for (qsizetype k = 0; k < i; ++k) {
                 QString undoError;
@@ -174,5 +183,14 @@ bool convertDataFormat(const QString &dataDir, QStringList *converted, QString *
     *converted = s.status.older;
     return true;
 }
+
+namespace testing {
+
+void setConvertFailWriteAt(int n)
+{
+    g_failWriteAt = n;
+}
+
+} // namespace testing
 
 } // namespace dss
