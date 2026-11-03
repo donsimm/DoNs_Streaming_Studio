@@ -1302,6 +1302,14 @@ private slots:
         selectOverlayNamed(QStringLiteral("Test Szene"));
         const qsizetype sourcesBefore = checked(m_scene).sources.size();
         selectSourceRow(0);
+        // Nach Kennung, nicht nach Zeile: Die neue Quelle kommt ganz nach vorne (Zeile 0), und die
+        // zweite Verbindung sieht sie, bevor das Fenster change_result hat (2 von 50 Läufen
+        // scheiterten so, als die Prüfung noch sourceAtRow(0) las).
+        const QUuid edited = sourceAtRow(0).id;
+        const auto editedX = [&] {
+            const Source *s = findSource(checked(m_scene), edited);
+            return s ? s->x : -1;
+        };
         auto *x = child<QSpinBox>("propertyX");
         auto *importStatus = child<QLabel>("importStatus");
         QVERIFY(x && importStatus);
@@ -1339,11 +1347,11 @@ private slots:
             QVERIFY(lists.wait(2000));
             replies.append(t.elapsed());
             if (replies.size() % 5 == 1 && !m_client->pendingImports().isEmpty()) {
-                const int before = sourceAtRow(0).x;
+                const int before = editedX();
                 x->setFocus();
                 t.restart();
                 QTest::keyClick(x, Qt::Key_Up);
-                QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).x, before + 1, 2000);
+                QTRY_COMPARE_WITH_TIMEOUT(editedX(), before + 1, 2000);
                 edits.append(t.elapsed());
             }
             QTest::qWait(100);
