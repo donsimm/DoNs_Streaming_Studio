@@ -17,10 +17,12 @@
 // Standard-Decoder (avsupport.h). Ohne Ton (P12). Nur Qt Core (CLAUDE.md Regel 9): Das Bild ist
 // ein Puffer BGRA mit vormultipliziertem Alpha; das Fenster legt ein QImage
 // Format_ARGB32_Premultiplied darüber, ohne zu kopieren.
-// Der Thread dekodiert einige Bilder voraus (kQueueSize), jedes mit seinem Zeitpunkt (Beginn +
-// Zeitstempel). Gezeigt wird, was frameAt(Zeitpunkt) liefert: das letzte Bild, dessen Zeitpunkt
-// erreicht ist. Fragt die Leinwand in festem Takt mit dem geplanten Zeitpunkt jedes Takts, kommt
-// bei gleicher Bildrate in jedem Takt genau ein neues Bild, auch wenn der Takt etwas schwankt.
+// Der Thread dekodiert einige Bilder voraus (kQueueSize), jedes mit seinem Abstand zum ersten Bild.
+// Gezeigt wird, was frameAt(Zeitpunkt) liefert: das letzte Bild, dessen Zeitpunkt (Beginn +
+// Abstand) erreicht ist. Der Beginn ist der Zeitpunkt des ersten frameAt, das ein Bild vorfindet
+// (Anker, P10a Punkt 66): So liegen die Bilder auf dem Raster des Takts, der fragt. Fragt die
+// Leinwand in festem Takt mit dem geplanten Zeitpunkt jedes Takts, kommt bei gleicher Bildrate in
+// jedem Takt genau ein neues Bild, auch wenn der Takt etwas schwankt.
 //
 // Ende (Entscheid 9): loop → wieder von vorne; sonst holdAtEnd → das letzte Bild bleibt;
 // sonst wird die Quelle leer (currentFrame() gibt nullptr). Mit loop hat holdAtEnd keine Wirkung.
@@ -58,6 +60,14 @@ public:
     // nicht gleichzeitig laufen. Gleichzeitig kostete es auf dem Studio-PC rund 30 % eines Kerns
     // mehr Rechenzeit bei gleicher Arbeit (Messung im Bericht P09).
     static constexpr std::chrono::milliseconds kRefillDelay{15};
+    // Toleranz der Zeitpunkte (P10a, Punkt 66): Ein Bild gilt als fällig, wenn sein Zeitpunkt
+    // höchstens so viel nach dem gefragten liegt. Zeitstempel in ganzen Millisekunden (WebM,
+    // Zeitbasis 1/1000) weichen bei 30 Bildern/s bis 1/3 ms vom genauen Raster n/30 s ab, allgemein
+    // durch Runden bis 0,5 ms. Ohne Toleranz kam dann je nach Lage des Takts jedes dritte Bild
+    // einen Takt zu spät und das nächste doppelt (Messung im Bericht P10a). 1 ms deckt 0,5 ms mit
+    // Reserve und ist klein gegen einen halben Takt (16,7 ms bei 30, 8,3 ms bei 60 Bildern/s).
+    static constexpr std::chrono::milliseconds kDueTolerance{1};
+    static bool isDue(Clock::time_point due, Clock::time_point t) { return due <= t + kDueTolerance; }
 
     VideoPlayer(const QString &path, bool loop, bool holdAtEnd);
     ~VideoPlayer(); // hält den Thread an und wartet auf ihn
@@ -81,15 +91,16 @@ private:
     struct Queued
     {
         std::shared_ptr<const VideoFrame> frame; // nullptr = ab hier leer (Ende ohne holdAtEnd)
-        Clock::time_point due;
+        Clock::duration offset;                  // Abstand zum ersten Bild
     };
 
     void run();
     // Legt ein Bild in die Warteschlange; wartet, solange sie voll ist oder (mit Vorrat) bis
     // kRefillDelay nach dem letzten Abholen. Ist das vorderste Bild
     // mehr als kDropAfter überfällig, wird es verworfen, damit das Video in Echtzeit weiterläuft,
-    // auch wenn niemand abholt (Leinwand verdeckt). false = anhalten.
-    bool push(std::shared_ptr<const VideoFrame> frame, Clock::time_point due);
+    // auch wenn niemand abholt (Leinwand verdeckt). Vor dem Anker ist nichts überfällig.
+    // false = anhalten.
+    bool push(std::shared_ptr<const VideoFrame> frame, Clock::duration offset);
 
     const QString m_path;
     const bool m_loop;
@@ -99,6 +110,8 @@ private:
     std::condition_variable m_wake; // Platz in der Warteschlange oder anhalten
     bool m_stop = false;
     std::deque<Queued> m_queue;
+    bool m_anchored = false;   // Beginn gesetzt (erstes frameAt mit Bild)
+    Clock::time_point m_base;  // Beginn: Zeitpunkt des ersten Bildes
     std::shared_ptr<const VideoFrame> m_frame; // gezeigtes Bild
     Clock::time_point m_refillAt; // frühestens dann nachfüllen (kRefillDelay)
     bool m_shown = false;      // mindestens ein Bild gezeigt

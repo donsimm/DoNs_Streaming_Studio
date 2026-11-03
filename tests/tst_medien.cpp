@@ -5,6 +5,7 @@
 //   P02 (Gegenprobe mit ffmpeg … alphaextract,signalstats), Takt, Ende ohne Einstellung (leer),
 //   «Am Ende anhalten» (letztes Bild bleibt) und «Wiederholen»
 // - dss-cli quelle-video --am-ende-anhalten und die Spalte in quelle-liste
+// - P10a: Toleranz der Zeitpunkte und Anker (Punkt 66)
 // Daten wie im Handtest: prototypes/media (alpha.webm, video.webm, bild1.png); JPEG und MP4
 // werden mit ffmpeg aus Kopien davon erzeugt.
 
@@ -22,6 +23,7 @@
 #include <QTest>
 #include <QThread>
 
+#include <algorithm>
 #include <memory>
 #include <thread>
 
@@ -349,6 +351,86 @@ private slots:
         QCOMPARE(same, 0);
         QCOMPARE(skipped, 0);
         QCOMPARE(p.statistics().dropped, 0ULL);
+    }
+
+    // P10a, Punkt 66: wie die Leinwand, schon die erste Abfrage mit dem geplanten Zeitpunkt eines
+    // Takts, der irgendwann nach dem Öffnen beginnt. Die Versätze 7,9, 8,7 und 9,0 ms waren vor
+    // P10a ungleichmässig (Messung im Bericht P10a). Der Anker legt die Bilder auf das Raster.
+    void anchorOnTick()
+    {
+        using Clock = VideoPlayer::Clock;
+        const auto period = std::chrono::nanoseconds(1'000'000'000 / 30);
+        for (const int offsetUs : {7900, 8700, 9000}) {
+            VideoPlayer p(media("alpha.webm"), true, false);
+            const Clock::time_point start = Clock::now() + std::chrono::microseconds(offsetUs);
+            uint64_t last = 0;
+            bool seen = false;
+            int fresh = 0;
+            int bad = 0;
+            for (int n = 1; fresh + bad < 45 && n < 200; ++n) {
+                const Clock::time_point due = start + n * period;
+                std::this_thread::sleep_until(due + std::chrono::milliseconds(n % 7)); // Schwanken
+                const bool has = p.frameAt(due) != nullptr;
+                const uint64_t serial = p.frameSerial();
+                if (seen)
+                    ++(serial == last + 1 ? fresh : bad);
+                seen = seen || has;
+                last = serial;
+            }
+            qInfo("Versatz %.1f ms: %d Takte mit genau einem neuen Bild, %d ungleichmässig",
+                  offsetUs / 1000.0, fresh, bad);
+            QCOMPARE(bad, 0);
+            QCOMPARE(fresh, 45);
+        }
+    }
+
+    // P10a, Punkt 66: Toleranz der Zeitpunkte ohne Takt in Echtzeit. Zeitstempel von alpha.webm
+    // (ganze Millisekunden, 0, 33, 67, 100 …) gegen einen Takt n/30 s, der genau beim ersten Bild
+    // beginnt (wie die Leinwand, deren erste Abfrage den Beginn setzt): Ohne Toleranz kommt jedes
+    // dritte Bild einen Takt zu spät, mit kDueTolerance jeder Takt genau ein neues Bild.
+    void dueTolerance()
+    {
+        using Clock = VideoPlayer::Clock;
+        QProcess probe;
+        probe.start(QStringLiteral("ffprobe"),
+                    {QStringLiteral("-v"), QStringLiteral("error"), QStringLiteral("-select_streams"),
+                     QStringLiteral("v:0"), QStringLiteral("-show_entries"), QStringLiteral("packet=pts"),
+                     QStringLiteral("-of"), QStringLiteral("default=nw=1:nk=1"), media("alpha.webm")});
+        QVERIFY(probe.waitForFinished(30000) && probe.exitCode() == 0);
+        QList<int> ptsMs;
+        for (const QByteArray &line : probe.readAllStandardOutput().split('\n')) {
+            if (!line.trimmed().isEmpty())
+                ptsMs.append(line.trimmed().toInt());
+        }
+        std::sort(ptsMs.begin(), ptsMs.end());
+        QCOMPARE(ptsMs.size(), qsizetype(300));
+        QCOMPARE(ptsMs.mid(0, 4), (QList<int>{0, 33, 67, 100})); // Zeitbasis 1/1000
+        const Clock::time_point base{};
+        const auto period = std::chrono::nanoseconds(1'000'000'000 / 30);
+        // Takte ohne neues Bild (beim nächsten kommen dann zwei)
+        const auto irregular = [&](auto isDue) {
+            int bad = 0;
+            qsizetype next = 1;
+            for (int n = 1; n < ptsMs.size(); ++n) {
+                int fresh = 0;
+                while (next < ptsMs.size() && isDue(base + std::chrono::milliseconds(ptsMs.at(next)),
+                                                    base + n * period)) {
+                    ++fresh;
+                    ++next;
+                }
+                bad += fresh != 1;
+            }
+            return bad;
+        };
+        const int without = irregular([](Clock::time_point due, Clock::time_point t) { return due <= t; });
+        const int with = irregular(&VideoPlayer::isDue);
+        qInfo("299 Takte: ohne Toleranz %d ungleichmässig, mit %lld ms %d", without,
+              static_cast<long long>(VideoPlayer::kDueTolerance.count()), with);
+        QVERIFY(without > 100); // jedes dritte Bild zu spät, das nächste doppelt
+        QCOMPARE(with, 0);
+        // Grenze: genau 1 ms nach dem gefragten Zeitpunkt noch fällig, 1 ns später nicht
+        QVERIFY(VideoPlayer::isDue(base + std::chrono::milliseconds(1), base));
+        QVERIFY(!VideoPlayer::isDue(base + std::chrono::milliseconds(1) + std::chrono::nanoseconds(1), base));
     }
 
 #ifdef DSS_CLI_BIN

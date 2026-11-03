@@ -83,7 +83,11 @@ std::shared_ptr<const VideoFrame> VideoPlayer::frameAt(Clock::time_point t)
     std::shared_ptr<const VideoFrame> result;
     {
         const std::lock_guard lock(m_mutex);
-        while (!m_queue.empty() && m_queue.front().due <= t) {
+        if (!m_anchored && !m_queue.empty()) {
+            m_base = t;
+            m_anchored = true;
+        }
+        while (!m_queue.empty() && isDue(m_base + m_queue.front().offset, t)) {
             m_frame = std::move(m_queue.front().frame);
             m_queue.pop_front();
             m_shown = true;
@@ -129,7 +133,7 @@ VideoPlayer::Statistics VideoPlayer::statistics() const
     return m_stats;
 }
 
-bool VideoPlayer::push(std::shared_ptr<const VideoFrame> frame, Clock::time_point due)
+bool VideoPlayer::push(std::shared_ptr<const VideoFrame> frame, Clock::duration offset)
 {
     std::unique_lock lock(m_mutex);
     for (;;) {
@@ -142,7 +146,11 @@ bool VideoPlayer::push(std::shared_ptr<const VideoFrame> frame, Clock::time_poin
             m_wake.wait_until(lock, m_refillAt);
             continue;
         }
-        const Clock::time_point overdue = m_queue.front().due + kDropAfter;
+        if (!m_anchored) {
+            m_wake.wait(lock); // bis zum ersten frameAt
+            continue;
+        }
+        const Clock::time_point overdue = m_base + m_queue.front().offset + kDropAfter;
         if (Clock::now() >= overdue) {
             // Niemand hat es abgeholt: gilt als gezeigt, aber verworfen.
             m_frame = std::move(m_queue.front().frame);
@@ -156,10 +164,10 @@ bool VideoPlayer::push(std::shared_ptr<const VideoFrame> frame, Clock::time_poin
     }
     if (frame) {
         ++m_stats.decoded;
-        if (Clock::now() > due + kLateLimit)
+        if (m_anchored && Clock::now() > m_base + offset + kLateLimit)
             ++m_stats.late;
     }
-    m_queue.push_back({std::move(frame), due});
+    m_queue.push_back({std::move(frame), offset});
     return true;
 }
 
@@ -190,7 +198,6 @@ void VideoPlayer::run()
     // Wiederverwendete Puffer: frei ist, was nur noch hier gehalten wird (use_count() == 1).
     std::vector<std::shared_ptr<VideoFrame>> pool;
 
-    Clock::time_point base;
     bool started = false;
     double firstPts = 0.0;
     double loopOffset = 0.0; // Sekunden der schon gespielten Durchgänge
@@ -235,7 +242,7 @@ void VideoPlayer::run()
                 } else {
                     // Ohne holdAtEnd ab dem Ende des letzten Bildes leer.
                     if (!m_holdAtEnd)
-                        push(nullptr, base + seconds(loopOffset + played));
+                        push(nullptr, seconds(loopOffset + played));
                     ended = true;
                 }
                 break;
@@ -290,12 +297,11 @@ void VideoPlayer::run()
                           : frame->best_effort_timestamp * timeBase;
             out->pts = lastPts;
             if (!started) {
-                // Beginn: das erste Bild ist sofort fällig.
-                base = Clock::now();
+                // Abstand 0: das erste Bild ist beim ersten frameAt fällig (Anker).
                 firstPts = lastPts;
                 started = true;
             }
-            if (!push(out, base + seconds(loopOffset + lastPts - firstPts))) {
+            if (!push(out, seconds(loopOffset + lastPts - firstPts))) {
                 ended = true;
                 break;
             }

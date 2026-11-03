@@ -177,11 +177,12 @@ void SourceRenderer::onTick()
 {
     ++m_tick;
     const auto now = std::chrono::steady_clock::now();
-    // War die Oberfläche lange beschäftigt, nicht nachholen, sondern ab jetzt weiterzählen.
-    if (now - (m_tickStart + m_tick * kFrameInterval) > 4 * kFrameInterval) {
-        m_tickStart = now;
-        m_tick = 0;
-    }
+    // War die Oberfläche lange beschäftigt, nicht nachholen, sondern die verpassten Takte
+    // überspringen. Das Raster bleibt, damit die Videos auf dem Raster ihres Ankers bleiben
+    // (VideoPlayer, P10a Punkt 66).
+    const auto behind = now - (m_tickStart + m_tick * kFrameInterval);
+    if (behind > 4 * kFrameInterval)
+        m_tick += behind / kFrameInterval;
     // Bild jedes Videos für den geplanten Zeitpunkt dieses Takts
     const auto sampleTime = m_tickStart + m_tick * kFrameInterval;
     bool any = false;
