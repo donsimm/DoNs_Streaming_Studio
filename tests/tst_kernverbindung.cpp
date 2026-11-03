@@ -424,6 +424,7 @@ private slots:
         QVERIFY(waitForLog(m_core.get(), QStringLiteral("Einstellungen geändert: Port 9000, Adresse im Heimnetz 10.0.0.2"),
                            &m_coreLog));
 
+#ifdef DSS_CLI_BIN
         // dss-cli über dieselbe Verbindung
         CliResult cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellungen")});
         QCOMPARE(cli.exitCode, 0);
@@ -452,6 +453,7 @@ private slots:
                                      QStringLiteral("einstellung-port"), QStringLiteral("9000")});
         QCOMPARE(cli.exitCode, 4);
         QVERIFY2(cli.err.contains(QStringLiteral("ändert nur der Kern")), qPrintable(cli.err));
+#endif
     }
 
     // Ungültige kern.ini: Kern startet mit Standardwerten, meldet den Fehler, schreibt die Datei
