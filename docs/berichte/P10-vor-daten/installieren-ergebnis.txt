@@ -1,0 +1,49 @@
+== Lauf 1: erste Installation (2026-11-03 20:35:19)
+Exit 0
+Sicherung des Datenordners: <Arbeit>/installtest/daten-sicherungen/2026-11-03_20-35-59
+umgewandelt: overlays/cbf17458-229b-4bd1-8449-f5548a069096.json (Format 2)
+umgewandelt: overlays/f5bb9bc6-06f4-4762-a15b-47c37e24f82c.json (Format 1)
+2 Dateien umgewandelt: <Arbeit>/installtest/daten
+Umgewandelt; Sicherung der alten Dateien: <Arbeit>/installtest/daten-sicherungen/2026-11-03_20-35-59
+Programmordner geleert: <Arbeit>/installtest/ziel/bin, <Arbeit>/installtest/ziel/share/dons-streaming-studio
+dss-app 0.1.0 (Einsatz, Commit dec3587)
+dss-core 0.1.0 (Einsatz, Commit dec3587)
+-rw-rw-r-- 1 dominik dominik   0 20:35:59 <Arbeit>/installtest/ziel/share/dons-streaming-studio/symbole/veraltet.svg
+
+<Arbeit>/installtest/ziel/bin:
+insgesamt 2552
+-rwxr-xr-x 1 dominik dominik 1350728 20:35:59 dss-app
+-rwxr-xr-x 1 dominik dominik  424424 20:35:47 dss-cli
+-rwxr-xr-x 1 dominik dominik  834584 20:35:50 dss-core
+-rw-rw-r-- 1 dominik dominik       0 20:35:59 veraltet-programm
+== Lauf 2: neue Installation mit veralteten Dateien (2026-11-03 20:35:59)
+Exit 0
+Format aktuell: <Arbeit>/installtest/daten
+Programmordner geleert: <Arbeit>/installtest/ziel/bin, <Arbeit>/installtest/ziel/share/dons-streaming-studio
+dss-app 0.1.0 (Einsatz, Commit dec3587)
+dss-core 0.1.0 (Einsatz, Commit dec3587)
+weg: bin/veraltet-programm
+weg: share/dons-streaming-studio/symbole/veraltet.svg
+<Arbeit>/installtest/ziel/bin:
+dss-app
+dss-cli
+dss-core
+
+<Arbeit>/installtest/ziel/share/dons-streaming-studio:
+be-vietnam-pro
+branding
+schriften
+symbole
+uebersetzung
+DoNs Streaming Studio 0.1.0
+Commit dec3587
+Installiert 2026-11-03 20:36:00 +0100 aus /home/dominik/DoNs_Streaming_Studio
+Daten unverändert
+== Lauf 3: absichtlich scheiternder Bau (2026-11-03 20:36:01)
+Exit 1
+<Arbeit>/installtest/klon/src/core/main.cpp:233:2: error: #error absichtlicher Fehler (Pr\U000000fcfung Punkt 69)
+  233 | #error absichtlicher Fehler (Prüfung Punkt 69)
+FEHLER: Bau gescheitert, nichts installiert (Protokoll: <Arbeit>/installtest/bau-klon/installieren.log)
+Ziel unverändert (nichts gelöscht)
+Daten unverändert
+Testeinheit entfernt

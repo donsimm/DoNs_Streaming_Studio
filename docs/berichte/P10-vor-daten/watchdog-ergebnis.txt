@@ -1,0 +1,24 @@
+Overlay «Watchdog Test» angelegt: Adresse watchdog-test, 1920x1080
+Datei erzeugen: 21:13:20
+Grösse 4294967296 Byte
+ExecStart: "/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core" "--datenordner" "<Arbeit>/daten" "--verbindung" "/run/user/1000/dss-watchdogtest.sock" "--einstellungen" "<Arbeit>/config/kern.ini"
+WatchdogUSec=10s
+Übernehmen start: 21:13:32, PID 334255
+Antwort nach 58.5 s: ok=True 
+get_overlay_list während des Übernehmens: 117 Antworten, min 0.2 / Median 0.2 / max 0.8 ms
+Exit Python: 0
+PID vorher 334255, nachher 334255 (gleich), NRestarts=0
+Starting dss-core-watchdogtest.service - DoNs Streaming Studio – Kern (dss-core, Entwicklung)...
+2026-11-03 21:13:32.516 info Einstellungen: <Arbeit>/config/kern.ini angelegt
+2026-11-03 21:13:32.516 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (<Arbeit>/config/kern.ini)
+2026-11-03 21:13:32.516 info Datenordner <Arbeit>/daten: 1 Overlays geladen
+2026-11-03 21:13:32.517 info Verbindung offen: /run/user/1000/dss-watchdogtest.sock
+2026-11-03 21:13:32.517 info systemd: Watchdog 10000 ms, Meldung alle 5000 ms
+Started dss-core-watchdogtest.service - DoNs Streaming Studio – Kern (dss-core, Entwicklung).
+2026-11-03 21:13:32.559 info Verbunden: watchdog-gross 0.1.0 (1 Verbindungen)
+2026-11-03 21:13:32.560 info Übernehme <Arbeit>/gross-4gib.png für add_image_source (1 laufend)
+2026-11-03 21:14:30.143 info Übernommen: <Arbeit>/gross-4gib.png → media/c412a0eccd6418252ba9d5fbf6d5953d676e7489033aedc39f2be2b099fd674d.png (4096.0 MiB, 57.6 s)
+2026-11-03 21:14:31.103 info Verbindung getrennt: watchdog-gross (noch 0)
+media: 4294967296 c412a0eccd6418252ba9d5fbf6d5953d676e7489033aedc39f2be2b099fd674d.png
+Testeinheit entfernt
+Arbeitsordner gelöscht

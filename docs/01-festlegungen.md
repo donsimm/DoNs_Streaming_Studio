@@ -207,9 +207,12 @@ Umgesetzt mit P10a (2026-11-03), Wahl von Claude Code mit Begründung im Bericht
 | Einheit | `dss-core.service` | `dss-core-entwicklung.service` |
 | Verbindung | `$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock` | `$XDG_RUNTIME_DIR/dons-streaming-studio-entwicklung/kern.sock` |
 | Fenster-Einstellungen | `~/.config/dons-streaming-studio/fenster.ini` | `~/.config/dons-streaming-studio-entwicklung/fenster.ini` |
+| Einstellungen des Kerns (seit P10-vor) | `~/.config/dons-streaming-studio/kern.ini` | `~/.config/dons-streaming-studio-entwicklung/kern.ini` |
+| Port des Overlay-Servers (Standard, in `kern.ini`, wirkt ab P10) | 8080 | 8081 |
 | Fenstertitel | «DoNs Streaming Studio» | «DoNs Streaming Studio – Entwicklung» |
 | Symbole, Schriften, Übersetzung | `~/.local/opt/dons-streaming-studio/share/dons-streaming-studio/` | aus dem Repo bzw. `build/` |
 | Eigene Symbole des Nutzers | `~/.config/dons-streaming-studio/symbole/` (beide lesen nur) | ebenso |
+| Bilder der Leinwand (seit P10-vor) | `~/Bilder/DoNs Streaming Studio/` (Ordner aus `xdg-user-dir PICTURES`), beide Versionen | ebenso |
 
 - `--version` und die Startzeile im Protokoll nennen Version und Commit, zum Beispiel «dss-app 0.1.0 (Einsatz, Commit 85ac702)».
 - **Sicherung beim Umwandeln:** `~/.local/share/dons-streaming-studio-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/`, eine vollständige Kopie des Datenordners (`cp -a`). Zurückspielen: `README.md`, Abschnitt «Einsatz».

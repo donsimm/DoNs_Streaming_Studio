@@ -1,0 +1,128 @@
+P10-vor: Wiederholungsläufe mit docs/berichte/P10-vor-daten/wiederholen.sh (Studio-PC, X11-Sitzung 1 auf seat0)
+
+== Durchgang 1, Stand 319856f: wiederholen.sh build tst_fensterbearbeiten 50 <Ordner>; danach tst_medien 50
+tst_fensterbearbeiten Lauf 9: FEHLER (27.303652558 s)
+tst_fensterbearbeiten Lauf 24: FEHLER (27.197203136 s)
+tst_fensterbearbeiten: 48 von 50 bestanden (2026-11-03 22:02:15)
+tst_medien: 50 von 50 bestanden (2026-11-03 22:20:30)
+-- Lauf 9:
+FAIL!  : TestFensterBearbeiten::usableWhileImportingLargeFile() Compared values are not the same
+   Actual   (sourceAtRow(0).x): 0
+   Expected (before + 1)      : 1
+   Loc: [/home/dominik/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
+-- Lauf 24:
+FAIL!  : TestFensterBearbeiten::usableWhileImportingLargeFile() Compared values are not the same
+   Actual   (sourceAtRow(0).x): 0
+   Expected (before + 1)      : 1
+   Loc: [/home/dominik/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
+-- Messungen usableWhileImportingLargeFile (bestandene Läufe):
+Lauf 1: Übernehmen 1024 MiB: 13671 ms; 121 Antworten des Kerns min 0 / Median 0 / max 165 ms; 24 Änderungen im Fenster max 61 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 2: Übernehmen 1024 MiB: 13612 ms; 121 Antworten des Kerns min 0 / Median 0 / max 143 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 3: Übernehmen 1024 MiB: 13608 ms; 120 Antworten des Kerns min 0 / Median 0 / max 199 ms; 24 Änderungen im Fenster max 64 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 4: Übernehmen 1024 MiB: 13535 ms; 120 Antworten des Kerns min 0 / Median 0 / max 164 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 25 ms
+Lauf 5: Übernehmen 1024 MiB: 13591 ms; 120 Antworten des Kerns min 0 / Median 0 / max 201 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 6: Übernehmen 1024 MiB: 13646 ms; 121 Antworten des Kerns min 0 / Median 0 / max 155 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 7: Übernehmen 1024 MiB: 13558 ms; 120 Antworten des Kerns min 0 / Median 0 / max 187 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 23 ms
+Lauf 8: Übernehmen 1024 MiB: 13767 ms; 122 Antworten des Kerns min 0 / Median 0 / max 128 ms; 25 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 23 ms
+Lauf 10: Übernehmen 1024 MiB: 13499 ms; 120 Antworten des Kerns min 0 / Median 0 / max 145 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 11: Übernehmen 1024 MiB: 13496 ms; 119 Antworten des Kerns min 0 / Median 0 / max 216 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 12: Übernehmen 1024 MiB: 13589 ms; 120 Antworten des Kerns min 0 / Median 0 / max 207 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 13: Übernehmen 1024 MiB: 13529 ms; 120 Antworten des Kerns min 0 / Median 0 / max 146 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 14: Übernehmen 1024 MiB: 13594 ms; 120 Antworten des Kerns min 0 / Median 0 / max 212 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 15: Übernehmen 1024 MiB: 13555 ms; 120 Antworten des Kerns min 0 / Median 0 / max 172 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 16: Übernehmen 1024 MiB: 13578 ms; 120 Antworten des Kerns min 0 / Median 0 / max 204 ms; 24 Änderungen im Fenster max 59 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 17: Übernehmen 1024 MiB: 13683 ms; 121 Antworten des Kerns min 0 / Median 0 / max 180 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 18: Übernehmen 1024 MiB: 13702 ms; 121 Antworten des Kerns min 0 / Median 0 / max 208 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 19: Übernehmen 1024 MiB: 13536 ms; 120 Antworten des Kerns min 0 / Median 0 / max 144 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 20: Übernehmen 1024 MiB: 13515 ms; 120 Antworten des Kerns min 0 / Median 0 / max 128 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 21: Übernehmen 1024 MiB: 13651 ms; 121 Antworten des Kerns min 0 / Median 0 / max 153 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 22 ms
+Lauf 22: Übernehmen 1024 MiB: 13702 ms; 121 Antworten des Kerns min 0 / Median 0 / max 214 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 23: Übernehmen 1024 MiB: 13537 ms; 120 Antworten des Kerns min 0 / Median 0 / max 162 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 25: Übernehmen 1024 MiB: 13786 ms; 122 Antworten des Kerns min 0 / Median 0 / max 163 ms; 25 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 26: Übernehmen 1024 MiB: 13504 ms; 119 Antworten des Kerns min 0 / Median 0 / max 204 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 27: Übernehmen 1024 MiB: 13601 ms; 120 Antworten des Kerns min 0 / Median 0 / max 216 ms; 24 Änderungen im Fenster max 62 ms; grösste Lücke der Ereignisschleife 18 ms
+Lauf 28: Übernehmen 1024 MiB: 13708 ms; 122 Antworten des Kerns min 0 / Median 0 / max 89 ms; 25 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 29: Übernehmen 1024 MiB: 13651 ms; 121 Antworten des Kerns min 0 / Median 0 / max 190 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 23 ms
+Lauf 30: Übernehmen 1024 MiB: 13530 ms; 120 Antworten des Kerns min 0 / Median 0 / max 153 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 31: Übernehmen 1024 MiB: 13453 ms; 119 Antworten des Kerns min 0 / Median 0 / max 173 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 32: Übernehmen 1024 MiB: 13501 ms; 119 Antworten des Kerns min 0 / Median 0 / max 214 ms; 24 Änderungen im Fenster max 59 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 33: Übernehmen 1024 MiB: 13556 ms; 120 Antworten des Kerns min 0 / Median 0 / max 173 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 34: Übernehmen 1024 MiB: 13549 ms; 120 Antworten des Kerns min 0 / Median 0 / max 140 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 26 ms
+Lauf 35: Übernehmen 1024 MiB: 13503 ms; 120 Antworten des Kerns min 0 / Median 0 / max 133 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 18 ms
+Lauf 36: Übernehmen 1024 MiB: 13698 ms; 121 Antworten des Kerns min 0 / Median 0 / max 210 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 37: Übernehmen 1024 MiB: 13621 ms; 120 Antworten des Kerns min 0 / Median 0 / max 217 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 38: Übernehmen 1024 MiB: 13487 ms; 119 Antworten des Kerns min 0 / Median 0 / max 223 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 39: Übernehmen 1024 MiB: 13502 ms; 119 Antworten des Kerns min 0 / Median 0 / max 224 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 40: Übernehmen 1024 MiB: 13553 ms; 120 Antworten des Kerns min 0 / Median 0 / max 153 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 26 ms
+Lauf 41: Übernehmen 1024 MiB: 13508 ms; 120 Antworten des Kerns min 0 / Median 0 / max 141 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 42: Übernehmen 1024 MiB: 13543 ms; 120 Antworten des Kerns min 0 / Median 0 / max 164 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 43: Übernehmen 1024 MiB: 13566 ms; 120 Antworten des Kerns min 0 / Median 0 / max 203 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 44: Übernehmen 1024 MiB: 13484 ms; 119 Antworten des Kerns min 0 / Median 0 / max 178 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 45: Übernehmen 1024 MiB: 13514 ms; 119 Antworten des Kerns min 0 / Median 0 / max 221 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 46: Übernehmen 1024 MiB: 13517 ms; 119 Antworten des Kerns min 0 / Median 0 / max 219 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 47: Übernehmen 1024 MiB: 13553 ms; 120 Antworten des Kerns min 0 / Median 0 / max 195 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 48: Übernehmen 1024 MiB: 13504 ms; 120 Antworten des Kerns min 0 / Median 0 / max 137 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 49: Übernehmen 1024 MiB: 13453 ms; 119 Antworten des Kerns min 0 / Median 0 / max 194 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 50: Übernehmen 1024 MiB: 13657 ms; 121 Antworten des Kerns min 0 / Median 0 / max 147 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 21 ms
+
+== Durchgang 2, Stand f475bb6 (Test folgt der Quelle nach Kennung), Beginn 2026-11-03 22:22
+tst_fensterbearbeiten: 50 von 50 bestanden (2026-11-03 22:39:35)
+-- Messungen usableWhileImportingLargeFile:
+Lauf 1: Übernehmen 1024 MiB: 13598 ms; 120 Antworten des Kerns min 0 / Median 0 / max 188 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 2: Übernehmen 1024 MiB: 13763 ms; 122 Antworten des Kerns min 0 / Median 0 / max 101 ms; 25 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 3: Übernehmen 1024 MiB: 13560 ms; 120 Antworten des Kerns min 0 / Median 0 / max 201 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 4: Übernehmen 1024 MiB: 13898 ms; 123 Antworten des Kerns min 0 / Median 0 / max 158 ms; 25 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 5: Übernehmen 1024 MiB: 13563 ms; 120 Antworten des Kerns min 0 / Median 0 / max 205 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 6: Übernehmen 1024 MiB: 13545 ms; 120 Antworten des Kerns min 0 / Median 0 / max 177 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 7: Übernehmen 1024 MiB: 13677 ms; 121 Antworten des Kerns min 0 / Median 0 / max 189 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 8: Übernehmen 1024 MiB: 13626 ms; 120 Antworten des Kerns min 0 / Median 0 / max 210 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 9: Übernehmen 1024 MiB: 13726 ms; 121 Antworten des Kerns min 0 / Median 0 / max 211 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 10: Übernehmen 1024 MiB: 13641 ms; 121 Antworten des Kerns min 0 / Median 0 / max 180 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 24 ms
+Lauf 11: Übernehmen 1024 MiB: 13675 ms; 121 Antworten des Kerns min 0 / Median 0 / max 190 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 12: Übernehmen 1024 MiB: 13521 ms; 119 Antworten des Kerns min 0 / Median 0 / max 210 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 13: Übernehmen 1024 MiB: 13558 ms; 120 Antworten des Kerns min 0 / Median 0 / max 161 ms; 24 Änderungen im Fenster max 59 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 14: Übernehmen 1024 MiB: 13516 ms; 120 Antworten des Kerns min 0 / Median 0 / max 149 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 23 ms
+Lauf 15: Übernehmen 1024 MiB: 13739 ms; 122 Antworten des Kerns min 0 / Median 0 / max 100 ms; 25 Änderungen im Fenster max 52 ms; grösste Lücke der Ereignisschleife 25 ms
+Lauf 16: Übernehmen 1024 MiB: 13721 ms; 122 Antworten des Kerns min 0 / Median 0 / max 100 ms; 25 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 17: Übernehmen 1024 MiB: 13714 ms; 121 Antworten des Kerns min 0 / Median 0 / max 221 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 18: Übernehmen 1024 MiB: 13750 ms; 121 Antworten des Kerns min 0 / Median 0 / max 197 ms; 25 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 19: Übernehmen 1024 MiB: 13500 ms; 119 Antworten des Kerns min 0 / Median 0 / max 224 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 19 ms
+Lauf 20: Übernehmen 1024 MiB: 13487 ms; 119 Antworten des Kerns min 0 / Median 0 / max 224 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 21: Übernehmen 1024 MiB: 13465 ms; 119 Antworten des Kerns min 0 / Median 0 / max 190 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 22: Übernehmen 1024 MiB: 13552 ms; 120 Antworten des Kerns min 0 / Median 0 / max 168 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 23: Übernehmen 1024 MiB: 13528 ms; 120 Antworten des Kerns min 0 / Median 0 / max 157 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 23 ms
+Lauf 24: Übernehmen 1024 MiB: 13573 ms; 120 Antworten des Kerns min 0 / Median 0 / max 198 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 25: Übernehmen 1024 MiB: 13664 ms; 121 Antworten des Kerns min 0 / Median 0 / max 164 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 26: Übernehmen 1024 MiB: 13552 ms; 120 Antworten des Kerns min 0 / Median 0 / max 168 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 27: Übernehmen 1024 MiB: 13506 ms; 119 Antworten des Kerns min 0 / Median 0 / max 206 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 28: Übernehmen 1024 MiB: 13509 ms; 120 Antworten des Kerns min 0 / Median 0 / max 123 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 29: Übernehmen 1024 MiB: 13499 ms; 119 Antworten des Kerns min 0 / Median 0 / max 218 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 24 ms
+Lauf 30: Übernehmen 1024 MiB: 13612 ms; 121 Antworten des Kerns min 0 / Median 0 / max 134 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 31: Übernehmen 1024 MiB: 13599 ms; 120 Antworten des Kerns min 0 / Median 0 / max 216 ms; 24 Änderungen im Fenster max 60 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 32: Übernehmen 1024 MiB: 13586 ms; 120 Antworten des Kerns min 0 / Median 0 / max 208 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 33: Übernehmen 1024 MiB: 13564 ms; 120 Antworten des Kerns min 0 / Median 0 / max 181 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 34: Übernehmen 1024 MiB: 13510 ms; 120 Antworten des Kerns min 0 / Median 0 / max 127 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 35: Übernehmen 1024 MiB: 13586 ms; 120 Antworten des Kerns min 0 / Median 0 / max 206 ms; 24 Änderungen im Fenster max 59 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 36: Übernehmen 1024 MiB: 13715 ms; 122 Antworten des Kerns min 0 / Median 0 / max 75 ms; 25 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 37: Übernehmen 1024 MiB: 13500 ms; 119 Antworten des Kerns min 0 / Median 0 / max 217 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 38: Übernehmen 1024 MiB: 13604 ms; 121 Antworten des Kerns min 0 / Median 0 / max 149 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 39: Übernehmen 1024 MiB: 13568 ms; 120 Antworten des Kerns min 0 / Median 0 / max 196 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 40: Übernehmen 1024 MiB: 13619 ms; 121 Antworten des Kerns min 0 / Median 0 / max 129 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 41: Übernehmen 1024 MiB: 13605 ms; 120 Antworten des Kerns min 0 / Median 0 / max 200 ms; 24 Änderungen im Fenster max 58 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 42: Übernehmen 1024 MiB: 13654 ms; 121 Antworten des Kerns min 0 / Median 0 / max 158 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 22 ms
+Lauf 43: Übernehmen 1024 MiB: 13457 ms; 119 Antworten des Kerns min 0 / Median 0 / max 166 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 44: Übernehmen 1024 MiB: 13480 ms; 119 Antworten des Kerns min 0 / Median 0 / max 208 ms; 24 Änderungen im Fenster max 56 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 45: Übernehmen 1024 MiB: 13683 ms; 121 Antworten des Kerns min 0 / Median 0 / max 141 ms; 25 Änderungen im Fenster max 61 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 46: Übernehmen 1024 MiB: 13494 ms; 119 Antworten des Kerns min 0 / Median 0 / max 213 ms; 24 Änderungen im Fenster max 57 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 47: Übernehmen 1024 MiB: 13542 ms; 120 Antworten des Kerns min 0 / Median 0 / max 187 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 21 ms
+Lauf 48: Übernehmen 1024 MiB: 13800 ms; 122 Antworten des Kerns min 0 / Median 0 / max 190 ms; 25 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 49: Übernehmen 1024 MiB: 13678 ms; 121 Antworten des Kerns min 0 / Median 0 / max 203 ms; 24 Änderungen im Fenster max 54 ms; grösste Lücke der Ereignisschleife 20 ms
+Lauf 50: Übernehmen 1024 MiB: 13584 ms; 120 Antworten des Kerns min 0 / Median 0 / max 209 ms; 24 Änderungen im Fenster max 55 ms; grösste Lücke der Ereignisschleife 20 ms
+
+== Nachprüfung 2026-11-03 22:40 bis 22:42 (vorübergehende qInfo im Test, nicht eingecheckt, 5 Läufe über ctest -V)
+Vor jeder Pfeiltaste: Quelle in Zeile 0 und X der bearbeiteten Quelle.
+Lauf 1: rc 0, 25 Pfeiltasten, X der bearbeiteten Quelle 1500 bis 1524, Zeile 0 eine andere Quelle: 0 Mal
+Lauf 2: rc 0, 24 Pfeiltasten, X der bearbeiteten Quelle 1500 bis 1523, Zeile 0 eine andere Quelle: 0 Mal
+Lauf 3: rc 0, 25 Pfeiltasten, X der bearbeiteten Quelle 1500 bis 1524, Zeile 0 eine andere Quelle: 0 Mal
+Lauf 4: rc 0, 25 Pfeiltasten, X der bearbeiteten Quelle 1500 bis 1524, Zeile 0 eine andere Quelle: 0 Mal
+Lauf 5: rc 0, 24 Pfeiltasten, X der bearbeiteten Quelle 1500 bis 1523, Zeile 0 eine andere Quelle: 0 Mal

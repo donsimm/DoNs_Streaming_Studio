@@ -1,0 +1,20 @@
+Klon: a7ff729 P10-vor: Test Fenster bedienbar während des Übernehmens von 1 GiB
+    34/35 Test #26: tst_fensterbearbeiten ............***Failed   27.69 sec
+release: Exit 0, Warnungen 0, 144 s, ctest: 97% tests passed, 1 tests failed out of 35
+aus-DSS_BUILD_APP: Exit 0, Warnungen 0, 54 s
+aus-DSS_BUILD_TESTS: Exit 0, Warnungen 0, 44 s
+aus-DSS_BUILD_CLI: Exit 1, Warnungen 0, 1 s
+aus-DSS_MEDIA_SIZE: Exit 0, Warnungen 0, 81 s
+aus-DSS_APP_RENDERER: Exit 0, Warnungen 0, 74 s
+aus-DSS_APP_CANVAS_EDIT: Exit 0, Warnungen 0, 83 s
+aus-DSS_VIDEO_ROTATION: Exit 0, Warnungen 0, 81 s
+aus-DSS_CORE_WATCHDOG: Exit 0, Warnungen 0, 80 s
+aus-DSS_APP_EDITING: Exit 0, Warnungen 0, 79 s
+aus-DSS_APP_TRANSFORM: Exit 0, Warnungen 0, 80 s
+    33/35 Test #26: tst_fensterbearbeiten ............***Failed   17.36 sec
+    35/35 Test #35: tst_uebernehmen ..................***Failed   39.13 sec
+aus-DSS_CORE_IMPORT_THREAD: Exit 0, Warnungen 0, 127 s, ctest: 94% tests passed, 2 tests failed out of 35
+aus-DSS_APP_SETTINGS_DIALOG: Exit 0, Warnungen 0, 116 s, ctest: 100% tests passed, 0 tests failed out of 35
+aus-DSS_APP_CANVAS_IMAGE: Exit 0, Warnungen 0, 115 s, ctest: 100% tests passed, 0 tests failed out of 35
+ein-DSS_INSTALLED_EDITION: Exit 0, Warnungen 0, 81 s
+fertig
