@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Zweiter Zeichner (P10, Teil B; K-01 bis K-08): Seite der Browserquelle eines Overlays.
+     Liefert der Overlay-Server im Kern unter /o/<adresse>/<token>/; alles, was die Seite lädt,
+     liegt unter diesem Pfad (keine Bibliotheken aus dem Netz). Zeichnen: overlay.js. -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>DoNs Streaming Studio – Overlay</title>
+<style>
+  /* Durchsichtiger Hintergrund; OBS zeigt die Seite in der Grösse der Browserquelle. */
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  #overlay { position: absolute; left: 0; top: 0; overflow: hidden; }
+  /* Kasten einer Quelle: gedreht und gespiegelt um die Mitte (wie der Editor). */
+  .source { position: absolute; transform-origin: 50% 50%; }
+  /* Bild und Video füllen den Kasten gestreckt; Ausrichtung um die Mitte. */
+  .source img, .source video { position: absolute; display: block; transform-origin: 50% 50%;
+                               object-fit: fill; }
+  .source svg { position: absolute; left: 0; top: 0; overflow: hidden; }
+  .source text { white-space: pre; }
+</style>
+</head>
+<body>
+<div id="overlay"></div>
+<script src="overlay.js"></script>
+</body>
+</html>
