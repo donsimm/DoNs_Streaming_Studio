@@ -104,6 +104,9 @@ private slots:
         QVERIFY(m_temp->isValid());
         QVERIFY(copyTree(kSource, dataDir()));
         QFile::remove(dataDir() + QStringLiteral("/LIESMICH.md"));
+        // git speichert die Rechte 0600 von tokens.json nicht (frischer Klon: 0644)
+        QVERIFY(QFile::setPermissions(dataDir() + QStringLiteral("/tokens.json"),
+                                      QFile::ReadOwner | QFile::WriteOwner));
     }
 
     void cleanup() { m_temp.reset(); }
