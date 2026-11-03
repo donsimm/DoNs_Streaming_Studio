@@ -611,6 +611,8 @@ private slots:
             c.width = w;
             c.height = h;
             c.rotation = 0;
+            c.flipHorizontal = false; // P09b
+            c.flipVertical = false;
             m_check->sendChange(sourceUpdate(m_scene, s.id, c));
         };
         place(image, 100, 100, 400, 200);
@@ -677,6 +679,18 @@ private slots:
         QVERIFY(std::abs(sourceAtRow(2).width - 500) <= 3);
         QCOMPARE(sourceAtRow(2).height, 200);
         QCOMPARE(sourceAtRow(2).y, 100);
+        // P09b: rechte Kante über die linke hinaus spiegelt waagrecht, die linke Kante bleibt
+        place(image, 100, 100, 400, 200);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
+        drag(canvas, at(500, 200), at(0, 200));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).flipHorizontal, true, 3000);
+        {
+            const Source s = sourceAtRow(2);
+            QVERIFY2(std::abs(s.width - 100) <= 3 && std::abs(s.x + s.width - 100) <= 1,
+                     qPrintable(QStringLiteral("x %1 Breite %2").arg(s.x).arg(s.width)));
+            QCOMPARE(s.flipVertical, false);
+            QCOMPARE(s.height, 200);
+        }
         // Drehen am Drehgriff mit Shift: Zeiger rechts der Mitte, knapp unter ihr (90.2°) → auf
         // ganze Grad eingerastet 90° (P09b)
         place(image, 100, 100, 400, 200);

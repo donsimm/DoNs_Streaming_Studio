@@ -40,6 +40,37 @@ class TestSourceGeometry : public QObject
     Q_OBJECT
 
 private slots:
+    // P09b, Entscheid 4: Inhalt im Kasten spiegeln; Kasten, Ecken und Treffer bleiben.
+    void flipContent()
+    {
+        Source s;
+        s.id = QUuid::createUuid();
+        s.x = 100;
+        s.y = 50;
+        s.width = 200;
+        s.height = 100;
+        QCOMPARE(contentToSource(s, QPointF(10, 20)), QPointF(10, 20));
+        QCOMPARE(flipScale(s), QPointF(1, 1));
+        s.flipHorizontal = true;
+        QCOMPARE(contentToSource(s, QPointF(10, 20)), QPointF(190, 20));
+        QCOMPARE(flipScale(s), QPointF(-1, 1));
+        s.flipVertical = true;
+        QCOMPARE(contentToSource(s, QPointF(10, 20)), QPointF(190, 80));
+        QCOMPARE(flipScale(s), QPointF(-1, -1));
+        s.flipHorizontal = false;
+        QCOMPARE(contentToSource(s, QPointF(0, 0)), QPointF(0, 100));
+        // Kasten bleibt: Ecken und Treffer wie ohne Spiegeln, auch gedreht
+        Source plain = s;
+        plain.flipVertical = false;
+        s.rotation = plain.rotation = 300;
+        QCOMPARE(sourceCorners(s), sourceCorners(plain));
+        QCOMPARE(sourceContains(s, QPointF(200, 100)), sourceContains(plain, QPointF(200, 100)));
+        // Inhalt links oben, gespiegelt und gedreht: liegt an der gedrehten Ecke links unten
+        const QPointF p = sourceToOverlay(s, contentToSource(s, QPointF(0, 0)));
+        const QPointF expected = sourceCorners(plain)[3];
+        QVERIFY(std::abs(p.x() - expected.x()) < 1e-9 && std::abs(p.y() - expected.y()) < 1e-9);
+    }
+
     void overlayToCanvas()
     {
         // 1920x1080 in eine Fläche 976x556 mit Rand 8: Massstab 0.5, Leinwand in der Mitte.

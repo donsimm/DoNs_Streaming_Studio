@@ -211,10 +211,13 @@ void SourceRenderer::paint(QPainter *painter, const dss::Overlay &overlay,
     for (int index : dss::drawnSources(overlay)) {
         const dss::Source &s = overlay.sources.at(index);
         painter->save();
-        // Drehung um die Mitte, positiv im Uhrzeigersinn (Entscheid 8)
+        // Drehung um die Mitte, positiv im Uhrzeigersinn (Entscheid 8); gespiegelt wird um die
+        // Mitte vor dem Drehen (P09b, Entscheid 4, dss::contentToSource).
         const QPointF center = dss::sourceCenter(s);
+        const QPointF flip = dss::flipScale(s);
         painter->translate(center);
         painter->rotate(dss::rotationDegrees(s.rotation));
+        painter->scale(flip.x(), flip.y());
         painter->translate(-s.width / 2.0, -s.height / 2.0);
         switch (s.kind) {
         case dss::SourceKind::Image: {

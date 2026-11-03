@@ -24,8 +24,9 @@ namespace dss {
 // Version der Schnittstelle; steht in der Begrüssung beider Seiten. 2 seit P08: Änderungen vom
 // Fenster an den Kern, overlay_list mit Ordnern in der Reihenfolge der Liste. 3 seit P09: Overlays
 // im Format 2 der Overlay-Datei (video.hold_at_end), set_overlay_size
+// 4 seit P09b: Overlays im Format 3 (flip_horizontal, flip_vertical)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 3;
+inline constexpr int kProtocolVersion = 4;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 

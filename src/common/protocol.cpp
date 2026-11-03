@@ -594,6 +594,10 @@ QJsonObject sourceChangesToJson(const SourceChanges &c)
         o.insert(QStringLiteral("height"), *c.height);
     if (c.rotation)
         o.insert(QStringLiteral("rotation"), *c.rotation);
+    if (c.flipHorizontal)
+        o.insert(QStringLiteral("flip_horizontal"), *c.flipHorizontal);
+    if (c.flipVertical)
+        o.insert(QStringLiteral("flip_vertical"), *c.flipVertical);
     if (c.visible)
         o.insert(QStringLiteral("visible"), *c.visible);
     QJsonObject v;
@@ -678,7 +682,8 @@ bool sourceChangesFromJson(const QJsonObject &o, SourceChanges *changes, QString
     SourceChanges c;
     if (!onlyKnownKeys(o, {QStringLiteral("name"), QStringLiteral("x"), QStringLiteral("y"),
                            QStringLiteral("width"), QStringLiteral("height"),
-                           QStringLiteral("rotation"), QStringLiteral("visible"),
+                           QStringLiteral("rotation"), QStringLiteral("flip_horizontal"),
+                           QStringLiteral("flip_vertical"), QStringLiteral("visible"),
                            QStringLiteral("video"), QStringLiteral("text")},
                        QStringLiteral("changes."), error)
         || !optionalStringChange(o, QStringLiteral("name"), &c.name, error)
@@ -687,6 +692,8 @@ bool sourceChangesFromJson(const QJsonObject &o, SourceChanges *changes, QString
         || !optionalIntChange(o, QStringLiteral("width"), &c.width, error)
         || !optionalIntChange(o, QStringLiteral("height"), &c.height, error)
         || !optionalIntChange(o, QStringLiteral("rotation"), &c.rotation, error)
+        || !optionalBoolChange(o, QStringLiteral("flip_horizontal"), &c.flipHorizontal, error)
+        || !optionalBoolChange(o, QStringLiteral("flip_vertical"), &c.flipVertical, error)
         || !optionalBoolChange(o, QStringLiteral("visible"), &c.visible, error))
         return false;
     if (o.contains(QStringLiteral("video"))) {

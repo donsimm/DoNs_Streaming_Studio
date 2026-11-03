@@ -306,6 +306,10 @@ QString applySourceChanges(Source *source, const SourceChanges &changes)
         changed.height = *changes.height;
     if (changes.rotation)
         changed.rotation = *changes.rotation;
+    if (changes.flipHorizontal)
+        changed.flipHorizontal = *changes.flipHorizontal;
+    if (changes.flipVertical)
+        changed.flipVertical = *changes.flipVertical;
     if (changes.visible)
         changed.visible = *changes.visible;
     if (changes.loop)

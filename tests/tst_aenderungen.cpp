@@ -295,6 +295,8 @@ private slots:
         c.width = 300;
         c.height = 200;
         c.rotation = 3599;
+        c.flipHorizontal = true; // P09b
+        c.flipVertical = false;  // P09b
         c.visible = false;
         c.loop = true;
         c.holdAtEnd = true; // P09
@@ -305,6 +307,8 @@ private slots:
         const QJsonObject o = sourceChangesToJson(c);
         QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("loop")).toBool(), true);
         QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("hold_at_end")).toBool(), true);
+        QCOMPARE(o.value(QStringLiteral("flip_horizontal")), QJsonValue(true));
+        QCOMPARE(o.value(QStringLiteral("flip_vertical")), QJsonValue(false));
         QCOMPARE(o.value(QStringLiteral("text")).toObject().value(QStringLiteral("font_size")).toInt(), 72);
         QCOMPARE(o.value(QStringLiteral("text")).toObject().value(QStringLiteral("align")).toString(),
                  QStringLiteral("center"));
@@ -318,6 +322,9 @@ private slots:
         QCOMPARE(sourceChangesToJson(one), (QJsonObject{{QStringLiteral("y"), 5}}));
         QVERIFY(SourceChanges().isEmpty());
         QVERIFY(!one.isEmpty());
+        // Spiegeln muss true/false sein (P09b).
+        QVERIFY(!sourceChangesFromJson(QJsonObject{{QStringLiteral("flip_vertical"), 1}}, &back, &error));
+        QVERIFY2(error.contains(QStringLiteral("flip_vertical")), qPrintable(error));
     }
 
     void changeResult()

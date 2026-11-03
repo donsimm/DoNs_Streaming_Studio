@@ -130,7 +130,21 @@ CanvasPress canvasPress(const Overlay &overlay, const QUuid &selectedId, QPointF
 
 SourceGeometry geometryOf(const Source &source)
 {
-    return {source.x, source.y, source.width, source.height, source.rotation};
+    return {source.x, source.y, source.width, source.height, source.rotation,
+            source.flipHorizontal, source.flipVertical};
+}
+
+SourceChanges geometryChanges(const SourceGeometry &geometry)
+{
+    SourceChanges c;
+    c.x = geometry.x;
+    c.y = geometry.y;
+    c.width = geometry.width;
+    c.height = geometry.height;
+    c.rotation = geometry.rotation;
+    c.flipHorizontal = geometry.flipHorizontal;
+    c.flipVertical = geometry.flipVertical;
+    return c;
 }
 
 bool applyGeometry(Overlay *overlay, const QUuid &sourceId, const SourceGeometry &geometry)
@@ -144,6 +158,8 @@ bool applyGeometry(Overlay *overlay, const QUuid &sourceId, const SourceGeometry
     s.width = geometry.width;
     s.height = geometry.height;
     s.rotation = geometry.rotation;
+    s.flipHorizontal = geometry.flipHorizontal;
+    s.flipVertical = geometry.flipVertical;
     return true;
 }
 
@@ -166,31 +182,47 @@ SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF 
     const double h = start.height;
     // Zeiger im Rahmen der Quelle beim Beginn; der Gegengriff liegt auf der anderen Seite.
     const QPointF p = overlayToSource(start, pointer);
-    double newW = w;
-    double newH = h;
+    // Grösse mit Vorzeichen, gemessen vom Gegengriff in Richtung des Griffs: negativ = über die
+    // Gegenseite hinaus (spiegeln, wie OBS).
+    double sizeX = w;
+    double sizeY = h;
     if (s.x > 0)
-        newW = p.x();
+        sizeX = p.x();
     else if (s.x < 0)
-        newW = w - p.x();
+        sizeX = w - p.x();
     if (s.y > 0)
-        newH = p.y();
+        sizeY = p.y();
     else if (s.y < 0)
-        newH = h - p.y();
-    newW = std::max(newW, double(kSourceMinSize));
-    newH = std::max(newH, double(kSourceMinSize));
+        sizeY = h - p.y();
     if (isCornerHandle(handle) && !freeAspect) {
-        // Wie ClampAspect in OBS: Ist das neue Verhältnis kleiner, folgt die Breite der Höhe.
+        // Wie ClampAspect in OBS: Ist das Verhältnis (mit Vorzeichen) kleiner, folgt die Breite
+        // der Höhe, sonst die Höhe der Breite; jede Seite behält ihr Vorzeichen. Mit verschiedenen
+        // Vorzeichen ist das Verhältnis negativ, dann folgt immer die Breite (wie OBS).
         const double aspect = w / h;
-        if (newW / newH < aspect)
-            newW = newH * aspect;
+        if (sizeX / sizeY < aspect)
+            sizeX = std::copysign(std::abs(sizeY) * aspect, sizeX);
         else
-            newH = newW / aspect;
+            sizeY = std::copysign(std::abs(sizeX) / aspect, sizeY);
     }
-    g.width = std::max(kSourceMinSize, static_cast<int>(std::lround(newW)));
-    g.height = std::max(kSourceMinSize, static_cast<int>(std::lround(newH)));
-    // Neuer Kasten im Rahmen des Beginns: Der Gegengriff bleibt, ohne Seite bleibt die Mitte.
-    const double x0 = s.x > 0 ? 0.0 : (s.x < 0 ? w - g.width : (w - g.width) / 2.0);
-    const double y0 = s.y > 0 ? 0.0 : (s.y < 0 ? h - g.height : (h - g.height) / 2.0);
+    const long roundedX = std::lround(sizeX);
+    const long roundedY = std::lround(sizeY);
+    const bool mirrorX = roundedX < 0;
+    const bool mirrorY = roundedY < 0;
+    g.width = std::max(kSourceMinSize, static_cast<int>(std::abs(roundedX)));
+    g.height = std::max(kSourceMinSize, static_cast<int>(std::abs(roundedY)));
+    g.flipHorizontal = start.flipHorizontal != mirrorX;
+    g.flipVertical = start.flipVertical != mirrorY;
+    // Neuer Kasten im Rahmen des Beginns: Er beginnt am Gegengriff und geht in Richtung des
+    // Griffs, gespiegelt auf die andere Seite; ohne Seite bleibt die Mitte.
+    const auto origin = [](int side, double extent, int size, bool mirror) {
+        if (side > 0)
+            return mirror ? -double(size) : 0.0;
+        if (side < 0)
+            return mirror ? extent : extent - size;
+        return (extent - size) / 2.0;
+    };
+    const double x0 = origin(s.x, w, g.width, mirrorX);
+    const double y0 = origin(s.y, h, g.height, mirrorY);
     const QPointF center = sourceToOverlay(start, QPointF(x0 + g.width / 2.0, y0 + g.height / 2.0));
     g.x = static_cast<int>(std::lround(center.x() - g.width / 2.0));
     g.y = static_cast<int>(std::lround(center.y() - g.height / 2.0));

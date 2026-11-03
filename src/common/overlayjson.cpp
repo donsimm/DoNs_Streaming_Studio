@@ -22,6 +22,8 @@ QJsonObject geometryAndCommon(const Source &source)
     o.insert(QStringLiteral("width"), source.width);
     o.insert(QStringLiteral("height"), source.height);
     o.insert(QStringLiteral("rotation"), source.rotation);
+    o.insert(QStringLiteral("flip_horizontal"), source.flipHorizontal);
+    o.insert(QStringLiteral("flip_vertical"), source.flipVertical);
     o.insert(QStringLiteral("visible"), source.visible);
     return o;
 }
@@ -185,10 +187,14 @@ bool sourceFromJson(const QJsonObject &object, const QString &path, int version,
         return false;
     }
     const QString kindKey = sourceKindName(source->kind);
-    r.allowOnly({QStringLiteral("id"), QStringLiteral("kind"), QStringLiteral("name"),
-                 QStringLiteral("x"), QStringLiteral("y"), QStringLiteral("width"),
-                 QStringLiteral("height"), QStringLiteral("rotation"), QStringLiteral("visible"),
-                 kindKey});
+    QStringList keys = {QStringLiteral("id"), QStringLiteral("kind"), QStringLiteral("name"),
+                        QStringLiteral("x"), QStringLiteral("y"), QStringLiteral("width"),
+                        QStringLiteral("height"), QStringLiteral("rotation"),
+                        QStringLiteral("visible"), kindKey};
+    // flip_horizontal und flip_vertical gibt es erst ab Version 3 (P09b); vorher gilt false.
+    if (version >= 3)
+        keys << QStringLiteral("flip_horizontal") << QStringLiteral("flip_vertical");
+    r.allowOnly(keys);
     source->name = r.string(QStringLiteral("name"));
     if (r.ok() && source->name.trimmed().isEmpty())
         r.fail(QStringLiteral("name"), QStringLiteral("darf nicht leer sein"));
@@ -197,6 +203,10 @@ bool sourceFromJson(const QJsonObject &object, const QString &path, int version,
     source->width = r.integer(QStringLiteral("width"));
     source->height = r.integer(QStringLiteral("height"));
     source->rotation = r.integer(QStringLiteral("rotation"));
+    if (version >= 3) {
+        source->flipHorizontal = r.boolean(QStringLiteral("flip_horizontal"));
+        source->flipVertical = r.boolean(QStringLiteral("flip_vertical"));
+    }
     source->visible = r.boolean(QStringLiteral("visible"));
     if (r.ok())
         r.check(QString(), validateSourceGeometry(source->width, source->height, source->rotation));

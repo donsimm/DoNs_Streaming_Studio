@@ -555,14 +555,9 @@ void MainWindow::onCanvasGeometryEdited(const QUuid &id, const dss::SourceGeomet
     if (m_selectedOverlay.isNull())
         return;
     m_geometryPreview = GeometryPreview{m_selectedOverlay, id, geometry, !finished};
-    // Alle fünf Werte in einer Änderung; häufige Änderungen fasst CoreClient zusammen (wie P08):
-    // unterwegs ist höchstens eine, danach geht die neueste.
-    dss::SourceChanges c;
-    c.x = geometry.x;
-    c.y = geometry.y;
-    c.width = geometry.width;
-    c.height = geometry.height;
-    c.rotation = geometry.rotation;
+    // Alle Werte der Transformation in einer Änderung (seit P09b auch Spiegeln); häufige Änderungen
+    // fasst CoreClient zusammen (wie P08): unterwegs ist höchstens eine, danach geht die neueste.
+    const dss::SourceChanges c = dss::geometryChanges(geometry);
     sendChange(dss::sourceUpdate(m_selectedOverlay, id, c), dss::changeKey(id, QStringLiteral("geometry")));
     // Sofort zeigen: Leinwand und Felder der Eigenschaften (ohne die Liste neu zu bauen).
     m_canvas->setOverlay(selectedOverlay());

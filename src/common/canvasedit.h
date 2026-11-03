@@ -27,10 +27,12 @@
 //     (hier auf 1°, Entscheid des Nutzers im Handtest P09, umgesetzt in P09b)
 //   - Zeiger (UpdateCursor, Zeile 688): Drehgriff OpenHandCursor, beim Drehen ClosedHandCursor,
 //     Verschieben SizeAllCursor, Griffe Size*Cursor nach Achtel der Drehung
-// Abweichungen von OBS (P09-Bericht): Kanten ändern nur Breite oder Höhe (Entscheid 7; OBS hält
-// auch dort das Verhältnis); Verhältnis = Kasten beim Beginn des Ziehens (OBS: Grösse der
-// Quelle); kein Einrasten ohne Shift (OBS: 5° um 45°-Schritte) und kein Einrasten an Rändern
-// (E-10); kein Spiegeln über den Gegengriff hinaus (Mindestgrösse 1 Pixel).
+//   - Spiegeln (StretchItem, Zeile 1582): Der Zeiger wird in den Rahmen der Quelle beim Beginn
+//     umgerechnet; liegt er jenseits der Gegenseite, wird die Grösse negativ und die Quelle
+//     gespiegelt (negativer Massstab). ClampAspect behält das Vorzeichen jeder Seite.
+// Abweichungen von OBS (P09- und P09b-Bericht): Kanten ändern nur Breite oder Höhe (Entscheid 7;
+// OBS hält auch dort das Verhältnis); kein Einrasten ohne Shift (OBS: 5° um 45°-Schritte) und
+// kein Einrasten an Rändern (E-10); Mindestgrösse 1 Pixel (OBS erlaubt 0).
 
 namespace dss {
 
@@ -81,9 +83,13 @@ struct SourceGeometry
     int width = 1;
     int height = 1;
     int rotation = 0; // Zehntelgrad 0 bis 3599
+    bool flipHorizontal = false; // P09b
+    bool flipVertical = false;   // P09b
     bool operator==(const SourceGeometry &) const = default;
 };
 SourceGeometry geometryOf(const Source &source);
+// Änderung an den Kern mit allen Werten der Lage (x, y, Breite, Höhe, Drehung, Spiegeln).
+SourceChanges geometryChanges(const SourceGeometry &geometry);
 // Setzt die Lage einer Quelle im Overlay (für die Vorschau beim Ziehen); false, wenn es die
 // Quelle nicht gibt.
 bool applyGeometry(Overlay *overlay, const QUuid &sourceId, const SourceGeometry &geometry);
@@ -94,6 +100,9 @@ SourceGeometry moveGeometry(const Source &start, QPointF startPointer, QPointF p
 // Skalieren an einem Ecken- oder Kantengriff. Der Gegengriff bleibt stehen (auch gedreht).
 // Ecken: Seitenverhältnis des Kastens beim Beginn bleibt, freeAspect (Shift) = frei.
 // Kanten: nur Breite bzw. Höhe (Entscheid 7). Mindestgrösse kSourceMinSize.
+// Über die Gegenseite hinaus (P09b, Entscheid 4, wie OBS): Der Kasten liegt dann auf der anderen
+// Seite des Gegengriffs, und die Quelle wird in dieser Richtung gespiegelt (gegenüber dem Beginn
+// umgeschaltet). Breite und Höhe bleiben positiv.
 SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF pointer,
                               bool freeAspect);
 

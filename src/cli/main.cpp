@@ -54,13 +54,16 @@ const char *const kUsage =
     "  quelle-bild ADRESSE DATEI\n"
     "  quelle-video ADRESSE DATEI [--wiederholen] [--am-ende-anhalten]\n"
     "  quelle-text ADRESSE TEXT SCHRIFTDATEI\n"
-    "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG\n"
+    "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG [--waagrecht-gespiegelt]\n"
+    "                   [--senkrecht-gespiegelt]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
     "quelle-bild und quelle-video: Grösse der Quelle = Grösse der Datei (Video: erstes Bild).\n"
     "NR: Nummer der Quelle aus quelle-liste (1 = ganz hinten).\n"
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
+    "--waagrecht-gespiegelt, --senkrecht-gespiegelt: Inhalt im Kasten spiegeln (ohne: nicht\n"
+    "gespiegelt). Breite und Höhe bleiben positiv.\n"
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/dons-streaming-studio).\n"
     "overlay-liste und quelle-liste gehen immer. Alle anderen Befehle ändern Overlays und gehen\n"
     "nur, wenn der Kern angehalten ist (systemctl --user stop dss-core.service).\n"
@@ -73,6 +76,8 @@ struct Arguments
     bool changeAddress = false;
     bool loop = false;
     bool holdAtEnd = false;
+    bool flipHorizontal = false; // P09b
+    bool flipVertical = false;   // P09b
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -94,6 +99,10 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->loop = true;
         } else if (a == QLatin1String("--am-ende-anhalten")) {
             result->holdAtEnd = true;
+        } else if (a == QLatin1String("--waagrecht-gespiegelt")) {
+            result->flipHorizontal = true;
+        } else if (a == QLatin1String("--senkrecht-gespiegelt")) {
+            result->flipVertical = true;
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -131,6 +140,18 @@ bool parseRotation(const QString &text, int *tenths, QString *error)
 QString yesNo(bool value)
 {
     return value ? QStringLiteral("ja") : QStringLiteral("nein");
+}
+
+// Spalte «Gespiegelt» (P09b): nein, waagrecht, senkrecht oder beide.
+QString flipText(const dss::Source &s)
+{
+    if (s.flipHorizontal && s.flipVertical)
+        return QStringLiteral("beide");
+    if (s.flipHorizontal)
+        return QStringLiteral("waagrecht");
+    if (s.flipVertical)
+        return QStringLiteral("senkrecht");
+    return QStringLiteral("nein");
 }
 
 // Gibt eine Tabelle mit linksbündigen Spalten aus.
@@ -171,6 +192,9 @@ public:
             return usage(QStringLiteral("--wiederholen gilt nur für quelle-video."));
         if (command != QLatin1String("quelle-video") && m_args.holdAtEnd)
             return usage(QStringLiteral("--am-ende-anhalten gilt nur für quelle-video."));
+        if (command != QLatin1String("quelle-geometrie") && (m_args.flipHorizontal || m_args.flipVertical))
+            return usage(QStringLiteral("--waagrecht-gespiegelt und --senkrecht-gespiegelt gelten nur für "
+                                        "quelle-geometrie."));
 
         struct Command
         {
@@ -334,14 +358,14 @@ private:
                                     QStringLiteral("Sichtbar"), QStringLiteral("X"),
                                     QStringLiteral("Y"), QStringLiteral("Breite"),
                                     QStringLiteral("Höhe"), QStringLiteral("Drehung"),
-                                    QStringLiteral("Wiederholen"), QStringLiteral("Am Ende anhalten"),
+                                    QStringLiteral("Gespiegelt"), QStringLiteral("Wiederholen"), QStringLiteral("Am Ende anhalten"),
                                     QStringLiteral("Name")}};
         for (qsizetype i = 0; i < o->sources.size(); ++i) {
             const dss::Source &s = o->sources.at(i);
             rows.append({QString::number(i + 1), dss::sourceKindName(s.kind), yesNo(s.visible),
                          QString::number(s.x), QString::number(s.y), QString::number(s.width),
                          QString::number(s.height), dss::rotationDisplay(s.rotation),
-                         s.kind == dss::SourceKind::Video ? yesNo(s.loop) : QStringLiteral("–"),
+                         flipText(s), s.kind == dss::SourceKind::Video ? yesNo(s.loop) : QStringLiteral("–"),
                          s.kind == dss::SourceKind::Video ? yesNo(s.holdAtEnd) : QStringLiteral("–"),
                          s.name});
         }
@@ -417,11 +441,21 @@ private:
                             .arg(number).arg(o->sources.size()));
         const QUuid overlayId = o->id;
         const QUuid sourceId = o->sources.at(number - 1).id;
-        if (!m_store->setSourceGeometry(overlayId, sourceId, x, y, width, height, rotation, &error))
+        // Lage, Grösse, Drehung und Spiegeln zusammen (P09b): alles oder nichts.
+        dss::SourceChanges c;
+        c.x = x;
+        c.y = y;
+        c.width = width;
+        c.height = height;
+        c.rotation = rotation;
+        c.flipHorizontal = m_args.flipHorizontal;
+        c.flipVertical = m_args.flipVertical;
+        if (!m_store->updateSource(overlayId, sourceId, c, &error))
             return fail(error);
-        out() << QStringLiteral("Quelle %1: X %2, Y %3, Breite %4, Höhe %5, Drehung %6\n")
+        const dss::Overlay *changed = m_store->overlay(overlayId);
+        out() << QStringLiteral("Quelle %1: X %2, Y %3, Breite %4, Höhe %5, Drehung %6, gespiegelt %7\n")
                      .arg(number).arg(x).arg(y).arg(width).arg(height)
-                     .arg(dss::rotationDisplay(rotation));
+                     .arg(dss::rotationDisplay(rotation), flipText(changed->sources.at(number - 1)));
         return kExitOk;
     }
 

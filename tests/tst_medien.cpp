@@ -334,6 +334,46 @@ private slots:
                                  QStringLiteral("--am-ende-anhalten")});
         QVERIFY(r.exitCode != 0);
     }
+
+    // P09b, Entscheid 4: dss-cli quelle-geometrie mit Spiegeln und Spalte «Gespiegelt».
+    void cliFlip()
+    {
+        QTemporaryDir data;
+        using testhelp::runCli;
+        QCOMPARE(runCli(data.path(), {QStringLiteral("overlay-neu"), QStringLiteral("Spiegel"),
+                                      QStringLiteral("1920"), QStringLiteral("1080")}).exitCode, 0);
+        QCOMPARE(runCli(data.path(), {QStringLiteral("quelle-bild"), QStringLiteral("spiegel"),
+                                      media("bild1.png")}).exitCode, 0);
+        testhelp::CliResult r = runCli(data.path(), {QStringLiteral("quelle-geometrie"), QStringLiteral("spiegel"),
+                                                     QStringLiteral("1"), QStringLiteral("-10"), QStringLiteral("20"),
+                                                     QStringLiteral("300"), QStringLiteral("200"), QStringLiteral("12.5"),
+                                                     QStringLiteral("--waagrecht-gespiegelt")});
+        QCOMPARE(r.exitCode, 0);
+        QVERIFY2(r.out.contains(QStringLiteral("gespiegelt waagrecht")), qPrintable(r.out));
+        r = runCli(data.path(), {QStringLiteral("quelle-liste"), QStringLiteral("spiegel")});
+        QVERIFY2(r.out.contains(QStringLiteral("Gespiegelt")) && r.out.contains(QStringLiteral("waagrecht")),
+                 qPrintable(r.out));
+        r = runCli(data.path(), {QStringLiteral("quelle-geometrie"), QStringLiteral("spiegel"), QStringLiteral("1"),
+                                 QStringLiteral("0"), QStringLiteral("0"), QStringLiteral("300"),
+                                 QStringLiteral("200"), QStringLiteral("0"), QStringLiteral("--waagrecht-gespiegelt"),
+                                 QStringLiteral("--senkrecht-gespiegelt")});
+        QVERIFY2(r.out.contains(QStringLiteral("gespiegelt beide")), qPrintable(r.out));
+        // Ohne Option: nicht gespiegelt
+        r = runCli(data.path(), {QStringLiteral("quelle-geometrie"), QStringLiteral("spiegel"), QStringLiteral("1"),
+                                 QStringLiteral("0"), QStringLiteral("0"), QStringLiteral("300"),
+                                 QStringLiteral("200"), QStringLiteral("0")});
+        QVERIFY2(r.out.contains(QStringLiteral("gespiegelt nein")), qPrintable(r.out));
+        // Datei: Format 3 mit beiden Feldern
+        OverlayStore store(data.path());
+        QString error;
+        QVERIFY(store.load(&error, OverlayStore::LoadMode::ReadOnly));
+        QCOMPARE(store.overlays().size(), 1);
+        QCOMPARE(store.overlays().first().sources.first().flipHorizontal, false);
+        // Nur bei quelle-geometrie erlaubt
+        r = runCli(data.path(), {QStringLiteral("quelle-liste"), QStringLiteral("spiegel"),
+                                 QStringLiteral("--senkrecht-gespiegelt")});
+        QCOMPARE(r.exitCode, 2);
+    }
 #endif
 };
 

@@ -26,19 +26,31 @@ Source box(int x, int y, int w, int h, int rotation = 0)
     return s;
 }
 
-SourceGeometry geo(int x, int y, int w, int h, int r = 0)
+SourceGeometry geo(int x, int y, int w, int h, int r = 0, bool flipH = false, bool flipV = false)
 {
-    return {x, y, w, h, r};
+    return {x, y, w, h, r, flipH, flipV};
 }
 
 } // namespace
+
+void applyGeometryTo(Source *s, const SourceGeometry &g)
+{
+    s->x = g.x;
+    s->y = g.y;
+    s->width = g.width;
+    s->height = g.height;
+    s->rotation = g.rotation;
+    s->flipHorizontal = g.flipHorizontal;
+    s->flipVertical = g.flipVertical;
+}
 
 namespace QTest {
 template <>
 char *toString(const dss::SourceGeometry &g)
 {
-    return qstrdup(qPrintable(QStringLiteral("x=%1 y=%2 w=%3 h=%4 r=%5")
-                                  .arg(g.x).arg(g.y).arg(g.width).arg(g.height).arg(g.rotation)));
+    return qstrdup(qPrintable(QStringLiteral("x=%1 y=%2 w=%3 h=%4 r=%5 fh=%6 fv=%7")
+                                  .arg(g.x).arg(g.y).arg(g.width).arg(g.height).arg(g.rotation)
+                                  .arg(g.flipHorizontal).arg(g.flipVertical)));
 }
 } // namespace QTest
 
@@ -120,8 +132,9 @@ private slots:
         // Übernehmen in das Overlay
         Overlay o;
         o.sources = {s};
-        QVERIFY(applyGeometry(&o, s.id, geo(1, 2, 3, 4, 5)));
-        QCOMPARE(geometryOf(o.sources[0]), geo(1, 2, 3, 4, 5));
+        QVERIFY(applyGeometry(&o, s.id, geo(1, 2, 3, 4, 5, true, false)));
+        QCOMPARE(geometryOf(o.sources[0]), geo(1, 2, 3, 4, 5, true, false));
+        QCOMPARE(o.sources[0].flipHorizontal, true);
         QVERIFY(!applyGeometry(&o, QUuid::createUuid(), geo(1, 2, 3, 4, 5)));
     }
 
@@ -162,12 +175,68 @@ private slots:
     void resizeMinimum()
     {
         const Source s = box(100, 100, 200, 100);
-        // Über den Gegengriff hinaus: Mindestgrösse 1, kein Spiegeln
-        QCOMPARE(resizeGeometry(s, CanvasHandle::Right, QPointF(0, 150), false), geo(100, 100, 1, 100));
-        QCOMPARE(resizeGeometry(s, CanvasHandle::Top, QPointF(0, 500), false), geo(100, 199, 200, 1));
-        const SourceGeometry g = resizeGeometry(s, CanvasHandle::BottomRight, QPointF(-50, -50), true);
-        QCOMPARE(g.width, 1);
-        QCOMPARE(g.height, 1);
+        // Genau auf den Gegengriff: Mindestgrösse 1, nicht gespiegelt
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Right, QPointF(100, 150), false), geo(100, 100, 1, 100));
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Right, QPointF(100.4, 150), false), geo(100, 100, 1, 100));
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Top, QPointF(0, 200), false), geo(100, 199, 200, 1));
+        const SourceGeometry g = resizeGeometry(s, CanvasHandle::BottomRight, QPointF(100, 100), true);
+        QCOMPARE(g, geo(100, 100, 1, 1));
+    }
+
+    // P09b, Entscheid 4: über die Gegenseite hinaus spiegeln, wie OBS (StretchItem, ClampAspect).
+    void resizeMirror()
+    {
+        const Source s = box(100, 100, 200, 100); // rechts unten (300, 200)
+        // Rechte Kante 100 px links über die linke Kante hinaus: Kasten 100..0 links davon,
+        // waagrecht gespiegelt; die linke Kante (x = 100) bleibt.
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Right, QPointF(0, 150), false),
+                 geo(0, 100, 100, 100, 0, true, false));
+        // Linke Kante nach rechts über die rechte hinaus
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Left, QPointF(450, 150), false),
+                 geo(300, 100, 150, 100, 0, true, false));
+        // Obere Kante unter die untere: senkrecht gespiegelt, untere Kante (y = 200) bleibt
+        QCOMPARE(resizeGeometry(s, CanvasHandle::Top, QPointF(0, 260), false),
+                 geo(100, 200, 200, 60, 0, false, true));
+        // Ecke frei (Shift) über beide Seiten: beide gespiegelt
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(-50, 20), true),
+                 geo(-50, 20, 150, 80, 0, true, true));
+        // Ecke mit Verhältnis über beide Seiten: Verhältnis positiv wie ohne Spiegeln
+        // (-150 / -80 = 1.875 < 2 → Breite folgt der Höhe: 160 x 80)
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(-50, 20), false),
+                 geo(-60, 20, 160, 80, 0, true, true));
+        // Ecke mit Verhältnis nur waagrecht über die Gegenseite: Verhältnis negativ, wie OBS
+        // folgt dann die Breite der Höhe (-150 / 50 < 2 → Breite 2 * 50 = 100 nach links)
+        QCOMPARE(resizeGeometry(s, CanvasHandle::BottomRight, QPointF(-50, 150), false),
+                 geo(0, 100, 100, 50, 0, true, false));
+        // Schon gespiegelte Quelle: nochmals über die Gegenseite schaltet zurück
+        Source flipped = s;
+        flipped.flipHorizontal = true;
+        flipped.flipVertical = true;
+        QCOMPARE(resizeGeometry(flipped, CanvasHandle::Right, QPointF(0, 150), false),
+                 geo(0, 100, 100, 100, 0, false, true));
+        // Innerhalb bleibt das Spiegeln, wie es war
+        QCOMPARE(resizeGeometry(flipped, CanvasHandle::Right, QPointF(350, 150), false),
+                 geo(100, 100, 250, 100, 0, true, true));
+        // Gedreht (90°): die Gegenkante bleibt auch beim Spiegeln stehen
+        const Source r = box(100, 100, 200, 100, 900);
+        const QPointF anchor = handlePosition(r, CanvasHandle::Left, 1.0);
+        const SourceGeometry m = resizeGeometry(r, CanvasHandle::Right,
+                                                sourceToOverlay(r, QPointF(-80, 50)), false);
+        QCOMPARE(m.width, 80);
+        QCOMPARE(m.height, 100);
+        QCOMPARE(m.flipHorizontal, true);
+        Source after = r;
+        applyGeometryTo(&after, m);
+        // Die Gegenkante (lokal links beim Beginn) ist jetzt die rechte Kante des neuen Kastens.
+        const QPointF anchorAfter = handlePosition(after, CanvasHandle::Right, 1.0);
+        QVERIFY(std::abs(anchorAfter.x() - anchor.x()) <= 0.5);
+        QVERIFY(std::abs(anchorAfter.y() - anchor.y()) <= 0.5);
+        // Änderung an den Kern mit allen Werten
+        const SourceChanges c = geometryChanges(m);
+        QCOMPARE(c.flipHorizontal, std::optional<bool>(true));
+        QCOMPARE(c.flipVertical, std::optional<bool>(false));
+        QCOMPARE(c.width, std::optional<int>(80));
+        QVERIFY(!c.name);
     }
 
     void resizeRotated()

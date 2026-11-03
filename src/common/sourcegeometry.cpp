@@ -39,6 +39,17 @@ QPointF overlayToSource(const Source &source, QPointF overlayPoint)
     return rotated(overlayPoint - sourceCenter(source), -rotationDegrees(source.rotation)) + half;
 }
 
+QPointF contentToSource(const Source &source, QPointF contentPoint)
+{
+    return QPointF(source.flipHorizontal ? source.width - contentPoint.x() : contentPoint.x(),
+                   source.flipVertical ? source.height - contentPoint.y() : contentPoint.y());
+}
+
+QPointF flipScale(const Source &source)
+{
+    return QPointF(source.flipHorizontal ? -1.0 : 1.0, source.flipVertical ? -1.0 : 1.0);
+}
+
 std::array<QPointF, 4> sourceCorners(const Source &source)
 {
     const double w = source.width;

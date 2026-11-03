@@ -7,6 +7,8 @@
 //   - Text in zwei Zeilen in einer Schrift des Systems (DejaVu Sans), abgeschnitten am Kasten
 //   - verborgenes Bild: nicht gezeichnet
 //   - variable Schrift Urbanist[wght]: Gewicht 800 deckt deutlich mehr als 200 (Achse wght)
+//   - gespiegelt (P09b): Bild mit roter linker und blauer rechter Hälfte, waagrecht gespiegelt,
+//     und waagrecht gespiegelt plus 90° gedreht (erst spiegeln, dann drehen)
 // Mit DSS_LEINWAND_BILD=DATEI wird das Bild der Leinwand gespeichert (Bericht).
 
 #include "canvaswidget.h"
@@ -48,7 +50,7 @@ class TestLeinwand : public QObject
     QTemporaryDir m_data;
     QTemporaryDir m_work;
     Overlay m_overlay;
-    QUuid m_image, m_rotated, m_jpeg, m_video, m_text, m_hidden, m_light, m_heavy;
+    QUuid m_image, m_rotated, m_jpeg, m_video, m_text, m_hidden, m_light, m_heavy, m_flipped, m_flippedRotated;
     std::unique_ptr<SourceRenderer> m_renderer;
     std::unique_ptr<CanvasWidget> m_canvas;
     Theme m_theme = darkTheme();
@@ -91,6 +93,17 @@ private slots:
                                             QStringLiteral("2"), jpg});
         QVERIFY(ff.waitForFinished(30000) && ff.exitCode() == 0);
 
+        // Links rot, rechts blau (P09b, Spiegeln)
+        const QString halves = m_work.filePath(QStringLiteral("haelften.png"));
+        {
+            QImage h(200, 100, QImage::Format_RGB32);
+            h.fill(QColor(255, 0, 0));
+            for (int y = 0; y < 100; ++y)
+                for (int x = 100; x < 200; ++x)
+                    h.setPixelColor(x, y, QColor(0, 0, 255));
+            QVERIFY(h.save(halves));
+        }
+
         OverlayStore store(m_data.path());
         QString error;
         QVERIFY(store.load(&error));
@@ -106,6 +119,9 @@ private slots:
         m_light = store.addTextSource(id, QStringLiteral("Gewicht"), QStringLiteral(DSS_TEST_VARIABLE_FONT), &error);
         m_heavy = store.addTextSource(id, QStringLiteral("Gewicht"), QStringLiteral(DSS_TEST_VARIABLE_FONT), &error);
         QVERIFY2(!m_heavy.isNull(), qPrintable(error));
+        m_flipped = store.addImageSource(id, halves, &error);
+        m_flippedRotated = store.addImageSource(id, halves, &error);
+        QVERIFY2(!m_flippedRotated.isNull(), qPrintable(error));
         const auto geometry = [&](const QUuid &s, int x, int y, int w, int h, int r) {
             QVERIFY2(store.setSourceGeometry(id, s, x, y, w, h, r, &error), qPrintable(error));
         };
@@ -118,6 +134,14 @@ private slots:
         geometry(m_light, 100, 900, 800, 160, 0);
         geometry(m_heavy, 1000, 900, 800, 160, 0);
         QVERIFY(store.setSourceVisible(id, m_hidden, false, &error));
+        for (const auto &[s, y, rotation] : {std::tuple{m_flipped, 0, 0}, std::tuple{m_flippedRotated, 170, 900}}) {
+            SourceChanges c;
+            c.x = 1650;
+            c.y = y;
+            c.rotation = rotation;
+            c.flipHorizontal = true;
+            QVERIFY2(store.updateSource(id, s, c, &error), qPrintable(error));
+        }
         SourceChanges text;
         text.fontSize = 100;
         QVERIFY(store.updateSource(id, m_text, text, &error));
@@ -180,6 +204,23 @@ private slots:
         QCOMPARE(v.decoderName, QStringLiteral("libvpx-vp9"));
         qInfo("Alpha-Mittel erstes Bild: %.4f", v.firstAlphaMean);
         QVERIFY(std::abs(v.firstAlphaMean - 52.8726) < 0.001);
+    }
+
+    // P09b, Entscheid 4: Spiegeln im Kasten, erst spiegeln, dann drehen.
+    void flipped()
+    {
+        const QImage image = grabCanvas();
+        // (1650, 0) 200x100, waagrecht gespiegelt: links blau, rechts rot
+        QVERIFY2(distance(at(image, QPointF(1700, 50)), QColor(0, 0, 255)) <= 2,
+                 qPrintable(at(image, QPointF(1700, 50)).name()));
+        QVERIFY(distance(at(image, QPointF(1800, 50)), QColor(255, 0, 0)) <= 2);
+        // (1650, 170) 200x100, gespiegelt und 90° im Uhrzeigersinn gedreht um die Mitte
+        // (1750, 220): lokal links (nach dem Spiegeln blau) zeigt nach oben.
+        QVERIFY2(distance(at(image, QPointF(1750, 150)), QColor(0, 0, 255)) <= 2,
+                 qPrintable(at(image, QPointF(1750, 150)).name()));
+        QVERIFY(distance(at(image, QPointF(1750, 290)), QColor(255, 0, 0)) <= 2);
+        // Kasten bleibt: neben dem gedrehten Kasten (x 1700 bis 1800) Schachbrett
+        QVERIFY(isChecker(at(image, QPointF(1680, 220))));
     }
 
     void twoLineText()

@@ -28,6 +28,15 @@ QPointF sourceToOverlay(const Source &source, QPointF local);
 // Punkt im Overlay → lokal in der Quelle (Umkehrung von sourceToOverlay).
 QPointF overlayToSource(const Source &source, QPointF overlayPoint);
 
+// Spiegeln (P09b): Punkt des Inhalts (Bild, Video, Text, in Pixeln des Kastens, ungespiegelt) →
+// lokal im Kasten. Waagrecht gespiegelt: x → Breite − x; senkrecht gespiegelt: y → Höhe − y.
+// Der Zeichner spiegelt um die Mitte, nach dem Drehen gerechnet also vor dem Drehen
+// (Reihenfolge wie OBS: erst Massstab mit Vorzeichen, dann Drehung, libobs/obs-scene.c
+// update_item_transform; im Browser «rotate(…) scale(-1, 1)» um die Mitte, P10).
+QPointF contentToSource(const Source &source, QPointF contentPoint);
+// Faktoren für QPainter::scale bzw. CSS scale(): -1 = gespiegelt, 1 = nicht.
+QPointF flipScale(const Source &source);
+
 // Ecken der gedrehten Quelle im Overlay: links oben, rechts oben, rechts unten, links unten.
 std::array<QPointF, 4> sourceCorners(const Source &source);
 

@@ -57,6 +57,11 @@ struct Source
     int width = 1;
     int height = 1;
     int rotation = 0; // Zehntelgrad um die Mitte der Quelle
+    // Gespiegelt (P09b, Entscheid 4): Der Inhalt wird im Kasten gespiegelt, an der senkrechten
+    // (waagrecht gespiegelt) bzw. waagrechten Mittellinie (senkrecht gespiegelt) des ungedrehten
+    // Kastens, danach gedreht. Breite und Höhe bleiben positiv, der Kasten bleibt, wo er ist.
+    bool flipHorizontal = false;
+    bool flipVertical = false;
     bool visible = true;
     TextProperties text; // nur bei SourceKind::Text
     QString file;        // nur bei Image und Video: Verweis "media/<sha256>.<endung>"
@@ -120,6 +125,8 @@ struct SourceChanges
     std::optional<int> width;
     std::optional<int> height;
     std::optional<int> rotation; // Zehntelgrad
+    std::optional<bool> flipHorizontal; // P09b
+    std::optional<bool> flipVertical;   // P09b
     std::optional<bool> visible;
     std::optional<bool> loop;        // nur Video
     std::optional<bool> holdAtEnd;   // nur Video (P09)
