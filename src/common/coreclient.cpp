@@ -124,8 +124,19 @@ qint64 CoreClient::sendSettingsUpdate(SettingsUpdate update)
     if (!m_connected)
         return 0;
     update.requestId = m_nextRequestId++;
+    m_settingsRequests.insert(update.requestId);
     send(settingsUpdateMessage(update));
     return update.requestId;
+}
+
+qint64 CoreClient::sendSettingsReset()
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    m_settingsRequests.insert(id);
+    send(resetSettingsMessage(id));
+    return id;
 }
 
 qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
@@ -445,6 +456,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
             qWarning("Kern: change_result ungültig: %s", qPrintable(error));
             return;
         }
+        if (m_settingsRequests.remove(result.requestId)) {
+            emit settingsUpdateFinished(result);
+            return;
+        }
         const QString key = m_keyOfRequest.take(result.requestId);
         if (!key.isEmpty() && m_requestOfKey.value(key) == result.requestId) {
             m_requestOfKey.remove(key);
@@ -502,6 +517,7 @@ void CoreClient::clearData()
     m_keyOfRequest.clear();
     m_requestOfKey.clear();
     m_heldChanges.clear();
+    m_settingsRequests.clear();
     const bool hadImports = !m_importNames.isEmpty();
     m_importNames.clear();
     if (hadImports)

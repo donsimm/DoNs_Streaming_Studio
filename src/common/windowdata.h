@@ -74,7 +74,7 @@ QString importStatusText(const QStringList &fileNames);
 // geändert ist. Geprüft wird im Kern, der Dialog zeigt dessen Meldung.
 std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, int port,
                                                      const QString &addressText);
-// Hinweis im Dialog: Die Werte wirken erst mit der Browserquelle (P10).
+// Hinweis im Dialog: Die Werte wirken sofort (Server startet neu, P10), nur Adressen dieses PCs.
 QString settingsDialogHint();
 // Meldung im Dialog: Datei ungültig (settings_error) bzw. ohne Verbindung; sonst leer.
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info);

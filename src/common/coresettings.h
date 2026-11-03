@@ -3,9 +3,11 @@
 #include "configpaths.h"
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QHostAddress>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 #include <optional>
@@ -78,18 +80,30 @@ QString homeAddressFromRoute(const QByteArray &routeText,
 // Dasselbe mit /proc/net/route und QNetworkInterface.
 QString detectHomeAddress(QString *interface = nullptr, QString *reason = nullptr);
 
+// P10, Punkt 78: IPv4-Adressen, die eine Netzwerkkarte dieses PCs gerade hat, ohne 127.x.x.x,
+// sortiert (QNetworkInterface::allAddresses).
+QStringList localIpv4Addresses();
+// Meldung, wenn address (gültig nach validateHomeAddress, nicht leer) keine Adresse dieses PCs
+// ist: «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»; sonst leer.
+QString checkLocalAddress(const QString &address, const QStringList &localAddresses);
+
+// P10, Punkt 77: Name der umbenannten ungültigen Datei, kern.ini.ungueltig-<JJJJ-MM-TT_hh-mm-ss>.
+QString invalidSettingsPath(const QString &path, const QDateTime &when);
+
 // Einstellungen im Kern: lädt die Datei beim Start, füllt eine fehlende Adresse einmal aus der
 // Standardroute und schreibt die Datei, nimmt Änderungen an (prüfen, atomar schreiben, erst dann
 // übernehmen). Ist die Datei ungültig, gelten die Standardwerte, die Datei wird nicht
-// überschrieben, und Änderungen werden abgewiesen, bis sie von Hand repariert ist (wie
-// liste.json).
+// überschrieben, und Änderungen werden abgewiesen, bis sie von Hand repariert oder mit
+// resetInvalid() zurückgesetzt ist (P10, Punkt 77).
 class CoreSettingsStore
 {
 public:
     using AddressDetector = std::function<QString(QString *interface, QString *reason)>;
+    using LocalAddresses = std::function<QStringList()>;
 
     CoreSettingsStore(const QString &path, const CoreSettings &defaults,
-                      AddressDetector detector = detectHomeAddress);
+                      AddressDetector detector = detectHomeAddress,
+                      LocalAddresses localAddresses = localIpv4Addresses);
 
     // Beim Start des Kerns. *log bekommt die Protokollzeilen (Info), *warnings Warnungen.
     void load(QStringList *log, QStringList *warnings);
@@ -100,15 +114,26 @@ public:
     QString fileError() const { return m_fileError; }
 
     // Ändert die angegebenen Werte (mindestens einer). false mit Meldung: ungültiger Wert,
-    // Datei ungültig oder nicht schreibbar; dann gilt der alte Stand.
+    // Adresse gehört nicht zu diesem PC (Punkt 78), Datei ungültig oder nicht schreibbar; dann
+    // gilt der alte Stand.
     bool change(std::optional<int> port, std::optional<QString> homeAddress, QString *error);
+
+    // Punkt 77: nur bei ungültiger Datei. Benennt sie in invalidSettingsPath(path, now) um,
+    // schreibt eine neue mit den Standardwerten und trägt die Adresse im Heimnetz wieder aus der
+    // Standardroute ein. *renamedTo bekommt den neuen Namen der alten Datei, *log die
+    // Protokollzeilen. false mit Meldung: Datei gültig, Umbenennen oder Schreiben fehlgeschlagen
+    // (dann gilt der alte Stand).
+    bool resetInvalid(const QDateTime &now, QString *renamedTo, QStringList *log, QString *error);
 
 private:
     bool write(const CoreSettings &settings, QString *error);
+    // Adresse aus der Standardroute in *settings eintragen (Protokollzeile bzw. Warnung).
+    bool fillHomeAddress(CoreSettings *settings, QStringList *log, QStringList *warnings);
 
     QString m_path;
     CoreSettings m_defaults;
     AddressDetector m_detector;
+    LocalAddresses m_localAddresses;
     CoreSettings m_settings;
     QString m_fileError;
 };

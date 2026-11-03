@@ -1065,6 +1065,18 @@ QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
     return o;
 }
 
+QJsonObject resetSettingsMessage(qint64 requestId)
+{
+    QJsonObject o = typed(msg::kResetSettings);
+    o.insert(QStringLiteral("request_id"), double(requestId));
+    return o;
+}
+
+bool parseResetSettings(const QJsonObject &message, qint64 *requestId, QString *error)
+{
+    return requireInt(message, QStringLiteral("request_id"), 0, qint64(1) << 53, requestId, error);
+}
+
 bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QString *error)
 {
     SettingsUpdate u;

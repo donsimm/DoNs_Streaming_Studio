@@ -51,18 +51,27 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     m_ok = buttons->addButton(QStringLiteral("OK"), QDialogButtonBox::AcceptRole);
     m_ok->setObjectName(QStringLiteral("settingsOk"));
     buttons->addButton(QStringLiteral("Abbrechen"), QDialogButtonBox::RejectRole);
+    // P10, Punkt 77: immer da, nur bei ungültiger kern.ini frei (keine Änderung der Anordnung).
+    m_reset = buttons->addButton(QStringLiteral("Auf Standardwerte zurücksetzen"), QDialogButtonBox::ResetRole);
+    m_reset->setObjectName(QStringLiteral("settingsReset"));
+    m_reset->setToolTip(QStringLiteral("Die ungültige kern.ini wird umbenannt (kern.ini.ungueltig-<Datum>) "
+                                       "und neu mit den Standardwerten geschrieben."));
     m_ok->setDefault(true);
     column->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(m_reset, &QPushButton::clicked, this, &SettingsDialog::resetToDefaults);
 
     connect(m_client, &dss::CoreClient::settingsChanged, this, &SettingsDialog::onSettingsChanged);
-    connect(m_client, &dss::CoreClient::changeFinished, this, &SettingsDialog::onChangeFinished);
+    // Punkt 76: Antworten auf Einstellungen kommen nur hier an, nicht in der Statuszeile.
+    connect(m_client, &dss::CoreClient::settingsUpdateFinished, this, &SettingsDialog::onChangeFinished);
     connect(m_client, &dss::CoreClient::connectedChanged, this, [this](bool connected) {
-        if (connected && isVisible())
+        if (connected && isVisible()) {
             m_client->requestSettings();
-        else if (!connected)
+        } else if (!connected) {
             m_pendingRequest = 0;
+            m_pendingReset = false;
+        }
         updateState();
     });
     updateState();
@@ -72,6 +81,7 @@ void SettingsDialog::showFromCore()
 {
     m_filled = false;
     m_pendingRequest = 0;
+    m_pendingReset = false;
     m_problem->clear();
     m_client->requestSettings();
     onSettingsChanged();
@@ -96,6 +106,14 @@ void SettingsDialog::accept()
     updateState();
 }
 
+void SettingsDialog::resetToDefaults()
+{
+    m_problem->clear();
+    m_pendingRequest = m_client->sendSettingsReset();
+    m_pendingReset = m_pendingRequest > 0;
+    updateState();
+}
+
 void SettingsDialog::onSettingsChanged()
 {
     const std::optional<dss::SettingsInfo> info = m_client->settings();
@@ -117,6 +135,15 @@ void SettingsDialog::onChangeFinished(const dss::ChangeResult &result)
     if (m_pendingRequest == 0 || result.requestId != m_pendingRequest)
         return;
     m_pendingRequest = 0;
+    const bool wasReset = m_pendingReset;
+    m_pendingReset = false;
+    if (result.ok && wasReset) {
+        // Zurückgesetzt: Dialog bleibt offen mit den neuen Werten und dem Hinweis des Kerns.
+        m_filled = false;
+        onSettingsChanged();
+        m_problem->setText(result.warning);
+        return;
+    }
     if (result.ok) {
         QDialog::accept();
         return;
@@ -133,6 +160,7 @@ void SettingsDialog::updateState()
     m_port->setEnabled(usable && m_pendingRequest == 0);
     m_address->setEnabled(usable && m_pendingRequest == 0);
     m_ok->setEnabled(usable && m_pendingRequest == 0);
+    m_reset->setEnabled(m_client->isConnected() && info && !info->error.isEmpty() && m_pendingRequest == 0);
     // Meldung des Zustands (ohne Verbindung, Datei ungültig) setzen bzw. wieder entfernen; eine
     // Meldung des Kerns zu einer Änderung bleibt stehen.
     if (!problem.isEmpty())

@@ -35,8 +35,9 @@ namespace dss {
 // 7 seit P10: Neuer Token (new_token), Adresse der Browserquelle (get_browser_source,
 //   browser_source)
 // 8 seit P10: Zustand des Overlay-Servers (server_status)
+// 9 seit P10: ungültige kern.ini zurücksetzen (reset_settings, Punkt 77)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 8;
+inline constexpr int kProtocolVersion = 9;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -82,6 +83,7 @@ inline constexpr char kSetOverlaySize[] = "set_overlay_size";
 inline constexpr char kGetSettings[] = "get_settings";
 inline constexpr char kSettings[] = "settings";
 inline constexpr char kUpdateSettings[] = "update_settings";
+inline constexpr char kResetSettings[] = "reset_settings"; // P10, Punkt 77
 // P10: Ausgabe ein/aus (E-24)
 inline constexpr char kSetOverlayOutput[] = "set_overlay_output";
 // P10: Neuer Token und Adresse der Browserquelle (E-12)
@@ -300,6 +302,10 @@ struct SettingsUpdate
 };
 QJsonObject settingsUpdateMessage(const SettingsUpdate &update);
 bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QString *error);
+// reset_settings (P10, Punkt 77): nur request_id. Antwort settings an alle, dann change_result
+// (bei ok mit warning = Hinweis auf die umbenannte alte Datei).
+QJsonObject resetSettingsMessage(qint64 requestId);
+bool parseResetSettings(const QJsonObject &message, qint64 *requestId, QString *error);
 
 // browser_source (P10): Adresse der Browserquelle eines Overlays mit Token, nur an die Verbindung,
 // die mit get_browser_source danach gefragt hat; danach nach jeder Änderung der Adresse (neuer

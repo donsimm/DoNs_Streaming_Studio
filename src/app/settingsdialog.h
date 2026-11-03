@@ -28,6 +28,7 @@ public:
 
 private:
     void accept() override;
+    void resetToDefaults(); // P10, Punkt 77
     void onSettingsChanged();
     void onChangeFinished(const dss::ChangeResult &result);
     void updateState();
@@ -38,7 +39,9 @@ private:
     QLabel *m_file = nullptr;
     QLabel *m_problem = nullptr;
     QPushButton *m_ok = nullptr;
+    QPushButton *m_reset = nullptr; // nur bei ungültiger kern.ini frei
     QString m_stateProblem;      // zuletzt gezeigte Meldung aus updateState
-    qint64 m_pendingRequest = 0; // update_settings unterwegs
+    qint64 m_pendingRequest = 0; // update_settings oder reset_settings unterwegs
+    bool m_pendingReset = false; // die Anfrage unterwegs ist reset_settings
     bool m_filled = false;       // Felder aus dem Kern gefüllt (danach nicht mehr überschreiben)
 };

@@ -162,10 +162,54 @@ QString detectHomeAddress(QString *interface, QString *reason)
     }, interface, reason);
 }
 
-CoreSettingsStore::CoreSettingsStore(const QString &path, const CoreSettings &defaults,
-                                     AddressDetector detector)
-    : m_path(path), m_defaults(defaults), m_detector(std::move(detector)), m_settings(defaults)
+QStringList localIpv4Addresses()
 {
+    QStringList result;
+    for (const QHostAddress &a : QNetworkInterface::allAddresses()) {
+        if (a.protocol() == QAbstractSocket::IPv4Protocol && !a.isLoopback())
+            result.append(a.toString());
+    }
+    result.sort();
+    result.removeDuplicates();
+    return result;
+}
+
+QString checkLocalAddress(const QString &address, const QStringList &localAddresses)
+{
+    if (address.isEmpty() || localAddresses.contains(address))
+        return {};
+    if (localAddresses.isEmpty())
+        return QStringLiteral("%1 gehört nicht zu diesem PC. Dieser PC hat gerade keine IPv4-Adresse "
+                              "ausser 127.0.0.1 (Netzwerkkabel?).").arg(address);
+    return QStringLiteral("%1 gehört nicht zu diesem PC. Adressen dieses PCs: %2.")
+        .arg(address, localAddresses.join(QStringLiteral(", ")));
+}
+
+QString invalidSettingsPath(const QString &path, const QDateTime &when)
+{
+    return path + QStringLiteral(".ungueltig-") + when.toString(QStringLiteral("yyyy-MM-dd_HH-mm-ss"));
+}
+
+CoreSettingsStore::CoreSettingsStore(const QString &path, const CoreSettings &defaults,
+                                     AddressDetector detector, LocalAddresses localAddresses)
+    : m_path(path), m_defaults(defaults), m_detector(std::move(detector)),
+      m_localAddresses(std::move(localAddresses)), m_settings(defaults)
+{
+}
+
+bool CoreSettingsStore::fillHomeAddress(CoreSettings *settings, QStringList *log, QStringList *warnings)
+{
+    QString iface;
+    QString reason;
+    const QString address = m_detector(&iface, &reason);
+    if (address.isEmpty()) {
+        warnings->append(QStringLiteral("Einstellungen: %1, Adresse im Heimnetz bleibt leer").arg(reason));
+        return false;
+    }
+    settings->homeAddress = address;
+    log->append(QStringLiteral("Einstellungen: Adresse im Heimnetz %1 eingetragen (Netzwerkkarte "
+                               "%2 der Standardroute)").arg(address, iface));
+    return true;
 }
 
 void CoreSettingsStore::load(QStringList *log, QStringList *warnings)
@@ -195,20 +239,9 @@ void CoreSettingsStore::load(QStringList *log, QStringList *warnings)
         }
     }
     bool changed = !exists;
-    if (m_settings.homeAddress.isEmpty()) {
-        // Einmal ermitteln und festschreiben (Entscheid 2026-11-03); danach nicht mehr neu.
-        QString iface;
-        QString reason;
-        const QString address = m_detector(&iface, &reason);
-        if (address.isEmpty()) {
-            warnings->append(QStringLiteral("Einstellungen: %1, Adresse im Heimnetz bleibt leer").arg(reason));
-        } else {
-            m_settings.homeAddress = address;
-            changed = true;
-            log->append(QStringLiteral("Einstellungen: Adresse im Heimnetz %1 eingetragen (Netzwerkkarte "
-                                       "%2 der Standardroute)").arg(address, iface));
-        }
-    }
+    // Einmal ermitteln und festschreiben (Entscheid 2026-11-03); danach nicht mehr neu.
+    if (m_settings.homeAddress.isEmpty() && fillHomeAddress(&m_settings, log, warnings))
+        changed = true;
     if (changed) {
         QString error;
         if (!write(m_settings, &error))
@@ -226,8 +259,8 @@ bool CoreSettingsStore::change(std::optional<int> port, std::optional<QString> h
                                QString *error)
 {
     if (!m_fileError.isEmpty()) {
-        *error = QStringLiteral("Einstellungen nicht änderbar: %1. Bitte die Datei von Hand reparieren "
-                                "oder löschen.").arg(m_fileError);
+        *error = QStringLiteral("Einstellungen nicht änderbar: %1. «Auf Standardwerte zurücksetzen» "
+                                "oder die Datei von Hand reparieren.").arg(m_fileError);
         return false;
     }
     if (!port && !homeAddress) {
@@ -247,6 +280,14 @@ bool CoreSettingsStore::change(std::optional<int> port, std::optional<QString> h
             *error = e;
             return false;
         }
+        // Punkt 78: nur eine Adresse, die eine Netzwerkkarte dieses PCs gerade hat (die
+        // bisherige darf bleiben, auch wenn das Kabel gerade fehlt).
+        if (*homeAddress != m_settings.homeAddress) {
+            if (const QString e = checkLocalAddress(*homeAddress, m_localAddresses()); !e.isEmpty()) {
+                *error = e;
+                return false;
+            }
+        }
         next.homeAddress = *homeAddress;
     }
     if (next == m_settings)
@@ -254,6 +295,40 @@ bool CoreSettingsStore::change(std::optional<int> port, std::optional<QString> h
     if (!write(next, error))
         return false;
     m_settings = next;
+    return true;
+}
+
+bool CoreSettingsStore::resetInvalid(const QDateTime &now, QString *renamedTo, QStringList *log,
+                                     QString *error)
+{
+    if (m_fileError.isEmpty()) {
+        *error = QStringLiteral("%1 ist gültig; nichts zurückgesetzt.").arg(m_path);
+        return false;
+    }
+    const QString target = invalidSettingsPath(m_path, now);
+    if (QFileInfo::exists(target)) {
+        *error = QStringLiteral("%1 gibt es schon; bitte in einer Sekunde noch einmal versuchen.").arg(target);
+        return false;
+    }
+    // Eine nicht lesbare Datei fehlt vielleicht ganz (dann gibt es nichts umzubenennen).
+    if (QFileInfo::exists(m_path) && !QFile::rename(m_path, target)) {
+        *error = QStringLiteral("%1 kann nicht in %2 umbenannt werden.").arg(m_path, target);
+        return false;
+    }
+    CoreSettings next = m_defaults;
+    QStringList warnings;
+    fillHomeAddress(&next, log, &warnings);
+    log->append(warnings);
+    if (!write(next, error)) {
+        // Alte Datei zurück, damit der Stand derselbe bleibt.
+        QFile::rename(target, m_path);
+        return false;
+    }
+    m_settings = next;
+    m_fileError.clear();
+    *renamedTo = target;
+    log->append(QStringLiteral("Einstellungen: ungültige Datei umbenannt in %1, %2 mit Standardwerten "
+                               "neu geschrieben").arg(target, m_path));
     return true;
 }
 

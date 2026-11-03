@@ -6,6 +6,7 @@
 #include <QList>
 #include <QLocalSocket>
 #include <QMap>
+#include <QSet>
 #include <QObject>
 #include <QString>
 #include <QUuid>
@@ -78,6 +79,9 @@ public:
     // Schickt update_settings; requestId wird hier vergeben. Antwort über changeFinished, neue
     // Werte über settingsChanged. Rückgabe: request_id, 0 ohne Verbindung.
     qint64 sendSettingsUpdate(SettingsUpdate update);
+    // P10, Punkt 77: ungültige kern.ini auf Standardwerte zurücksetzen (reset_settings). Antwort
+    // wie bei sendSettingsUpdate über settingsUpdateFinished.
+    qint64 sendSettingsReset();
 
     // Adresse der Browserquelle (P10) des Overlays id, mit Token. Der Kern schickt sie danach bei
     // jeder Änderung von selbst neu, auch nach dem Wiederverbinden; null = keine mehr.
@@ -124,8 +128,11 @@ signals:
     void errorReceived(const dss::ErrorInfo &error);
     void quitReplied(const dss::QuitReply &reply);
     void fontsChanged();
-    // Antwort auf eine Änderung (auch auf eine, die zurückgehalten war).
+    // Antwort auf eine Änderung (auch auf eine, die zurückgehalten war). Nicht für Einstellungen.
     void changeFinished(const dss::ChangeResult &result);
+    // P10, Punkt 76: Antwort auf sendSettingsUpdate bzw. sendSettingsReset, nur hier (nicht in
+    // changeFinished), damit eine Abweisung nur im Dialog «Einstellungen» erscheint.
+    void settingsUpdateFinished(const dss::ChangeResult &result);
     // pendingImports() hat sich geändert.
     void pendingImportsChanged();
     // settings() hat sich geändert (P10-vor).
@@ -171,6 +178,7 @@ private:
     QHash<QString, qint64> m_requestOfKey;     // unterwegs: Schlüssel → request_id
     QHash<QString, ChangeRequest> m_heldChanges; // zurückgehalten je Schlüssel
     QMap<qint64, QString> m_importNames;       // unterwegs mit Datei: request_id → Dateiname
+    QSet<qint64> m_settingsRequests;           // update_settings und reset_settings unterwegs
     std::optional<SystemStats> m_lastStats;
     std::optional<SettingsInfo> m_settings;
     QUuid m_browserSourceWanted;

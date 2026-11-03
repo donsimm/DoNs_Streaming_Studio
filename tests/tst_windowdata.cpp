@@ -93,7 +93,7 @@ private slots:
         QCOMPARE(u->homeAddress, std::optional<QString>(QString()));
         u = settingsUpdateFromForm(current, 80, QStringLiteral("abc"));
         QVERIFY(u && u->port == 80 && u->homeAddress == QStringLiteral("abc")); // prüft der Kern
-        QVERIFY(settingsDialogHint().contains(QStringLiteral("Browserquelle (P10)")));
+        QVERIFY(settingsDialogHint().contains(QStringLiteral("Nur Adressen dieses PCs")));
         QVERIFY(!settingsDialogProblem(false, std::nullopt).isEmpty());
         QVERIFY(settingsDialogProblem(true, std::nullopt).isEmpty());
         SettingsInfo info{current, 1024, 32767, QStringLiteral("/x/kern.ini"), QStringLiteral("kaputt")};

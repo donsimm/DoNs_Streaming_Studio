@@ -20,6 +20,7 @@
 #include <QJsonDocument>
 #include <QLocalSocket>
 #include <QSignalSpy>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -187,7 +188,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 8); // seit P10
+        QCOMPARE(c->coreHello().protocolVersion, 9); // seit P10 (reset_settings)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -393,6 +394,11 @@ private slots:
             {"{\"type\":\"update_settings\",\"request_id\":4,\"port\":9000,\"home_address\":\"127.0.0.1\"}",
              QStringLiteral("keine Adresse im Heimnetz")},
             {"{\"type\":\"update_settings\",\"request_id\":5}", QStringLiteral("ohne port und home_address")},
+            // P10, Punkt 78: 192.0.2.1 (Beispielnetz nach RFC 5737) gehört nie zu diesem PC
+            {"{\"type\":\"update_settings\",\"request_id\":7,\"port\":9000,\"home_address\":\"192.0.2.1\"}",
+             QStringLiteral("192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: ")},
+            // P10, Punkt 77: gültige Datei wird nicht zurückgesetzt
+            {"{\"type\":\"reset_settings\",\"request_id\":8}", QStringLiteral("ist gültig; nichts zurückgesetzt")},
         };
         for (const auto &[line, text] : invalid) {
             one.sendLine(line);
@@ -404,15 +410,16 @@ private slots:
         QCOMPARE([&] { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }(), before);
         QVERIFY(two.waitFor(QStringLiteral("settings"), 300).isEmpty());
 
-        // Gültig: Antwort an den Absender, neue Werte an alle, Datei geschrieben.
-        one.sendLine("{\"type\":\"update_settings\",\"request_id\":6,\"port\":9000,\"home_address\":\"10.0.0.2\"}");
+        // Gültig: Antwort an den Absender, neue Werte an alle, Datei geschrieben. Leere Adresse (seit
+        // P10 nimmt der Kern nur Adressen dieses PCs an, Punkt 78; die erkannte gilt schon).
+        one.sendLine("{\"type\":\"update_settings\",\"request_id\":6,\"port\":9000,\"home_address\":\"\"}");
         ChangeResult r;
         QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &r, &error));
         QVERIFY2(r.ok, qPrintable(r.message));
         QCOMPARE(r.requestId, 6);
         SettingsInfo broadcast;
         QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
-        QCOMPARE(broadcast.settings, (CoreSettings{9000, QStringLiteral("10.0.0.2")}));
+        QCOMPARE(broadcast.settings, (CoreSettings{9000, QString()}));
         // Der Absender bekommt die neuen Werte wie alle, vor change_result (wie bei Änderungen an
         // Overlays, docs/08 «Einstellungen»).
         QVERIFY2(one.allLines().contains("\"port\":9000,\"port_max\":32767"), one.allLines().constData());
@@ -421,9 +428,9 @@ private slots:
             QVERIFY(f.open(QIODevice::ReadOnly));
             CoreSettings stored;
             QVERIFY(parseCoreSettings(f.readAll(), defaultCoreSettings(), &stored, &error));
-            QCOMPARE(stored, (CoreSettings{9000, QStringLiteral("10.0.0.2")}));
+            QCOMPARE(stored, (CoreSettings{9000, QString()}));
         }
-        QVERIFY(waitForLog(m_core.get(), QStringLiteral("Einstellungen geändert: Port 9000, Adresse im Heimnetz 10.0.0.2"),
+        QVERIFY(waitForLog(m_core.get(), QStringLiteral("Einstellungen geändert: Port 9000, Adresse im Heimnetz leer"),
                            &m_coreLog));
 
 #ifdef DSS_CLI_BIN
@@ -431,7 +438,7 @@ private slots:
         CliResult cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellungen")});
         QCOMPARE(cli.exitCode, 0);
         QVERIFY2(cli.out.contains(QStringLiteral("9000 (erlaubt 1024 bis 32767)")), qPrintable(cli.out));
-        QVERIFY(cli.out.contains(QStringLiteral("10.0.0.2")));
+        QVERIFY2(cli.out.contains(QRegularExpression(QStringLiteral("Adresse im Heimnetz +leer"))), qPrintable(cli.out));
         QVERIFY(cli.out.contains(QStringLiteral("Kern")));
         cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
                                      QStringLiteral("1023")});
@@ -456,6 +463,73 @@ private slots:
         QCOMPARE(cli.exitCode, 4);
         QVERIFY2(cli.err.contains(QStringLiteral("ändert nur der Kern")), qPrintable(cli.err));
 #endif
+    }
+
+    // P10, Punkt 77: ungültige kern.ini über reset_settings zurücksetzen (eigener Kern mit eigener
+    // kaputter Datei). Die alte Datei bleibt unter kern.ini.ungueltig-<Zeit> erhalten.
+    void settingsResetInvalid()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("r.sock"));
+        const QString dir = config.filePath(QFileInfo(coreSettingsPath()).dir().dirName());
+        const QString path = dir + QStringLiteral("/kern.ini");
+        QVERIFY(QDir().mkpath(dir));
+        const QByteArray broken("[overlay-server]\nport=99999\n");
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly) && f.write(broken) == broken.size());
+        }
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        QVERIFY(log.contains(QStringLiteral("Port 99999 ungültig")));
+        RawConnection one(socket);
+        RawConnection two(socket);
+        one.hello(QStringLiteral("dss-app"));
+        two.hello(QStringLiteral("dss-app"));
+        QVERIFY(!one.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        QVERIFY(!two.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        one.sendLine("{\"type\":\"get_settings\"}");
+        SettingsInfo info;
+        QString error;
+        QVERIFY(parseSettings(one.waitFor(QStringLiteral("settings")), &info, &error));
+        QVERIFY(!info.error.isEmpty());
+        one.sendLine("{\"type\":\"reset_settings\",\"request_id\":1}");
+        ChangeResult r;
+        QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &r, &error));
+        QVERIFY2(r.ok, qPrintable(r.message));
+        QVERIFY2(r.warning.startsWith(QStringLiteral("Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt "
+                                                     "kern.ini.ungueltig-")),
+                 qPrintable(r.warning));
+        const QString renamed = r.warning.section(QStringLiteral("heisst jetzt "), 1).chopped(1);
+        QVERIFY(QRegularExpression(QStringLiteral("^kern\\.ini\\.ungueltig-\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d$"))
+                    .match(renamed).hasMatch());
+        {
+            QFile old(dir + QLatin1Char('/') + renamed);
+            QVERIFY(old.open(QIODevice::ReadOnly));
+            QCOMPARE(old.readAll(), broken);
+        }
+        // Neue Werte an alle, ohne Meldung; die Datei hat die Standardwerte mit der erkannten Adresse.
+        QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &info, &error));
+        const CoreSettings expected{defaultCoreSettings().port, detectHomeAddress()};
+        QCOMPARE(info.settings, expected);
+        QVERIFY(info.error.isEmpty());
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::ReadOnly));
+            CoreSettings stored;
+            QVERIFY(parseCoreSettings(f.readAll(), defaultCoreSettings(), &stored, &error));
+            QCOMPARE(stored, expected);
+        }
+        QVERIFY(waitForLog(core.get(), QStringLiteral("ungültige Datei umbenannt in"), &log));
+        // Danach wieder änderbar
+        one.sendLine("{\"type\":\"update_settings\",\"request_id\":2,\"port\":9002}");
+        QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &r, &error));
+        QVERIFY2(r.ok, qPrintable(r.message));
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
     }
 
     // P10: Adresse der Browserquelle mit Token nur an die Verbindung, die danach fragt; nach

@@ -128,9 +128,10 @@ std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current
 
 QString settingsDialogHint()
 {
-    return QStringLiteral("Port und Adresse gelten erst mit der Browserquelle (P10). Leere Adresse: "
-                          "Der Kern trägt beim nächsten Start die Adresse der Netzwerkkarte mit der "
-                          "Standardroute ein.");
+    return QStringLiteral("Port und Adresse gelten sofort: Der Overlay-Server startet mit den neuen "
+                          "Werten neu, und in OBS muss die neue Adresse der Browserquelle eingetragen "
+                          "werden. Nur Adressen dieses PCs. Leere Adresse: Der Kern trägt beim "
+                          "nächsten Start die Adresse der Netzwerkkarte mit der Standardroute ein.");
 }
 
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info)

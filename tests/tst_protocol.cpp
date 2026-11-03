@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 8); // seit P10
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 9); // seit P10 (reset_settings)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -550,6 +550,19 @@ private slots:
         QVERIFY(parseGetBrowserSource(getBrowserSourceMessage(QUuid()), &parsed, &error));
         QVERIFY(parsed.isNull());
         QVERIFY(!parseGetBrowserSource(simpleMessage(msg::kGetBrowserSource), &parsed, &error));
+    }
+
+    // P10, Punkt 77
+    void resetSettingsMessage()
+    {
+        const QJsonObject o = dss::resetSettingsMessage(12);
+        QCOMPARE(messageType(o), QStringLiteral("reset_settings"));
+        qint64 id = 0;
+        QString error;
+        QVERIFY(parseResetSettings(o, &id, &error));
+        QCOMPARE(id, 12);
+        QVERIFY(!parseResetSettings(QJsonObject{{QStringLiteral("type"), QStringLiteral("reset_settings")}}, &id, &error));
+        QVERIFY(error.contains(QStringLiteral("request_id")));
     }
 
     void serverStatusMessages()

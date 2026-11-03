@@ -6,6 +6,7 @@
 
 #include "coresettings.h"
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
@@ -311,8 +312,94 @@ private slots:
         QCOMPARE(calls, 0); // keine Erkennung, nichts schreiben
         QString error;
         QVERIFY(!store.change(8090, std::nullopt, &error));
-        QVERIFY2(error.contains(QStringLiteral("von Hand reparieren")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("«Auf Standardwerte zurücksetzen»")), qPrintable(error));
         QCOMPARE(readFile(path), broken);
+    }
+
+    // P10, Punkt 77: ungültige Datei umbenennen, Standardwerte mit erkannter Adresse schreiben.
+    void resetInvalidFile()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        const QByteArray broken("[overlay-server]\nport=99999\nadresse-im-heimnetz=\n");
+        QVERIFY(writeFile(path, broken));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QStringLiteral("192.168.1.9"), {}, &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QVERIFY(!store.fileError().isEmpty());
+        const QDateTime when(QDate(2026, 11, 4), QTime(13, 2, 3));
+        const QString renamedPath = path + QStringLiteral(".ungueltig-2026-11-04_13-02-03");
+        QCOMPARE(invalidSettingsPath(path, when), renamedPath);
+        // Name schon vergeben: nichts geändert
+        QVERIFY(writeFile(renamedPath, "anders"));
+        QString renamed;
+        QStringList resetLog;
+        QString error;
+        QVERIFY(!store.resetInvalid(when, &renamed, &resetLog, &error));
+        QVERIFY2(error.contains(QStringLiteral("gibt es schon")), qPrintable(error));
+        QCOMPARE(readFile(path), broken);
+        QVERIFY(!store.fileError().isEmpty());
+        QVERIFY(QFile::remove(renamedPath));
+
+        QVERIFY2(store.resetInvalid(when, &renamed, &resetLog, &error), qPrintable(error));
+        QCOMPARE(renamed, renamedPath);
+        QCOMPARE(readFile(renamedPath), broken); // alte Datei unverändert aufbewahrt
+        QCOMPARE(store.settings(), (CoreSettings{8081, QStringLiteral("192.168.1.9")}));
+        QCOMPARE(readFile(path), serializeCoreSettings(store.settings()));
+        QVERIFY(store.fileError().isEmpty());
+        QCOMPARE(calls, 1);
+        QVERIFY(resetLog.first().contains(QStringLiteral("Adresse im Heimnetz 192.168.1.9 eingetragen")));
+        QVERIFY(resetLog.last().contains(QStringLiteral("ungültige Datei umbenannt in ") + renamedPath));
+        // Danach wieder änderbar; eine gültige Datei setzt resetInvalid nicht zurück.
+        QVERIFY2(store.change(8090, std::nullopt, &error), qPrintable(error));
+        QVERIFY(!store.resetInvalid(when.addSecs(1), &renamed, &resetLog, &error));
+        QVERIFY2(error.contains(QStringLiteral("ist gültig")), qPrintable(error));
+        QCOMPARE(store.settings().port, 8090);
+        // Neu geladen gilt die neue Datei.
+        CoreSettingsStore again(path, {8081, QString()}, FakeDetector{QStringLiteral("10.0.0.5"), {}, &calls});
+        again.load(&log, &warnings);
+        QCOMPARE(again.settings(), (CoreSettings{8090, QStringLiteral("192.168.1.9")}));
+    }
+
+    // P10, Punkt 78: nur Adressen, die eine Netzwerkkarte dieses PCs gerade hat.
+    void onlyAddressesOfThisPc()
+    {
+        QCOMPARE(checkLocalAddress(QStringLiteral("192.168.1.1"), {QStringLiteral("192.168.1.9")}),
+                 QStringLiteral("192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9."));
+        QCOMPARE(checkLocalAddress(QStringLiteral("192.168.1.1"), {QStringLiteral("10.0.0.2"), QStringLiteral("192.168.1.9")}),
+                 QStringLiteral("192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 10.0.0.2, 192.168.1.9."));
+        QVERIFY(checkLocalAddress(QStringLiteral("192.168.1.1"), {}).contains(QStringLiteral("keine IPv4-Adresse")));
+        QVERIFY(checkLocalAddress(QStringLiteral("192.168.1.9"), {QStringLiteral("192.168.1.9")}).isEmpty());
+        QVERIFY(checkLocalAddress(QString(), {}).isEmpty());
+        // Auf diesem PC: die erkannte Adresse gehört dazu, 127.x.x.x nicht
+        const QStringList local = localIpv4Addresses();
+        qInfo("Adressen dieses PCs: %s", qPrintable(local.join(QStringLiteral(", "))));
+        for (const QString &a : local)
+            QVERIFY(!a.startsWith(QStringLiteral("127.")) && !a.contains(QLatin1Char(':')));
+        if (const QString detected = detectHomeAddress(); !detected.isEmpty())
+            QVERIFY(local.contains(detected));
+
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QStringLiteral("192.168.1.9"), {}, &calls},
+                                [] { return QStringList{QStringLiteral("192.168.1.9")}; });
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        const QByteArray before = readFile(path);
+        QString error;
+        QVERIFY(!store.change(9000, QStringLiteral("192.168.1.1"), &error));
+        QCOMPARE(error, QStringLiteral("192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9."));
+        QCOMPARE(readFile(path), before);
+        // Die bisherige Adresse darf bleiben, auch wenn die Karte sie gerade nicht hat (Kabel weg).
+        CoreSettingsStore unplugged(path, {8081, QString()}, FakeDetector{QString(), {}, &calls},
+                                    [] { return QStringList(); });
+        unplugged.load(&log, &warnings);
+        QVERIFY2(unplugged.change(9000, QStringLiteral("192.168.1.9"), &error), qPrintable(error));
+        QCOMPARE(unplugged.settings(), (CoreSettings{9000, QStringLiteral("192.168.1.9")}));
     }
 
     void changeValidatesAndWrites()
@@ -320,7 +407,8 @@ private slots:
         QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("kern.ini"));
         int calls = 0;
-        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QStringLiteral("192.168.1.9"), {}, &calls});
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QStringLiteral("192.168.1.9"), {}, &calls},
+                                [] { return QStringList{QStringLiteral("10.0.0.2"), QStringLiteral("192.168.1.9")}; });
         QStringList log;
         QStringList warnings;
         store.load(&log, &warnings);

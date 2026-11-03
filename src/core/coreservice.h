@@ -122,6 +122,9 @@ private:
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
+    void handleSettingsReset(QLocalSocket *socket, const QJsonObject &message);
+    // Einstellungen geändert: settings an alle, Adressen der Browserquellen, Server neu.
+    void settingsApplied();
     void onSaveRequested();
     // Schriften (Teil F): beim ersten get_fonts geladen, danach aus dem Zwischenspeicher.
     void handleGetFonts(QLocalSocket *socket);

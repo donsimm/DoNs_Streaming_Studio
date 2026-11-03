@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QDateTime>
 #include <QTimer>
 
 namespace {
@@ -325,6 +326,8 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, settingsMessage());
     } else if (type == QLatin1String(dss::msg::kUpdateSettings) && m_settings) {
         handleSettingsUpdate(socket, message);
+    } else if (type == QLatin1String(dss::msg::kResetSettings) && m_settings) {
+        handleSettingsReset(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
         QUuid id;
         if (!dss::parseGetBrowserSource(message, &id, &error)) {
@@ -465,19 +468,49 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
                                                QString::fromLatin1(dss::err::kRejected), error}));
         return;
     }
-    const dss::CoreSettings after = m_settings->settings();
-    if (!(after == before)) {
-        qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
-              after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
-        broadcast(settingsMessage());
-        updateBrowserSources();
-#if DSS_CORE_OVERLAY_SERVER
-        // Neuer Port oder neue Adresse: Server neu starten (Teil A 2)
-        if (m_overlayServer)
-            m_overlayServer->configure(after.port, after.homeAddress);
-#endif
-    }
+    if (!(m_settings->settings() == before))
+        settingsApplied();
     send(socket, dss::changeResultMessage({update.requestId, true, QUuid(), QString(), QString()}));
+}
+
+// P10, Punkt 77: ungültige kern.ini umbenennen und mit Standardwerten neu schreiben.
+void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &message)
+{
+    qint64 requestId = 0;
+    QString error;
+    if (!dss::parseResetSettings(message, &requestId, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        return;
+    }
+    QString renamed;
+    QStringList log;
+    if (!m_settings->resetInvalid(QDateTime::currentDateTime(), &renamed, &log, &error)) {
+        qWarning("Einstellungen nicht zurückgesetzt: %s", qPrintable(error));
+        send(socket, dss::changeResultMessage({requestId, false, QUuid(),
+                                               QString::fromLatin1(dss::err::kRejected), error}));
+        return;
+    }
+    for (const QString &line : std::as_const(log))
+        qInfo("%s", qPrintable(line));
+    settingsApplied();
+    send(socket, dss::changeResultMessage(
+                     {requestId, true, QUuid(), QString(), QString(),
+                      QStringLiteral("Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt %1.")
+                          .arg(QFileInfo(renamed).fileName())}));
+}
+
+void CoreService::settingsApplied()
+{
+    const dss::CoreSettings after = m_settings->settings();
+    qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
+          after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
+    broadcast(settingsMessage());
+    updateBrowserSources();
+#if DSS_CORE_OVERLAY_SERVER
+    // Neuer Port oder neue Adresse: Server neu starten (Teil A 2)
+    if (m_overlayServer)
+        m_overlayServer->configure(after.port, after.homeAddress);
+#endif
 }
 
 void CoreService::send(QLocalSocket *socket, const QJsonObject &message)

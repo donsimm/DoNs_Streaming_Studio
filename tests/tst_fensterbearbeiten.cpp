@@ -19,6 +19,7 @@
 #include "mainwindow.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
+#include "settingsdialog.h"
 #if DSS_APP_CANVAS_IMAGE
 #include "sourcerenderer.h"
 #endif
@@ -1350,7 +1351,9 @@ private slots:
         auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("settingsOk"));
         auto *hint = dialog->findChild<QLabel *>(QStringLiteral("settingsHint"));
         QVERIFY(port && address && problem && ok && hint);
-        QVERIFY(hint->text().contains(QStringLiteral("erst mit der Browserquelle (P10)")));
+        QVERIFY(hint->text().contains(QStringLiteral("Server startet mit den neuen Werten neu")));
+        auto *reset = dialog->findChild<QPushButton *>(QStringLiteral("settingsReset"));
+        QVERIFY(reset && reset->isVisible());
         // Werte des Kerns: Port aus kern.ini des Tests (seit P10 eigener Port je Testkern,
         // prozesshilfe.h) und die erkannte Adresse
         QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 3000);
@@ -1368,15 +1371,28 @@ private slots:
         QVERIFY(dialog->isVisible());
         QCOMPARE(problem->height(), problemHeight); // Meldung ändert das Layout nicht
         QVERIFY(ok->isEnabled());
+        QVERIFY(!reset->isEnabled()); // Datei gültig: nichts zurückzusetzen
+
+        // P10, Punkt 78: Adresse, die nicht zu diesem PC gehört (192.0.2.1, Beispielnetz nach
+        // RFC 5737); Punkt 76: die Meldung steht nur im Dialog, nicht in der Statuszeile.
+        address->setText(QStringLiteral("192.0.2.1"));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().startsWith(QStringLiteral("192.0.2.1 gehört nicht zu diesem PC. "
+                                                                           "Adressen dieses PCs: ")),
+                                 3000);
+        QVERIFY(dialog->isVisible());
+        QTest::qWait(200);
+        QVERIFY2(!m_window->statusBar()->currentMessage().contains(QStringLiteral("192.0.2.1")),
+                 qPrintable(m_window->statusBar()->currentMessage()));
 
         // Gültig: Kern schreibt, alle Verbindungen bekommen die neuen Werte, Dialog schliesst
         port->setValue(9000);
-        address->setText(QStringLiteral("10.0.0.2"));
+        address->setText(detectHomeAddress());
         QTest::mouseClick(ok, Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(m_check->settings()
                                      && m_check->settings()->settings
-                                            == (CoreSettings{9000, QStringLiteral("10.0.0.2")}),
+                                            == (CoreSettings{9000, detectHomeAddress()}),
                                  3000);
         QVERIFY(m_client->settings()->file.endsWith(QStringLiteral("/kern.ini")));
 
@@ -1389,6 +1405,59 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
         QTest::qWait(300);
         QCOMPARE(m_check->settings()->settings.port, 9000);
+    }
+
+    // P10, Punkt 77: Dialog mit einem eigenen Kern, dessen kern.ini ungültig ist: «OK» ausgegraut,
+    // «Auf Standardwerte zurücksetzen» frei; danach die neuen Werte im Dialog und der Hinweis.
+    void settingsDialogReset()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        std::unique_ptr<QTemporaryDir> run = testhelp::runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("r.sock"));
+        const QString dir = config.filePath(QFileInfo(coreSettingsPath()).dir().dirName());
+        QVERIFY(QDir().mkpath(dir));
+        {
+            QFile f(dir + QStringLiteral("/kern.ini"));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[overlay-server]\nport=99999\n");
+        }
+        // Port nach dem Zurücksetzen: Standard der Version in Arbeit (8081). Ist er belegt, meldet
+        // das nur der Server; der Test prüft den Dialog.
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(testhelp::waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        CoreClient::Options o;
+        o.socketPath = socket;
+        o.program = QStringLiteral("tst_fensterbearbeiten");
+        o.version = version();
+        CoreClient client(o);
+        client.start();
+        QTRY_VERIFY_WITH_TIMEOUT(client.isConnected(), 5000);
+        SettingsDialog dialog(&client, m_window.get());
+        dialog.showFromCore();
+        auto *problem = dialog.findChild<QLabel *>(QStringLiteral("settingsProblem"));
+        auto *ok = dialog.findChild<QPushButton *>(QStringLiteral("settingsOk"));
+        auto *reset = dialog.findChild<QPushButton *>(QStringLiteral("settingsReset"));
+        auto *port = dialog.findChild<QSpinBox *>(QStringLiteral("settingsPort"));
+        auto *address = dialog.findChild<QLineEdit *>(QStringLiteral("settingsAddress"));
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("Port 99999 ungültig")), 3000);
+        QVERIFY(!ok->isEnabled());
+        QVERIFY(reset->isEnabled());
+        QTest::mouseClick(reset, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().startsWith(QStringLiteral("Auf Standardwerte zurückgesetzt. Die ungültige "
+                                                                           "Datei heisst jetzt kern.ini.ungueltig-")),
+                                 3000);
+        QVERIFY(dialog.isVisible());
+        QVERIFY(ok->isEnabled());
+        QVERIFY(!reset->isEnabled());
+        QCOMPARE(port->value(), defaultCoreSettings().port);
+        QCOMPARE(address->text(), detectHomeAddress());
+        QCOMPARE(QDir(dir).entryList(QDir::Files).size(), 2); // kern.ini und die umbenannte
+        dialog.reject();
+        client.stop();
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
     }
 #endif
 
