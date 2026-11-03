@@ -29,7 +29,9 @@
 #include <QDialog>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
+#include <QFrame>
 #include <QInputDialog>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
@@ -361,6 +363,60 @@ private slots:
         selectSourceRow(2); // Bild
         QCOMPARE(child<QStackedWidget>("propertyPages")->currentIndex(), 1);
         QVERIFY(child<QPushButton>("imageReplace")->isEnabled());
+    }
+
+    // P09b, E-26: Name oben, Bereich «Transformation» mit Spiegeln, darunter der Bereich der Art
+    // mit kleinem Titel und feiner Linie; Spiegeln per Kästchen kommt beim Kern an.
+    void propertySections()
+    {
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        auto *pages = child<QStackedWidget>("propertyPages");
+        auto *transform = child<QWidget>("propertyTransform");
+        auto *name = child<QLineEdit>("propertyName");
+        const auto titles = [](QWidget *w) {
+            QStringList r;
+            for (const QLabel *l : w->findChildren<QLabel *>(QStringLiteral("propertySectionTitle"),
+                                                              Qt::FindDirectChildrenOnly))
+                r.append(l->text());
+            return r;
+        };
+        QCOMPARE(titles(transform), QStringList{QStringLiteral("Transformation")});
+        const QStringList kinds = {QString(), QStringLiteral("Bild"), QStringLiteral("Video"),
+                                   QStringLiteral("Text")};
+        for (int i = 1; i < pages->count(); ++i)
+            QCOMPARE(titles(pages->widget(i)), QStringList{kinds.at(i)});
+        // Reihenfolge von oben: Name, Transformation, Art
+        QVERIFY(name->mapTo(m_window.get(), QPoint()).y() < transform->mapTo(m_window.get(), QPoint()).y());
+        QVERIFY(transform->mapTo(m_window.get(), QPoint()).y() < pages->mapTo(m_window.get(), QPoint()).y());
+        auto *line = transform->findChild<QFrame *>(QStringLiteral("propertySectionLine"));
+        QVERIFY(line);
+        QCOMPARE(line->height(), 1);
+        for (const QString &x : {QStringLiteral("propertyX"), QStringLiteral("propertyY"),
+                                QStringLiteral("propertyWidth"), QStringLiteral("propertyHeight"),
+                                QStringLiteral("propertyRotation"),
+                                QStringLiteral("propertyFlipHorizontal"),
+                                QStringLiteral("propertyFlipVertical")})
+            QVERIFY2(transform->isAncestorOf(child<QWidget>(x.toLatin1().constData())), qPrintable(x));
+
+        selectSourceRow(2); // Bild
+        auto *flipH = child<QCheckBox>("propertyFlipHorizontal");
+        auto *flipV = child<QCheckBox>("propertyFlipVertical");
+        QVERIFY(flipH->isEnabled() && flipV->isEnabled());
+        const bool before = sourceAtRow(2).flipHorizontal;
+        QCOMPARE(flipH->isChecked(), before);
+        QTest::mouseClick(flipH, Qt::LeftButton, {}, QPoint(8, flipH->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).flipHorizontal, !before, 3000);
+        QTest::mouseClick(flipV, Qt::LeftButton, {}, QPoint(8, flipV->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).flipVertical, true, 3000);
+        // Änderung von aussen (zweite Verbindung) zeigt das Kästchen
+        SourceChanges c;
+        c.flipHorizontal = before;
+        c.flipVertical = false;
+        m_check->sendChange(sourceUpdate(m_scene, sourceAtRow(2).id, c));
+        QTRY_COMPARE_WITH_TIMEOUT(flipV->isChecked(), false, 3000);
+        QCOMPARE(flipH->isChecked(), before);
     }
 
     // P09 Entscheid 1 (E-23): Kopfbereich über die ganze Breite, links angedockte Docks darunter.

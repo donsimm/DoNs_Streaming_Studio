@@ -39,6 +39,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include <tuple>
+
 namespace {
 
 // Version der gespeicherten Anordnung; bei einem Umbau der Docks erhöhen, dann gilt
@@ -496,6 +498,14 @@ void MainWindow::refreshProperties()
         if (!pending(QStringLiteral("rotation")) && d.rotation->value() != degrees)
             d.rotation->setValue(degrees);
     }
+    // Spiegeln (P09b): Kästchen im Bereich «Transformation»
+    for (const auto &[box, value, field] :
+         {std::tuple{d.flipHorizontal, source && source->flipHorizontal, QStringLiteral("flipHorizontal")},
+          std::tuple{d.flipVertical, source && source->flipVertical, QStringLiteral("flipVertical")}}) {
+        const QSignalBlocker block(box);
+        if (!pending(field))
+            box->setChecked(value);
+    }
     int page = PropertiesDock::kEmptyPage;
     QString hint = QStringLiteral("Keine Quelle gewählt");
     if (source) {
@@ -598,7 +608,8 @@ void MainWindow::refreshActions()
         edit && source && dss::sourceStepIndex(*overlay, source->id, -1).has_value());
     const PropertiesDock &d = m_propertiesDock;
     for (QWidget *w : std::initializer_list<QWidget *>{d.name, d.x, d.y, d.width, d.height,
-                                                       d.rotation, d.replaceImage, d.loop,
+                                                       d.rotation, d.flipHorizontal,
+                                                       d.flipVertical, d.replaceImage, d.loop,
                                                        d.content, d.family, d.weight,
                                                        d.fontSize, d.color, d.align})
         w->setEnabled(edit && source);

@@ -165,6 +165,16 @@ void MainWindow::connectEditing()
         c.align = dss::TextAlign(m_propertiesDock.align->itemData(index).toInt());
         updateSelectedSource(c, QStringLiteral("align"));
     });
+    connect(d.flipHorizontal, &QCheckBox::clicked, this, [this](bool checked) {
+        dss::SourceChanges c;
+        c.flipHorizontal = checked;
+        updateSelectedSource(c, QStringLiteral("flipHorizontal"));
+    });
+    connect(d.flipVertical, &QCheckBox::clicked, this, [this](bool checked) {
+        dss::SourceChanges c;
+        c.flipVertical = checked;
+        updateSelectedSource(c, QStringLiteral("flipVertical"));
+    });
     connect(d.loop, &QCheckBox::clicked, this, [this](bool checked) {
         dss::SourceChanges c;
         c.loop = checked;

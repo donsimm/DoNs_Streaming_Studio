@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
+#include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -102,13 +103,27 @@ void nameWidgets(std::initializer_list<std::pair<QObject *, const char *>> widge
         w->setObjectName(QString::fromLatin1(name));
 }
 
-QWidget *page(QWidget *parent, QGridLayout **grid)
+// Bereich im Dock «Eigenschaften» (P09b, E-26): kleiner Titel, darunter eine feine Linie wie
+// der Rahmen des Kopfbereichs (Farbe border), darunter die Felder im Raster *grid.
+QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid)
 {
     auto *w = new QWidget(parent);
-    *grid = new QGridLayout(w);
-    (*grid)->setContentsMargins(8, 0, 8, 8);
+    auto *column = new QVBoxLayout(w);
+    column->setContentsMargins(8, 6, 8, 8);
+    column->setSpacing(4);
+    auto *label = new QLabel(title, w);
+    label->setObjectName(QStringLiteral("propertySectionTitle"));
+    column->addWidget(label);
+    auto *line = new QFrame(w);
+    line->setObjectName(QStringLiteral("propertySectionLine"));
+    line->setFixedHeight(1);
+    column->addWidget(line);
+    column->addSpacing(2);
+    *grid = new QGridLayout;
+    (*grid)->setContentsMargins(0, 0, 0, 0);
     (*grid)->setHorizontalSpacing(8);
     (*grid)->setVerticalSpacing(6);
+    column->addLayout(*grid);
     return w;
 }
 
@@ -181,57 +196,69 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     formColumn->setContentsMargins(0, 0, 0, 0);
     formColumn->setSpacing(0);
 
-    auto *common = new QWidget(form);
-    auto *grid = new QGridLayout(common);
-    grid->setContentsMargins(8, 8, 8, 6);
-    grid->setHorizontalSpacing(8);
-    grid->setVerticalSpacing(6);
-    r.name = new QLineEdit(common);
-    r.x = pixelBox(0, -100000, common);
-    r.y = pixelBox(0, -100000, common);
-    r.width = pixelBox(1, 1, common);
-    r.height = pixelBox(1, 1, common);
+    // Oben der Name (P09b, E-26), darunter der Hinweis (keine Quelle, nur Anzeige).
+    auto *nameBox = new QWidget(form);
+    auto *nameGrid = new QGridLayout(nameBox);
+    nameGrid->setContentsMargins(8, 8, 8, 0);
+    nameGrid->setHorizontalSpacing(8);
+    nameGrid->setVerticalSpacing(4);
+    r.name = new QLineEdit(nameBox);
+    r.hint = new QLabel(QStringLiteral("Keine Quelle gewählt"), nameBox);
+    r.hint->setObjectName(QStringLiteral("hintLabel"));
+    nameGrid->addWidget(new QLabel(QStringLiteral("Name"), nameBox), 0, 0);
+    nameGrid->addWidget(r.name, 0, 1);
+    nameGrid->addWidget(r.hint, 1, 1);
+    nameGrid->setColumnStretch(1, 1);
+    formColumn->addWidget(nameBox);
+
+    // Bereich «Transformation»: Lage, Grösse, Drehung, Spiegeln (für alle Arten).
+    QGridLayout *grid = nullptr;
+    QWidget *transform = section(QStringLiteral("Transformation"), form, &grid);
+    transform->setObjectName(QStringLiteral("propertyTransform"));
+    r.x = pixelBox(0, -100000, transform);
+    r.y = pixelBox(0, -100000, transform);
+    r.width = pixelBox(1, 1, transform);
+    r.height = pixelBox(1, 1, transform);
     // Drehung 0.0 bis 359.9 Grad, gespeichert in Zehntelgrad; das Feld läuft rundum.
-    r.rotation = new QDoubleSpinBox(common);
+    r.rotation = new QDoubleSpinBox(transform);
     r.rotation->setDecimals(1);
     r.rotation->setRange(0.0, 359.9);
     r.rotation->setWrapping(true);
     r.rotation->setSuffix(QStringLiteral(" °"));
     r.rotation->setKeyboardTracking(false);
     keepValueVisible(r.rotation);
-    grid->addWidget(new QLabel(QStringLiteral("Name"), common), 0, 0);
-    grid->addWidget(r.name, 0, 1, 1, 3);
-    grid->addWidget(new QLabel(QStringLiteral("X"), common), 1, 0);
-    grid->addWidget(r.x, 1, 1);
-    grid->addWidget(new QLabel(QStringLiteral("Y"), common), 1, 2);
-    grid->addWidget(r.y, 1, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Breite"), common), 2, 0);
-    grid->addWidget(r.width, 2, 1);
-    grid->addWidget(new QLabel(QStringLiteral("Höhe"), common), 2, 2);
-    grid->addWidget(r.height, 2, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Drehung"), common), 3, 0);
-    grid->addWidget(r.rotation, 3, 1);
-    r.hint = new QLabel(QStringLiteral("Keine Quelle gewählt"), common);
-    r.hint->setObjectName(QStringLiteral("hintLabel"));
-    grid->addWidget(r.hint, 3, 2, 1, 2);
+    r.flipHorizontal = new QCheckBox(QStringLiteral("Waagrecht gespiegelt"), transform);
+    r.flipVertical = new QCheckBox(QStringLiteral("Senkrecht gespiegelt"), transform);
+    grid->addWidget(new QLabel(QStringLiteral("X"), transform), 0, 0);
+    grid->addWidget(r.x, 0, 1);
+    grid->addWidget(new QLabel(QStringLiteral("Y"), transform), 0, 2);
+    grid->addWidget(r.y, 0, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Breite"), transform), 1, 0);
+    grid->addWidget(r.width, 1, 1);
+    grid->addWidget(new QLabel(QStringLiteral("Höhe"), transform), 1, 2);
+    grid->addWidget(r.height, 1, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Drehung"), transform), 2, 0);
+    grid->addWidget(r.rotation, 2, 1);
+    grid->addWidget(r.flipHorizontal, 3, 0, 1, 2);
+    grid->addWidget(r.flipVertical, 3, 2, 1, 2);
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(3, 1);
-    formColumn->addWidget(common);
+    formColumn->addWidget(transform);
 
-    // Seiten je Art der Quelle; die Seite wechselt mit der gewählten Quelle (kein Umbau des
-    // Layouts, CLAUDE.md Regel 9).
+    // Bereich je Art der Quelle («Bild», «Video», «Text»); die Seite wechselt mit der gewählten
+    // Quelle (kein Umbau des Layouts, CLAUDE.md Regel 9).
     r.kindPages = new QStackedWidget(form);
     r.kindPages->addWidget(new QWidget(r.kindPages)); // kEmptyPage
 
     QGridLayout *g = nullptr;
-    QWidget *imagePage = page(r.kindPages, &g);
+    QWidget *imagePage = section(QStringLiteral("Bild"), r.kindPages, &g);
     r.replaceImage = new QPushButton(QStringLiteral("Datei ersetzen …"), imagePage);
     g->addWidget(r.replaceImage, 0, 0);
     g->setColumnStretch(1, 1);
     g->setRowStretch(1, 1);
     r.kindPages->addWidget(imagePage);
 
-    QWidget *videoPage = page(r.kindPages, &g);
+    QWidget *videoPage = section(QStringLiteral("Video"), r.kindPages, &g);
     r.loop = new QCheckBox(QStringLiteral("Wiederholen"), videoPage);
     g->addWidget(r.loop, 0, 0);
     r.holdAtEnd = new QCheckBox(QStringLiteral("Am Ende anhalten"), videoPage);
@@ -239,12 +266,10 @@ PropertiesDock createPropertiesDock(QWidget *parent)
                                            "am Ende leer."));
     g->addWidget(r.holdAtEnd, 1, 0);
     g->setColumnStretch(1, 1);
-    g->setRowStretch(1, 1);
-    g->setRowStretch(1, 0);
     g->setRowStretch(2, 1);
     r.kindPages->addWidget(videoPage);
 
-    QWidget *textPage = page(r.kindPages, &g);
+    QWidget *textPage = section(QStringLiteral("Text"), r.kindPages, &g);
     r.content = new QPlainTextEdit(textPage);
     r.content->setAccessibleName(QStringLiteral("Inhalt"));
     r.content->setTabChangesFocus(true);
@@ -317,12 +342,15 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     nameWidgets({{r.name, "propertyName"}, {r.x, "propertyX"}, {r.y, "propertyY"},
                  {r.width, "propertyWidth"}, {r.height, "propertyHeight"},
                  {r.rotation, "propertyRotation"}, {r.kindPages, "propertyPages"},
+                 {r.flipHorizontal, "propertyFlipHorizontal"},
+                 {r.flipVertical, "propertyFlipVertical"},
                  {r.replaceImage, "imageReplace"}, {r.loop, "videoLoop"},
                  {r.holdAtEnd, "videoHoldAtEnd"},
                  {r.content, "textContent"}, {r.family, "textFamily"}, {r.weight, "textWeight"},
                  {r.italic, "textItalic"}, {r.fontSize, "textSize"}, {r.align, "textAlign"}});
     for (QWidget *w : std::initializer_list<QWidget *>{
-             r.name, r.x, r.y, r.width, r.height, r.rotation, r.replaceImage, r.loop, r.holdAtEnd,
+             r.name, r.x, r.y, r.width, r.height, r.rotation, r.flipHorizontal, r.flipVertical,
+             r.replaceImage, r.loop, r.holdAtEnd,
              r.content,
              r.family, r.weight, r.italic, r.fontSize, r.color, r.align})
         w->setEnabled(false);

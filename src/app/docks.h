@@ -51,15 +51,18 @@ struct PropertiesDock
 {
     QDockWidget *dock = nullptr;
     QScrollArea *scroll = nullptr;
-    // Für alle Arten
+    // Für alle Arten: oben der Name, dann der Bereich «Transformation» (P09b, E-26)
     QLineEdit *name = nullptr;
     QSpinBox *x = nullptr;
     QSpinBox *y = nullptr;
     QSpinBox *width = nullptr;
     QSpinBox *height = nullptr;
     QDoubleSpinBox *rotation = nullptr;
+    QCheckBox *flipHorizontal = nullptr; // P09b
+    QCheckBox *flipVertical = nullptr;
     QLabel *hint = nullptr;
-    // Seite je Art: kEmptyPage, kImagePage, kVideoPage, kTextPage
+    // Seite je Art mit eigenem Bereich («Bild», «Video», «Text»): kEmptyPage, kImagePage,
+    // kVideoPage, kTextPage
     QStackedWidget *kindPages = nullptr;
     // Bild
     QPushButton *replaceImage = nullptr;

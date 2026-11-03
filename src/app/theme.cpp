@@ -309,6 +309,10 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #dockButtons QToolButton::menu-indicator { image: none; width: 0px; }
 
 #hintLabel { color: @textMuted@; }
+/* P09b, E-26: Bereiche im Dock «Eigenschaften», kleine Titel und feine Linie wie der Rahmen
+   des Kopfbereichs (#headerBar). */
+#propertySectionTitle { font-size: @fontSizeSmall@pt; font-weight: bold; color: @textMuted@; }
+#propertySectionLine { background: @border@; border: none; }
 #coreStatus { font-weight: bold; padding: 0 8px; }
 #coreStatus[state="disconnected"] { color: @coreDisconnected@; }
 #coreStatus[state="connected"] { color: @coreConnected@; }
