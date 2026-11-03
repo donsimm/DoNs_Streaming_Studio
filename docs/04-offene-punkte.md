@@ -159,3 +159,13 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Logos in den Verbindungsknöpfen etwa zwei Drittel der heutigen Grösse, ohne eigenen Rand ums Logo; der Rahmen des Knopfes (Farbe des Zustands) bleibt die einzige Umrandung.
 - Dock «Eigenschaften», Bereich «Transformation»: drei kleine Symbolknöpfe in der Titelzeile, am rechten Rand des Docks (nicht direkt neben dem Titel): Kopieren, Einfügen, Zurücksetzen. Hinweis beim Darüberfahren; «Einfügen» ausgegraut, solange nichts kopiert ist; Wirkung wie die Befehle aus E-25.
 - Umsetzung: mit dem nächsten Baustein (P10), Teil «Vorab».
+
+## Entschieden nach P09b (2026-11-03)
+
+- Punkt 66: im Vorab-Teil von P10 klären und beheben. Zuerst messen, ob die Videobilder ungleichmässig kommen (Ruckeln alle 100 ms bei Zeitstempeln in ganzen Millisekunden); dann Zeitpunkt mit kleiner Toleranz rechnen (Vorschlag 1 ms), `tst_medien` 50 Mal ohne Fehler.
+- Punkt 60: Tastenkürzel genau wie OBS: Strg+Umschalt+C / Strg+Umschalt+V (Transformation kopieren / einfügen), Strg+R (zurücksetzen), Strg+F (einpassen), Strg+S (strecken), Strg+D (zentrieren). Entscheid des Nutzers, auch für Strg+S. Umsetzung im Vorab-Teil von P10.
+- Punkt 61: so lassen. «Einpassen» und «Strecken» setzen feste Pixel (keine Begrenzung wie in OBS); «Einfügen» überträgt die Pixelgrösse, nicht den Massstab.
+- Punkt 62: neue Funktion E-27 «Mehrfachauswahl wie OBS», SOLL, später.
+- Punkt 63: so lassen, kein eigener Dialog «Transformation bearbeiten»; die Werte stehen im Dock «Eigenschaften».
+- Punkt 64: so lassen, Rundung auf ganze Pixel nach Regel 11.
+- Punkt 65: Der Editor beachtet die Drehung aus den Metadaten von Videos (zum Beispiel Display-Matrix in MP4), wie bei der EXIF-Ausrichtung von Bildern (K-07). Umsetzung im Vorab-Teil von P10; P10 prüft mit einem Testvideo, ob die Browserquelle in OBS sie ebenfalls beachtet.
