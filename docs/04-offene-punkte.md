@@ -104,3 +104,8 @@ Stand: 2026-11-03 (nach P08, Handtest offen).
 - Punkt 38 (Annahmen zu CPU und LAN-Verlauf): so lassen; Werte vom Nutzer mit der Leistungsanzeige des Systems abgeglichen.
 - Punkt 41 (hängender Kern wird nicht erkannt): mit P10 lösen.
 - Punkt 42 (Kern startet aus dem Repo-Ordner): mit P10 lösen, durch einen festen Installationsort ausserhalb des Repos und ein Installationsskript. Grund: Sobald die Browserquelle im Stream genutzt wird, soll eine laufende Claude-Code-Sitzung die Programme im Einsatz nicht austauschen.
+
+## Entschieden im Handtest P08 (2026-11-03)
+
+- Neu E-23: Kopfbereich fest über die ganze Fensterbreite; links oder rechts angedockte Docks beginnen darunter. Umsetzung als erster Teil von P09.
+- Punkt 48: Die blaue Fläche links neben einem gewählten Eintrag im Ordner wird entfernt (P09). An dieser Stelle kommt mit P10 der Schalter «Ausgabe ein/aus» pro Overlay (E-24).

@@ -22,8 +22,8 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P09 | Zeichner im Editor | Leinwand zeichnet Bild, Text (Schriftdatei), Video und WebM mit Alpha (libavcodec, libvpx); Quelle mit der Maus wählen, verschieben, skalieren, drehen | P08 | E-03 bis E-05, E-08 (Maus), E-09, E-11 |
-| P10 | Browserquelle | Dazu: fester Installationsort ausserhalb des Repos mit Installationsskript (Punkt 42), Überwachung eines hängenden Kerns (Punkt 41). Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
+| P09 | Zeichner im Editor | Vorab: Kopfbereich fest über die ganze Breite (E-23), blaue Fläche neben gewählten Einträgen im Ordner entfernen (Punkt 48). Leinwand zeichnet Bild, Text (Schriftdatei), Video und WebM mit Alpha (libavcodec, libvpx); Quelle mit der Maus wählen, verschieben, skalieren, drehen | P08 | E-03 bis E-05, E-08 (Maus), E-09, E-11 |
+| P10 | Browserquelle | Dazu: Schalter «Ausgabe ein/aus» pro Overlay in der Liste (E-24); fester Installationsort ausserhalb des Repos mit Installationsskript (Punkt 42), Überwachung eines hängenden Kerns (Punkt 41). Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
 | P11 | Bildvergleich der zwei Zeichner | K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen | P10 | (Voraussetzung für K-07) |
 | P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar | P09 | E-20, E-21 |
 

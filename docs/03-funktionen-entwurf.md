@@ -30,6 +30,8 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-20 | Ton von Videos über eine Audiokarte des Studio-PCs (über das Mischpult zum Streaming-PC) | MUSS | Entscheid des Nutzers 2026-11-02, gehört zu E-05 |
 | E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte» |
 | E-22 | Rückgängig und Wiederholen | SOLL | Entscheid des Nutzers 2026-11-02 (vor P08): Änderungen wirken sofort, Rückgängig kommt später |
+| E-23 | Kopfbereich fest über die ganze Fensterbreite, Docks immer darunter | MUSS | Wunsch des Nutzers 2026-11-03 (Handtest P08), Umsetzung P09 |
+| E-24 | Schalter pro Overlay «Ausgabe ein/aus» links neben dem Eintrag in der Liste; aus = Browserquelle zeigt nichts (leer, durchsichtig), Editor bleibt bearbeitbar | MUSS | Wunsch des Nutzers 2026-11-03, Umsetzung P10 |
 
 ### Quelle Text (E-03)
 
