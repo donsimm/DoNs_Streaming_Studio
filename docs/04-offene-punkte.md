@@ -131,5 +131,5 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 ## Wünsche aus dem Handtest P09 (2026-11-03)
 
 - Einrasten beim Drehen mit Umschalttaste in 1°-Schritten statt 15° (entschieden, siehe `docs/01-festlegungen.md`). Umsetzung mit dem nächsten Baustein.
-- Leistungsanzeige (CPU, RAM, LAN) im Kopfbereich: feste Grösse, höchstens ein Drittel der Fensterbreite. Noch zu besprechen.
+- Leistungsanzeige (CPU, RAM, LAN) im Kopfbereich: entschieden, feste Breite 600 Pixel für alle drei zusammen (200 je Anzeige), rechts im Kopfbereich. Wäre das mehr als ein Drittel der Fensterbreite, wird sie auf ein Drittel verkleinert. Der Platz zwischen Verbindungsknöpfen und Anzeige bleibt leer. Umsetzung mit dem nächsten Baustein.
 - Symbole fehlten im Handtest-Fenster, weil `handtest.sh` ein eigenes `XDG_CONFIG_HOME` nutzt; kein Fehler der Software. Im normalen Fenster geprüft, in Ordnung (2026-11-03).
