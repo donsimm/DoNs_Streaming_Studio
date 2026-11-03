@@ -613,6 +613,9 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
     }
     if (is(msg::kSetOverlaySize))
         return done(m_store->setOverlaySize(r.overlayId, r.width, r.height, &error), error);
+    if (is(msg::kSetOverlayOutput))
+        return done(m_store->setOverlayOutput(r.overlayId, r.output, &error), error);
+
     if (is(msg::kAddTextSource)) {
         // Inhalt «Text», Standardschrift Be Vietnam Pro (Entscheid 4, E-11)
         const QUuid id = m_store->addTextSource(r.overlayId, QStringLiteral("Text"),

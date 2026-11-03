@@ -265,6 +265,7 @@ QJsonObject overlayToJson(const Overlay &overlay)
     o.insert(QStringLiteral("address"), overlay.address);
     o.insert(QStringLiteral("width"), overlay.width);
     o.insert(QStringLiteral("height"), overlay.height);
+    o.insert(QStringLiteral("output"), overlay.output);
     QJsonArray sources;
     for (const Source &source : overlay.sources)
         sources.append(sourceToJson(source));
@@ -290,10 +291,16 @@ bool overlayFromJson(const QJsonObject &object, Overlay *overlay, QString *error
                      .arg(version).arg(kOverlayFormatVersionMin).arg(kOverlayFormatVersion);
         return false;
     }
-    r.allowOnly({QStringLiteral("format_version"), QStringLiteral("id"), QStringLiteral("name"),
-                 QStringLiteral("address"), QStringLiteral("width"), QStringLiteral("height"),
-                 QStringLiteral("sources")});
+    QStringList keys{QStringLiteral("format_version"), QStringLiteral("id"), QStringLiteral("name"),
+                     QStringLiteral("address"), QStringLiteral("width"), QStringLiteral("height"),
+                     QStringLiteral("sources")};
+    // output gibt es erst ab Version 4 (P10, E-24); vorher ist die Ausgabe ein.
+    if (version >= 4)
+        keys << QStringLiteral("output");
+    r.allowOnly(keys);
     Overlay result;
+    if (version >= 4)
+        result.output = r.boolean(QStringLiteral("output"));
     result.id = r.uuid(QStringLiteral("id"));
     result.name = r.string(QStringLiteral("name"));
     if (r.ok())

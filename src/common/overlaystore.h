@@ -82,6 +82,8 @@ public:
     bool removeOverlay(const QUuid &overlayId, QString *error);
     // P09 (Entscheid 5): Auflösung ändern; die Quellen behalten ihre Pixelwerte.
     bool setOverlaySize(const QUuid &overlayId, int width, int height, QString *error);
+    // P10 (E-24): Ausgabe an die Browserquelle ein/aus.
+    bool setOverlayOutput(const QUuid &overlayId, bool output, QString *error);
 
     // Liste (P08, Teil B): jede Änderung wird sofort atomar in liste.json gespeichert. Ist
     // liste.json kaputt, werden diese Änderungen abgewiesen (die Datei wird nicht überschrieben).

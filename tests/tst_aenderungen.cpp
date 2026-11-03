@@ -102,6 +102,7 @@ private slots:
         r.index = 2;
         r.changeAddress = true;
         r.expanded = true;
+        r.output = false;
         r.weight = 700;
         r.italic = true;
         r.changes.x = -5;
@@ -126,6 +127,7 @@ private slots:
         QCOMPARE(back.index, has("index") ? r.index : standard.index);
         QCOMPARE(back.changeAddress, has("change_address") ? r.changeAddress : standard.changeAddress);
         QCOMPARE(back.expanded, has("expanded") ? r.expanded : standard.expanded);
+        QCOMPARE(back.output, has("output") ? r.output : standard.output);
         QCOMPARE(back.weight, has("weight") ? r.weight : standard.weight);
         QCOMPARE(back.italic, has("italic") ? r.italic : standard.italic);
         QCOMPARE(back.changes, has("changes") ? r.changes : standard.changes);
@@ -163,7 +165,8 @@ private slots:
         QCOMPARE(keys(msg::kSetTextFont), QStringLiteral("file,italic,overlay_id,source_id,weight"));
         QCOMPARE(keys(msg::kReplaceImageFile), QStringLiteral("file,overlay_id,source_id"));
         QCOMPARE(keys(msg::kSetOverlaySize), QStringLiteral("height,overlay_id,width"));
-        QCOMPARE(changeTypes().size(), 19);
+        QCOMPARE(keys(msg::kSetOverlayOutput), QStringLiteral("output,overlay_id"));
+        QCOMPARE(changeTypes().size(), 20);
         QVERIFY(!isChangeType(QStringLiteral("get_overlay")));
         QVERIFY(!isChangeType(QStringLiteral("set_token")));
     }

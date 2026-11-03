@@ -28,8 +28,10 @@ namespace dss {
 // 4 seit P09b: Overlays im Format 3 (flip_horizontal, flip_vertical); overlay und
 //   overlay_changed mit media_sizes (Originalgrösse der Dateien)
 // 5 seit P10-vor: Einstellungen des Kerns (get_settings, settings, update_settings)
+// 6 seit P10: Overlays im Format 4 (output, E-24), overlay_list mit output, Änderung
+//   set_overlay_output
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 5;
+inline constexpr int kProtocolVersion = 6;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -75,6 +77,8 @@ inline constexpr char kSetOverlaySize[] = "set_overlay_size";
 inline constexpr char kGetSettings[] = "get_settings";
 inline constexpr char kSettings[] = "settings";
 inline constexpr char kUpdateSettings[] = "update_settings";
+// P10: Ausgabe ein/aus (E-24)
+inline constexpr char kSetOverlayOutput[] = "set_overlay_output";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -142,6 +146,7 @@ struct OverlaySummary
     int width = 0;
     int height = 0;
     int sourceCount = 0;
+    bool output = true; // P10 (E-24): Ausgabe ein/aus
 
     bool operator==(const OverlaySummary &) const = default;
 };
@@ -230,6 +235,7 @@ struct ChangeRequest
     int index = 0;
     bool changeAddress = false;   // rename_overlay
     bool expanded = false;        // set_folder_expanded
+    bool output = true;           // set_overlay_output (P10, E-24)
     std::optional<int> weight;    // set_text_font; leer = aus der Datei
     std::optional<bool> italic;   // set_text_font; leer = aus der Datei
     SourceChanges changes;        // update_source

@@ -439,6 +439,14 @@ bool OverlayStore::setOverlaySize(const QUuid &overlayId, int width, int height,
                   error);
 }
 
+bool OverlayStore::setOverlayOutput(const QUuid &overlayId, bool output, QString *error)
+{
+    return modify(overlayId, [&](Overlay *o) {
+        o->output = output;
+        return QString();
+    }, error);
+}
+
 bool OverlayStore::moveOverlayInList(const QUuid &overlayId, const QUuid &folderId, int index,
                                      QString *error)
 {

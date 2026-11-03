@@ -83,6 +83,9 @@ struct Overlay
     int width = 1920;
     int height = 1080;
     QList<Source> sources; // Zeichenreihenfolge: das erste Element liegt hinten
+    // Ausgabe ein/aus (E-24, P10): aus = die Browserquelle zeigt nichts (leer, durchsichtig), der
+    // Editor zeigt und bearbeitet das Overlay weiter. Neue Overlays: ein.
+    bool output = true;
 
     bool operator==(const Overlay &) const = default;
 };

@@ -87,6 +87,22 @@ void removeFlipFields(QJsonObject &o)
     o.insert(QStringLiteral("sources"), sources);
 }
 
+// Entfernt hold_at_end aus allen Videoquellen (Format 1, vor P09).
+void removeHoldAtEnd(QJsonObject &o)
+{
+    QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
+    for (qsizetype i = 0; i < sources.size(); ++i) {
+        QJsonObject s = sources.at(i).toObject();
+        if (s.contains(QStringLiteral("video"))) {
+            QJsonObject video = s.value(QStringLiteral("video")).toObject();
+            video.remove(QStringLiteral("hold_at_end"));
+            s.insert(QStringLiteral("video"), video);
+        }
+        sources[i] = s;
+    }
+    o.insert(QStringLiteral("sources"), sources);
+}
+
 // Ändert in der JSON-Darstellung eines Overlays einen Wert und liest wieder ein.
 QString parseError(const std::function<void(QJsonObject &)> &change)
 {
@@ -324,7 +340,48 @@ private slots:
         QVERIFY2(parseOverlay(serializeOverlay(original), &loaded, &error), qPrintable(error));
         QCOMPARE(loaded, original);
         QCOMPARE(loaded.sources[1].loop, true);
-        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 3); // seit P09b
+        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 4); // seit P10
+    }
+
+    // P10 (E-24): Ausgabe ein/aus im Overlay, Format 4.
+    void outputField()
+    {
+        Overlay original = makeOverlay();
+        QCOMPARE(original.output, true); // neue Overlays: Ausgabe ein
+        original.output = false;
+        const QJsonObject o = overlayToJson(original);
+        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 4);
+        QCOMPARE(o.value(QStringLiteral("output")), QJsonValue(false));
+        Overlay loaded;
+        QString error;
+        QVERIFY2(parseOverlay(QJsonDocument(o).toJson(), &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded, original);
+
+        // Version 4: Pflicht und true/false
+        QJsonObject missing = o;
+        missing.remove(QStringLiteral("output"));
+        QVERIFY(!parseOverlay(QJsonDocument(missing).toJson(), &loaded, &error));
+        QVERIFY2(error.contains(QStringLiteral("output")), qPrintable(error));
+        QJsonObject wrong = o;
+        wrong.insert(QStringLiteral("output"), 0);
+        QVERIFY(!parseOverlay(QJsonDocument(wrong).toJson(), &loaded, &error));
+        QVERIFY2(error.contains(QStringLiteral("output")), qPrintable(error));
+
+        // Version 1 bis 3: ohne das Feld, Ausgabe ein; mit ihm ungültig (unbekanntes Feld).
+        for (int version : {1, 2, 3}) {
+            QJsonObject old = overlayToJson(makeOverlay());
+            old.insert(QStringLiteral("format_version"), version);
+            old.remove(QStringLiteral("output"));
+            if (version < 3)
+                removeFlipFields(old);
+            if (version < 2)
+                removeHoldAtEnd(old);
+            QVERIFY2(parseOverlay(QJsonDocument(old).toJson(), &loaded, &error), qPrintable(error));
+            QCOMPARE(loaded.output, true);
+            old.insert(QStringLiteral("output"), false);
+            QVERIFY(!parseOverlay(QJsonDocument(old).toJson(), &loaded, &error));
+            QVERIFY2(error.contains(QStringLiteral("output")), qPrintable(error));
+        }
     }
 
     // P09, Entscheid 9: «Am Ende anhalten» in Modell und Datei (format_version 2).
@@ -363,6 +420,7 @@ private slots:
         const Overlay original = makeOverlay();
         QJsonObject o = overlayToJson(original);
         o.insert(QStringLiteral("format_version"), 1);
+        o.remove(QStringLiteral("output")); // erst ab Format 4 (P10)
         removeFlipFields(o);
         QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
         QJsonObject s = sources.at(1).toObject();
@@ -386,6 +444,7 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("hold_at_end")), qPrintable(error));
         QJsonObject v2 = overlayToJson(original);
         v2.insert(QStringLiteral("format_version"), 2);
+        v2.remove(QStringLiteral("output")); // erst ab Format 4 (P10)
         removeFlipFields(v2);
         QJsonArray sources2 = v2.value(QStringLiteral("sources")).toArray();
         QJsonObject s2 = sources2.at(1).toObject();
@@ -407,7 +466,7 @@ private slots:
         original.sources[1].flipHorizontal = true;
         original.sources[1].flipVertical = true;
         const QJsonObject o = overlayToJson(original);
-        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 3);
+        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 4);
         const QJsonObject first = o.value(QStringLiteral("sources")).toArray().at(0).toObject();
         QCOMPARE(first.value(QStringLiteral("flip_horizontal")), QJsonValue(true));
         QCOMPARE(first.value(QStringLiteral("flip_vertical")), QJsonValue(false));
@@ -416,7 +475,7 @@ private slots:
         QVERIFY2(parseOverlay(QJsonDocument(o).toJson(), &loaded, &error), qPrintable(error));
         QCOMPARE(loaded, original);
 
-        // Version 3: beide Felder Pflicht und true/false
+        // Ab Version 3: beide Felder Pflicht und true/false
         for (const QString &key : {QStringLiteral("flip_horizontal"), QStringLiteral("flip_vertical")}) {
             QJsonObject missing = o;
             QJsonArray sources = missing.value(QStringLiteral("sources")).toArray();
@@ -437,6 +496,7 @@ private slots:
         // mit ihnen ist die Datei ungültig (unbekanntes Feld).
         QJsonObject v2 = overlayToJson(makeOverlay());
         v2.insert(QStringLiteral("format_version"), 2);
+        v2.remove(QStringLiteral("output"));
         removeFlipFields(v2);
         QVERIFY2(parseOverlay(QJsonDocument(v2).toJson(), &loaded, &error), qPrintable(error));
         for (const Source &source : loaded.sources) {
@@ -445,10 +505,11 @@ private slots:
         }
         QJsonObject v2flip = o;
         v2flip.insert(QStringLiteral("format_version"), 2);
+        v2flip.remove(QStringLiteral("output"));
         QVERIFY(!parseOverlay(QJsonDocument(v2flip).toJson(), &loaded, &error));
         QVERIFY2(error.contains(QStringLiteral("flip_")), qPrintable(error));
-        // Gespeichert wird wieder Version 3 mit beiden Feldern.
-        QCOMPARE(overlayToJson(loaded).value(QStringLiteral("format_version")).toInt(), 3);
+        // Gespeichert wird die neueste Version (4, P10) mit beiden Feldern.
+        QCOMPARE(overlayToJson(loaded).value(QStringLiteral("format_version")).toInt(), 4);
 
         // Ändern über SourceChanges, auch bei Text; Breite und Höhe bleiben positiv.
         Overlay edited = makeOverlay();
@@ -491,7 +552,7 @@ private slots:
         QTest::newRow("Kommazahl") << 4 << QStringLiteral("sources[0].x");
         QTest::newRow("unbekanntes Feld") << 5 << QStringLiteral("unbekanntes Feld");
         QTest::newRow("fehlendes Feld") << 6 << QStringLiteral("«width»: fehlt");
-        QTest::newRow("format_version 4") << 7 << QStringLiteral("neuer");
+        QTest::newRow("format_version 5") << 7 << QStringLiteral("neuer");
         QTest::newRow("format_version 0") << 8 << QStringLiteral("unbekannt");
         QTest::newRow("format_version fehlt") << 9 << QStringLiteral("format_version");
         QTest::newRow("Ausrichtung") << 10 << QStringLiteral("justify");
@@ -518,7 +579,7 @@ private slots:
             case 4: setInSource(o, 0, QStringLiteral("x"), 1.5); break;
             case 5: o.insert(QStringLiteral("token"), QStringLiteral("x")); break;
             case 6: o.remove(QStringLiteral("width")); break;
-            case 7: o.insert(QStringLiteral("format_version"), 4); break;
+            case 7: o.insert(QStringLiteral("format_version"), 5); break;
             case 8: o.insert(QStringLiteral("format_version"), 0); break;
             case 9: o.remove(QStringLiteral("format_version")); break;
             case 10: setInText(o, QStringLiteral("align"), QStringLiteral("justify")); break;

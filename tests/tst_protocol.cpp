@@ -136,7 +136,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 5); // seit P10-vor
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 6); // seit P10
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -176,8 +176,9 @@ private slots:
         const QList<OverlaySummary> list = {
             summarizeOverlay(sampleOverlay()),
             {QUuid::fromString(QStringLiteral("7be08f35-6885-4a95-9c32-939c45a688ea")),
-             QStringLiteral("Chat Ecke"), QStringLiteral("chat-ecke"), 800, 600, 0}};
+             QStringLiteral("Chat Ecke"), QStringLiteral("chat-ecke"), 800, 600, 0, false}};
         QCOMPARE(list.first().sourceCount, 2);
+        QCOMPARE(list.first().output, true); // P10 (E-24)
         OverlayLayout layout = layoutFromIds({list.at(0).id});
         ListEntry folder;
         folder.isFolder = true;
@@ -225,6 +226,14 @@ private slots:
         a.replace(0, entry);
         o.insert(QStringLiteral("entries"), a);
         QVERIFY(!parseOverlayList(o, &back, &error));
+        // P10: output ist Pflicht und true/false
+        e.insert(QStringLiteral("id"), summary.id.toString(QUuid::WithoutBraces));
+        e.remove(QStringLiteral("output"));
+        entry.insert(QStringLiteral("overlay"), e);
+        a.replace(0, entry);
+        o.insert(QStringLiteral("entries"), a);
+        QVERIFY(!parseOverlayList(o, &back, &error));
+        QVERIFY2(error.contains(QStringLiteral("output")), qPrintable(error));
         QVERIFY(!parseOverlayList(simpleMessage(msg::kOverlayList), &back, &error));
     }
 

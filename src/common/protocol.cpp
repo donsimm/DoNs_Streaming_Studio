@@ -59,6 +59,17 @@ bool requireIntField(const QJsonObject &o, const QString &key, int min, int max,
     return true;
 }
 
+bool requireBool(const QJsonObject &o, const QString &key, bool *value, QString *error)
+{
+    const QJsonValue v = o.value(key);
+    if (!v.isBool()) {
+        *error = QStringLiteral("Feld %1 fehlt oder ist nicht true/false").arg(key);
+        return false;
+    }
+    *value = v.toBool();
+    return true;
+}
+
 bool requireUuid(const QJsonObject &o, const QString &key, QUuid *id, QString *error)
 {
     QString text;
@@ -195,7 +206,7 @@ bool parseHello(const QJsonObject &message, Hello *hello, QString *error)
 OverlaySummary summarizeOverlay(const Overlay &overlay)
 {
     return {overlay.id, overlay.name, overlay.address, overlay.width, overlay.height,
-            int(overlay.sources.size())};
+            int(overlay.sources.size()), overlay.output};
 }
 
 const OverlaySummary *OverlayListData::summary(const QUuid &id) const
@@ -216,7 +227,8 @@ QJsonObject summaryToJson(const OverlaySummary &s)
                        {QStringLiteral("address"), s.address},
                        {QStringLiteral("width"), s.width},
                        {QStringLiteral("height"), s.height},
-                       {QStringLiteral("source_count"), s.sourceCount}};
+                       {QStringLiteral("source_count"), s.sourceCount},
+                       {QStringLiteral("output"), s.output}};
 }
 
 bool summaryFromJson(const QJsonValue &value, OverlaySummary *s, QString *error)
@@ -234,7 +246,8 @@ bool summaryFromJson(const QJsonValue &value, OverlaySummary *s, QString *error)
            && requireIntField(e, QStringLiteral("height"), kOverlayMinSize, kOverlayMaxHeight,
                               &s->height, error)
            && requireIntField(e, QStringLiteral("source_count"), 0,
-                              std::numeric_limits<int>::max(), &s->sourceCount, error);
+                              std::numeric_limits<int>::max(), &s->sourceCount, error)
+           && requireBool(e, QStringLiteral("output"), &s->output, error);
 }
 
 } // namespace
@@ -784,6 +797,7 @@ enum ChangeField : unsigned {
     FExpanded = 1u << 9,
     FFontStyle = 1u << 10,   // weight, italic (je Zahl/true/false oder null)
     FChanges = 1u << 11,
+    FOutput = 1u << 12,      // output (true/false), P10
 };
 
 const QList<std::pair<const char *, unsigned>> &changeFieldTable()
@@ -808,6 +822,7 @@ const QList<std::pair<const char *, unsigned>> &changeFieldTable()
         {msg::kSetTextFont, FOverlay | FSource | FFile | FFontStyle},
         {msg::kReplaceImageFile, FOverlay | FSource | FFile},
         {msg::kSetOverlaySize, FOverlay | FSize},
+        {msg::kSetOverlayOutput, FOverlay | FOutput},
     };
     return table;
 }
@@ -863,6 +878,8 @@ QJsonObject changeRequestMessage(const ChangeRequest &r)
         o.insert(QStringLiteral("change_address"), r.changeAddress);
     if (f & FExpanded)
         o.insert(QStringLiteral("expanded"), r.expanded);
+    if (f & FOutput)
+        o.insert(QStringLiteral("output"), r.output);
     if (f & FFontStyle) {
         o.insert(QStringLiteral("weight"), r.weight ? QJsonValue(*r.weight) : QJsonValue(QJsonValue::Null));
         o.insert(QStringLiteral("italic"), r.italic ? QJsonValue(*r.italic) : QJsonValue(QJsonValue::Null));
@@ -911,7 +928,8 @@ bool parseChangeRequest(const QJsonObject &message, ChangeRequest *request, QStr
     }
     for (const auto &[flag, key, target] :
          {std::tuple{FChangeAddress, "change_address", &r.changeAddress},
-          std::tuple{FExpanded, "expanded", &r.expanded}}) {
+          std::tuple{FExpanded, "expanded", &r.expanded},
+          std::tuple{FOutput, "output", &r.output}}) {
         if (!(f & flag))
             continue;
         const QJsonValue v = message.value(QLatin1String(key));

@@ -277,6 +277,28 @@ private slots:
         QCOMPARE(m_b->overlays().size(), 3);
     }
 
+    // Ausgabe ein/aus (E-24, P10): beide Fenster sehen es, die Datei behält es.
+    void overlayOutput()
+    {
+        QVERIFY(current(m_chat).output);
+        ChangeRequest r = request(msg::kSetOverlayOutput);
+        r.overlayId = m_chat;
+        r.output = false;
+        QVERIFY(change(r).ok);
+        QVERIFY(sameInBoth(m_chat));
+        QVERIFY(!current(m_chat).output);
+        QTRY_VERIFY_WITH_TIMEOUT(!m_b->listData().summary(m_chat)->output, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!storedOverlay(m_chat).output, 3000);
+
+        r.output = true;
+        QVERIFY(change(r).ok);
+        QTRY_VERIFY_WITH_TIMEOUT(m_b->listData().summary(m_chat)->output, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(storedOverlay(m_chat).output, 3000);
+
+        r.overlayId = QUuid::createUuid();
+        QCOMPARE(change(r).code, QStringLiteral("unknown_overlay"));
+    }
+
     void folders()
     {
         ChangeRequest r = request(msg::kCreateFolder);

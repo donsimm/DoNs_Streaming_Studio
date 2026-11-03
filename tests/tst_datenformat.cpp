@@ -29,6 +29,8 @@ const QString kSource = QStringLiteral(DSS_TEST_FORMAT_DIR);
 const QString kFormatOne = QStringLiteral("overlays/f5bb9bc6-06f4-4762-a15b-47c37e24f82c.json");
 const QString kFormatTwo = QStringLiteral("overlays/cbf17458-229b-4bd1-8449-f5548a069096.json");
 const QString kFormatThree = QStringLiteral("overlays/f3ab0d90-c6d2-40d3-87a3-4251c27d5d51.json");
+// P10: Format 4 mit Ausgabe aus (E-24), schon aktuell
+const QString kFormatFour = QStringLiteral("overlays/02b9d140-0573-4e87-9958-0a74ee955363.json");
 
 bool copyTree(const QString &from, const QString &to)
 {
@@ -138,6 +140,7 @@ private slots:
         const DataFormatStatus s = checkDataFormat(dataDir());
         QVERIFY(s.error.isEmpty());
         QCOMPARE(s.older, (QStringList{kFormatTwo + QStringLiteral(" (Format 2)"),
+                                       kFormatThree + QStringLiteral(" (Format 3)"),
                                        kFormatOne + QStringLiteral(" (Format 1)")}));
         QVERIFY(s.newer.isEmpty());
         QVERIFY(s.unreadable.isEmpty());
@@ -148,7 +151,7 @@ private slots:
     {
         // Was das Programm aus den alten Dateien liest, muss nach dem Umwandeln gleich sein.
         QMap<QString, QByteArray> before;
-        for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree}) {
+        for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree, kFormatFour}) {
             Overlay o;
             QString error;
             QVERIFY2(parseOverlay(readAll(dataDir() + QLatin1Char('/') + f), &o, &error), qPrintable(error));
@@ -159,26 +162,32 @@ private slots:
         QStringList converted;
         QString error;
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 2);
-        for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree}) {
+        QCOMPARE(converted.size(), 3);
+        for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree, kFormatFour}) {
             QCOMPARE(readAll(dataDir() + QLatin1Char('/') + f), before.value(f));
-            QCOMPARE(formatVersion(dataDir() + QLatin1Char('/') + f), 3);
+            QCOMPARE(formatVersion(dataDir() + QLatin1Char('/') + f), 4);
         }
-        // Alles andere unverändert: Format 3, Liste, Token, Medien
+        // Ausgabe (P10): ältere Formate ein, Format 4 wie gespeichert (aus)
+        for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree, kFormatFour}) {
+            const QJsonObject o = QJsonDocument::fromJson(readAll(dataDir() + QLatin1Char('/') + f)).object();
+            QCOMPARE(o.value(QStringLiteral("output")), QJsonValue(f != kFormatFour));
+        }
+        // Alles andere unverändert: Format 4, Liste, Token, Medien
         const QMap<QString, QByteArray> filesAfter = snapshot(dataDir());
         QCOMPARE(filesAfter.keys(), filesBefore.keys());
         for (const QString &f : filesBefore.keys()) {
-            if (f != kFormatOne && f != kFormatTwo)
+            if (f != kFormatOne && f != kFormatTwo && f != kFormatThree)
                 QVERIFY2(filesAfter.value(f) == filesBefore.value(f), qPrintable(f));
         }
         QVERIFY(!checkDataFormat(dataDir()).needsConversion());
 
-        // Das Programm lädt alles ohne Fehler (nur die absichtlich fehlende Schrift als Warnung)
+        // Das Programm lädt alles ohne Fehler (nur die absichtlich fehlende Schrift als Warnung,
+        // je eine in format-drei und format-vier)
         OverlayStore store(dataDir());
         QVERIFY2(store.load(&error, OverlayStore::LoadMode::ReadOnly), qPrintable(error));
-        QCOMPARE(store.overlays().size(), 3);
+        QCOMPARE(store.overlays().size(), 4);
         QVERIFY2(store.loadErrors().isEmpty(), qPrintable(store.loadErrors().join(QLatin1Char('\n'))));
-        QCOMPARE(store.loadWarnings().size(), 1);
+        QCOMPARE(store.loadWarnings().size(), 2);
 
         // Ein zweites Mal: nichts zu tun
         QVERIFY(convertDataFormat(dataDir(), &converted, &error));
@@ -188,14 +197,14 @@ private slots:
 
     void newerFormatChangesNothing()
     {
-        QString path = dataDir() + QLatin1Char('/') + kFormatThree;
+        QString path = dataDir() + QLatin1Char('/') + kFormatFour;
         QByteArray data = readAll(path);
-        data.replace("\"format_version\": 3", "\"format_version\": 4");
+        data.replace("\"format_version\": 4", "\"format_version\": 5");
         QFile f(path);
         QVERIFY(f.open(QIODevice::WriteOnly) && f.write(data) == data.size());
         f.close();
         const DataFormatStatus s = checkDataFormat(dataDir());
-        QCOMPARE(s.newer, QStringList{kFormatThree + QStringLiteral(" (Format 4)")});
+        QCOMPARE(s.newer, QStringList{kFormatFour + QStringLiteral(" (Format 5)")});
         const QMap<QString, QByteArray> before = snapshot(dataDir());
         QStringList converted;
         QString error;
@@ -229,7 +238,7 @@ private slots:
         QStringList converted;
         QString error;
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 2);
+        QCOMPARE(converted.size(), 3);
         QCOMPARE(readAll(broken), QByteArray("{ kaputt"));
     }
 
@@ -246,7 +255,7 @@ private slots:
     {
         QFETCH(int, failAt);
         const QMap<QString, QByteArray> before = contents(dataDir());
-        QCOMPARE(checkDataFormat(dataDir()).older.size(), 2);
+        QCOMPARE(checkDataFormat(dataDir()).older.size(), 3);
         // Erste umzuwandelnde Datei (older ist nach Name sortiert: Format 2 vor Format 1)
         const QString first = dataDir() + QLatin1Char('/') + kFormatTwo;
         const ino_t firstInode = inode(first);
@@ -272,7 +281,7 @@ private slots:
         // Gegenprobe: Beim zweiten Mal (ohne Testfehler) wurde die erste Datei wirklich
         // geschrieben und danach zurückgeschrieben; ohne Testmöglichkeit gelingt das Umwandeln.
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 2);
+        QCOMPARE(converted.size(), 3);
         QVERIFY(contents(dataDir()) != before);
     }
 
@@ -304,20 +313,20 @@ private slots:
         }
         r = runCore(dir + QStringList{QStringLiteral("--umwandeln")});
         QCOMPARE(r.exitCode, 0);
-        QVERIFY2(r.out.contains(QStringLiteral("2 Dateien umgewandelt")), qPrintable(r.out));
+        QVERIFY2(r.out.contains(QStringLiteral("3 Dateien umgewandelt")), qPrintable(r.out));
         r = runCore(dir + QStringList{QStringLiteral("--format-pruefen")});
         QCOMPARE(r.exitCode, 0);
         QVERIFY2(r.out.startsWith(QStringLiteral("Format aktuell")), qPrintable(r.out));
 
-        const QString path = dataDir() + QLatin1Char('/') + kFormatThree;
+        const QString path = dataDir() + QLatin1Char('/') + kFormatFour;
         QByteArray data = readAll(path);
-        data.replace("\"format_version\": 3", "\"format_version\": 9");
+        data.replace("\"format_version\": 4", "\"format_version\": 9");
         QFile f(path);
         QVERIFY(f.open(QIODevice::WriteOnly) && f.write(data) == data.size());
         f.close();
         r = runCore(dir + QStringList{QStringLiteral("--format-pruefen")});
         QCOMPARE(r.exitCode, 5);
-        QVERIFY2(r.err.contains(kFormatThree + QStringLiteral(" (Format 9)")), qPrintable(r.err));
+        QVERIFY2(r.err.contains(kFormatFour + QStringLiteral(" (Format 9)")), qPrintable(r.err));
 
         r = runCore({QStringLiteral("--datenordner"), m_temp->path() + QStringLiteral("/fehlt"),
                      QStringLiteral("--format-pruefen")});

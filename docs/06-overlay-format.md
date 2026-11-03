@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-02 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-03 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -82,12 +82,13 @@ Beispiel: «Überblick Start» oben, darunter der Ordner «Szenen» mit einem Ov
 
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
-| `format_version` | ganze Zahl | `1`, `2` oder `3` | Version des Formats. Geschrieben wird immer `3`. Eine höhere Zahl wird abgewiesen, nicht geraten. Versionen 1 (P04 bis P08) und 2 (P09) werden weiter gelesen, siehe «Versionen». |
+| `format_version` | ganze Zahl | `1` bis `4` | Version des Formats. Geschrieben wird immer `4`. Eine höhere Zahl wird abgewiesen, nicht geraten. Versionen 1 (P04 bis P08), 2 (P09) und 3 (P09b bis P10-vor) werden weiter gelesen, siehe «Versionen». |
 | `id` | Text | UUID, Kleinbuchstaben, ohne Klammern | Kennung, ändert sich nie. Bestimmt den Dateinamen. |
 | `name` | Text | nicht leer (nicht nur Leerzeichen) | frei wählbarer Name |
 | `address` | Text | `a-z`, `0-9`, einzelne `-` dazwischen | Adresse für die Browserquelle, siehe «Adresse» |
 | `width` | ganze Zahl | 1 bis 7680 | Breite der Leinwand in Pixeln |
 | `height` | ganze Zahl | 1 bis 4320 | Höhe der Leinwand in Pixeln |
+| `output` | true/false | | seit Version 4 (P10): Ausgabe ein (E-24). `false` = die Browserquelle zeigt nichts (leer, durchsichtig) und bleibt verbunden; der Editor zeigt und bearbeitet das Overlay weiter. Neue Overlays: `true`; eine Kopie übernimmt den Wert |
 | `sources` | Liste | 0 oder mehr Quellen | Zeichenreihenfolge: das erste Element liegt hinten, das letzte vorne |
 
 ## Quelle
@@ -150,8 +151,9 @@ Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und
 | 1 | P04 | `video.loop` kam in P05 ohne neue Version dazu (auf dem Studio-PC gab es noch keine Overlay-Dateien, geprüft 2026-11-02, Bericht P05) |
 | 2 | P09 | neues Pflichtfeld `video.hold_at_end`. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 1 gibt (geprüft 2026-11-03, Bericht P09) |
 | 3 | P09b | neue Pflichtfelder `flip_horizontal` und `flip_vertical` je Quelle. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 2 gibt (geprüft 2026-11-03, Bericht P09b) |
+| 4 | P10 | neues Pflichtfeld `output` (Ausgabe ein/aus, E-24). Neue Version, weil es im Einsatz eine echte Overlay-Datei gibt (Installation des Nutzers 2026-11-03, P10a); `scripts/installieren.sh` wandelt sie beim nächsten Installieren um (mit Sicherung). Begründung des Orts im Bericht P10 |
 
-Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. Beim nächsten Speichern wird die Datei als Version 3 geschrieben. Seit P10a wandelt `scripts/installieren.sh` beim Installieren alle Dateien in älterem Format um (`dss-core --umwandeln`, nach einer Sicherung des ganzen Datenordners); eine Datei in neuerem Format, als die neue Version lesen kann, bricht die Installation ab (`dss-core --format-pruefen`, Exit-Code 5).
+Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. In Version 1 bis 3 ist `output` ein unbekanntes Feld, die Ausgabe ist dann ein; ab Version 4 ist es Pflicht. Beim nächsten Speichern wird die Datei als Version 4 geschrieben. Seit P10a wandelt `scripts/installieren.sh` beim Installieren alle Dateien in älterem Format um (`dss-core --umwandeln`, nach einer Sicherung des ganzen Datenordners); eine Datei in neuerem Format, als die neue Version lesen kann, bricht die Installation ab (`dss-core --format-pruefen`, Exit-Code 5).
 
 ## Regeln beim Lesen
 
@@ -185,12 +187,13 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
 <!-- beispiel-anfang -->
 ```json
 {
-    "format_version": 3,
+    "format_version": 4,
     "id": "db7f47a9-dee3-4de5-b056-40b5b3507607",
     "name": "Überblick Start",
     "address": "ueberblick-start",
     "width": 1920,
     "height": 1080,
+    "output": true,
     "sources": [
         {
             "id": "e7992e97-e48e-42dc-a15b-0438e7c19f50",

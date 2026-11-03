@@ -163,11 +163,11 @@ private slots:
         QCOMPARE(*reloaded->overlay(second), *store->overlay(second));
         QCOMPARE(reloaded->token(id), store->token(id));
 
-        // Datei heisst overlays/<Kennung>.json und enthält format_version 3 (seit P09b)
+        // Datei heisst overlays/<Kennung>.json und enthält format_version 4 (seit P10)
         const QJsonObject json = QJsonDocument::fromJson(readFile(store->overlayFilePath(id))).object();
         QVERIFY(store->overlayFilePath(id).endsWith(
             QStringLiteral("/overlays/") + id.toString(QUuid::WithoutBraces) + QStringLiteral(".json")));
-        QCOMPARE(json.value(QStringLiteral("format_version")).toInt(), 3);
+        QCOMPARE(json.value(QStringLiteral("format_version")).toInt(), 4);
     }
 
     void addressFromNameTwice()
@@ -372,7 +372,7 @@ private slots:
         const QUuid id = create(store.get(), QStringLiteral("Zukunft"));
         const QUuid other = create(store.get(), QStringLiteral("Heute"));
         QJsonObject json = QJsonDocument::fromJson(readFile(store->overlayFilePath(id))).object();
-        json.insert(QStringLiteral("format_version"), 4);
+        json.insert(QStringLiteral("format_version"), 5);
         const QByteArray content = QJsonDocument(json).toJson();
         QVERIFY(writeFile(store->overlayFilePath(id), content));
 
