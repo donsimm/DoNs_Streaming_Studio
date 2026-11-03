@@ -181,4 +181,4 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 
 ## Wünsche nach P10a (2026-11-03)
 
-- Neues Dock für die Mediendateien (`media/` im Datenordner): zeigt die Dateien mit Dateityp und Grösse; die Dateien lassen sich in Ordner einteilen. Umfang, Priorität und Baustein noch offen (werden einzeln mit dem Nutzer besprochen). Zu beachten: Die Dateien in `media/` heissen nach dem SHA-256 ihres Inhalts (`docs/06-overlay-format.md`), der ursprüngliche Dateiname wird bisher nicht gespeichert.
+- Neues Dock für die Mediendateien (`media/` im Datenordner): zeigt die Dateien mit Dateityp und Grösse; die Dateien lassen sich in Ordner einteilen. Baustein: eigener Baustein P10b direkt nach P10 (Entscheid des Nutzers 2026-11-03). Umfang und Priorität noch offen (werden einzeln mit dem Nutzer besprochen). Zu beachten: Die Dateien in `media/` heissen nach dem SHA-256 ihres Inhalts (`docs/06-overlay-format.md`), der ursprüngliche Dateiname wird bisher nicht gespeichert.

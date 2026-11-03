@@ -26,6 +26,7 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
 | P10 | Browserquelle | Braucht P10a (Einsatz, Video-Drehung). Übernehmen von Dateien im Kern in einem eigenen Thread (Punkt 67). Dazu: Schalter «Ausgabe ein/aus» pro Overlay in der Liste (E-24). Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
+| P10b | Medien | Dock für die Mediendateien (`media/`): Dateityp, Grösse, Einteilung in Ordner (Wunsch des Nutzers 2026-11-03, «Wünsche nach P10a» in `docs/04-offene-punkte.md`). Einzelheiten werden noch mit dem Nutzer besprochen | P10 | (neu, Nummer folgt) |
 | P11 | Bildvergleich der zwei Zeichner | K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen | P10 | (Voraussetzung für K-07) |
 | P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar | P09 | E-20, E-21 |
 
