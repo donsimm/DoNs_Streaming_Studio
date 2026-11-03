@@ -164,3 +164,13 @@ Entschieden (2026-11-02, vom Nutzer bestätigt), umgesetzt mit P08:
 - Rückgängig und Wiederholen: neue Funktion E-22, SOLL, nach den MUSS-Punkten.
 - Be Vietnam Pro liegt als Datei im Repo und ist Standardschrift neuer Textquellen.
 - Schriftauswahl: alle installierten Schriften des Studio-PCs, Be Vietnam Pro und eigene Dateien. Die gewählte Schriftdatei wird wie ein Bild in den Datenordner kopiert. Grund: Die Browserquelle zeichnet auf dem Streaming-PC, wo die Schriften des Studio-PCs fehlen.
+
+## Zeichnen im Editor
+
+Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09:
+
+- Bild und Video füllen die Box der Quelle (Breite × Höhe) und werden dafür gestreckt. Eine neu hinzugefügte Bild- oder Videoquelle bekommt die Originalgrösse der Datei (ersetzt Annahme 2 aus P04 für Bild und Video).
+- Ziehen mit der Maus wie OBS: an einer Ecke bleibt das Seitenverhältnis, mit Umschalttaste frei; an einer Kante nur Breite oder Höhe.
+- Drehen mit der Maus über einen Griff oberhalb der gewählten Quelle wie in OBS; mit Umschalttaste rastet der Winkel in 15°-Schritten ein.
+- Ende eines Videos: ohne Einstellung wird die Quelle leer (durchsichtig). Neues Kästchen «Am Ende anhalten» in den Eigenschaften des Videos: das letzte Bild bleibt stehen. Mit «Wiederholen» beginnt das Video von vorne; «Am Ende anhalten» ist dann ausgegraut. Neues Feld im Modell und in der Overlay-Datei. Gilt gleich für Editor und Browserquelle.
+- Im Editor läuft ein Video ab dem Wählen des Overlays. Wann ein Video in der Browserquelle startet, wird mit P10 entschieden.
