@@ -15,7 +15,7 @@ Auftrag: `prompts/P10a-nacharbeiten-einsatz.md`. Teil A: Nacharbeiten am Editor 
 | `tst_medien` und `tst_fensterbearbeiten` je 50 Mal | je 50 von 50 (`--repeat until-fail:50`, 2026-11-03 17:52 bis 18:16), nach einer Korrektur am Test `tst_fensterbearbeiten` (der erste Lauf scheiterte in Wiederholung 40, siehe «Tests») |
 | Startprüfung `--runs 20` | 20 von 20 in allen vier Fällen (2026-11-03 18:16 bis 18:18) |
 | Dokumente | nachgeführt: `docs/01-festlegungen.md` (Video-Drehung, zweiter Zeichner; Tabelle der Orte je Version, Sicherung, Watchdog), `docs/04-offene-punkte.md` (41, 56, 60, 65, 66 erledigt; neu 67 bis 71), `docs/06-overlay-format.md` (Umwandeln beim Installieren), `docs/07-bauplan.md` (P10a unter «Erledigt»), `docs/08-kern-schnittstelle.md` (Verbindung und Einheit je Version, Watchdog), `README.md` (Abschnitt «Einsatz», Schalter), `CLAUDE.md` (Regel 18) |
-| Handtest | offen, 5 Prüfungen (unten) |
+| Handtest | **bestanden** (2026-11-03, 18:34 bis 18:40), alle 5 Prüfungen; Ergebnis unter «Handtest» |
 
 ## Teil A
 
@@ -233,6 +233,18 @@ cd ~/DoNs_Streaming_Studio && systemctl --user stop dss-core-entwicklung.service
 ```
 
 Erwartet: Es bleiben `dons-streaming-studio` (echte Daten) und `dons-streaming-studio-sicherungen` (Sicherung aus Prüfung 2). Die Einheit `dss-core-entwicklung.service` bleibt für die weitere Arbeit eingerichtet (entfernen ginge mit `scripts/dienst-einrichten.sh --entfernen`).
+
+### Ergebnis des Handtests (2026-11-03)
+
+| Prüfung | Ergebnis |
+|---|---|
+| 1 – Kopfbereich, Knöpfe, Tastenkürzel | bestanden (18:34). Frage des Nutzers: Die sechs Knöpfe zum Ausrichten unten im Dock «Eigenschaften» wirken nicht. Das ist so vorgesehen (Punkt 51, E-10 SOLL, ausgegraut seit P05) |
+| 2 – Erste echte Installation | bestanden (18:36). Ausgabe: Commit `6d83c93` ohne «-geändert», `overlays/6f845017-9f86-4b8b-bc92-7fa1801c3165.json` von Format 2 umgewandelt, Sicherung `~/.local/share/dons-streaming-studio-sicherungen/2026-11-03_18-36-06`, Einheit `dss-core.service`, Menüeintrag, «dss-app 0.1.0 (Einsatz, Commit 6d83c93)», «dss-core 0.1.0 (Einsatz, Commit 6d83c93)» |
+| 3 – Start über das Anwendungsmenü | bestanden (18:38) |
+| 4 – Beide Versionen gleichzeitig | bestanden (18:39) |
+| 5 – Aufräumen der Entwicklungsdaten | bestanden (18:40). In `~/.local/share/` bleiben `dons-streaming-studio` und `dons-streaming-studio-sicherungen` |
+
+Damit ist Punkt 71 erledigt: `dss-core.service` zeigt jetzt auf `~/.local/opt/dons-streaming-studio/bin/dss-core`.
 
 ## Commits
 
