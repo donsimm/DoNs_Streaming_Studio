@@ -31,6 +31,8 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte» |
 | E-22 | Rückgängig und Wiederholen | SOLL | Entscheid des Nutzers 2026-11-02 (vor P08): Änderungen wirken sofort, Rückgängig kommt später |
 | E-23 | Kopfbereich fest über die ganze Fensterbreite, Docks immer darunter | MUSS | Wunsch des Nutzers 2026-11-03 (Handtest P08), Umsetzung P09 |
+| E-25 | Transformieren wie OBS: kopieren, einfügen (auch in ein anderes Overlay), zurücksetzen (Lage 0/0, Originalgrösse, Drehung 0°, nicht gespiegelt; bei Text bleibt die Grösse), 90° im und gegen den Uhrzeigersinn, 180°, waagrecht und senkrecht spiegeln, auf Leinwand einpassen, auf Leinwand strecken, zentrieren, senkrecht und waagrecht zentrieren. Per Rechtsklick auf die Quelle (Leinwand und Dock «Quellen») und im Menü «Bearbeiten». Zuschneiden nicht enthalten | MUSS | Wunsch des Nutzers 2026-11-03, nach Menü «Transform» von OBS (`frontend/data/locale/en-US.ini`) |
+| E-26 | Dock «Eigenschaften» in Bereiche geteilt: oben Name; Bereich «Transformation» (X, Y, Breite, Höhe, Drehung, Spiegeln); Bereich nach Art («Text», «Video», «Bild») mit den übrigen Eigenschaften. Kleine Titel, feine Trennlinien wie im Kopfbereich | MUSS | Wunsch des Nutzers 2026-11-03 |
 | E-24 | Schalter pro Overlay «Ausgabe ein/aus» links neben dem Eintrag in der Liste; aus = Browserquelle zeigt nichts (leer, durchsichtig), Editor bleibt bearbeitbar | MUSS | Wunsch des Nutzers 2026-11-03, Umsetzung P10 |
 
 ### Quelle Text (E-03)

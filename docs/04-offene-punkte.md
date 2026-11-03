@@ -133,3 +133,10 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Einrasten beim Drehen mit Umschalttaste in 1°-Schritten statt 15° (entschieden, siehe `docs/01-festlegungen.md`). Umsetzung mit dem nächsten Baustein.
 - Leistungsanzeige (CPU, RAM, LAN) im Kopfbereich: entschieden, feste Breite 600 Pixel für alle drei zusammen (200 je Anzeige), rechts im Kopfbereich. Wäre das mehr als ein Drittel der Fensterbreite, wird sie auf ein Drittel verkleinert. Der Platz zwischen Verbindungsknöpfen und Anzeige bleibt leer. Umsetzung mit dem nächsten Baustein.
 - Symbole fehlten im Handtest-Fenster, weil `handtest.sh` ein eigenes `XDG_CONFIG_HOME` nutzt; kein Fehler der Software. Im normalen Fenster geprüft, in Ordnung (2026-11-03).
+
+## Entschieden nach P09 (2026-11-03)
+
+- Punkt 52: Text über die Box hinaus wird am Rand der Box abgeschnitten (bestätigt). Gilt auch für die Browserquelle (P10).
+- Punkt 53: Ein Video beginnt beim Einblenden von vorne; ausgeblendet wird es nicht abgespielt (bestätigt). Gilt auch für die Browserquelle (P10).
+- Punkt 55: a) Drehen ohne Umschalttaste rastet nicht ein (so lassen). b) Seitenverhältnis an der Ecke nach der Originalgrösse der Datei, wie OBS (bei Text: nach der Box). c) Ziehen über die Gegenseite hinaus spiegelt die Quelle, wie OBS. Folge von c: neue Felder «waagrecht gespiegelt» und «senkrecht gespiegelt» in Modell, Datei und Schnittstelle; beide Zeichner müssen spiegeln. Umsetzung mit dem nächsten Baustein.
+- Spiegeln zusätzlich per Befehl (Rechtsklick), Teil von E-25. Neue Funktionen E-25 (Transformieren wie OBS) und E-26 (Dock «Eigenschaften» in Bereiche geteilt), beide MUSS, mit dem nächsten Baustein. Zuschneiden: später als eigener Punkt besprechen.
