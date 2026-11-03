@@ -52,6 +52,18 @@ Liste und Einrichtung: `scripts/pakete.txt`, `scripts/einrichten.sh`. Gemessen a
 
 Ebenfalls vorhanden, aber nicht in der Liste: `qt6-base-dev-tools` 6.8.2+dfsg-9+deb13u2 und `libqt6test6` 6.8.2+dfsg-9+deb13u2 (Abhängigkeiten von `qt6-base-dev`), `pkgconf` 1.8.1-4, `x11-utils` 7.7+7 (`xwininfo`, genutzt von der Startprüfung). Nicht weiterverfolgt, aber weiterhin installiert: `qt6-webengine-dev`, `qt6-multimedia-dev`, PyQt6. Nicht installiert: `xdotool`, `wmctrl`, `shellcheck`.
 
+## Netzwerk
+
+Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf dem Studio-PC, 19:55):
+
+| Angabe | Studio-PC |
+|---|---|
+| Netzwerkkarte | `enp3s0` (Kabel), `UP` |
+| Adresse IPv4 | `192.168.1.9/24`, vom Router per DHCP, am Router fest reserviert (Angabe des Nutzers) |
+| Router (Standardroute) | `192.168.1.1` über `enp3s0` |
+| IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten). Ob der Router eingehende IPv6-Verbindungen sperrt: nicht geprüft |
+| USB-Tethering | nicht mehr vorhanden |
+
 ## Streaming-PC (nicht Teil der Entwicklung)
 
 Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, ASUS ROG Maximus Z790 Dark Hero, Nobara. Dort läuft das Haupt-OBS, das meist Browserquellen nutzt.
