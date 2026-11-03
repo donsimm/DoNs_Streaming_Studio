@@ -529,7 +529,8 @@ void MainWindow::createTransformMenu(QMenu *edit)
 {
     // Reihenfolge und Trennlinien wie das Menü «Transformieren» in OBS (frontend/forms/OBSBasic.ui,
     // Zeilen 774-795, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524); Texte nach de-DE.ini
-    // (Zeilen 652-666) mit «waagrecht/senkrecht» und «Leinwand» statt «Bildschirm».
+    // (Zeilen 652-666), aber mit den Worten des Auftrags P09b (Entscheid 5): «waagrecht/senkrecht»,
+    // «Auf Leinwand einpassen», «Zentrieren».
     // «Transformation bearbeiten …» (Dialog) gibt es nicht, die Werte stehen im Dock
     // «Eigenschaften».
     m_transformMenu = edit->addMenu(QStringLiteral("&Transformieren"));
@@ -548,16 +549,16 @@ void MainWindow::createTransformMenu(QMenu *edit)
         const char *name;
         bool separatorBefore;
     } entries[] = {
-        {C::Reset, "Transformation &zurücksetzen", "transformReset", false},
+        {C::Reset, "Transformation zu&rücksetzen", "transformReset", false},
         {C::Rotate90Clockwise, "90° im &Uhrzeigersinn drehen", "transformRotate90Clockwise", true},
         {C::Rotate90CounterClockwise, "90° &gegen den Uhrzeigersinn drehen",
          "transformRotate90CounterClockwise", false},
         {C::Rotate180, "180° &drehen", "transformRotate180", false},
         {C::FlipHorizontal, "&Waagrecht spiegeln", "transformFlipHorizontal", true},
         {C::FlipVertical, "&Senkrecht spiegeln", "transformFlipVertical", false},
-        {C::FitToCanvas, "An Leinwand &anpassen", "transformFit", true},
+        {C::FitToCanvas, "Auf Leinwand ein&passen", "transformFit", true},
         {C::StretchToCanvas, "Auf Leinwand s&trecken", "transformStretch", false},
-        {C::CenterOnCanvas, "Auf Leinwand &zentrieren", "transformCenter", false},
+        {C::CenterOnCanvas, "&Zentrieren", "transformCenter", false},
         {C::CenterVertically, "Senkrecht zentrieren", "transformCenterVertically", false},
         {C::CenterHorizontally, "Waagrecht zentrieren", "transformCenterHorizontally", false},
     };

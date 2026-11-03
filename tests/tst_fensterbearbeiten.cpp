@@ -870,8 +870,8 @@ private slots:
             QStringLiteral("Transformation zurücksetzen"), QStringLiteral("-"),
             QStringLiteral("90° im Uhrzeigersinn drehen"), QStringLiteral("90° gegen den Uhrzeigersinn drehen"),
             QStringLiteral("180° drehen"), QStringLiteral("-"), QStringLiteral("Waagrecht spiegeln"),
-            QStringLiteral("Senkrecht spiegeln"), QStringLiteral("-"), QStringLiteral("An Leinwand anpassen"),
-            QStringLiteral("Auf Leinwand strecken"), QStringLiteral("Auf Leinwand zentrieren"),
+            QStringLiteral("Senkrecht spiegeln"), QStringLiteral("-"), QStringLiteral("Auf Leinwand einpassen"),
+            QStringLiteral("Auf Leinwand strecken"), QStringLiteral("Zentrieren"),
             QStringLiteral("Senkrecht zentrieren"), QStringLiteral("Waagrecht zentrieren")}));
         const auto action = [this](const char *name) {
             QAction *a = m_window->findChild<QAction *>(QString::fromLatin1(name));
