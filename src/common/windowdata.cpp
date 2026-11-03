@@ -112,4 +112,34 @@ QString importStatusText(const QStringList &fileNames)
         .arg(fileNames.size()).arg(quoted.join(QStringLiteral(", ")));
 }
 
+std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, int port,
+                                                     const QString &addressText)
+{
+    SettingsUpdate update;
+    const QString address = addressText.trimmed();
+    if (port != current.port)
+        update.port = port;
+    if (address != current.homeAddress)
+        update.homeAddress = address;
+    if (!update.port && !update.homeAddress)
+        return std::nullopt;
+    return update;
+}
+
+QString settingsDialogHint()
+{
+    return QStringLiteral("Port und Adresse gelten erst mit der Browserquelle (P10). Leere Adresse: "
+                          "Der Kern trägt beim nächsten Start die Adresse der Netzwerkkarte mit der "
+                          "Standardroute ein.");
+}
+
+QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info)
+{
+    if (!connected)
+        return QStringLiteral("Keine Verbindung zum Kern, Einstellungen nicht verfügbar.");
+    if (info && !info->error.isEmpty())
+        return info->error;
+    return {};
+}
+
 } // namespace dss

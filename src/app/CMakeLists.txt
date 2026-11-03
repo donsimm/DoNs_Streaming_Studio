@@ -44,6 +44,13 @@ target_compile_definitions(dss_app_ui PUBLIC DSS_APP_EDITING=$<BOOL:${DSS_APP_ED
 # Dock «Quellen». Aus: Menü «Bearbeiten» leer und ausgegraut, kein Rechtsklick auf der Leinwand.
 option(DSS_APP_TRANSFORM "Befehle Transformieren im Fenster (P09b)" ON)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_TRANSFORM=$<BOOL:${DSS_APP_TRANSFORM}>)
+# Dialog «Werkzeuge → Einstellungen …» (P10-vor, Teil B 1): Port und Adresse des Kerns. Aus:
+# Menü «Werkzeuge» leer und ausgegraut wie bis P10a; dss-cli kann die Werte weiter ändern.
+option(DSS_APP_SETTINGS_DIALOG "Dialog Einstellungen des Kerns (P10-vor)" ON)
+target_compile_definitions(dss_app_ui PUBLIC DSS_APP_SETTINGS_DIALOG=$<BOOL:${DSS_APP_SETTINGS_DIALOG}>)
+if(DSS_APP_SETTINGS_DIALOG)
+  target_sources(dss_app_ui PRIVATE settingsdialog.h settingsdialog.cpp)
+endif()
 
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
 if(DSS_APP_RENDERER)

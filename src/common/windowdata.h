@@ -1,6 +1,7 @@
 #pragma once
 
 #include "overlay.h"
+#include "protocol.h"
 #include "systemstats.h"
 
 #include <QList>
@@ -67,5 +68,15 @@ QString coreStatusText(bool connected); // «Kern-Dienst: verbunden» / «… ni
 // P10-vor (Punkt 67): Hinweis, solange der Kern Dateien übernimmt: leer, «Übernehme «a.png» …»,
 // «Übernehme 2 Dateien («a.png», «b.mp4») …».
 QString importStatusText(const QStringList &fileNames);
+
+// P10-vor, Teil B 1: Dialog «Werkzeuge → Einstellungen …». Nur die Werte, die sich gegenüber dem
+// Stand des Kerns geändert haben (Adresse ohne Leerzeichen am Rand); std::nullopt, wenn nichts
+// geändert ist. Geprüft wird im Kern, der Dialog zeigt dessen Meldung.
+std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, int port,
+                                                     const QString &addressText);
+// Hinweis im Dialog: Die Werte wirken erst mit der Browserquelle (P10).
+QString settingsDialogHint();
+// Meldung im Dialog: Datei ungültig (settings_error) bzw. ohne Verbindung; sonst leer.
+QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info);
 
 } // namespace dss

@@ -100,6 +100,21 @@ void CoreClient::requestFonts()
         send(simpleMessage(msg::kGetFonts));
 }
 
+void CoreClient::requestSettings()
+{
+    if (m_connected)
+        send(simpleMessage(msg::kGetSettings));
+}
+
+qint64 CoreClient::sendSettingsUpdate(SettingsUpdate update)
+{
+    if (!m_connected)
+        return 0;
+    update.requestId = m_nextRequestId++;
+    send(settingsUpdateMessage(update));
+    return update.requestId;
+}
+
 qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
 {
     if (!m_connected)
@@ -382,6 +397,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         m_fonts = faces;
         m_fontError = fontError;
         emit fontsChanged();
+    } else if (type == QLatin1String(msg::kSettings)) {
+        SettingsInfo info;
+        if (!parseSettings(message, &info, &error)) {
+            qWarning("Kern: settings ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_settings = info;
+        emit settingsChanged();
     } else if (type == QLatin1String(msg::kChangeResult)) {
         ChangeResult result;
         if (!parseChangeResult(message, &result, &error)) {
@@ -450,6 +473,10 @@ void CoreClient::clearData()
     if (hadImports)
         emit pendingImportsChanged();
     m_lastStats.reset();
+    const bool hadSettings = m_settings.has_value();
+    m_settings.reset();
+    if (hadSettings)
+        emit settingsChanged();
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);
     emit overlayListChanged();

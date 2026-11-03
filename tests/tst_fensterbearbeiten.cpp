@@ -11,6 +11,7 @@
 
 #include "canvaswidget.h"
 #include "coreclient.h"
+#include "coresettings.h"
 #include "dockviews.h"
 #include "fontcatalog.h"
 #include "headerbar.h"
@@ -1147,6 +1148,71 @@ private slots:
         QCOMPARE(geometryOf(*findSource(checked(m_scene), image.id)),
                  (SourceGeometry{100, 100, 400, 200, 0, false, false}));
     }
+
+#if DSS_APP_SETTINGS_DIALOG
+    // P10-vor, Teil B 1: Werkzeuge → Einstellungen … liest die Werte vom Kern, schickt Änderungen
+    // als Nachricht und zeigt die Meldung des Kerns.
+    void settingsDialog()
+    {
+        auto *action = child<QAction>("settingsAction");
+        QVERIFY(action);
+        QVERIFY(action->isEnabled());
+        QMenu *tools = nullptr;
+        for (QMenu *m : m_window->findChildren<QMenu *>())
+            if (m->title() == QStringLiteral("&Werkzeuge"))
+                tools = m;
+        QVERIFY(tools && tools->isEnabled() && tools->actions().contains(action));
+        QCOMPARE(action->text(), QStringLiteral("&Einstellungen …"));
+
+        action->trigger();
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
+                                     && dialog->isVisible(), 3000);
+        auto *port = dialog->findChild<QSpinBox *>(QStringLiteral("settingsPort"));
+        auto *address = dialog->findChild<QLineEdit *>(QStringLiteral("settingsAddress"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("settingsProblem"));
+        auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("settingsOk"));
+        auto *hint = dialog->findChild<QLabel *>(QStringLiteral("settingsHint"));
+        QVERIFY(port && address && problem && ok && hint);
+        QVERIFY(hint->text().contains(QStringLiteral("erst mit der Browserquelle (P10)")));
+        // Werte des Kerns: Standard der Version und die erkannte Adresse
+        QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 3000);
+        QCOMPARE(port->value(), defaultCoreSettings().port);
+        QCOMPARE(address->text(), detectHomeAddress());
+        QCOMPARE(port->minimum(), 1024);
+        QCOMPARE(port->maximum(), 32767);
+
+        // Ungültige Adresse: Meldung des Kerns im Dialog, Dialog bleibt offen, nichts geändert
+        const int problemHeight = problem->height();
+        address->setText(QStringLiteral("192.168.1"));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("Adresse «192.168.1» ungültig")), 3000);
+        QVERIFY(dialog->isVisible());
+        QCOMPARE(problem->height(), problemHeight); // Meldung ändert das Layout nicht
+        QVERIFY(ok->isEnabled());
+
+        // Gültig: Kern schreibt, alle Verbindungen bekommen die neuen Werte, Dialog schliesst
+        port->setValue(9000);
+        address->setText(QStringLiteral("10.0.0.2"));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->settings()
+                                     && m_check->settings()->settings
+                                            == (CoreSettings{9000, QStringLiteral("10.0.0.2")}),
+                                 3000);
+        QVERIFY(m_client->settings()->file.endsWith(QStringLiteral("/kern.ini")));
+
+        // Wieder öffnen zeigt den neuen Stand; Abbrechen ändert nichts
+        action->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && port->value() == 9000, 3000);
+        QVERIFY(problem->text().isEmpty());
+        port->setValue(9100);
+        clickButton(dialog, QStringLiteral("Abbrechen"));
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTest::qWait(300);
+        QCOMPARE(m_check->settings()->settings.port, 9000);
+    }
+#endif
 };
 
 int main(int argc, char *argv[])

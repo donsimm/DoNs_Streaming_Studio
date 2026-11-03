@@ -16,6 +16,7 @@
 
 class CanvasWidget;
 class HeaderBar;
+class SettingsDialog;
 class SourceRenderer;
 class QAction;
 class QLabel;
@@ -82,6 +83,7 @@ private:
     void restoreLayout();
     void saveLayout();
     void showAbout();
+    void showSettings(); // P10-vor: Werkzeuge → Einstellungen …
     void connectCore();
     void onCoreConnectedChanged(bool connected);
     void onStats(const dss::SystemStats &stats);
@@ -155,6 +157,8 @@ private:
     QAction *m_resetTransform = nullptr;   // P10a: auch Knopf im Bereich «Transformation»
     QList<QAction *> m_transformActions;   // alle Befehle ausser Kopieren und Einfügen
     QMenuBar *m_menuBar = nullptr;
+    QAction *m_settingsAction = nullptr;       // P10-vor, nur mit DSS_APP_SETTINGS_DIALOG
+    SettingsDialog *m_settingsDialog = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     CanvasWidget *m_canvas = nullptr;

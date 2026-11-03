@@ -71,6 +71,14 @@ public:
     std::optional<SystemStats> lastStats() const { return m_lastStats; }
     ConnectionStates connectionStates() const { return m_connectionStates; }
 
+    // Einstellungen des Kerns (P10-vor), wenn er sie geschickt hat (Antwort auf requestSettings
+    // oder nach einer Änderung); ohne Verbindung leer.
+    std::optional<SettingsInfo> settings() const { return m_settings; }
+    void requestSettings();
+    // Schickt update_settings; requestId wird hier vergeben. Antwort über changeFinished, neue
+    // Werte über settingsChanged. Rückgabe: request_id, 0 ohne Verbindung.
+    qint64 sendSettingsUpdate(SettingsUpdate update);
+
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
@@ -111,6 +119,8 @@ signals:
     void changeFinished(const dss::ChangeResult &result);
     // pendingImports() hat sich geändert.
     void pendingImportsChanged();
+    // settings() hat sich geändert (P10-vor).
+    void settingsChanged();
 
 private:
     void tryConnect();
@@ -149,6 +159,7 @@ private:
     QHash<QString, ChangeRequest> m_heldChanges; // zurückgehalten je Schlüssel
     QMap<qint64, QString> m_importNames;       // unterwegs mit Datei: request_id → Dateiname
     std::optional<SystemStats> m_lastStats;
+    std::optional<SettingsInfo> m_settings;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
 };

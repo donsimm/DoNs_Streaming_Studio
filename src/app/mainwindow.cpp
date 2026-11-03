@@ -7,6 +7,9 @@
 #include "docks.h"
 #include "headerbar.h"
 #include "symbols.h"
+#if DSS_APP_SETTINGS_DIALOG
+#include "settingsdialog.h"
+#endif
 #if DSS_APP_RENDERER
 #include "sourcerenderer.h"
 #endif
@@ -107,7 +110,15 @@ void MainWindow::createMenus()
 #endif
     bar->addMenu(QStringLiteral("&Ansicht"))->setEnabled(false);
     m_docksMenu = bar->addMenu(QStringLiteral("D&ocks"));
-    bar->addMenu(QStringLiteral("&Werkzeuge"))->setEnabled(false);
+    QMenu *tools = bar->addMenu(QStringLiteral("&Werkzeuge"));
+#if DSS_APP_SETTINGS_DIALOG
+    // Einstellungen des Kerns (P10-vor, Teil B 1); nur mit Verbindung zum Kern.
+    m_settingsAction = tools->addAction(QStringLiteral("&Einstellungen …"), this, &MainWindow::showSettings);
+    m_settingsAction->setObjectName(QStringLiteral("settingsAction"));
+    m_settingsAction->setEnabled(false);
+#else
+    tools->setEnabled(false);
+#endif
 
     QMenu *help = bar->addMenu(QStringLiteral("&Hilfe"));
     help->addAction(QStringLiteral("Ü&ber …"), this, &MainWindow::showAbout);
@@ -290,8 +301,21 @@ void MainWindow::showStatus(const QString &text)
     statusBar()->showMessage(text, 10000);
 }
 
+void MainWindow::showSettings()
+{
+#if DSS_APP_SETTINGS_DIALOG
+    if (!m_client)
+        return;
+    if (!m_settingsDialog)
+        m_settingsDialog = new SettingsDialog(m_client, this);
+    m_settingsDialog->showFromCore();
+#endif
+}
+
 void MainWindow::onCoreConnectedChanged(bool connected)
 {
+    if (m_settingsAction)
+        m_settingsAction->setEnabled(connected);
     m_coreStatus->setText(dss::coreStatusText(connected));
     m_coreStatus->setProperty("state", connected ? QStringLiteral("connected")
                                                  : QStringLiteral("disconnected"));

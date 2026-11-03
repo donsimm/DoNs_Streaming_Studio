@@ -79,6 +79,26 @@ private slots:
         QCOMPARE(importStatusText({QStringLiteral("a.png"), QStringLiteral("b.mp4")}),
                  QStringLiteral("Übernehme 2 Dateien («a.png», «b.mp4») …"));
     }
+
+    void settingsForm()
+    {
+        const CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        QVERIFY(!settingsUpdateFromForm(current, 8081, QStringLiteral(" 192.168.1.9 ")));
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, 8090, QStringLiteral("192.168.1.9"));
+        QVERIFY(u);
+        QCOMPARE(u->port, std::optional<int>(8090));
+        QVERIFY(!u->homeAddress);
+        u = settingsUpdateFromForm(current, 8081, QString());
+        QVERIFY(u && !u->port);
+        QCOMPARE(u->homeAddress, std::optional<QString>(QString()));
+        u = settingsUpdateFromForm(current, 80, QStringLiteral("abc"));
+        QVERIFY(u && u->port == 80 && u->homeAddress == QStringLiteral("abc")); // prüft der Kern
+        QVERIFY(settingsDialogHint().contains(QStringLiteral("Browserquelle (P10)")));
+        QVERIFY(!settingsDialogProblem(false, std::nullopt).isEmpty());
+        QVERIFY(settingsDialogProblem(true, std::nullopt).isEmpty());
+        SettingsInfo info{current, 1024, 32767, QStringLiteral("/x/kern.ini"), QStringLiteral("kaputt")};
+        QCOMPARE(settingsDialogProblem(true, info), QStringLiteral("kaputt"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestWindowData)

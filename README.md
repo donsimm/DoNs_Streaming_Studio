@@ -70,6 +70,7 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_APP_RENDERER` | `ON` | Leinwand zeichnet die Quellen (P09); aus: leere Leinwand wie in P08 |
 | `DSS_APP_CANVAS_EDIT` | `ON` | Quellen auf der Leinwand mit Maus und Pfeiltasten bearbeiten (P09); aus: Leinwand zeigt nur an |
 | `DSS_APP_TRANSFORM` | `ON` | Befehle «Transformieren» im Menü «Bearbeiten» und per Rechtsklick (P09b); aus: kein Menü «Transformieren» |
+| `DSS_APP_SETTINGS_DIALOG` | `ON` | Dialog «Werkzeuge → Einstellungen …» für Port und Adresse des Kerns (P10-vor); aus: Menü «Werkzeuge» ausgegraut, Einstellungen nur mit `dss-cli` |
 | `DSS_VIDEO_ROTATION` | `ON` | Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner (P10a); aus: Videos wie gespeichert |
 | `DSS_CORE_IMPORT_THREAD` | `ON` | Kern übernimmt neue Dateien (SHA-256, Kopie) in eigenen Threads und antwortet dabei weiter (P10-vor); aus: in der Hauptschleife wie in P10a |
 | `DSS_CORE_WATCHDOG` | `ON` | Kern meldet sich beim Watchdog von systemd (P10a); aus: ohne Meldung, dann `scripts/dienst-einrichten.sh --watchdog 0` |
