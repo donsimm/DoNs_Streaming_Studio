@@ -205,8 +205,9 @@ SourceGeometry rotateGeometry(const Source &start, QPointF pointer, bool snap)
         return g;
     double degrees = std::atan2(pointer.y() - c.y(), pointer.x() - c.x()) * 180.0 / std::numbers::pi
                      + 90.0;
+    // Mit Shift auf ganze Grad (Entscheid 1 in P09b; OBS rastet auf 15° ein), ohne Shift Zehntelgrad.
     if (snap)
-        degrees = std::round(degrees / 15.0) * 15.0;
+        degrees = std::round(degrees / kRotateSnapDegrees) * kRotateSnapDegrees;
     g.rotation = normalizedTenths(degrees);
     return g;
 }

@@ -214,14 +214,18 @@ private slots:
         QCOMPARE(rotateGeometry(s, QPointF(-100, 50), false).rotation, 2700); // links
         // Zehntelgrad: atan(10/100) = 5.71° → 57
         QCOMPARE(rotateGeometry(s, QPointF(60, -50), false).rotation, 57);
-        // Shift: auf 15° einrasten
-        QCOMPARE(rotateGeometry(s, QPointF(60, -50), true).rotation, 0);
+        // Shift: auf ganze Grad einrasten (P09b, vorher 15°)
+        QCOMPARE(rotateGeometry(s, QPointF(60, -50), true).rotation, 60); // 5.71° → 6°
         QCOMPARE(rotateGeometry(s, QPointF(50 + 100 * std::sin(0.40), 50 - 100 * std::cos(0.40)), true).rotation,
-                 300); // 22.9° → 30°
+                 230); // 22.92° → 23°
         QCOMPARE(rotateGeometry(s, QPointF(50 - 100 * std::sin(0.1), 50 - 100 * std::cos(0.1)), true).rotation,
-                 0); // -5.7° → 0
+                 3540); // -5.73° → -6° = 354°
         QCOMPARE(rotateGeometry(s, QPointF(50 - 100 * std::sin(0.2), 50 - 100 * std::cos(0.2)), true).rotation,
-                 3450); // -11.5° → -15° = 345°
+                 3490); // -11.46° → -11° = 349°
+        QCOMPARE(rotateGeometry(s, QPointF(200, 50.5), true).rotation, 900); // 90.29° → 90°
+        // Ohne Shift kein Einrasten: Zehntelgrad bleiben
+        QCOMPARE(rotateGeometry(s, QPointF(50 + 100 * std::sin(0.40), 50 - 100 * std::cos(0.40)), false).rotation,
+                 229); // 22.92° → 22.9°
         // Lage und Grösse bleiben, Zeiger in der Mitte ändert nichts
         QCOMPARE(rotateGeometry(s, QPointF(200, 50), false), geo(0, 0, 100, 100, 900));
         QCOMPARE(rotateGeometry(box(0, 0, 100, 100, 450), QPointF(50, 50), false).rotation, 450);

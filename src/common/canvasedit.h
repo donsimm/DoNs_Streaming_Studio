@@ -24,6 +24,7 @@
 //   - Ecken: Seitenverhältnis bleibt, mit Shift frei; ClampAspect (Zeile 1362): Ist das neue
 //     Verhältnis kleiner als das alte, folgt die Breite der Höhe, sonst die Höhe der Breite
 //   - Drehen (RotateItem, Zeile 1668): Winkel = atan2 zur Mitte + 90°; Shift rastet auf 15° ein
+//     (hier auf 1°, Entscheid des Nutzers im Handtest P09, umgesetzt in P09b)
 //   - Zeiger (UpdateCursor, Zeile 688): Drehgriff OpenHandCursor, beim Drehen ClosedHandCursor,
 //     Verschieben SizeAllCursor, Griffe Size*Cursor nach Achtel der Drehung
 // Abweichungen von OBS (P09-Bericht): Kanten ändern nur Breite oder Höhe (Entscheid 7; OBS hält
@@ -97,7 +98,9 @@ SourceGeometry resizeGeometry(const Source &start, CanvasHandle handle, QPointF 
                               bool freeAspect);
 
 // Drehen am Drehgriff: Winkel des Zeigers um die Mitte, 0° = Zeiger über der Mitte, positiv im
-// Uhrzeigersinn; snap (Shift) = auf 15° einrasten. Ergebnis in Zehntelgrad 0 bis 3599.
+// Uhrzeigersinn; snap (Shift) = auf ganze Grad einrasten (P09b), sonst Zehntelgrad.
+// Ergebnis in Zehntelgrad 0 bis 3599.
+inline constexpr double kRotateSnapDegrees = 1.0;
 SourceGeometry rotateGeometry(const Source &start, QPointF pointer, bool snap);
 
 // Pfeiltasten: 1 Pixel, mit Shift 10 Pixel (OBS: frontend/OBSBasic.cpp Zeilen 390-406,

@@ -647,12 +647,13 @@ private slots:
         QVERIFY(std::abs(sourceAtRow(2).width - 500) <= 3);
         QCOMPARE(sourceAtRow(2).height, 200);
         QCOMPARE(sourceAtRow(2).y, 100);
-        // Drehen am Drehgriff mit Shift: Zeiger rechts der Mitte → 90°
+        // Drehen am Drehgriff mit Shift: Zeiger rechts der Mitte, knapp unter ihr (90.2°) → auf
+        // ganze Grad eingerastet 90° (P09b)
         place(image, 100, 100, 400, 200);
         QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).width, 400, 3000);
         {
             const QPointF handle = canvas->toWidget(QPointF(300, 100)) - QPointF(0, 30);
-            drag(canvas, handle, at(600, 190), Qt::ShiftModifier);
+            drag(canvas, handle, at(600, 201), Qt::ShiftModifier);
             QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(2).rotation, 900, 3000);
             QCOMPARE(sourceAtRow(2).x, 100);
             QCOMPARE(child<QDoubleSpinBox>("propertyRotation")->value(), 90.0);
@@ -663,7 +664,7 @@ private slots:
             drag(canvas, handle, at(450, 250));
             QTRY_VERIFY_WITH_TIMEOUT(sourceAtRow(2).rotation != 900, 3000);
             const int r = sourceAtRow(2).rotation;
-            QVERIFY2(r > 900 && r < 1800 && r % 150 != 0, qPrintable(QString::number(r)));
+            QVERIFY2(r > 900 && r < 1800 && r % 10 != 0, qPrintable(QString::number(r)));
         }
         // Pfeiltasten: 1 Pixel, mit Shift 10
         place(image, 100, 100, 400, 200);
