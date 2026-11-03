@@ -180,3 +180,13 @@ Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09b:
 - **Spiegeln:** Jede Quelle kann waagrecht und senkrecht gespiegelt sein (Felder `flip_horizontal`, `flip_vertical`, Format 3, `docs/06-overlay-format.md`). Der Inhalt wird in seinem Kasten um dessen Mitte gespiegelt, vor der Drehung; Breite und Höhe bleiben positiv.
 - **EXIF-Ausrichtung:** Bilder werden so gezeigt, wie ihre EXIF-Ausrichtung es verlangt (wie der Browser mit `image-orientation: from-image`); die Originalgrösse ist die angezeigte Grösse.
 - **Zweiter Zeichner (P10, K-07):** Die Browserquelle muss Spiegeln und EXIF-Ausrichtung genauso umsetzen wie der Editor: Reihenfolge Ausrichtung des Bildes → Strecken in den Kasten → Spiegeln um die Mitte → Drehung um die Mitte (CSS etwa `transform: rotate(<Winkel>) scale(-1, 1)`), EXIF bei JPEG und bei PNG (`eXIf` vor `IDAT`). Ob die Chromium-Version der Browserquelle in OBS die EXIF-Ausrichtung von PNG beachtet, ist nicht geprüft (Chromium unterstützt sie seit dem Commit 694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6 vom 2024-02-05, https://chromium.googlesource.com/chromium/src/+/694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6); das klärt der Bildvergleich (K-08) bzw. T-04.
+
+## Einsatz (Version im Stream)
+
+Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P10a:
+
+- Getrennt werden die Version **in Arbeit** (Repo, von Claude Code geändert) und die Version **im Einsatz** (installiert, läuft im Stream).
+- Eine neue Version kommt nur durch den Nutzer in den Einsatz, mit einem Befehl nach der Abnahme (`scripts/installieren.sh`). Claude Code installiert nie selbst.
+- Installationsort: `~/.local/opt/dons-streaming-studio/` im Benutzerordner, ohne `sudo`. Bau dafür im Release-Modus.
+- Daten getrennt: Die installierte Version nutzt die echten Daten (`~/.local/share/dons-streaming-studio`). Die Version aus dem Repo nutzt einen eigenen Entwicklungsordner mit eigenem Kern, eigener Verbindung und eigenen Fenster-Einstellungen; beide können gleichzeitig laufen. Beim Installieren werden die echten Dateien bei Bedarf in ein neues Format umgewandelt, vorher mit Sicherungskopie.
+- Start der installierten Version über einen Eintrag «DoNs Streaming Studio» im Anwendungsmenü von Xfce, mit dem eigenen Programm-Symbol des Nutzers (Fernseher, aus dem alten Repo `donstv_Studio`, `assets/branding/`, eigenes Werk des Nutzers). Dasselbe Symbol im Fenster und in der Taskleiste.
