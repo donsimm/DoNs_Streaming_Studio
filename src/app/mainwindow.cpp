@@ -68,6 +68,14 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
     createCentralArea();
     createDocks();
     createStatusBar();
+    if (m_transformMenu) {
+        connectTransformShortcuts();
+    } else {
+        // Ohne DSS_APP_TRANSFORM keine Knöpfe im Bereich «Transformation»
+        for (QToolButton *b : {m_propertiesDock.copyTransform, m_propertiesDock.pasteTransform,
+                               m_propertiesDock.resetTransform})
+            b->hide();
+    }
     if (!editingAllowed()) {
         // Nur Anzeige: nichts ziehen (Schalter DSS_APP_EDITING oder ohne Kern).
         m_overlaysDock.tree->setDragDropMode(QAbstractItemView::NoDragDrop);
@@ -625,6 +633,9 @@ void MainWindow::refreshActions()
             a->setEnabled(edit && source);
         m_copyTransform->setEnabled(source != nullptr);
         m_pasteTransform->setEnabled(edit && source && m_copiedTransform);
+        d.copyTransform->setEnabled(m_copyTransform->isEnabled());
+        d.pasteTransform->setEnabled(m_pasteTransform->isEnabled());
+        d.resetTransform->setEnabled(m_resetTransform->isEnabled());
     }
     // «Am Ende anhalten» ist mit «Wiederholen» ausgegraut (Entscheid 9).
     d.holdAtEnd->setEnabled(edit && source && !source->loop);

@@ -116,7 +116,8 @@ private slots:
     void connectionSymbolsUsePaletteColors_data()
     {
         QTest::addColumn<QString>("file");
-        for (const char *f : {"twitch.svg", "youtube.svg", "obs.svg", "ndi.svg", "hinzufuegen.svg"})
+        for (const char *f : {"twitch.svg", "youtube.svg", "obs.svg", "ndi.svg", "hinzufuegen.svg",
+                              "kopieren.svg", "einfuegen.svg", "zuruecksetzen.svg"})
             QTest::newRow(f) << QString::fromLatin1(f);
     }
 

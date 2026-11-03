@@ -60,6 +60,10 @@ struct PropertiesDock
     QDoubleSpinBox *rotation = nullptr;
     QCheckBox *flipHorizontal = nullptr; // P09b
     QCheckBox *flipVertical = nullptr;
+    // P10a: Knöpfe in der Titelzeile des Bereichs «Transformation»
+    QToolButton *copyTransform = nullptr;
+    QToolButton *pasteTransform = nullptr;
+    QToolButton *resetTransform = nullptr;
     QLabel *hint = nullptr;
     // Seite je Art mit eigenem Bereich («Bild», «Video», «Text»): kEmptyPage, kImagePage,
     // kVideoPage, kTextPage

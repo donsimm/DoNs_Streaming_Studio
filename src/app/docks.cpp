@@ -104,16 +104,27 @@ void nameWidgets(std::initializer_list<std::pair<QObject *, const char *>> widge
 }
 
 // Bereich im Dock «Eigenschaften» (P09b, E-26): kleiner Titel, darunter eine feine Linie wie
-// der Rahmen des Kopfbereichs (Farbe border), darunter die Felder im Raster *grid.
-QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid)
+// der Rahmen des Kopfbereichs (Farbe border), darunter die Felder im Raster *grid. Knöpfe in
+// titleButtons stehen in der Titelzeile am rechten Rand (P10a, Teil A 2).
+QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
+                 const QList<QToolButton *> &titleButtons = {})
 {
     auto *w = new QWidget(parent);
     auto *column = new QVBoxLayout(w);
     column->setContentsMargins(8, 6, 8, 8);
     column->setSpacing(4);
+    auto *titleRow = new QHBoxLayout;
+    titleRow->setContentsMargins(0, 0, 0, 0);
+    titleRow->setSpacing(4);
     auto *label = new QLabel(title, w);
     label->setObjectName(QStringLiteral("propertySectionTitle"));
-    column->addWidget(label);
+    titleRow->addWidget(label);
+    titleRow->addStretch(1);
+    for (QToolButton *b : titleButtons) {
+        b->setParent(w);
+        titleRow->addWidget(b);
+    }
+    column->addLayout(titleRow);
     auto *line = new QFrame(w);
     line->setObjectName(QStringLiteral("propertySectionLine"));
     line->setFixedHeight(1);
@@ -211,9 +222,21 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     nameGrid->setColumnStretch(1, 1);
     formColumn->addWidget(nameBox);
 
-    // Bereich «Transformation»: Lage, Grösse, Drehung, Spiegeln (für alle Arten).
+    // Bereich «Transformation»: Lage, Grösse, Drehung, Spiegeln (für alle Arten). In der
+    // Titelzeile rechts Kopieren, Einfügen, Zurücksetzen (P10a, Teil A 2); was sie tun und wann
+    // sie gehen, verbindet MainWindow mit den Befehlen «Transformieren» (E-25).
+    r.copyTransform = symbolButton(QStringLiteral("kopieren.svg"), QStringLiteral("K"),
+                                   QStringLiteral("Transformation kopieren"), nullptr);
+    r.pasteTransform = symbolButton(QStringLiteral("einfuegen.svg"), QStringLiteral("E"),
+                                    QStringLiteral("Transformation einfügen"), nullptr);
+    r.resetTransform = symbolButton(QStringLiteral("zuruecksetzen.svg"), QStringLiteral("Z"),
+                                    QStringLiteral("Transformation zurücksetzen"), nullptr);
+    nameWidgets({{r.copyTransform, "transformCopyButton"},
+                 {r.pasteTransform, "transformPasteButton"},
+                 {r.resetTransform, "transformResetButton"}});
     QGridLayout *grid = nullptr;
-    QWidget *transform = section(QStringLiteral("Transformation"), form, &grid);
+    QWidget *transform = section(QStringLiteral("Transformation"), form, &grid,
+                                 {r.copyTransform, r.pasteTransform, r.resetTransform});
     transform->setObjectName(QStringLiteral("propertyTransform"));
     r.x = pixelBox(0, -100000, transform);
     r.y = pixelBox(0, -100000, transform);

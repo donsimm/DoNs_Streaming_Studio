@@ -39,6 +39,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -921,6 +922,7 @@ private slots:
         selectSourceRow(2);
         QTRY_VERIFY_WITH_TIMEOUT(action("transformReset")->isEnabled(), 2000);
         QVERIFY(!action("transformPaste")->isEnabled());
+        QVERIFY(!child<QToolButton>("transformPasteButton")->isEnabled()); // P10a: Knopf ebenso
 
         // Bild: 90° im Uhrzeigersinn, linke obere Ecke des umschliessenden Kastens bleibt (100, 100)
         action("transformRotate90Clockwise")->trigger();
@@ -1013,6 +1015,131 @@ private slots:
         QCOMPARE(list->currentRow(), 1);
         QVERIFY2(listMenu.contains(QStringLiteral("Transformieren")), qPrintable(listMenu.join(u'|')));
         place(image, m_scene, 100, 100, 400, 200, 0);
+    }
+
+    // P10a Teil A 2 und 3: Knöpfe im Bereich «Transformation» und Tastenkürzel wie OBS; die Kürzel
+    // gelten mit Fokus auf der Leinwand oder im Dock «Quellen», nicht in Textfeldern.
+    void transformButtonsAndShortcuts()
+    {
+        if (!DSS_APP_EDITING || !DSS_APP_TRANSFORM)
+            QSKIP("Schalter DSS_APP_EDITING oder DSS_APP_TRANSFORM ist aus");
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        const Source image = sourceAtRow(2);
+        const auto placeImage = [&](int x, int y, int w, int h) {
+            SourceChanges c;
+            c.x = x;
+            c.y = y;
+            c.width = w;
+            c.height = h;
+            c.rotation = 0;
+            c.flipHorizontal = false;
+            c.flipVertical = false;
+            // Auf die Antwort des Kerns warten: sonst kann die Änderung erst nach einer Änderung
+            // des Fensters abgehen und sie überschreiben.
+            bool answered = false;
+            const qint64 id = m_check->sendChange(sourceUpdate(m_scene, image.id, c));
+            const QMetaObject::Connection connection = connect(
+                m_check.get(), &CoreClient::changeFinished, this,
+                [&](const ChangeResult &r) { answered = answered || r.requestId == id; });
+            QTRY_VERIFY_WITH_TIMEOUT(answered, 3000);
+            disconnect(connection);
+            const SourceGeometry expected{x, y, w, h, 0, false, false};
+            QTRY_VERIFY_WITH_TIMEOUT(geometryOf(*findSource(*m_client->overlay(m_scene), image.id))
+                                         == expected, 3000);
+        };
+        placeImage(100, 100, 400, 200);
+        const auto expectedAfter = [&](dss::TransformCommand command) {
+            const Source *s = findSource(*m_client->overlay(m_scene), image.id);
+            return dss::transformGeometry(*s, command, QSize(1920, 1080),
+                                          dss::originalSize(*s, m_client->mediaSizes()));
+        };
+        const auto action = [this](const char *name) {
+            return m_window->findChild<QAction *>(QString::fromLatin1(name));
+        };
+
+        // Kürzel wie OBS im Menü
+        QCOMPARE(action("transformCopy")->shortcut(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C));
+        QCOMPARE(action("transformPaste")->shortcut(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+        QCOMPARE(action("transformReset")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_R));
+        QCOMPARE(action("transformFit")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_F));
+        QCOMPARE(action("transformStretch")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_S));
+        QCOMPARE(action("transformCenter")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_D));
+
+        // Knöpfe: rechts in der Titelzeile, Hinweis mit Kürzel, Einfügen erst nach dem Kopieren
+        auto *copy = child<QToolButton>("transformCopyButton");
+        auto *paste = child<QToolButton>("transformPasteButton");
+        auto *reset = child<QToolButton>("transformResetButton");
+        auto *section = child<QWidget>("propertyTransform");
+        QVERIFY(copy->isVisible() && paste->isVisible() && reset->isVisible());
+        // Klicks gehen über das Fenster (Qt 6), die Knöpfe müssen im sichtbaren Teil liegen.
+        child<QScrollArea>("propertiesScroll")->ensureWidgetVisible(reset);
+        QTRY_COMPARE_WITH_TIMEOUT(QApplication::widgetAt(reset->mapToGlobal(reset->rect().center())),
+                                  static_cast<QWidget *>(reset), 2000);
+        QVERIFY(copy->x() < paste->x() && paste->x() < reset->x());
+        QCOMPARE(reset->x() + reset->width(), section->contentsRect().right() + 1 - 8);
+        QCOMPARE(copy->toolTip(), QStringLiteral("Transformation kopieren (%1)")
+                                      .arg(action("transformCopy")->shortcut().toString(QKeySequence::NativeText)));
+        QVERIFY(paste->toolTip().startsWith(QStringLiteral("Transformation einfügen (")));
+        QVERIFY(reset->toolTip().startsWith(QStringLiteral("Transformation zurücksetzen (")));
+        child<SourceList>("sourceList")->setCurrentRow(-1);
+        QTRY_VERIFY_WITH_TIMEOUT(!copy->isEnabled() && !reset->isEnabled(), 2000);
+        selectSourceRow(2);
+        QTRY_VERIFY_WITH_TIMEOUT(copy->isEnabled() && reset->isEnabled(), 2000);
+        // Einfügen folgt dem Befehl (ausgegraut ohne Kopie, geprüft in transformCommands)
+        QCOMPARE(paste->isEnabled(), action("transformPaste")->isEnabled());
+        QTest::mouseClick(copy, Qt::LeftButton);
+        QVERIFY(paste->isEnabled());
+        SourceGeometry copied = geometryOf(sourceAtRow(2));
+        QCOMPARE(copied, (SourceGeometry{100, 100, 400, 200, 0, false, false}));
+        const SourceGeometry resetExpected = expectedAfter(dss::TransformCommand::Reset);
+        QTest::mouseClick(reset, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), resetExpected, 3000);
+        QTest::mouseClick(paste, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), copied, 3000);
+
+        // Kürzel mit Fokus auf der Leinwand
+        CanvasWidget *canvas = m_window->canvas();
+        canvas->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->hasFocus(), 2000);
+        SourceGeometry expected = expectedAfter(dss::TransformCommand::CenterOnCanvas);
+        QTest::keyClick(canvas, Qt::Key_D, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), expected, 3000);
+        expected = expectedAfter(dss::TransformCommand::StretchToCanvas);
+        QTest::keyClick(canvas, Qt::Key_S, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), expected, 3000);
+        expected = expectedAfter(dss::TransformCommand::FitToCanvas);
+        QTest::keyClick(canvas, Qt::Key_F, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), expected, 3000);
+        // Kopieren mit Strg+Umschalt+C, dann zurücksetzen mit Strg+R
+        QTest::keyClick(canvas, Qt::Key_C, Qt::ControlModifier | Qt::ShiftModifier);
+        copied = expected;
+        expected = expectedAfter(dss::TransformCommand::Reset);
+        QTest::keyClick(canvas, Qt::Key_R, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), expected, 3000);
+
+        // Kürzel mit Fokus im Dock «Quellen»: Einfügen mit Strg+Umschalt+V
+        auto *list = child<SourceList>("sourceList");
+        list->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(list->hasFocus(), 2000);
+        QTest::keyClick(list, Qt::Key_V, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(sourceAtRow(2)), copied, 3000);
+        QCOMPARE(list->currentRow(), 2);
+
+        // In Textfeldern wirken die Kürzel nicht (Name, Zahlenfeld X)
+        placeImage(100, 100, 400, 200);
+        for (QWidget *field : {static_cast<QWidget *>(child<QLineEdit>("propertyName")),
+                               static_cast<QWidget *>(child<QSpinBox>("propertyX"))}) {
+            field->setFocus();
+            QTRY_VERIFY_WITH_TIMEOUT(field->hasFocus(), 2000);
+            for (Qt::Key key : {Qt::Key_D, Qt::Key_S, Qt::Key_F, Qt::Key_R})
+                QTest::keyClick(field, key, Qt::ControlModifier);
+            QTest::keyClick(field, Qt::Key_V, Qt::ControlModifier | Qt::ShiftModifier);
+        }
+        QTest::qWait(500);
+        QCOMPARE(geometryOf(*findSource(checked(m_scene), image.id)),
+                 (SourceGeometry{100, 100, 400, 200, 0, false, false}));
     }
 };
 

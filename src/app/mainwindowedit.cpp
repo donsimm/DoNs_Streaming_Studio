@@ -542,25 +542,30 @@ void MainWindow::createTransformMenu(QMenu *edit)
                                                   &MainWindow::pasteTransform);
     m_pasteTransform->setObjectName(QStringLiteral("transformPaste"));
     using C = dss::TransformCommand;
+    // Tastenkürzel genau wie OBS (P10a, Teil A 3, Punkt 60): OBSBasic.ui Zeilen 1726-1785.
     const struct
     {
         C command;
         const char *text;
         const char *name;
         bool separatorBefore;
+        QKeyCombination shortcut;
     } entries[] = {
-        {C::Reset, "Transformation zu&rücksetzen", "transformReset", false},
-        {C::Rotate90Clockwise, "90° im &Uhrzeigersinn drehen", "transformRotate90Clockwise", true},
+        {C::Reset, "Transformation zu&rücksetzen", "transformReset", false,
+         Qt::CTRL | Qt::Key_R},
+        {C::Rotate90Clockwise, "90° im &Uhrzeigersinn drehen", "transformRotate90Clockwise", true,
+         {}},
         {C::Rotate90CounterClockwise, "90° &gegen den Uhrzeigersinn drehen",
-         "transformRotate90CounterClockwise", false},
-        {C::Rotate180, "180° &drehen", "transformRotate180", false},
-        {C::FlipHorizontal, "&Waagrecht spiegeln", "transformFlipHorizontal", true},
-        {C::FlipVertical, "&Senkrecht spiegeln", "transformFlipVertical", false},
-        {C::FitToCanvas, "Auf Leinwand ein&passen", "transformFit", true},
-        {C::StretchToCanvas, "Auf Leinwand s&trecken", "transformStretch", false},
-        {C::CenterOnCanvas, "&Zentrieren", "transformCenter", false},
-        {C::CenterVertically, "Senkrecht zentrieren", "transformCenterVertically", false},
-        {C::CenterHorizontally, "Waagrecht zentrieren", "transformCenterHorizontally", false},
+         "transformRotate90CounterClockwise", false, {}},
+        {C::Rotate180, "180° &drehen", "transformRotate180", false, {}},
+        {C::FlipHorizontal, "&Waagrecht spiegeln", "transformFlipHorizontal", true, {}},
+        {C::FlipVertical, "&Senkrecht spiegeln", "transformFlipVertical", false, {}},
+        {C::FitToCanvas, "Auf Leinwand ein&passen", "transformFit", true, Qt::CTRL | Qt::Key_F},
+        {C::StretchToCanvas, "Auf Leinwand s&trecken", "transformStretch", false,
+         Qt::CTRL | Qt::Key_S},
+        {C::CenterOnCanvas, "&Zentrieren", "transformCenter", false, Qt::CTRL | Qt::Key_D},
+        {C::CenterVertically, "Senkrecht zentrieren", "transformCenterVertically", false, {}},
+        {C::CenterHorizontally, "Waagrecht zentrieren", "transformCenterHorizontally", false, {}},
     };
     for (const auto &e : entries) {
         if (e.separatorBefore)
@@ -568,10 +573,46 @@ void MainWindow::createTransformMenu(QMenu *edit)
         QAction *a = m_transformMenu->addAction(QString::fromUtf8(e.text), this,
                                                 [this, c = e.command] { runTransform(c); });
         a->setObjectName(QString::fromLatin1(e.name));
+        if (e.shortcut != QKeyCombination())
+            a->setShortcut(QKeySequence(e.shortcut));
+        if (e.command == C::Reset)
+            m_resetTransform = a;
         m_transformActions.append(a);
     }
+    m_copyTransform->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C));
+    m_pasteTransform->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
     for (QAction *a : m_transformMenu->actions())
         a->setEnabled(false);
+}
+
+void MainWindow::connectTransformShortcuts()
+{
+    // Die Kürzel stehen im Menü und gelten nur, wenn der Fokus auf der Leinwand oder im Dock
+    // «Quellen» liegt (P10a, Teil A 3), nicht in Textfeldern: Qt::WidgetShortcut an genau diesen
+    // beiden Widgets. Im Menü selbst lösen sie nicht aus, weil der Fokus nie auf der Menüleiste
+    // liegt. https://doc.qt.io/qt-6.8/qt.html#ShortcutContext-enum,
+    // https://doc.qt.io/qt-6.8/qaction.html#shortcutContext-prop
+    for (QAction *a : m_transformMenu->actions()) {
+        if (a->shortcut().isEmpty())
+            continue;
+        a->setShortcutContext(Qt::WidgetShortcut);
+        m_canvas->addAction(a);
+        m_sourcesDock.list->addAction(a);
+    }
+    // Knöpfe im Bereich «Transformation» (P10a, Teil A 2): dieselben Befehle wie im Menü;
+    // ausgegraut wie die Befehle (refreshActions).
+    const std::pair<QToolButton *, QAction *> buttons[] = {
+        {m_propertiesDock.copyTransform, m_copyTransform},
+        {m_propertiesDock.pasteTransform, m_pasteTransform},
+        {m_propertiesDock.resetTransform, m_resetTransform}};
+    for (const auto &[button, action] : buttons) {
+        const QString tip = QStringLiteral("%1 (%2)").arg(
+            QString(action->text()).remove(QLatin1Char('&')),
+            action->shortcut().toString(QKeySequence::NativeText));
+        button->setToolTip(tip);
+        button->setAccessibleName(tip);
+        connect(button, &QToolButton::clicked, action, &QAction::trigger);
+    }
 }
 
 void MainWindow::showCanvasMenu(const QUuid &id, const QPoint &globalPosition)

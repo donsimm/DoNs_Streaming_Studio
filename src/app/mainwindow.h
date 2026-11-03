@@ -126,6 +126,8 @@ private:
     void fillSourceMenu(QMenu *menu, const dss::Overlay &overlay, const QUuid &id);
     // P09b (E-25): Befehle «Transformieren» an der gewählten Quelle (Schalter DSS_APP_TRANSFORM)
     void createTransformMenu(QMenu *edit);
+    // P10a: Tastenkürzel an Leinwand und Dock «Quellen», Knöpfe im Bereich «Transformation»
+    void connectTransformShortcuts();
     void showCanvasMenu(const QUuid &id, const QPoint &globalPosition);
     void runTransform(dss::TransformCommand command);
     void copyTransform();
@@ -150,6 +152,7 @@ private:
     QMenu *m_transformMenu = nullptr;      // P09b, nur mit DSS_APP_TRANSFORM
     QAction *m_copyTransform = nullptr;
     QAction *m_pasteTransform = nullptr;
+    QAction *m_resetTransform = nullptr;   // P10a: auch Knopf im Bereich «Transformation»
     QList<QAction *> m_transformActions;   // alle Befehle ausser Kopieren und Einfügen
     QMenuBar *m_menuBar = nullptr;
     HeaderBar *m_header = nullptr;
