@@ -47,6 +47,27 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 2. Weitere Bau-Prompts nach dem Bauplan `docs/07-bauplan.md` (Reihenfolge P06 bis P12 bestätigt am 2026-11-02). P06: Aussehen wie OBS (`prompts/P06-aussehen-obs.md`) abgenommen (2026-11-02), einschliesslich Handtest. P07 (`prompts/P07-kern-dienst.md`) abgenommen (2026-11-02), einschliesslich Handtest. Neue offene Punkte 35 bis 43 in `docs/04-offene-punkte.md`. Offene Punkte aus P07 sind alle besprochen (`docs/04-offene-punkte.md`, «Entschieden nach P07»). P08 (`prompts/P08-bearbeiten.md`, Bearbeiten im Fenster) abgenommen (2026-11-03), einschliesslich Handtest; neue offene Punkte 44 bis 51 in `docs/04-offene-punkte.md`. Offene Punkte aus P08 alle besprochen (`docs/04-offene-punkte.md`, «Entschieden nach P08»). P09 (`prompts/P09-zeichner-editor.md`, Zeichner im Editor) abgenommen (2026-11-03), einschliesslich Handtest; Bericht `docs/berichte/P09-bericht.md`, neue offene Punkte 52 bis 59 in `docs/04-offene-punkte.md`, alle besprochen («Entschieden nach P09»). P09b (`prompts/P09b-nacharbeiten-editor.md`, Nacharbeiten Editor, eingefügt vor P10 auf Entscheid des Nutzers 2026-11-03) abgenommen (2026-11-03), einschliesslich Handtest; Bericht `docs/berichte/P09b-bericht.md`, neue offene Punkte 60 bis 66 in `docs/04-offene-punkte.md`. Offene Punkte aus P09b alle besprochen («Entschieden nach P09b»). Als Nächstes P10a (`prompts/P10a-nacharbeiten-einsatz.md`, Nacharbeiten Editor und Einsatz, eingefügt 2026-11-03 auf Entscheid des Nutzers), vom Nutzer bestätigt, Ausführung auf dem Studio-PC. Danach P10 (Browserquelle).
 3. Sobald das Netzwerk besteht: T-03 bis T-05.
 
+## Stand für den nächsten Chat (2026-11-03, 15:25)
+
+Wechsel des Chats auf Vorschlag des bisherigen Chats, weil dieser sehr lang war. Der bisherige Chat hat P03 bis P09b geplant, ausführen lassen und mit dem Nutzer abgenommen.
+
+**Läuft gerade:** P10a (`prompts/P10a-nacharbeiten-einsatz.md`) in einer Claude-Code-Sitzung auf dem Studio-PC, vom Nutzer bestätigt. Der Nutzer meldet «fertig», wenn Claude Code fertig ist.
+
+**Als Nächstes, in dieser Reihenfolge:**
+
+1. `git pull`, Bericht `docs/berichte/P10a-bericht.md` lesen und prüfen (Kurzfassung, Abnahme, Pakete, `[OFFEN]`, neue offene Punkte). Prüfen, dass Claude Code nicht in `~/.local/opt/dons-streaming-studio/` installiert und die echten Daten nicht verändert hat. Falls Claude Code nicht gepusht hat: Nutzer pusht im zweiten Terminal mit `cd ~/DoNs_Streaming_Studio && git pull --rebase origin main && git push origin main` (SSH, keine Eingabe nötig).
+2. Handtest P10a mit dem Nutzer: **eine Prüfung pro Nachricht**, Befehle mit `cd ~/DoNs_Streaming_Studio &&`, auf die Antwort warten. Die erste echte Installation macht der Nutzer selbst. Danach Abnahme eintragen (Bericht, Bauplan, diese Übergabe) und die Kopie dieser Datei im Claude-Projekt (`claude/00-uebergabe.md`) nachführen.
+3. Neue offene Punkte aus P10a einzeln mit dem Nutzer besprechen.
+4. P10 (Browserquelle) planen. Absehbare Fragen an den Nutzer, je einzeln: Port des Overlay-Servers (auf dem Bild 8080); wann ein Video in der Browserquelle startet (beim Laden, beim Einschalten mit E-24, beim Einblenden); was die Browserquelle bei «Ausgabe aus» zeigt (entschieden: leer, durchsichtig); Form der Adresse mit Token; was beim Wechsel der Adresse mit der alten Adresse geschieht; wie die Browserquelle ohne Heimnetz geprüft wird (T-04 wartet auf das Netzwerk; Prüfung lokal auf dem Studio-PC, OBS-Prüfung später); ob die Browserquelle auf dem Studio-PC in einem Browser geprüft wird (welcher, Paket nötig?). Vorgaben für den zweiten Zeichner: gleiche Schriftdatei, Zeilen vom Kern (K-04), Spiegeln, EXIF und Video-Drehung, Text an der Box abgeschnitten, Video beim Einblenden von vorne, stumm. Offener Punkt für P10: ob OBS (CEF) EXIF in PNG beachtet.
+5. Danach P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
+
+**Erfahrungen aus dem bisherigen Chat:**
+
+- Der Nutzer will den Ablauf klar und knapp, eine Sache pro Nachricht, nummerierte Fragen mit Vorschlag. Er entscheidet zügig; Vorschläge mit Begründung und Gegenargument sind willkommen.
+- Er reagiert verärgert auf vermeidbare Fehler (falscher Ordner, fehlende Datei im Commit, Befehl ohne `cd`). Nach jedem Push mit `git show --stat` prüfen, dass alle Dateien im Commit sind. Im Chat-Container liegt der Klon unter `/root/repo`; immer diesen Pfad verwenden.
+- Markenlogos legt der Chat nicht selbst ab. Die eigenen Symbole des Nutzers liegen in `~/.config/dons-streaming-studio/symbole/` (nicht im Repo).
+- Das Claude Doc mit den Festlegungen wird seit P06 nicht mehr nachgeführt; massgebend ist das Repo.
+
 ## Rolle des Chats (Vorgabe des Nutzers, 2026-11-02, bis auf Weiteres)
 
 - Der Chat arbeitet als IT-Projektplaner. Bei ihm laufen alle Informationen zusammen; seine Aufgabe ist, den Überblick zu behalten und Struktur ins Projekt zu bringen.
