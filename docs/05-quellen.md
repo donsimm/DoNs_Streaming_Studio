@@ -100,4 +100,15 @@ Abgerufen in P08 (2026-11-02 und 2026-11-03):
 - QProcess: https://doc.qt.io/qt-6.8/qprocess.html
 - Qt Test: https://doc.qt.io/qt-6.8/qttest-index.html
 
+Abgerufen in P09 (2026-11-03):
+
+- OBS Studio, Quellcode Commit `65c320b46e1af5c7a555161aea6182cdf7a8c524` (Skalieren, Seitenverhältnis, Drehen, Zeiger, Pfeiltasten): https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/widgets/OBSBasicPreview.cpp, https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/OBSBasic.cpp
+- Qt 6.8.2 Quellcode (Fläche links im Baum, Übersetzungsdateien): https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/itemviews/qtreeview.cpp, https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/styles/qstylesheetstyle.cpp, https://github.com/qt/qtbase/blob/v6.8.2/src/corelib/kernel/qtranslator.cpp
+- Qt 6.8: QTranslator::load https://doc.qt.io/qt-6.8/qtranslator.html#load-2, QFont::setVariableAxis https://doc.qt.io/qt-6.8/qfont.html#setVariableAxis, QFontDatabase::addApplicationFont https://doc.qt.io/qt-6.8/qfontdatabase.html#addApplicationFont, QRawFont https://doc.qt.io/qt-6.8/qrawfont.html, QImage::Format https://doc.qt.io/qt-6.8/qimage.html#Format-enum, QPainter https://doc.qt.io/qt-6.8/qpainter.html, QThreadPool::start https://doc.qt.io/qt-6.8/qthreadpool.html#start-1, QMetaObject::invokeMethod https://doc.qt.io/qt-6.8/qmetaobject.html#invokeMethod-5, QMainWindow::setMenuWidget https://doc.qt.io/qt-6.8/qmainwindow.html#setMenuWidget, QWidget::grab https://doc.qt.io/qt-6.8/qwidget.html#grab, QSaveFile https://doc.qt.io/qt-6.8/qsavefile.html
+- FFmpeg 7.1 (Paket 7.1.5-0+deb13u1): Dekodieren https://ffmpeg.org/doxygen/7.1/group__lavc__decoding.html, Lesen und Springen https://ffmpeg.org/doxygen/7.1/group__lavf__decoding.html, AVFrame https://ffmpeg.org/doxygen/7.1/structAVFrame.html, libswscale https://ffmpeg.org/doxygen/7.1/group__libsws.html, Pixelformate https://ffmpeg.org/doxygen/7.1/pixdesc_8h.html, Matroska `alpha_mode` https://ffmpeg.org/doxygen/7.1/matroskadec_8c_source.html, VP9-Alpha nur mit libvpx-vp9 https://trac.ffmpeg.org/ticket/8344
+- OpenType: Tabelle `fvar` https://learn.microsoft.com/en-us/typography/opentype/spec/fvar, Aufbau der Datei https://learn.microsoft.com/en-us/typography/opentype/spec/otff
+- Urbanist[wght] (Testschrift, SIL Open Font License 1.1) im Repo google/fonts, Commit `c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1`: https://github.com/google/fonts/tree/c13390277dfb1fcc7415d84ef7ef9cfc1e52f8c1/ofl/urbanist
+- std::condition_variable: https://en.cppreference.com/w/cpp/thread/condition_variable/wait
+- sysstat (pidstat, mpstat) 12.7.5: https://sysstat.github.io/
+
 Weitere Qt-Quellen je Baustein: `docs/berichte/`.

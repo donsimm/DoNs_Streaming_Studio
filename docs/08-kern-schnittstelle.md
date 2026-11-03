@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-03 (P08). Version der Schnittstelle: **2**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
+Stand: 2026-11-03 (P09). Version der Schnittstelle: **3**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays wird nie übertragen, weder gelesen noch geändert (kommt mit P10; CLAUDE.md Regel 12).
+
+### Version 3 (P09)
+
+Die Version stieg von 2 auf 3, weil `overlay` und `overlay_changed` jetzt Overlays im Dateiformat 2 tragen (Pflichtfeld `video.hold_at_end`, `docs/06-overlay-format.md`), die ein Fenster der Version 2 als ungültig verwerfen würde. Dazu kommen die Änderung `set_overlay_size` (ein Kern der Version 2 antwortet `unknown_type`), das Feld `changes.video.hold_at_end`, das Feld `data_dir` im `hello` des Kerns und das Feld `warning` in `change_result`.
 
 ### Version 2 (P08)
 
@@ -61,7 +65,7 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 2 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 2».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 3 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 3».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `connections` und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
@@ -93,10 +97,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `2` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `3` |
+| `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"program":"dss-core","protocol_version":2,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":3,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -139,7 +144,7 @@ Ein ganzes Overlay. `overlay` ist die Antwort auf `get_overlay`, `overlay_change
 | `overlay` | Objekt | Overlay **im Format der Overlay-Datei** (`docs/06-overlay-format.md`), mit allen Feldern einschliesslich `format_version`; gelesen wird es genauso streng wie die Datei. **Ohne Token.** |
 
 ```json
-{"overlay":{"address":"test-eins","format_version":1,"height":720,"id":"7be08f35-6885-4a95-9c32-939c45a688ea","name":"Test Eins","sources":[{"height":720,"id":"0c1d2b7e-8a43-4c1e-9d47-1b5e6f3a2c90","image":{"file":"media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png"},"kind":"image","name":"bild1.png","rotation":0,"visible":true,"width":1280,"x":0,"y":0}],"width":1280},"type":"overlay"}
+{"overlay":{"address":"test-eins","format_version":2,"height":720,"id":"7be08f35-6885-4a95-9c32-939c45a688ea","name":"Test Eins","sources":[{"height":720,"id":"0c1d2b7e-8a43-4c1e-9d47-1b5e6f3a2c90","image":{"file":"media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png"},"kind":"image","name":"bild1.png","rotation":0,"visible":true,"width":1280,"x":0,"y":0}],"width":1280},"type":"overlay"}
 ```
 
 ### `overlay_removed`
@@ -163,11 +168,12 @@ Antwort auf eine Änderung, **nur** an das Fenster, das sie geschickt hat, und i
 | `id` | Text oder `null` | Kennung des neu angelegten Overlays, Ordners oder der neuen Quelle (`create_overlay`, `copy_overlay`, `create_folder`, `add_*_source`), sonst `null` |
 | `code` | Text oder `null` | bei `ok: false` der Fehlercode (`invalid_message`, `unknown_overlay`, `unknown_source`, `unknown_folder`, `rejected`), sonst `null` |
 | `message` | Text oder `null` | bei `ok: false` die Meldung auf Deutsch; das Fenster zeigt sie in der Statuszeile. Sonst `null` |
+| `warning` | Text oder `null` | seit Version 3: bei `ok: true` ein Hinweis, den das Fenster in der Statuszeile zeigt, zum Beispiel «Grösse von «bild.png» nicht lesbar (…), die Quelle bekommt die Grösse des Overlays 1920x1080.» Sonst `null` |
 
 ```json
-{"code":null,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","message":null,"ok":true,"request_id":1,"type":"change_result"}
-{"code":"rejected","id":null,"message":"Drehung 3600 ungültig, erlaubt sind 0 bis 3599 Zehntelgrad.","ok":false,"request_id":6,"type":"change_result"}
-{"code":"invalid_message","id":null,"message":"Feld changes.breite ist unbekannt","ok":false,"request_id":7,"type":"change_result"}
+{"code":null,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","message":null,"ok":true,"request_id":1,"type":"change_result","warning":null}
+{"code":"rejected","id":null,"message":"Drehung 3600 ungültig, erlaubt sind 0 bis 3599 Zehntelgrad.","ok":false,"request_id":6,"type":"change_result","warning":null}
+{"code":"invalid_message","id":null,"message":"Feld changes.breite ist unbekannt","ok":false,"request_id":7,"type":"change_result","warning":null}
 ```
 
 ### `font_list`
@@ -260,7 +266,7 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `2`) | `overlay_list`, `connections`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `3`) | `overlay_list`, `connections`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -268,7 +274,7 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":2,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":3,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -286,6 +292,7 @@ Kennungen: `overlay_id`, `source_id`, `folder_id` sind Text (UUID). `file` ist e
 | Typ | Felder | Wirkung | `id` in `change_result` |
 |---|---|---|---|
 | `create_overlay` | `name`, `width`, `height` (ganze Zahlen) | neues Overlay ohne Quellen, Adresse aus dem Namen, eigener Token; ans Ende der Liste | Overlay |
+| `set_overlay_size` | `overlay_id`, `width`, `height` (ganze Zahlen, 1 bis 7680 bzw. 4320) | seit Version 3 (P09): neue Auflösung; die Quellen behalten ihre Pixelwerte | – |
 | `rename_overlay` | `overlay_id`, `name`, `change_address` (true/false) | neuer Name; bei `true` auch neue Adresse aus dem Namen (eindeutig gemacht) | – |
 | `copy_overlay` | `overlay_id` | Kopie mit neuen Kennungen, Name «<Name> Kopie», eigener Adresse und neuem Token; direkt nach dem Original in der Liste | Overlay |
 | `remove_overlay` | `overlay_id` | löscht das Overlay (Datei und Eintrag in der Liste) | – |
@@ -295,8 +302,8 @@ Kennungen: `overlay_id`, `source_id`, `folder_id` sind Text (UUID). `file` ist e
 | `remove_folder` | `folder_id` | löscht den Ordner; seine Overlays kommen an seiner Stelle auf die oberste Ebene | – |
 | `move_folder` | `folder_id`, `index` | setzt den Ordner an die Stelle `index` der obersten Ebene | – |
 | `set_folder_expanded` | `folder_id`, `expanded` (true/false) | auf- oder zugeklappt (wird gespeichert) | – |
-| `add_image_source` | `overlay_id`, `file` | neue Bildquelle zuoberst, Lage 0/0 in der Grösse des Overlays | Quelle |
-| `add_video_source` | `overlay_id`, `file` | neue Videoquelle wie oben, «Wiederholen» aus | Quelle |
+| `add_image_source` | `overlay_id`, `file` | neue Bildquelle zuoberst, Lage 0/0 in der Grösse der Datei (seit P09; nicht lesbar: Grösse des Overlays und `warning`) | Quelle |
+| `add_video_source` | `overlay_id`, `file` | neue Videoquelle wie oben (Grösse des ersten Bildes), «Wiederholen» und «Am Ende anhalten» aus | Quelle |
 | `add_text_source` | `overlay_id` | neue Textquelle wie oben, Inhalt «Text», Schrift Be Vietnam Pro Regular | Quelle |
 | `remove_source` | `overlay_id`, `source_id` | entfernt die Quelle (die Kopie im Datenordner bleibt) | – |
 | `move_source` | `overlay_id`, `source_id`, `index` | Stelle in der Zeichenreihenfolge, 0 = ganz hinten | – |
@@ -314,6 +321,7 @@ Objekt `changes` (nur angegebene Felder ändern sich, mindestens eines; unbekann
 | `rotation` | ganze Zahl | Drehung in Zehntelgrad, 0 bis 3599 |
 | `visible` | true/false | sichtbar |
 | `video.loop` | true/false | nur Video: wiederholen |
+| `video.hold_at_end` | true/false | nur Video, seit Version 3: am Ende anhalten |
 | `text.content` | Text | nur Text: Inhalt, mehrzeilig |
 | `text.font_size` | ganze Zahl | nur Text: Schriftgrösse in Pixeln, ab 1 |
 | `text.color` | Text | nur Text: `#RRGGBBAA` |
@@ -327,10 +335,12 @@ Grenzen und Meldungen kommen aus dem Modell (`docs/06-overlay-format.md`). Eine 
 {"type":"move_overlay","request_id":3,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","folder_id":"70fcf543-5e55-4028-ace3-1ddfed919ce5","index":0}
 {"type":"add_text_source","request_id":4,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8"}
 {"type":"update_source","request_id":5,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","changes":{"x":40,"y":900,"text":{"content":"Willkommen","font_size":72}}}
+{"type":"set_overlay_size","request_id":9,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","width":1280,"height":720}
+{"type":"update_source","request_id":10,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"b814d820-5d53-42a8-9683-ef3419cf4d7e","changes":{"video":{"hold_at_end":true}}}
 {"type":"set_text_font","request_id":8,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","weight":700,"italic":false}
 ```
 
-(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`)
+(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`. Die Zeilen mit `request_id` 9 und 10 sind in P09 von Hand ergänzt, Form wie `tst_aenderungen` sie prüft.)
 
 Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `request_id`, antwortet der Kern mit `change_result` `ok: false`, `code: invalid_message`; sonst mit `error` `invalid_message`.
 
@@ -338,7 +348,7 @@ Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `r
 
 Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele Änderungen pro Sekunde. Zwei Stufen verhindern, dass der Kern überlastet wird oder die Datei bei jedem Schritt schreibt:
 
-1. **Fenster** (`CoreClient::sendChange` mit Schlüssel, zum Beispiel Feld und Quelle): Je Schlüssel ist höchstens eine Änderung unterwegs. Eine neue Änderung, bevor `change_result` da ist, wird zurückgehalten und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. Gemessen in `tst_bearbeiten` (2026-11-03): 200 Schritte → 3 Änderungen an den Kern, der letzte Wert kommt an.
+1. **Fenster** (`CoreClient::sendChange` mit Schlüssel, zum Beispiel Feld und Quelle; beim Ziehen auf der Leinwand seit P09 ein `update_source` mit `x`, `y`, `width`, `height`, `rotation` unter dem Schlüssel «<Quelle>/geometry», Auflösung unter «<Overlay>/size»): Je Schlüssel ist höchstens eine Änderung unterwegs. Eine neue Änderung, bevor `change_result` da ist, wird zurückgehalten und ersetzt eine schon zurückgehaltene; nach der Antwort geht die letzte los. Gemessen in `tst_bearbeiten` (2026-11-03): 200 Schritte → 3 Änderungen an den Kern, der letzte Wert kommt an.
 2. **Kern** (Abschnitt «Speichern»): Jede Änderung gilt sofort im Speicher und geht sofort an alle Fenster; die Datei schreibt er später.
 
 ### Speichern

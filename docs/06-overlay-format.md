@@ -82,7 +82,7 @@ Beispiel: «Überblick Start» oben, darunter der Ordner «Szenen» mit einem Ov
 
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
-| `format_version` | ganze Zahl | genau `1` | Version des Formats. Eine höhere Zahl wird abgewiesen, nicht geraten. Das Feld `video.loop` kam in P05 dazu, ohne neue Version: Auf dem Studio-PC gab es noch keine echten Overlay-Dateien (geprüft 2026-11-02, Bericht P05). |
+| `format_version` | ganze Zahl | `1` oder `2` | Version des Formats. Geschrieben wird immer `2`. Eine höhere Zahl wird abgewiesen, nicht geraten. Version 1 (P04 bis P08) wird weiter gelesen, siehe «Versionen». |
 | `id` | Text | UUID, Kleinbuchstaben, ohne Klammern | Kennung, ändert sich nie. Bestimmt den Dateinamen. |
 | `name` | Text | nicht leer (nicht nur Leerzeichen) | frei wählbarer Name |
 | `address` | Text | `a-z`, `0-9`, einzelne `-` dazwischen | Adresse für die Browserquelle, siehe «Adresse» |
@@ -131,8 +131,20 @@ Drehrichtung: Ein positiver Winkel dreht im Uhrzeigersinn um die Mitte der Quell
 |---|---|---|---|
 | `file` | Text | Verweis `media/<SHA-256>.<Endung>` | Videodatei, auch WebM (VP9) mit Alpha |
 | `loop` | true/false | | am Ende wieder von vorne; beim Hinzufügen `false` (nicht wiederholen) |
+| `hold_at_end` | true/false | | seit Version 2 (P09): am Ende das letzte Bild stehen lassen; beim Hinzufügen `false` |
 
-`loop` gibt es nur bei `video`; bei `image` ist es ein unbekanntes Feld. Zum Ton speichert das Format nichts: Der Studio-PC spielt ihn über eine Audiokarte ab, die Browserquelle ist immer stumm (`docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»). Start und Stopp von Videos sind nicht entschieden.
+`loop` und `hold_at_end` gibt es nur bei `video`; bei `image` sind sie unbekannte Felder. Am Ende eines Videos (Entscheid 9, P09): mit `loop` wieder von vorne, sonst mit `hold_at_end` das letzte Bild, sonst wird die Quelle leer (durchsichtig). Mit `loop` hat `hold_at_end` keine Wirkung, der Wert bleibt aber gespeichert (im Editor ist «Am Ende anhalten» dann ausgegraut). Ein Video läuft im Editor ab der Wahl des Overlays (Entscheid 10). Zum Ton speichert das Format nichts: Der Studio-PC spielt ihn über eine Audiokarte ab, die Browserquelle ist immer stumm (`docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»).
+
+Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und Videoquellen bekommen beim Hinzufügen die Grösse der Datei (Bild: Pixel des Bildes; Video: Grösse des ersten Bildes), Lage (0, 0), Drehung 0. Lässt sich die Grösse nicht lesen, bekommt die Quelle die Grösse des Overlays, und Kern bzw. dss-cli melden das als Warnung. Text wird ab der oberen Kante gesetzt, Zeilen nur an den Zeilenwechseln des Inhalts; was über den Kasten hinausgeht, wird im Editor abgeschnitten (Annahme P09, nicht entschieden).
+
+## Versionen
+
+| Version | seit | Unterschied |
+|---|---|---|
+| 1 | P04 | `video.loop` kam in P05 ohne neue Version dazu (auf dem Studio-PC gab es noch keine Overlay-Dateien, geprüft 2026-11-02, Bericht P05) |
+| 2 | P09 | neues Pflichtfeld `video.hold_at_end`. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 1 gibt (geprüft 2026-11-03, Bericht P09) |
+
+Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, in Version 2 Pflicht. Beim nächsten Speichern wird die Datei als Version 2 geschrieben.
 
 ## Regeln beim Lesen
 
