@@ -170,6 +170,23 @@ private slots:
         QCOMPARE(findSource(o, image)->x, 0);
         QCOMPARE(findSource(o, image)->rotation, 0);
 
+        // P09b, Entscheid 7: gespeichert 32x64, mit EXIF-Ausrichtung 5 bis 8 angezeigt 64x32
+        // (libav liefert die gespeicherte Grösse, der Store vertauscht).
+        for (const QString &name : {QStringLiteral("orientierung-6.jpg"), QStringLiteral("orientierung-5.png"),
+                                   QStringLiteral("orientierung-3.jpg")}) {
+            int w = 0;
+            int h = 0;
+            const QString file = QStringLiteral(DSS_TEST_EXIF_DIR "/") + name;
+            QVERIFY2(readMediaSize(file, &w, &h, &error), qPrintable(error));
+            QCOMPARE(QSize(w, h), name.contains(QLatin1Char('3')) ? QSize(64, 32) : QSize(32, 64));
+            const QUuid s = store.addImageSource(id, file, &error, &warning);
+            QVERIFY2(!s.isNull(), qPrintable(error));
+            const Source *added = findSource(*store.overlay(id), s);
+            QCOMPARE(QSize(added->width, added->height), QSize(64, 32));
+            QCOMPARE(store.mediaSizes(*store.overlay(id)).value(added->file), QSize(64, 32));
+            QVERIFY(store.removeSource(id, s, &error));
+        }
+
         // P09b: Originalgrösse für die Nachrichten an die Fenster (media_sizes). Jede Datei wird
         // nur einmal gelesen, auch eine unlesbare; unlesbare Dateien fehlen.
         {

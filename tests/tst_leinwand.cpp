@@ -9,6 +9,8 @@
 //   - variable Schrift Urbanist[wght]: Gewicht 800 deckt deutlich mehr als 200 (Achse wght)
 //   - gespiegelt (P09b): Bild mit roter linker und blauer rechter Hälfte, waagrecht gespiegelt,
 //     und waagrecht gespiegelt plus 90° gedreht (erst spiegeln, dann drehen)
+//   - EXIF-Ausrichtung (P09b): tests/daten/exif/orientierung-1 bis -8 als JPEG und PNG; jedes
+//     zeigt nach der Ausrichtung 64x32 mit rot, grün (oben), blau, gelb (unten)
 // Mit DSS_LEINWAND_BILD=DATEI wird das Bild der Leinwand gespeichert (Bericht).
 
 #include "canvaswidget.h"
@@ -51,6 +53,8 @@ class TestLeinwand : public QObject
     QTemporaryDir m_work;
     Overlay m_overlay;
     QUuid m_image, m_rotated, m_jpeg, m_video, m_text, m_hidden, m_light, m_heavy, m_flipped, m_flippedRotated;
+    // P09b: Ausrichtung 1 bis 8, erst JPEG, dann PNG; Lage links oben im Overlay
+    QList<std::pair<QUuid, QPoint>> m_oriented;
     std::unique_ptr<SourceRenderer> m_renderer;
     std::unique_ptr<CanvasWidget> m_canvas;
     Theme m_theme = darkTheme();
@@ -122,6 +126,23 @@ private slots:
         m_flipped = store.addImageSource(id, halves, &error);
         m_flippedRotated = store.addImageSource(id, halves, &error);
         QVERIFY2(!m_flippedRotated.isNull(), qPrintable(error));
+        // 4 x 4 Bilder rechts in der freien Fläche (1650, 380) bis (1918, 532)
+        for (int i = 0; i < 16; ++i) {
+            const QString file = QStringLiteral(DSS_TEST_EXIF_DIR "/orientierung-%1.%2")
+                                     .arg(i % 8 + 1)
+                                     .arg(i < 8 ? QStringLiteral("jpg") : QStringLiteral("png"));
+            const QUuid s = store.addImageSource(id, file, &error);
+            QVERIFY2(!s.isNull(), qPrintable(error));
+            const QPoint at(1650 + (i % 4) * 68, 380 + (i / 4) * 40);
+            m_oriented.append({s, at});
+            // Grösse der neuen Quelle: so, wie das Bild angezeigt wird (Kern, mit EXIF)
+            const Source *added = findSource(*store.overlay(id), s);
+            QCOMPARE(QSize(added->width, added->height), QSize(64, 32));
+            SourceChanges c;
+            c.x = at.x();
+            c.y = at.y();
+            QVERIFY2(store.updateSource(id, s, c, &error), qPrintable(error));
+        }
         const auto geometry = [&](const QUuid &s, int x, int y, int w, int h, int r) {
             QVERIFY2(store.setSourceGeometry(id, s, x, y, w, h, r, &error), qPrintable(error));
         };
@@ -221,6 +242,30 @@ private slots:
         QVERIFY(distance(at(image, QPointF(1750, 290)), QColor(255, 0, 0)) <= 2);
         // Kasten bleibt: neben dem gedrehten Kasten (x 1700 bis 1800) Schachbrett
         QVERIFY(isChecker(at(image, QPointF(1680, 220))));
+    }
+
+    void exifOrientation()
+    {
+        // P09b, Entscheid 7: alle 16 Bilder sehen nach der Ausrichtung gleich aus (wie der
+        // Browser mit image-orientation: from-image). JPEG mit etwas Spielraum (verlustbehaftet).
+        const QImage image = grabCanvas();
+        for (int i = 0; i < m_oriented.size(); ++i) {
+            const QPoint o = m_oriented.at(i).second;
+            const int tolerance = i < 8 ? 12 : 2;
+            const struct { QPoint offset; QColor color; } quarters[] = {
+                {{16, 8}, QColor(255, 0, 0)}, {{48, 8}, QColor(0, 255, 0)},
+                {{16, 24}, QColor(0, 0, 255)}, {{48, 24}, QColor(255, 255, 0)}};
+            for (const auto &q : quarters) {
+                const QColor c = at(image, QPointF(o + q.offset));
+                QVERIFY2(distance(c, q.color) <= tolerance,
+                         qPrintable(QStringLiteral("Bild %1 (%2) bei %3/%4: %5 statt %6")
+                                        .arg(i % 8 + 1)
+                                        .arg(i < 8 ? QStringLiteral("JPEG") : QStringLiteral("PNG"))
+                                        .arg(q.offset.x())
+                                        .arg(q.offset.y())
+                                        .arg(c.name(), q.color.name())));
+            }
+        }
     }
 
     void twoLineText()

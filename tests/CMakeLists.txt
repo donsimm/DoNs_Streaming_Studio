@@ -137,6 +137,11 @@ dss_add_test(tst_sourcegeometry)
 target_compile_definitions(tst_sourcegeometry PRIVATE
   DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften" DSS_TEST_FONT="${DSS_TEST_FONT}")
 dss_add_test(tst_canvasedit)
+# P09b: EXIF-Ausrichtung (Lesen und Rechnen), ohne Qt Gui; Bilder aus tests/daten/exif/erzeugen.py
+dss_add_test(tst_imageorientation)
+target_compile_definitions(tst_imageorientation PRIVATE
+  DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif" DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}")
+set_tests_properties(tst_imageorientation PROPERTIES FIXTURES_REQUIRED dss_media)
 
 # P09: Übersetzung von Qt ohne «ß» (Punkt 44), ohne Qt Gui.
 dss_add_test(tst_qmfile)
@@ -155,7 +160,7 @@ if(TARGET dss_media)
   target_link_libraries(tst_medien PRIVATE dss_media)
   # prozesshilfe.h braucht DSS_CORE_BIN, auch wenn hier nur dss-cli läuft.
   target_compile_definitions(tst_medien PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
-    DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+    DSS_CORE_BIN="$<TARGET_FILE:dss-core>" DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif")
   if(DSS_BUILD_CLI AND DSS_MEDIA_SIZE)
     target_compile_definitions(tst_medien PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
     add_dependencies(tst_medien dss-cli)
@@ -170,7 +175,8 @@ if(DSS_BUILD_APP AND DSS_APP_RENDERER)
   target_link_libraries(tst_leinwand PRIVATE dss_app_ui dss_media dss_warnings Qt6::Test)
   target_compile_definitions(tst_leinwand PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
     DSS_TEST_FONT="${DSS_TEST_FONT}"
-    DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf")
+    DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf"
+    DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif")
   add_test(NAME tst_leinwand COMMAND tst_leinwand)
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/leinwand-config)
   set_tests_properties(tst_leinwand PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media

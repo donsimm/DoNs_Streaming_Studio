@@ -1,6 +1,7 @@
 #include "overlaystore.h"
 
 #include "address.h"
+#include "imageorientation.h"
 #include "overlayjson.h"
 
 #include <QCoreApplication>
@@ -574,9 +575,16 @@ std::optional<QSize> OverlayStore::mediaSize(const QString &reference, QString *
         CachedSize cached;
         int width = 0;
         int height = 0;
-        if (m_mediaSizeReader(mediaFilePath(reference), &width, &height, &cached.reason)
+        const QString path = mediaFilePath(reference);
+        if (m_mediaSizeReader(path, &width, &height, &cached.reason)
             && width >= kSourceMinSize && height >= kSourceMinSize) {
+            // Bilder so gross, wie sie angezeigt werden (P09b, Entscheid 7): Der Leser gibt die
+            // gespeicherte Grösse, die EXIF-Ausrichtung 5 bis 8 vertauscht Breite und Höhe.
+            const bool image = allowedMediaSuffixes(MediaUse::Image)
+                                   .contains(QFileInfo(reference).suffix().toLower());
             cached.size = QSize(width, height);
+            if (image)
+                cached.size = orientedSize(*cached.size, imageFileOrientation(path));
         } else if (cached.reason.isEmpty()) {
             cached.reason = QStringLiteral("Grösse %1x%2").arg(width).arg(height);
         }

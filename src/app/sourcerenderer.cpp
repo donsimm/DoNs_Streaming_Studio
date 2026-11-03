@@ -1,13 +1,16 @@
 #include "sourcerenderer.h"
 
+#include "imageorientation.h"
 #include "videoplayer.h"
 #include "windowedit.h"
 
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QFontMetricsF>
+#include <QImageReader>
 #include <QPainter>
 #include <QRawFont>
+#include <QTransform>
 
 // Quellen:
 //   QPainter::translate/rotate/scale (positiv = im Uhrzeigersinn): https://doc.qt.io/qt-6.8/qpainter.html#rotate
@@ -19,6 +22,8 @@
 //   QRawFont::fromFont, fontTable: https://doc.qt.io/qt-6.8/qrawfont.html
 //   QThreadPool::start(std::function): https://doc.qt.io/qt-6.8/qthreadpool.html#start-1
 //   QTimer::PreciseTimer: https://doc.qt.io/qt-6.8/qt.html#TimerType-enum
+//   QImageReader::setAutoTransform: https://doc.qt.io/qt-6.8/qimagereader.html#setAutoTransform
+//   QImage::mirrored, QImage::transformed: https://doc.qt.io/qt-6.8/qimage.html#mirrored
 
 namespace {
 
@@ -138,11 +143,22 @@ void SourceRenderer::requestImage(const QString &reference)
     m_images.insert(reference, ImageEntry());
     const QString path = mediaPath(reference);
     m_loader.start([this, path, reference] {
-        QImage image(path);
-        if (image.isNull())
+        // EXIF-Ausrichtung selbst anwenden (P09b, Entscheid 7): Qt 6.8 dreht nicht von sich aus
+        // und liest eXIf in PNG nicht (geprüft 2026-11-03, P09b-Bericht).
+        QImageReader reader(path);
+        reader.setAutoTransform(false);
+        QImage image = reader.read();
+        if (image.isNull()) {
             qWarning("Bild nicht lesbar: %s", qPrintable(path));
-        else
+        } else {
+            const dss::OrientationSteps steps =
+                dss::orientationSteps(dss::imageFileOrientation(path));
+            if (steps.mirror)
+                image = image.mirrored(true, false);
+            if (steps.rotation != 0)
+                image = image.transformed(QTransform().rotate(steps.rotation));
             image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        }
         // Zurück in den Thread der Oberfläche. Der Destruktor wartet auf den Pool, this lebt also
         // noch; wird es danach gelöscht, verwirft Qt die Nachricht mit ihm.
         // https://doc.qt.io/qt-6.8/qmetaobject.html#invokeMethod-5
