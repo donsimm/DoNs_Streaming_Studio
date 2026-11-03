@@ -464,14 +464,20 @@ private slots:
         QVERIFY(header);
         for (const auto &[windowWidth, total] : {std::pair{1920, 600}, std::pair{1280, 426}}) {
             m_window->resize(windowWidth, 800);
-            QTRY_COMPARE_WITH_TIMEOUT(m_window->width(), windowWidth, 2000);
-            QCoreApplication::processEvents();
             const auto *cpu = header->findChild<QWidget *>(QStringLiteral("gaugeCpu"));
             const auto *ram = header->findChild<QWidget *>(QStringLiteral("gaugeRam"));
             const auto *lan = header->findChild<QWidget *>(QStringLiteral("gaugeLan"));
             const auto *left = header->findChild<QWidget *>(QStringLiteral("headerLeft"));
             QVERIFY(cpu && ram && lan && left);
-            QCOMPARE(cpu->width() + ram->width() + lan->width(), total);
+            // resize() setzt die Breite sofort; die Bestätigung des Fenstermanagers für die
+            // vorherige Grösse kann danach eintreffen und die Breite kurz zurücksetzen (P10a:
+            // 1 von 40 Läufen, Anzeige 600 bei Sollbreite 1280). Deshalb warten, bis Fenster und
+            // Anzeige zur Sollbreite passen, und danach ohne Ereignisverarbeitung prüfen.
+            const auto gaugesSum = [&] { return cpu->width() + ram->width() + lan->width(); };
+            QTRY_VERIFY2_WITH_TIMEOUT(m_window->width() == windowWidth && gaugesSum() == total,
+                                      qPrintable(QStringLiteral("Fenster %1, Anzeige %2")
+                                                     .arg(m_window->width()).arg(gaugesSum())),
+                                      3000);
             QCOMPARE(cpu->width(), dss::headerGaugeWidth(total, 0));
             QCOMPARE(ram->x(), cpu->x() + cpu->width());
             QCOMPARE(lan->x(), ram->x() + ram->width());
