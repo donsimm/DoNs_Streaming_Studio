@@ -64,9 +64,19 @@ Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf
 | IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten). Ob der Router eingehende IPv6-Verbindungen sperrt: nicht geprüft |
 | USB-Tethering | nicht mehr vorhanden |
 
+Streaming-PC (Ausgabe von `ip -br addr && ip route && ping -c 4 192.168.1.9` auf dem Streaming-PC, Angabe des Nutzers 2026-11-03, 19:59):
+
+| Angabe | Streaming-PC |
+|---|---|
+| Netzwerkkarte | `eno2`, `UP` (Kabel: nach dem Namen eine eingebaute Karte, nicht bestätigt); `wlo1` (WLAN) `DOWN` |
+| Adresse IPv4 | `192.168.1.116/24`, vom Router per DHCP; ob reserviert: nicht geprüft |
+| Router (Standardroute) | `192.168.1.1` über `eno2` |
+| IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten) |
+| Ping zum Studio-PC `192.168.1.9` | 4 von 4, 0 % Verlust, Zeit min/Mittel/max 0,139 / 0,313 / 0,582 ms, TTL 64 (gleiches Netz, kein Router dazwischen) |
+
 ## Streaming-PC (nicht Teil der Entwicklung)
 
-Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, ASUS ROG Maximus Z790 Dark Hero, Nobara. Dort läuft das Haupt-OBS, das meist Browserquellen nutzt.
+Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, ASUS ROG Maximus Z790 Dark Hero. Betriebssystem am 2026-11-03 noch Zorin OS (Rechnername `Dominik-Desktop`), Wechsel zu Nobara zeitnah geplant (Angabe des Nutzers). Dort läuft das Haupt-OBS, das meist Browserquellen nutzt.
 
 ## Nicht geprüft
 
