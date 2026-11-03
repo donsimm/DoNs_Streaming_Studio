@@ -5,6 +5,7 @@
 #include <QHash>
 #include <QList>
 #include <QLocalSocket>
+#include <QMap>
 #include <QObject>
 #include <QString>
 #include <QUuid>
@@ -86,6 +87,9 @@ public:
     qint64 sendChange(ChangeRequest request, const QString &coalesceKey = QString());
     // true, solange eine Änderung mit diesem Schlüssel unterwegs oder zurückgehalten ist.
     bool isChangePending(const QString &coalesceKey) const;
+    // P10-vor (Punkt 67): Namen der Dateien, die eigene Änderungen gerade übernehmen lassen
+    // (Kopie im Kern, bis change_result kommt), in der Reihenfolge des Schickens.
+    QStringList pendingImports() const;
 
     // Bittet den Kern, sich zu beenden (normales Schliessen des Fensters, Entscheid 1). Wartet
     // höchstens timeoutMs auf die Antwort und trennt danach die Verbindung; ohne Verbindung
@@ -105,6 +109,8 @@ signals:
     void fontsChanged();
     // Antwort auf eine Änderung (auch auf eine, die zurückgehalten war).
     void changeFinished(const dss::ChangeResult &result);
+    // pendingImports() hat sich geändert.
+    void pendingImportsChanged();
 
 private:
     void tryConnect();
@@ -141,6 +147,7 @@ private:
     QHash<qint64, QString> m_keyOfRequest;     // unterwegs: request_id → Schlüssel
     QHash<QString, qint64> m_requestOfKey;     // unterwegs: Schlüssel → request_id
     QHash<QString, ChangeRequest> m_heldChanges; // zurückgehalten je Schlüssel
+    QMap<qint64, QString> m_importNames;       // unterwegs mit Datei: request_id → Dateiname
     std::optional<SystemStats> m_lastStats;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;

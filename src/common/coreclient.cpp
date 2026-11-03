@@ -1,6 +1,7 @@
 #include "coreclient.h"
 
 #include <QDeadlineTimer>
+#include <QFileInfo>
 #include <QJsonObject>
 #include <QLocalSocket>
 #include <QProcess>
@@ -118,7 +119,23 @@ qint64 CoreClient::transmit(ChangeRequest request, const QString &coalesceKey)
         m_requestOfKey.insert(coalesceKey, request.requestId);
     }
     send(changeRequestMessage(request));
+    // Änderungen, für die der Kern zuerst eine Datei übernimmt (P10-vor): Hinweis im Fenster.
+    // Ein Verweis "media/…" (Schrift aus dem Datenordner) ist schon übernommen.
+    const bool imports = request.type == QLatin1String(msg::kAddImageSource)
+                         || request.type == QLatin1String(msg::kAddVideoSource)
+                         || request.type == QLatin1String(msg::kReplaceImageFile)
+                         || (request.type == QLatin1String(msg::kSetTextFont)
+                             && !validateMediaReference(request.file).isEmpty());
+    if (imports) {
+        m_importNames.insert(request.requestId, QFileInfo(request.file).fileName());
+        emit pendingImportsChanged();
+    }
     return request.requestId;
+}
+
+QStringList CoreClient::pendingImports() const
+{
+    return m_importNames.values();
 }
 
 bool CoreClient::isChangePending(const QString &coalesceKey) const
@@ -378,7 +395,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
             if (m_heldChanges.contains(key))
                 transmit(m_heldChanges.take(key), key);
         }
+        const bool imported = m_importNames.remove(result.requestId) > 0;
         emit changeFinished(result);
+        if (imported)
+            emit pendingImportsChanged();
     } else if (type == QLatin1String(msg::kError)) {
         ErrorInfo info;
         if (!parseError(message, &info, &error)) {
@@ -425,6 +445,10 @@ void CoreClient::clearData()
     m_keyOfRequest.clear();
     m_requestOfKey.clear();
     m_heldChanges.clear();
+    const bool hadImports = !m_importNames.isEmpty();
+    m_importNames.clear();
+    if (hadImports)
+        emit pendingImportsChanged();
     m_lastStats.reset();
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);

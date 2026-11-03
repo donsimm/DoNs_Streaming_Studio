@@ -16,19 +16,6 @@
 
 namespace dss {
 
-QStringList allowedMediaSuffixes(MediaUse use)
-{
-    switch (use) {
-    case MediaUse::Image:
-        return {QStringLiteral("png"), QStringLiteral("jpg"), QStringLiteral("jpeg")};
-    case MediaUse::Video:
-        return {QStringLiteral("webm"), QStringLiteral("mp4")};
-    case MediaUse::Font:
-        return {QStringLiteral("ttf"), QStringLiteral("otf")};
-    }
-    return {};
-}
-
 QString defaultDataDir(Edition edition)
 {
     // AppDataLocation hängt den Programmnamen an (<APPNAME>). Kern, Fenster und dss-cli
@@ -495,68 +482,23 @@ bool OverlayStore::setFolderExpanded(const QUuid &folderId, bool expanded, QStri
 
 QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString *error)
 {
-    const QFileInfo info(filePath);
-    const QString suffix = info.suffix().toLower();
-    const QStringList allowed = allowedMediaSuffixes(use);
-    if (!allowed.contains(suffix)) {
-        *error = QStringLiteral("Endung «%1» nicht erlaubt, erlaubt sind: %2.")
-                     .arg(info.suffix(), allowed.join(QStringLiteral(", ")));
-        return {};
-    }
-    QFile source(filePath);
-    if (!source.open(QIODevice::ReadOnly)) {
-        *error = QStringLiteral("%1 kann nicht gelesen werden (%2)").arg(filePath, source.errorString());
-        return {};
-    }
-    // Stückweise statt addData(QIODevice *), damit m_progress dazwischen laufen kann.
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    while (!source.atEnd()) {
-        const QByteArray chunk = source.read(1 << 20);
-        if (chunk.isEmpty() && source.error() != QFileDevice::NoError) {
-            *error = QStringLiteral("%1 kann nicht gelesen werden (%2)").arg(filePath, source.errorString());
-            return {};
-        }
-        hash.addData(chunk);
-        if (m_progress)
-            m_progress();
-    }
-    const QString reference = QStringLiteral("media/") + QString::fromLatin1(hash.result().toHex())
-                              + QLatin1Char('.') + suffix;
-    const QString target = mediaFilePath(reference);
-    if (QFileInfo::exists(target))
-        return reference; // gleicher Inhalt schon vorhanden: keine zweite Kopie
+    const MediaImportResult r = importMediaFile(mediaDir(), filePath, use, nullptr, m_progress);
+    if (r.reference.isEmpty())
+        *error = r.error;
+    return r.reference;
+}
 
-    if (!QDir().mkpath(mediaDir())) {
-        *error = QStringLiteral("Ordner %1 kann nicht angelegt werden.").arg(mediaDir());
+QString OverlayStore::resolveMedia(const QString &file, MediaUse use, QString *error)
+{
+    if (!validateMediaReference(file).isEmpty())
+        return importMedia(file, use, error);
+    // Verweis auf eine Kopie, die schon im Datenordner liegt.
+    if (!allowedMediaSuffixes(use).contains(QFileInfo(file).suffix())
+        || !QFileInfo::exists(mediaFilePath(file))) {
+        *error = QStringLiteral("Datei %1 fehlt im Datenordner.").arg(file);
         return {};
     }
-    source.seek(0);
-    QSaveFile copy(target);
-    if (!copy.open(QIODevice::WriteOnly)) {
-        *error = QStringLiteral("%1 kann nicht geschrieben werden (%2)").arg(target, copy.errorString());
-        return {};
-    }
-    // Inhalt beim Kopieren nochmals prüfen, falls sich die Datei seit dem Hashen geändert hat.
-    QCryptographicHash check(QCryptographicHash::Sha256);
-    while (!source.atEnd()) {
-        const QByteArray chunk = source.read(1 << 20);
-        if (chunk.isEmpty() && source.error() != QFileDevice::NoError)
-            break;
-        check.addData(chunk);
-        copy.write(chunk);
-        if (m_progress)
-            m_progress();
-    }
-    if (source.error() != QFileDevice::NoError || check.result() != hash.result()) {
-        copy.cancelWriting();
-        *error = QStringLiteral("%1 hat sich beim Kopieren geändert oder ist nicht lesbar.").arg(filePath);
-        return {};
-    }
-    if (!copy.commit()) {
-        *error = QStringLiteral("%1 kann nicht gespeichert werden (%2)").arg(target, copy.errorString());
-        return {};
-    }
-    return reference;
+    return file;
 }
 
 QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QString *error,
@@ -619,19 +561,21 @@ MediaSizes OverlayStore::mediaSizes(const Overlay &overlay) const
 }
 
 QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                                   bool loop, bool holdAtEnd, QString *error, QString *warning)
+                                   bool loop, bool holdAtEnd, QString *error, QString *warning,
+                                   const QString &sourceName)
 {
     if (!overlay(overlayId)) {
         *error = unknownOverlay(overlayId);
         return {};
     }
     const QString reference =
-        importMedia(filePath, kind == SourceKind::Image ? MediaUse::Image : MediaUse::Video, error);
+        resolveMedia(filePath, kind == SourceKind::Image ? MediaUse::Image : MediaUse::Video, error);
     if (reference.isEmpty())
         return {};
     Source source;
     source.kind = kind;
-    source.name = QFileInfo(filePath).fileName(); // ursprünglicher Dateiname als Vorschlag
+    // ursprünglicher Dateiname als Vorschlag
+    source.name = sourceName.isEmpty() ? QFileInfo(filePath).fileName() : sourceName;
     source.file = reference;
     source.loop = loop;
     source.holdAtEnd = holdAtEnd;
@@ -656,15 +600,18 @@ QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePa
 }
 
 QUuid OverlayStore::addImageSource(const QUuid &overlayId, const QString &filePath, QString *error,
-                                   QString *warning)
+                                   QString *warning, const QString &sourceName)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Image, false, false, error, warning);
+    return addMediaSource(overlayId, filePath, SourceKind::Image, false, false, error, warning,
+                          sourceName);
 }
 
 QUuid OverlayStore::addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
-                                   QString *error, QString *warning, bool holdAtEnd)
+                                   QString *error, QString *warning, bool holdAtEnd,
+                                   const QString &sourceName)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Video, loop, holdAtEnd, error, warning);
+    return addMediaSource(overlayId, filePath, SourceKind::Video, loop, holdAtEnd, error, warning,
+                          sourceName);
 }
 
 QUuid OverlayStore::addTextSource(const QUuid &overlayId, const QString &content,
@@ -674,7 +621,7 @@ QUuid OverlayStore::addTextSource(const QUuid &overlayId, const QString &content
         *error = unknownOverlay(overlayId);
         return {};
     }
-    const QString reference = importMedia(fontFilePath, MediaUse::Font, error);
+    const QString reference = resolveMedia(fontFilePath, MediaUse::Font, error);
     if (reference.isEmpty())
         return {};
     Source source;
@@ -754,20 +701,9 @@ bool OverlayStore::setTextFont(const QUuid &overlayId, const QUuid &sourceId,
         *error = e;
         return false;
     }
-    QString ref;
-    if (validateMediaReference(fontFile).isEmpty()) {
-        // Verweis auf eine Kopie, die schon im Datenordner liegt.
-        if (!allowedMediaSuffixes(MediaUse::Font).contains(QFileInfo(fontFile).suffix())
-            || !QFileInfo::exists(mediaFilePath(fontFile))) {
-            *error = QStringLiteral("Schriftdatei %1 fehlt im Datenordner.").arg(fontFile);
-            return false;
-        }
-        ref = fontFile;
-    } else {
-        ref = importMedia(fontFile, MediaUse::Font, error);
-        if (ref.isEmpty())
-            return false;
-    }
+    const QString ref = resolveMedia(fontFile, MediaUse::Font, error);
+    if (ref.isEmpty())
+        return false;
     const bool ok = modify(overlayId, [&](Overlay *o) {
         const int index = sourceIndex(*o, sourceId);
         Source changed = o->sources.at(index);
@@ -794,7 +730,7 @@ bool OverlayStore::replaceImageFile(const QUuid &overlayId, const QUuid &sourceI
         *error = e;
         return false;
     }
-    const QString ref = importMedia(filePath, MediaUse::Image, error);
+    const QString ref = resolveMedia(filePath, MediaUse::Image, error);
     if (ref.isEmpty())
         return false;
     return modify(overlayId, [&](Overlay *o) {

@@ -16,6 +16,9 @@ namespace {
 constexpr int kStatsIntervalMs = 1000; // Leistungswerte einmal pro Sekunde (Teil E)
 constexpr int kProbeTimeoutMs = 500;   // Prüfen, ob unter dem Pfad schon ein Kern antwortet
 constexpr qsizetype kMaxSocketPathBytes = 107;
+// Übernehmen (P10-vor, Punkt 67): höchstens zwei Dateien gleichzeitig. Eine kleine Datei wartet
+// so nicht hinter einer grossen; mehr Threads teilen sich nur dieselbe Platte.
+constexpr int kImportThreads = 2;
 
 } // namespace
 
@@ -32,6 +35,12 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath, QO
     m_store->setDeferredWrites(true);
     connect(m_saver, &dss::SaveScheduler::saveRequested, this, &CoreService::onSaveRequested);
     connect(m_fontLoader, &dss::FontCatalogLoader::finished, this, &CoreService::onFontsLoaded);
+#if DSS_CORE_IMPORT_THREAD
+    // Kopie und SHA-256 neuer Dateien in eigenen Threads (P10-vor, Punkt 67); Overlays und
+    // liste.json ändert der Kern weiterhin nur hier in der Hauptschleife (onImportFinished).
+    m_importer = new dss::MediaImporter(m_store->mediaDir(), kImportThreads, this);
+    connect(m_importer, &dss::MediaImporter::finished, this, &CoreService::onImportFinished);
+#endif
     // In P07 gibt es noch keine Verbindungen: alle «nicht eingerichtet» (grau).
     for (dss::Connection c : dss::kAllConnections)
         m_connectionStates.insert(c, dss::ConnectionState::Off);
@@ -42,6 +51,7 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath, QO
 
 CoreService::~CoreService()
 {
+    stopImports();
     QString error;
     if (!savePending(&error))
         qCritical("Nicht gespeichert: %s", qPrintable(error));
@@ -109,6 +119,17 @@ QList<dss::OverlaySummary> CoreService::summaries() const
 QJsonObject CoreService::listMessage() const
 {
     return dss::overlayListMessage(m_store->layout(), summaries(), m_store->layoutError());
+}
+
+int CoreService::stopImports()
+{
+    if (!m_importer || m_imports.isEmpty())
+        return 0;
+    const int count = m_importer->cancelAll();
+    for (const PendingImport &p : std::as_const(m_imports))
+        qWarning("Übernehmen abgebrochen: %s", qPrintable(p.file));
+    m_imports.clear();
+    return count;
 }
 
 bool CoreService::savePending(QString *error)
@@ -362,9 +383,36 @@ void CoreService::handleChange(QLocalSocket *socket, const QJsonObject &message)
         }
         return;
     }
+    dss::MediaUse use = dss::MediaUse::Image;
+    const QString file = m_importer ? fileToImport(request, &use) : QString();
+    if (!file.isEmpty()) {
+        // Zuerst übernehmen (Thread), dann ändern (onImportFinished). Kennungen jetzt schon
+        // prüfen, damit eine falsche Kennung nicht erst nach dem Kopieren auffällt; nach dem
+        // Übernehmen prüft applyChange sie nochmals (Overlay oder Quelle können inzwischen
+        // gelöscht sein).
+        if (std::optional<dss::ChangeResult> failure = checkIds(request)) {
+            failure->requestId = request.requestId;
+            qWarning("Änderung %s abgelehnt: %s", qPrintable(request.type), qPrintable(failure->message));
+            send(socket, dss::changeResultMessage(*failure));
+            return;
+        }
+        const quint64 job = m_importer->start(file, use);
+        PendingImport pending{socket, request, file, {}};
+        pending.timer.start();
+        m_imports.insert(job, pending);
+        qInfo("Übernehme %s für %s (%lld laufend)", qPrintable(file), qPrintable(request.type),
+              static_cast<long long>(m_imports.size()));
+        return;
+    }
+    finishChange(socket, request, nullptr);
+}
+
+void CoreService::finishChange(QLocalSocket *socket, const dss::ChangeRequest &request,
+                               const ImportedFile *imported)
+{
     const QList<dss::Overlay> before = m_store->overlays();
     const QJsonObject listBefore = listMessage();
-    dss::ChangeResult result = applyChange(request);
+    dss::ChangeResult result = applyChange(request, imported);
     result.requestId = request.requestId;
     // Zuerst an alle (auch an das Fenster, das die Änderung geschickt hat), dann die Antwort:
     // Das Fenster übernimmt den Zustand nur aus diesen Nachrichten (Teil A).
@@ -373,24 +421,70 @@ void CoreService::handleChange(QLocalSocket *socket, const QJsonObject &message)
         m_saver->changed();
     if (!result.ok)
         qWarning("Änderung %s abgelehnt: %s", qPrintable(request.type), qPrintable(result.message));
-    send(socket, dss::changeResultMessage(result));
+    // Ist das Fenster inzwischen getrennt (nach einem Übernehmen), gilt die Änderung trotzdem.
+    if (socket && m_clients.contains(socket))
+        send(socket, dss::changeResultMessage(result));
 }
 
-dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
+QString CoreService::fileToImport(const dss::ChangeRequest &r, dss::MediaUse *use) const
+{
+    using namespace dss;
+    const QString &type = r.type;
+    if (type == QLatin1String(msg::kAddImageSource) || type == QLatin1String(msg::kReplaceImageFile)) {
+        *use = MediaUse::Image;
+        return r.file;
+    }
+    if (type == QLatin1String(msg::kAddVideoSource)) {
+        *use = MediaUse::Video;
+        return r.file;
+    }
+    if (type == QLatin1String(msg::kAddTextSource)) {
+        *use = MediaUse::Font;
+        return defaultTextFontFile();
+    }
+    // Schrift: ein Verweis "media/…" ist schon übernommen.
+    if (type == QLatin1String(msg::kSetTextFont) && !validateMediaReference(r.file).isEmpty()) {
+        *use = MediaUse::Font;
+        return r.file;
+    }
+    return {};
+}
+
+void CoreService::onImportFinished(quint64 job, const dss::MediaImportResult &result)
+{
+    const auto it = m_imports.find(job);
+    if (it == m_imports.end())
+        return;
+    const PendingImport pending = *it;
+    m_imports.erase(it);
+    const double seconds = pending.timer.elapsed() / 1000.0;
+    if (result.reference.isEmpty()) {
+        qWarning("Übernehmen von %s gescheitert nach %.1f s: %s", qPrintable(pending.file), seconds,
+                 qPrintable(result.error));
+        const dss::ChangeResult failure{pending.request.requestId, false, QUuid(),
+                                        QString::fromLatin1(dss::err::kRejected), result.error};
+        qWarning("Änderung %s abgelehnt: %s", qPrintable(pending.request.type), qPrintable(result.error));
+        if (pending.socket && m_clients.contains(pending.socket.data()))
+            send(pending.socket.data(), dss::changeResultMessage(failure));
+        return;
+    }
+    qInfo("Übernommen: %s → %s (%.1f MiB, %.1f s%s)", qPrintable(pending.file),
+          qPrintable(result.reference), result.bytes / 1048576.0, seconds,
+          result.existed ? ", war schon vorhanden" : "");
+    const ImportedFile imported{result.reference, QFileInfo(pending.file).fileName()};
+    finishChange(pending.socket.data(), pending.request, &imported);
+}
+
+std::optional<dss::ChangeResult> CoreService::checkIds(const dss::ChangeRequest &r) const
 {
     using namespace dss;
     const auto fail = [](const char *code, const QString &message) {
         return ChangeResult{0, false, QUuid(), QString::fromLatin1(code), message};
     };
-    const auto done = [](bool ok, const QString &error, const QUuid &id = QUuid()) {
-        return ok ? ChangeResult{0, true, id, QString(), QString()}
-                  : ChangeResult{0, false, QUuid(), QString::fromLatin1(err::kRejected), error};
-    };
     const QString type = r.type;
     const auto is = [&type](const char *name) { return type == QLatin1String(name); };
     const QString idText = r.overlayId.toString(QUuid::WithoutBraces);
 
-    // Kennungen zuerst prüfen, damit das Fenster den Grund unterscheiden kann.
     const bool needsOverlay = !is(msg::kCreateOverlay) && !is(msg::kCreateFolder)
                                   && !is(msg::kRenameFolder) && !is(msg::kRemoveFolder)
                                   && !is(msg::kMoveFolder) && !is(msg::kSetFolderExpanded);
@@ -408,6 +502,28 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
     if (needsFolder && !m_store->layout().folder(r.folderId))
         return fail(err::kUnknownFolder, QStringLiteral("Kein Ordner mit der Kennung %1")
                                              .arg(r.folderId.toString(QUuid::WithoutBraces)));
+    return std::nullopt;
+}
+
+dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const ImportedFile *imported)
+{
+    using namespace dss;
+    const auto fail = [](const char *code, const QString &message) {
+        return ChangeResult{0, false, QUuid(), QString::fromLatin1(code), message};
+    };
+    const auto done = [](bool ok, const QString &error, const QUuid &id = QUuid()) {
+        return ok ? ChangeResult{0, true, id, QString(), QString()}
+                  : ChangeResult{0, false, QUuid(), QString::fromLatin1(err::kRejected), error};
+    };
+    const QString type = r.type;
+    const auto is = [&type](const char *name) { return type == QLatin1String(name); };
+
+    // Kennungen zuerst prüfen, damit das Fenster den Grund unterscheiden kann.
+    if (std::optional<ChangeResult> failure = checkIds(r))
+        return *failure;
+    // Schon übernommene Datei (Thread, P10-vor) statt des Pfads des Nutzers.
+    const QString file = imported ? imported->reference : r.file;
+    const QString sourceName = imported ? imported->sourceName : QString();
 
     QString error;
     if (is(msg::kCreateOverlay)) {
@@ -441,8 +557,9 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
         // Video: Standard «nicht wiederholen» und «nicht anhalten» (docs/01-festlegungen.md).
         QString warning;
         const QUuid id = is(msg::kAddImageSource)
-                             ? m_store->addImageSource(r.overlayId, r.file, &error, &warning)
-                             : m_store->addVideoSource(r.overlayId, r.file, false, &error, &warning);
+                             ? m_store->addImageSource(r.overlayId, file, &error, &warning, sourceName)
+                             : m_store->addVideoSource(r.overlayId, file, false, &error, &warning,
+                                                       false, sourceName);
         ChangeResult result = done(!id.isNull(), error, id);
         if (result.ok && !warning.isEmpty()) {
             qWarning("%s", qPrintable(warning));
@@ -455,7 +572,7 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
     if (is(msg::kAddTextSource)) {
         // Inhalt «Text», Standardschrift Be Vietnam Pro (Entscheid 4, E-11)
         const QUuid id = m_store->addTextSource(r.overlayId, QStringLiteral("Text"),
-                                                defaultTextFontFile(), &error);
+                                                imported ? file : defaultTextFontFile(), &error);
         if (!id.isNull()) {
             const Overlay *o = m_store->overlay(r.overlayId);
             addMediaFont(o->sources.at(sourceIndex(*o, id)).text.fontFile);
@@ -473,8 +590,8 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
         bool italic = r.italic.value_or(false);
         if (!r.weight || !r.italic) {
             // Eigene Datei: Gewicht und kursiv stehen in der Datei (fc-query).
-            const QString path = validateMediaReference(r.file).isEmpty()
-                                     ? m_store->mediaFilePath(r.file) : r.file;
+            const QString path = validateMediaReference(file).isEmpty()
+                                     ? m_store->mediaFilePath(file) : file;
             const QList<FontFace> faces = queryFontFiles({path}, FontOrigin::Media, &error);
             if (faces.isEmpty())
                 return fail(err::kRejected, QStringLiteral("%1 ist keine lesbare Schriftdatei%2")
@@ -485,14 +602,14 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
             error.clear();
         }
         QString reference;
-        const bool ok = m_store->setTextFont(r.overlayId, r.sourceId, r.file, weight, italic, &error,
+        const bool ok = m_store->setTextFont(r.overlayId, r.sourceId, file, weight, italic, &error,
                                              &reference);
         if (ok)
             addMediaFont(reference);
         return done(ok, error);
     }
     if (is(msg::kReplaceImageFile))
-        return done(m_store->replaceImageFile(r.overlayId, r.sourceId, r.file, &error), error);
+        return done(m_store->replaceImageFile(r.overlayId, r.sourceId, file, &error), error);
     return fail(err::kUnknownType, QStringLiteral("Unbekannte Änderung «%1»").arg(type));
 }
 

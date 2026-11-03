@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fontcatalog.h"
+#include "mediaimport.h"
 #include "overlaystore.h"
 #include "protocol.h"
 #include "savescheduler.h"
@@ -43,6 +44,11 @@ public:
 
     int clientCount() const { return int(m_clients.size()); }
 
+    // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
+    // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
+    // DSS_CORE_IMPORT_THREAD aus) immer 0.
+    int stopImports();
+
     // Schreibt alle Änderungen, die noch nicht gespeichert sind (vor dem Beenden, vor dem Neu
     // laden). false mit Meldung, wenn etwas nicht gespeichert werden konnte.
     bool savePending(QString *error);
@@ -76,7 +82,23 @@ private:
     std::pair<int, int> broadcastDifferences(const QList<dss::Overlay> &before,
                                              const QJsonObject &listBefore);
     void handleChange(QLocalSocket *socket, const QJsonObject &message);
-    dss::ChangeResult applyChange(const dss::ChangeRequest &request);
+    // Datei, die vor der Änderung schon übernommen wurde (P10-vor, Punkt 67).
+    struct ImportedFile
+    {
+        QString reference;  // "media/…"
+        QString sourceName; // ursprünglicher Dateiname (Name neuer Bild- und Videoquellen)
+    };
+    // Prüft die Kennungen (Overlay, Quelle, Ordner); bei einem Fehler das Ergebnis.
+    std::optional<dss::ChangeResult> checkIds(const dss::ChangeRequest &request) const;
+    dss::ChangeResult applyChange(const dss::ChangeRequest &request,
+                                  const ImportedFile *imported = nullptr);
+    // Wendet die Änderung an, schickt die Unterschiede an alle und change_result an socket
+    // (nullptr bzw. getrennt: keine Antwort).
+    void finishChange(QLocalSocket *socket, const dss::ChangeRequest &request,
+                      const ImportedFile *imported);
+    // Datei, die die Änderung zuerst übernehmen muss, und wofür; leer, wenn keine.
+    QString fileToImport(const dss::ChangeRequest &request, dss::MediaUse *use) const;
+    void onImportFinished(quint64 job, const dss::MediaImportResult &result);
     void onSaveRequested();
     // Schriften (Teil F): beim ersten get_fonts geladen, danach aus dem Zwischenspeicher.
     void handleGetFonts(QLocalSocket *socket);
@@ -102,4 +124,14 @@ private:
     QList<dss::FontFace> m_fonts;
     QString m_fontError;
     QList<QPointer<QLocalSocket>> m_fontWaiters;
+    // Übernehmen im eigenen Thread (P10-vor, Punkt 67); nullptr ohne DSS_CORE_IMPORT_THREAD.
+    dss::MediaImporter *m_importer = nullptr;
+    struct PendingImport
+    {
+        QPointer<QLocalSocket> socket;
+        dss::ChangeRequest request;
+        QString file;
+        QElapsedTimer timer; // seit Beginn des Übernehmens (Protokoll)
+    };
+    QHash<quint64, PendingImport> m_imports;
 };

@@ -64,5 +64,8 @@ double rotationDegrees(int tenthDegrees);
 
 // Statuszeile rechts.
 QString coreStatusText(bool connected); // «Kern-Dienst: verbunden» / «… nicht verbunden»
+// P10-vor (Punkt 67): Hinweis, solange der Kern Dateien übernimmt: leer, «Übernehme «a.png» …»,
+// «Übernehme 2 Dateien («a.png», «b.mp4») …».
+QString importStatusText(const QStringList &fileNames);
 
 } // namespace dss

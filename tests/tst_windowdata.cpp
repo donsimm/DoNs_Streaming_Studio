@@ -73,6 +73,11 @@ private slots:
         QCOMPARE(rotationDegrees(3599), 359.9);
         QCOMPARE(coreStatusText(true), QStringLiteral("Kern-Dienst: verbunden"));
         QCOMPARE(coreStatusText(false), QStringLiteral("Kern-Dienst: nicht verbunden"));
+        // P10-vor: laufende Übernahmen
+        QCOMPARE(importStatusText({}), QString());
+        QCOMPARE(importStatusText({QStringLiteral("a.png")}), QStringLiteral("Übernehme «a.png» …"));
+        QCOMPARE(importStatusText({QStringLiteral("a.png"), QStringLiteral("b.mp4")}),
+                 QStringLiteral("Übernehme 2 Dateien («a.png», «b.mp4») …"));
     }
 };
 

@@ -164,6 +164,7 @@ private:
     PropertiesDock m_propertiesDock;
     ControlDock m_controlDock;
     QLabel *m_statusMessage = nullptr;
+    QLabel *m_importStatus = nullptr; // P10-vor: «Übernehme …», solange der Kern Dateien kopiert
     QLabel *m_coreStatus = nullptr;
     bool m_firstPaintReported = false;
 

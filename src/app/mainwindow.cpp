@@ -196,6 +196,11 @@ void MainWindow::createStatusBar()
     zoom->addItem(QStringLiteral("Einpassen"));
     zoom->setToolTip(QStringLiteral("Zoom"));
     statusBar()->addPermanentWidget(zoom);
+    // Laufende Übernahmen (P10-vor, Punkt 67): immer da, leer ohne Übernahme (keine Änderung
+    // der Anordnung beim Wechsel).
+    m_importStatus = new QLabel(this);
+    m_importStatus->setObjectName(QStringLiteral("importStatus"));
+    statusBar()->addPermanentWidget(m_importStatus);
     m_coreStatus = new QLabel(dss::coreStatusText(false), this);
     m_coreStatus->setObjectName(QStringLiteral("coreStatus"));
     m_coreStatus->setProperty("state", QStringLiteral("disconnected"));
@@ -256,6 +261,9 @@ void MainWindow::connectCore()
             refreshOverlay();
     });
     connect(m_client, &dss::CoreClient::errorReceived, this, &MainWindow::onCoreError);
+    connect(m_client, &dss::CoreClient::pendingImportsChanged, this, [this] {
+        m_importStatus->setText(dss::importStatusText(m_client->pendingImports()));
+    });
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
     connect(m_sourcesDock.list, &QListWidget::currentItemChanged, this,

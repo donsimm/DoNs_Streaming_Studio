@@ -99,4 +99,17 @@ QString coreStatusText(bool connected)
                      : QStringLiteral("Kern-Dienst: nicht verbunden");
 }
 
+QString importStatusText(const QStringList &fileNames)
+{
+    if (fileNames.isEmpty())
+        return {};
+    QStringList quoted;
+    for (const QString &name : fileNames)
+        quoted.append(QStringLiteral("«%1»").arg(name));
+    if (fileNames.size() == 1)
+        return QStringLiteral("Übernehme %1 …").arg(quoted.first());
+    return QStringLiteral("Übernehme %1 Dateien (%2) …")
+        .arg(fileNames.size()).arg(quoted.join(QStringLiteral(", ")));
+}
+
 } // namespace dss

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "configpaths.h"
+#include "mediaimport.h"
 #include "overlay.h"
 #include "overlaylist.h"
 #include "tokenstore.h"
@@ -27,12 +28,6 @@
 // Overlay im Speicher unverändert.
 
 namespace dss {
-
-// Wofür eine Datei des Nutzers verwendet wird; bestimmt die erlaubten Endungen.
-enum class MediaUse { Image, Video, Font };
-
-// Erlaubte Endungen (Kleinbuchstaben), siehe docs/06-overlay-format.md
-QStringList allowedMediaSuffixes(MediaUse use);
 
 // Datenordner nach QStandardPaths::AppDataLocation mit dem Programmnamen appDirName(edition),
 // unter Linux ~/.local/share/dons-streaming-studio (bzw. $XDG_DATA_HOME/…) im Einsatz und
@@ -99,8 +94,12 @@ public:
     bool setFolderExpanded(const QUuid &folderId, bool expanded, QString *error);
 
     // Kopiert eine Datei nach media/<SHA-256>.<Endung> (gleicher Inhalt → eine Kopie)
-    // und gibt den Verweis "media/…" zurück, bei Fehler einen leeren Text.
+    // und gibt den Verweis "media/…" zurück, bei Fehler einen leeren Text. Läuft im Thread des
+    // Aufrufs (dss-cli; der Kern übernimmt seit P10-vor mit MediaImporter in einem eigenen
+    // Thread und gibt danach den Verweis weiter).
     QString importMedia(const QString &filePath, MediaUse use, QString *error);
+    // Ordner der Kopien: <Datenordner>/media
+    QString mediaDir() const;
 
     // Liest die Grösse einer Bild- oder Videodatei in Pixeln (Bild: Pixel, Video: erstes Bild).
     // false mit Meldung, wenn die Datei nicht lesbar ist. Gesetzt von Kern und dss-cli
@@ -124,12 +123,16 @@ public:
     // nicht lesen, gilt die Grösse des Overlays und *warning (falls nicht nullptr) nennt den
     // Grund. Text und Bild/Video ohne MediaSizeReader: Grösse des Overlays.
     // Name: ursprünglicher Dateiname bzw. «Text: <erste Zeile>».
+    // filePath (auch fontFilePath, unten filePath von replaceImageFile) ist ein Pfad (die Datei
+    // wird kopiert) oder seit P10-vor ein Verweis "media/…" auf eine schon übernommene Kopie;
+    // dann ist sourceName der Name der Quelle (leer: Name der Kopie).
     QUuid addImageSource(const QUuid &overlayId, const QString &filePath, QString *error,
-                         QString *warning = nullptr);
+                         QString *warning = nullptr, const QString &sourceName = QString());
     // loop: am Ende wiederholen (Standard im Modell: nicht wiederholen); holdAtEnd: am Ende
     // anhalten (P09, Standard aus).
     QUuid addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
-                         QString *error, QString *warning = nullptr, bool holdAtEnd = false);
+                         QString *error, QString *warning = nullptr, bool holdAtEnd = false,
+                         const QString &sourceName = QString());
     QUuid addTextSource(const QUuid &overlayId, const QString &content,
                         const QString &fontFilePath, QString *error);
     bool removeSource(const QUuid &overlayId, const QUuid &sourceId, QString *error);
@@ -167,7 +170,8 @@ public:
 
 private:
     QString overlaysDir() const;
-    QString mediaDir() const;
+    // Verweis "media/…" auf eine vorhandene Kopie mit erlaubter Endung, oder Pfad übernehmen.
+    QString resolveMedia(const QString &file, MediaUse use, QString *error);
     QSet<QString> takenAddresses(const QUuid &except = QUuid()) const;
     bool writeOverlay(const Overlay &overlay, QString *error);
     // Speichert ein neues Overlay mit neuem Token; ohne Token wird die Datei wieder entfernt.
@@ -176,7 +180,8 @@ private:
     bool modify(const QUuid &overlayId, const std::function<QString(Overlay *)> &change,
                 QString *error);
     QUuid addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                         bool loop, bool holdAtEnd, QString *error, QString *warning);
+                         bool loop, bool holdAtEnd, QString *error, QString *warning,
+                         const QString &sourceName);
     // size: Grösse der neuen Quelle, ohne Angabe die des Overlays.
     QUuid addPreparedSource(const QUuid &overlayId, Source source, QString *error,
                             std::optional<std::pair<int, int>> size = std::nullopt);

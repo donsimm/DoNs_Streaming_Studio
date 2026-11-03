@@ -44,7 +44,8 @@ RUNNING_S = 1.0
 
 CORE = "src/core/dss-core"
 UNIT_MISSING = "dss-startpruefung-gibt-es-nicht.service"
-CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: "]
+CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: ",
+                 "Aufräumen media/: 0 vorläufige Dateien"]
 
 # Programm, Signal zum Beenden, Muster der Startzeile, erwartete Protokollzeilen
 CASES = {

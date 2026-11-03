@@ -200,3 +200,11 @@ if(DSS_BUILD_APP AND DSS_APP_RENDERER)
   set_tests_properties(tst_leinwand PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/leinwand-config")
 endif()
+
+# P10-vor (Punkte 67, 68): Übernehmen im eigenen Thread, Aufräumen beim Start, ohne Qt Gui;
+# Kern als eigener Prozess mit eigenem Datenordner.
+dss_add_test(tst_uebernehmen)
+target_compile_definitions(tst_uebernehmen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}")
+add_dependencies(tst_uebernehmen dss-core)
+set_tests_properties(tst_uebernehmen PROPERTIES FIXTURES_REQUIRED dss_media)

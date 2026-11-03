@@ -12,6 +12,7 @@
 #include <QTest>
 
 #include <memory>
+#include <vector>
 
 namespace testhelp {
 
@@ -23,12 +24,25 @@ inline std::unique_ptr<QTemporaryDir> runtimeDir()
         + QStringLiteral("/dss-test-XXXXXX"));
 }
 
-// Startet dss-core mit eigenem Datenordner und eigener Verbindung; Protokoll auf stderr wird
-// gesammelt (readAllStandardError).
-inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString &socketPath)
+// Eigener Ordner der Einstellungen (XDG_CONFIG_HOME) für jeden gestarteten Kern (P10-vor): Der
+// Kern schreibt dort kern.ini, nie in ~/.config. Die Ordner bleiben bis zum Ende des Tests.
+inline QString testConfigHome()
+{
+    static std::vector<std::unique_ptr<QTemporaryDir>> dirs;
+    dirs.push_back(std::make_unique<QTemporaryDir>());
+    return dirs.back()->path();
+}
+
+// Startet dss-core mit eigenem Datenordner, eigener Verbindung und eigenem Ordner der
+// Einstellungen; Protokoll auf stderr wird gesammelt (readAllStandardError).
+inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString &socketPath,
+                                           const QString &configHome = testConfigHome())
 {
     auto p = std::make_unique<QProcess>();
     p->setProcessChannelMode(QProcess::SeparateChannels);
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert(QStringLiteral("XDG_CONFIG_HOME"), configHome);
+    p->setProcessEnvironment(env);
     p->start(QStringLiteral(DSS_CORE_BIN),
              {QStringLiteral("--datenordner"), dataDir, QStringLiteral("--verbindung"), socketPath});
     return p;

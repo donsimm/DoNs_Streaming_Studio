@@ -8,6 +8,7 @@
 #include "dataformat.h"
 #include "datalock.h"
 #include "logging.h"
+#include "mediaimport.h"
 #include "overlaystore.h"
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
@@ -152,6 +153,21 @@ int main(int argc, char *argv[])
         return kExitAlreadyRunning;
     }
 
+    // Reste von QSaveFile in media/ (Punkt 68): Nach einem Absturz oder SIGKILL mitten im
+    // Übernehmen kann eine vorläufige Datei liegen bleiben (unter Linux nur, wenn das Dateisystem
+    // keine Dateien ohne Namen kann, mediaimport.h). Jetzt läuft keine Übernahme, und die Sperre
+    // hält nur dieser Kern.
+    {
+        const dss::LeftoverCleanup cleanup =
+            dss::removeSaveFileLeftovers(dataDir + QStringLiteral("/media"));
+        for (const QString &f : cleanup.removed)
+            qInfo("Aufräumen: vorläufige Datei gelöscht: media/%s", qPrintable(f));
+        for (const QString &f : cleanup.failed)
+            qWarning("Aufräumen: nicht gelöscht: media/%s", qPrintable(f));
+        qInfo("Aufräumen media/: %d vorläufige Dateien von QSaveFile gelöscht (%lld Byte)",
+              cleanup.count, static_cast<long long>(cleanup.bytes));
+    }
+
     dss::OverlayStore store(dataDir);
 #if DSS_MEDIA_SIZE
     // Grösse neuer Bild- und Videoquellen aus der Datei (P09, Entscheid 6)
@@ -204,8 +220,12 @@ int main(int argc, char *argv[])
     const auto watchdogTime = dss::watchdogTimeout();
     QElapsedTimer sinceWatchdog;
     if (watchdogTime.count() > 0) {
+#if !DSS_CORE_IMPORT_THREAD
         // Beim Übernehmen einer grossen Datei steht die Hauptschleife lange still (1 GiB etwa
         // 16 s, Bericht P10a); das ist kein Hängen. Dann höchstens einmal je Sekunde melden.
+        // Mit DSS_CORE_IMPORT_THREAD entfällt das (P10-vor): Die Hauptschleife steht beim
+        // Übernehmen nicht still, und eine Meldung aus dem Thread würde eine hängende
+        // Hauptschleife verdecken.
         sinceWatchdog.start();
         store.setProgressCallback([&sinceWatchdog] {
             if (sinceWatchdog.elapsed() < 1000)
@@ -213,6 +233,7 @@ int main(int argc, char *argv[])
             dss::notifySystemd("WATCHDOG=1");
             sinceWatchdog.restart();
         });
+#endif
         const auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(watchdogTime / 2);
         watchdog.setInterval(std::max<std::chrono::milliseconds>(interval, std::chrono::milliseconds(1)));
         QObject::connect(&watchdog, &QTimer::timeout, [] { dss::notifySystemd("WATCHDOG=1"); });
@@ -224,6 +245,13 @@ int main(int argc, char *argv[])
 #endif
     const int rc = app.exec();
     dss::notifySystemd("STOPPING=1");
+    // Laufende Übernahmen abbrechen (P10-vor, Punkt 67): QSaveFile verwirft die vorläufigen
+    // Dateien, unter dem endgültigen Namen entsteht nichts.
+    QElapsedTimer stopping;
+    stopping.start();
+    if (const int canceled = service.stopImports(); canceled > 0)
+        qInfo("%d Übernahmen abgebrochen (%lld ms)", canceled,
+              static_cast<long long>(stopping.elapsed()));
     // Änderungen, die noch nicht in der Datei sind, vor dem Beenden speichern (P08, Teil A).
     if (!service.savePending(&error))
         qCritical("Beim Beenden nicht gespeichert: %s", qPrintable(error));

@@ -30,6 +30,10 @@ set(DSS_COMMIT "" CACHE STRING "Commit des Baus für --version (scripts/installi
 # P10a (Punkt 41): Der Kern meldet sich regelmässig bei systemd (Watchdog). Aus: keine Meldung,
 # WatchdogSec in der Einheit darf dann nicht gesetzt sein.
 option(DSS_CORE_WATCHDOG "Kern meldet sich beim Watchdog von systemd (P10a)" ON)
+# P10-vor (Punkt 67): Der Kern übernimmt neue Dateien (Kopie, SHA-256) in eigenen Threads und
+# beantwortet währenddessen weiter Nachrichten. Aus: Übernehmen in der Hauptschleife wie P10a
+# (mit der zusätzlichen Meldung an den Watchdog nach jedem MiB).
+option(DSS_CORE_IMPORT_THREAD "Kern übernimmt Dateien in eigenen Threads (P10-vor)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html
