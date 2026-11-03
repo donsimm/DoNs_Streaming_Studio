@@ -18,7 +18,8 @@
 // Nachricht pro Zeile.
 // Vollständige Beschreibung: docs/08-kern-schnittstelle.md. Hier steht nur das Umwandeln von
 // Nachrichten in Daten und zurück, ohne Verbindung und ohne Qt Gui (CLAUDE.md Regel 9).
-// Der Token eines Overlays kommt in keiner Nachricht vor (CLAUDE.md Regel 12).
+// Der Token eines Overlays steht nur in browser_source (seit Version 7, P10), und nur an die
+// Verbindung, die mit get_browser_source danach fragt; nie im Protokoll (CLAUDE.md Regel 12).
 
 namespace dss {
 
@@ -30,8 +31,10 @@ namespace dss {
 // 5 seit P10-vor: Einstellungen des Kerns (get_settings, settings, update_settings)
 // 6 seit P10: Overlays im Format 4 (output, E-24), overlay_list mit output, Änderung
 //   set_overlay_output
+// 7 seit P10: Neuer Token (new_token), Adresse der Browserquelle (get_browser_source,
+//   browser_source)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 6;
+inline constexpr int kProtocolVersion = 7;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -79,6 +82,10 @@ inline constexpr char kSettings[] = "settings";
 inline constexpr char kUpdateSettings[] = "update_settings";
 // P10: Ausgabe ein/aus (E-24)
 inline constexpr char kSetOverlayOutput[] = "set_overlay_output";
+// P10: Neuer Token und Adresse der Browserquelle (E-12)
+inline constexpr char kNewToken[] = "new_token";
+inline constexpr char kGetBrowserSource[] = "get_browser_source";
+inline constexpr char kBrowserSource[] = "browser_source";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -290,5 +297,23 @@ struct SettingsUpdate
 };
 QJsonObject settingsUpdateMessage(const SettingsUpdate &update);
 bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QString *error);
+
+// browser_source (P10): Adresse der Browserquelle eines Overlays mit Token, nur an die Verbindung,
+// die mit get_browser_source danach gefragt hat; danach nach jeder Änderung der Adresse (neuer
+// Token, neue lesbare Adresse, Port, Adresse im Heimnetz) von selbst. url leer: keine Adresse
+// möglich, Grund in problem.
+struct BrowserSourceInfo
+{
+    QUuid overlayId;
+    QString url;
+    QString problem;
+
+    bool operator==(const BrowserSourceInfo &) const = default;
+};
+QJsonObject browserSourceMessage(const BrowserSourceInfo &info);
+bool parseBrowserSource(const QJsonObject &message, BrowserSourceInfo *info, QString *error);
+// get_browser_source: Kennung des Overlays; null = keine Adresse mehr schicken.
+QJsonObject getBrowserSourceMessage(const QUuid &overlayId);
+bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString *error);
 
 } // namespace dss

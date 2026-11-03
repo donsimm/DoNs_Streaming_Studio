@@ -32,6 +32,7 @@ add_library(dss_common STATIC
   mediaimport.h mediaimport.cpp
   coresettings.h coresettings.cpp
   coresession.h coresession.cpp
+  browsersource.h browsersource.cpp
   canvasimage.h canvasimage.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -72,10 +72,14 @@ struct CliResult
 };
 
 #ifdef DSS_CLI_BIN
-inline CliResult runCli(const QString &dataDir, const QStringList &args)
+// input: Eingabe auf stdin (zum Beispiel die Antwort auf eine Rückfrage); stdin wird danach
+// geschlossen, damit eine Rückfrage nie wartet.
+inline CliResult runCli(const QString &dataDir, const QStringList &args, const QByteArray &input = {})
 {
     QProcess p;
     p.start(QStringLiteral(DSS_CLI_BIN), QStringList{QStringLiteral("--datenordner"), dataDir} + args);
+    p.write(input);
+    p.closeWriteChannel();
     p.waitForFinished(10000);
     return {p.exitStatus() == QProcess::NormalExit ? p.exitCode() : -1,
             QString::fromUtf8(p.readAllStandardOutput()), QString::fromUtf8(p.readAllStandardError())};

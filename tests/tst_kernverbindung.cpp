@@ -6,6 +6,7 @@
 // Daten wie im Handtest (CLAUDE.md Regel 7): Bild und Video aus prototypes/media, Schrift
 // DejaVu Sans.
 
+#include "browsersource.h"
 #include "coreclient.h"
 #include "coresettings.h"
 #include "overlayjson.h"
@@ -185,7 +186,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 6); // seit P10
+        QCOMPARE(c->coreHello().protocolVersion, 7); // seit P10
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -454,6 +455,83 @@ private slots:
         QCOMPARE(cli.exitCode, 4);
         QVERIFY2(cli.err.contains(QStringLiteral("ändert nur der Kern")), qPrintable(cli.err));
 #endif
+    }
+
+    // P10: Adresse der Browserquelle mit Token nur an die Verbindung, die danach fragt; nach
+    // neuem Token und neuem Port von selbst neu; nie im Protokoll.
+    void browserSource()
+    {
+        const QString detected = detectHomeAddress();
+        if (detected.isEmpty())
+            QSKIP("Keine Adresse im Heimnetz auf diesem PC (Standardroute fehlt)");
+        const QString address = storedOverlay(m_overviewId).address;
+        const auto storedToken = [&] {
+            OverlayStore store(m_data.path());
+            QString error;
+            store.load(&error, OverlayStore::LoadMode::ReadOnly);
+            return store.token(m_overviewId);
+        };
+        RawConnection one(m_socket);
+        RawConnection two(m_socket);
+        one.hello(QStringLiteral("dss-app"));
+        two.hello(QStringLiteral("dss-app"));
+        QVERIFY(!one.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        QVERIFY(!two.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        one.sendLine(encodeMessage(getBrowserSourceMessage(m_overviewId)).chopped(1));
+        BrowserSourceInfo info;
+        QString error;
+        QVERIFY2(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error),
+                 qPrintable(error));
+        const QString oldToken = storedToken();
+        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, oldToken));
+        QVERIFY(info.problem.isEmpty());
+
+        // Neuer Token: neue Adresse an one, nichts an two, Protokoll ohne Token
+        ChangeRequest r;
+        r.type = QString::fromLatin1(msg::kNewToken);
+        r.requestId = 11;
+        r.overlayId = m_overviewId;
+        one.sendLine(encodeMessage(changeRequestMessage(r)).chopped(1));
+        QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
+        ChangeResult result;
+        QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &result, &error));
+        QVERIFY2(result.ok, qPrintable(result.message));
+        const QString newToken = storedToken();
+        QVERIFY(newToken != oldToken);
+        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, newToken));
+        QVERIFY(waitForLog(m_core.get(), QStringLiteral("Neuer Token für Overlay «Überblick Start» (/o/%1/…): "
+                                                        "die alte Adresse gilt nicht mehr").arg(address),
+                           &m_coreLog));
+        QVERIFY(two.waitFor(QStringLiteral("browser_source"), 300).isEmpty());
+        QVERIFY(!two.allLines().contains(newToken.toLatin1()));
+        QVERIFY(!two.allLines().contains(oldToken.toLatin1()));
+
+        // Neuer Port: neue Adresse von selbst
+        one.sendLine("{\"type\":\"update_settings\",\"request_id\":12,\"port\":9001}");
+        QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
+        QCOMPARE(info.url, browserSourceUrl(detected, 9001, address, newToken));
+        one.sendLine(QStringLiteral("{\"type\":\"update_settings\",\"request_id\":13,\"port\":%1}")
+                         .arg(defaultCoreSettings().port).toUtf8());
+        QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
+        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, newToken));
+
+        // Unbekanntes Overlay: problem; null: keine Adresse mehr
+        one.sendLine(encodeMessage(getBrowserSourceMessage(QUuid::createUuid())).chopped(1));
+        QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
+        QVERIFY(info.url.isEmpty());
+        QCOMPARE(info.problem, QStringLiteral("Kein Overlay mit dieser Kennung."));
+        one.sendLine(encodeMessage(getBrowserSourceMessage(QUuid())).chopped(1));
+        r.requestId = 14;
+        one.sendLine(encodeMessage(changeRequestMessage(r)).chopped(1));
+        const qsizetype seen = one.allLines().size();
+        QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &result, &error));
+        QVERIFY(result.ok);
+        QVERIFY(one.waitFor(QStringLiteral("browser_source"), 300).isEmpty());
+        QVERIFY(!one.allLines().mid(seen).contains("browser_source"));
+
+        m_overviewToken = storedToken();
+        QVERIFY(!m_coreLog.contains(oldToken) && !m_coreLog.contains(newToken)
+                && !m_coreLog.contains(m_overviewToken));
     }
 
     // Ungültige kern.ini: Kern startet mit Standardwerten, meldet den Fehler, schreibt die Datei

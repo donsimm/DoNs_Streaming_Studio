@@ -84,6 +84,9 @@ public:
     bool setOverlaySize(const QUuid &overlayId, int width, int height, QString *error);
     // P10 (E-24): Ausgabe an die Browserquelle ein/aus.
     bool setOverlayOutput(const QUuid &overlayId, bool output, QString *error);
+    // P10 (Teil A 8): neuer Token für die Browserquelle, sofort in tokens.json gespeichert. Die
+    // alte Adresse gilt danach nicht mehr.
+    bool newToken(const QUuid &overlayId, QString *error);
 
     // Liste (P08, Teil B): jede Änderung wird sofort atomar in liste.json gespeichert. Ist
     // liste.json kaputt, werden diese Änderungen abgewiesen (die Datei wird nicht überschrieben).

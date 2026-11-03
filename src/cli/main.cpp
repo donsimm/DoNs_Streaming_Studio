@@ -57,6 +57,7 @@ const char *const kUsageTemplate =
     "  overlay-umbenennen ADRESSE NEUER_NAME [--adresse-mitaendern]\n"
     "  overlay-kopieren ADRESSE\n"
     "  overlay-loeschen ADRESSE\n"
+    "  neuer-token ADRESSE [--ja]\n"
     "  quelle-liste ADRESSE\n"
     "  quelle-bild ADRESSE DATEI\n"
     "  quelle-video ADRESSE DATEI [--wiederholen] [--am-ende-anhalten]\n"
@@ -74,6 +75,8 @@ const char *const kUsageTemplate =
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
     "--waagrecht-gespiegelt, --senkrecht-gespiegelt: Inhalt im Kasten spiegeln (ohne: nicht\n"
     "gespiegelt). Breite und Höhe bleiben positiv.\n"
+    "neuer-token: neuer Token für die Browserquelle (P10). Die alte Adresse funktioniert danach\n"
+    "nicht mehr; dss-cli fragt vorher nach (--ja: ohne Rückfrage). Der Token wird nicht ausgegeben.\n"
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/%1).\n"
     "overlay-liste und quelle-liste gehen immer. Alle anderen Befehle ändern Overlays und gehen\n"
     "nur, wenn der Kern angehalten ist (systemctl --user stop %2).\n"
@@ -101,6 +104,7 @@ struct Arguments
     bool holdAtEnd = false;
     bool flipHorizontal = false; // P09b
     bool flipVertical = false;   // P09b
+    bool yes = false;            // P10: neuer-token ohne Rückfrage
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -132,6 +136,8 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->flipHorizontal = true;
         } else if (a == QLatin1String("--senkrecht-gespiegelt")) {
             result->flipVertical = true;
+        } else if (a == QLatin1String("--ja")) {
+            result->yes = true;
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -221,6 +227,8 @@ public:
             return usage(QStringLiteral("--wiederholen gilt nur für quelle-video."));
         if (command != QLatin1String("quelle-video") && m_args.holdAtEnd)
             return usage(QStringLiteral("--am-ende-anhalten gilt nur für quelle-video."));
+        if (command != QLatin1String("neuer-token") && m_args.yes)
+            return usage(QStringLiteral("--ja gilt nur für neuer-token."));
         if (command != QLatin1String("quelle-geometrie") && (m_args.flipHorizontal || m_args.flipVertical))
             return usage(QStringLiteral("--waagrecht-gespiegelt und --senkrecht-gespiegelt gelten nur für "
                                         "quelle-geometrie."));
@@ -237,6 +245,7 @@ public:
             {"overlay-umbenennen", 2, [this](const QStringList &x) { return renameOverlay(x); }},
             {"overlay-kopieren", 1, [this](const QStringList &x) { return copyOverlay(x); }},
             {"overlay-loeschen", 1, [this](const QStringList &x) { return removeOverlay(x); }},
+            {"neuer-token", 1, [this](const QStringList &x) { return newToken(x); }},
             {"quelle-liste", 1, [this](const QStringList &x) { return listSources(x); }},
             {"quelle-bild", 2, [this](const QStringList &x) { return addMedia(x, dss::SourceKind::Image); }},
             {"quelle-video", 2, [this](const QStringList &x) { return addMedia(x, dss::SourceKind::Video); }},
@@ -370,6 +379,32 @@ private:
         if (!m_store->removeOverlay(o->id, &error))
             return fail(error);
         out() << QStringLiteral("Overlay «%1» (Adresse %2) gelöscht\n").arg(name, address);
+        return kExitOk;
+    }
+
+    // P10 (Teil A 8): dieselbe Rückfrage wie der Knopf «Neuer Token» im Fenster.
+    int newToken(const QStringList &a)
+    {
+        QString error;
+        const dss::Overlay *o = find(a.at(0), &error);
+        if (!o)
+            return fail(error);
+        if (!m_args.yes) {
+            out() << "Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue Adresse "
+                     "eingetragen werden. Fortfahren? [j/N] ";
+            out().flush();
+            QTextStream in(stdin);
+            const QString answer = in.readLine().trimmed().toLower();
+            if (answer != QLatin1String("j") && answer != QLatin1String("ja")) {
+                out() << "Abgebrochen, Token unverändert.\n";
+                return kExitError;
+            }
+        }
+        if (!m_store->newToken(o->id, &error))
+            return fail(error);
+        out() << QStringLiteral("Neuer Token für Overlay «%1» (Adresse %2). Die neue Adresse der "
+                                "Browserquelle steht im Fenster, Dock «Steuerung».\n")
+                     .arg(o->name, o->address);
         return kExitOk;
     }
 

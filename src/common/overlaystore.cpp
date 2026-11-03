@@ -447,6 +447,15 @@ bool OverlayStore::setOverlayOutput(const QUuid &overlayId, bool output, QString
     }, error);
 }
 
+bool OverlayStore::newToken(const QUuid &overlayId, QString *error)
+{
+    if (indexOf(overlayId) < 0) {
+        *error = unknownOverlay(overlayId);
+        return false;
+    }
+    return m_tokens.createToken(overlayId, error);
+}
+
 bool OverlayStore::moveOverlayInList(const QUuid &overlayId, const QUuid &folderId, int index,
                                      QString *error)
 {

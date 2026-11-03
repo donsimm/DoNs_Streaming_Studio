@@ -79,6 +79,12 @@ public:
     // Werte über settingsChanged. Rückgabe: request_id, 0 ohne Verbindung.
     qint64 sendSettingsUpdate(SettingsUpdate update);
 
+    // Adresse der Browserquelle (P10) des Overlays id, mit Token. Der Kern schickt sie danach bei
+    // jeder Änderung von selbst neu, auch nach dem Wiederverbinden; null = keine mehr.
+    void requestBrowserSource(const QUuid &id);
+    // Letzte Antwort zum angefragten Overlay; leer bis dahin und ohne Verbindung.
+    std::optional<BrowserSourceInfo> browserSource() const { return m_browserSource; }
+
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
@@ -121,6 +127,8 @@ signals:
     void pendingImportsChanged();
     // settings() hat sich geändert (P10-vor).
     void settingsChanged();
+    // browserSource() hat sich geändert (P10).
+    void browserSourceChanged();
 
 private:
     void tryConnect();
@@ -160,6 +168,8 @@ private:
     QMap<qint64, QString> m_importNames;       // unterwegs mit Datei: request_id → Dateiname
     std::optional<SystemStats> m_lastStats;
     std::optional<SettingsInfo> m_settings;
+    QUuid m_browserSourceWanted;
+    std::optional<BrowserSourceInfo> m_browserSource;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
 };

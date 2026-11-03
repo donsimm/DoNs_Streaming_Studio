@@ -200,7 +200,9 @@ private slots:
                                                     QStringLiteral("10"), QStringLiteral("10")},
                                         QStringList{QStringLiteral("overlay-loeschen"), QStringLiteral("vorher")},
                                         QStringList{QStringLiteral("overlay-umbenennen"), QStringLiteral("vorher"),
-                                                    QStringLiteral("X")}}) {
+                                                    QStringLiteral("X")},
+                                        QStringList{QStringLiteral("neuer-token"), QStringLiteral("vorher"),
+                                                    QStringLiteral("--ja")}}) {
             r = runCli(data.path(), args);
             QCOMPARE(r.exitCode, 3);
             QVERIFY2(r.err.contains(QStringLiteral("systemctl --user stop dss-core-entwicklung.service")),
@@ -217,6 +219,56 @@ private slots:
                                  QStringLiteral("10"), QStringLiteral("10")});
         QCOMPARE(r.exitCode, 0);
         QVERIFY(!QFileInfo::exists(lockFilePath(data.path())));
+    }
+
+    // P10 (Teil A 8): neuer-token mit Rückfrage; der Token erscheint nie in der Ausgabe.
+    void cliNewToken()
+    {
+        QTemporaryDir data;
+        QCOMPARE(runCli(data.path(), {QStringLiteral("overlay-neu"), QStringLiteral("Eins"),
+                                      QStringLiteral("1280"), QStringLiteral("720")}).exitCode, 0);
+        const QString tokensPath = data.path() + QStringLiteral("/tokens.json");
+        const QByteArray before = readFile(tokensPath);
+        const QString question = QStringLiteral(
+            "Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue Adresse eingetragen "
+            "werden. Fortfahren?");
+
+        // Nein, leer (Ende der Eingabe) oder etwas anderes: abgebrochen, Token unverändert.
+        for (const QByteArray &answer : {QByteArray("n\n"), QByteArray(), QByteArray("vielleicht\n")}) {
+            const CliResult r = runCli(data.path(), {QStringLiteral("neuer-token"), QStringLiteral("eins")},
+                                       answer);
+            QCOMPARE(r.exitCode, 1);
+            QVERIFY2(r.out.contains(question), qPrintable(r.out));
+            QVERIFY(r.out.contains(QStringLiteral("Abgebrochen")));
+            QCOMPARE(readFile(tokensPath), before);
+        }
+        // Ja
+        CliResult r = runCli(data.path(), {QStringLiteral("neuer-token"), QStringLiteral("eins")},
+                             QByteArray("j\n"));
+        QCOMPARE(r.exitCode, 0);
+        const QByteArray afterYes = readFile(tokensPath);
+        QVERIFY(afterYes != before);
+        // --ja: ohne Rückfrage
+        r = runCli(data.path(), {QStringLiteral("neuer-token"), QStringLiteral("eins"), QStringLiteral("--ja")});
+        QCOMPARE(r.exitCode, 0);
+        QVERIFY(!r.out.contains(question));
+        QVERIFY(readFile(tokensPath) != afterYes);
+        QCOMPARE(QFile::permissions(tokensPath) & 0x7777,
+                 QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadUser
+                     | QFileDevice::WriteUser);
+
+        // Kein Token in der Ausgabe
+        OverlayStore store(data.path());
+        QString error;
+        QVERIFY(store.load(&error, OverlayStore::LoadMode::ReadOnly));
+        const QString token = store.token(store.overlays().first().id);
+        QCOMPARE(token.size(), 43);
+        QVERIFY(!r.out.contains(token) && !r.err.contains(token));
+
+        // Unbekannte Adresse, --ja bei anderem Befehl
+        QCOMPARE(runCli(data.path(), {QStringLiteral("neuer-token"), QStringLiteral("zwei"),
+                                      QStringLiteral("--ja")}).exitCode, 1);
+        QCOMPARE(runCli(data.path(), {QStringLiteral("overlay-liste"), QStringLiteral("--ja")}).exitCode, 2);
     }
 #endif
 };

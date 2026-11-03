@@ -131,8 +131,10 @@ private slots:
         QCOMPARE(back.weight, has("weight") ? r.weight : standard.weight);
         QCOMPARE(back.italic, has("italic") ? r.italic : standard.italic);
         QCOMPARE(back.changes, has("changes") ? r.changes : standard.changes);
-        // Kein Zugangsdatum über die Schnittstelle (Teil A): kein Feld heisst token.
-        QVERIFY(!QJsonDocument(message).toJson().contains("token"));
+        // Kein Zugangsdatum in einer Änderung (Teil A): kein Feld heisst token (new_token, P10,
+        // hat nur overlay_id).
+        for (const QString &key : message.keys())
+            QVERIFY2(!key.contains(QStringLiteral("token")), qPrintable(key));
     }
 
     void fieldsPerType()
@@ -166,7 +168,8 @@ private slots:
         QCOMPARE(keys(msg::kReplaceImageFile), QStringLiteral("file,overlay_id,source_id"));
         QCOMPARE(keys(msg::kSetOverlaySize), QStringLiteral("height,overlay_id,width"));
         QCOMPARE(keys(msg::kSetOverlayOutput), QStringLiteral("output,overlay_id"));
-        QCOMPARE(changeTypes().size(), 20);
+        QCOMPARE(keys(msg::kNewToken), QStringLiteral("overlay_id"));
+        QCOMPARE(changeTypes().size(), 21);
         QVERIFY(!isChangeType(QStringLiteral("get_overlay")));
         QVERIFY(!isChangeType(QStringLiteral("set_token")));
     }

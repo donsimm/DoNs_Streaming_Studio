@@ -66,6 +66,9 @@ private:
         dss::LineSplitter lines;
         bool greeted = false;
         dss::Hello hello;
+        // Browserquelle (P10): Overlay aus get_browser_source und zuletzt geschickte Adresse
+        QUuid browserSource;
+        dss::BrowserSourceInfo browserSourceSent;
     };
 
     void onNewConnection();
@@ -102,6 +105,10 @@ private:
     // Datei, die die Änderung zuerst übernehmen muss, und wofür; leer, wenn keine.
     QString fileToImport(const dss::ChangeRequest &request, dss::MediaUse *use) const;
     void onImportFinished(quint64 job, const dss::MediaImportResult &result);
+    // Adresse der Browserquelle (P10): mit Token, nur an Verbindungen, die danach fragen.
+    dss::BrowserSourceInfo browserSourceInfo(const QUuid &overlayId) const;
+    // Schickt jeder fragenden Verbindung die Adresse neu, wenn sie sich geändert hat.
+    void updateBrowserSources();
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);

@@ -1,6 +1,7 @@
 // Prüft Lesen und Schreiben aller Nachrichten der Schnittstelle Kern–Fenster ohne Qt Gui
 // (P07, Teil D; docs/08-kern-schnittstelle.md).
 
+#include "browsersource.h"
 #include "overlayjson.h"
 #include "protocol.h"
 
@@ -136,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 6); // seit P10
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 7); // seit P10
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -509,6 +510,46 @@ private slots:
         QVERIFY(parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
                                                 {QStringLiteral("port"), 80}},
                                     &parsed, &error));
+    }
+
+    // P10: Adresse der Browserquelle
+    void browserSourceMessages()
+    {
+        QCOMPARE(browserSourceUrl(QStringLiteral("192.168.1.9"), 8081, QStringLiteral("ueberblick"),
+                                  QStringLiteral("abc")),
+                 QStringLiteral("http://192.168.1.9:8081/o/ueberblick/abc/"));
+        QCOMPARE(browserSourceLogPath(QStringLiteral("ueberblick")), QStringLiteral("/o/ueberblick/…"));
+
+        const QUuid id = QUuid::fromString(QStringLiteral("2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11"));
+        const BrowserSourceInfo info{id, QStringLiteral("http://192.168.1.9:8081/o/a/b/"), QString()};
+        QJsonObject o = browserSourceMessage(info);
+        QCOMPARE(QString::fromUtf8(encodeMessage(o)),
+                 QStringLiteral("{\"overlay_id\":\"2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11\",\"problem\":null,"
+                                "\"type\":\"browser_source\",\"url\":\"http://192.168.1.9:8081/o/a/b/\"}\n"));
+        BrowserSourceInfo back;
+        QString error;
+        QVERIFY2(parseBrowserSource(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        const BrowserSourceInfo problem{id, QString(), QStringLiteral("Keine Adresse")};
+        QVERIFY(parseBrowserSource(browserSourceMessage(problem), &back, &error));
+        QCOMPARE(back, problem);
+        // genau eines von url und problem
+        o.insert(QStringLiteral("problem"), QStringLiteral("x"));
+        QVERIFY(!parseBrowserSource(o, &back, &error));
+        o.insert(QStringLiteral("url"), QJsonValue::Null);
+        o.insert(QStringLiteral("problem"), QJsonValue::Null);
+        QVERIFY(!parseBrowserSource(o, &back, &error));
+        o.remove(QStringLiteral("problem"));
+        QVERIFY(!parseBrowserSource(o, &back, &error));
+
+        QUuid parsed;
+        QVERIFY(parseGetBrowserSource(getBrowserSourceMessage(id), &parsed, &error));
+        QCOMPARE(parsed, id);
+        QCOMPARE(QString::fromUtf8(encodeMessage(getBrowserSourceMessage(QUuid()))),
+                 QStringLiteral("{\"overlay_id\":null,\"type\":\"get_browser_source\"}\n"));
+        QVERIFY(parseGetBrowserSource(getBrowserSourceMessage(QUuid()), &parsed, &error));
+        QVERIFY(parsed.isNull());
+        QVERIFY(!parseGetBrowserSource(simpleMessage(msg::kGetBrowserSource), &parsed, &error));
     }
 };
 

@@ -1,5 +1,6 @@
 #include "coreservice.h"
 
+#include "browsersource.h"
 #include "version.h"
 
 #include <QDir>
@@ -195,6 +196,7 @@ void CoreService::reload()
         qWarning("Warnung: %s", qPrintable(w));
 
     const auto [changed, removed] = broadcastDifferences(before, listBefore);
+    updateBrowserSources();
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
           static_cast<long long>(m_store->overlays().size()), changed, removed);
     // Schriftdateien im Datenordner können sich geändert haben.
@@ -305,6 +307,15 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, settingsMessage());
     } else if (type == QLatin1String(dss::msg::kUpdateSettings) && m_settings) {
         handleSettingsUpdate(socket, message);
+    } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
+        QUuid id;
+        if (!dss::parseGetBrowserSource(message, &id, &error)) {
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+            return;
+        }
+        client.browserSource = id;
+        client.browserSourceSent = {};
+        updateBrowserSources();
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetOverlay)) {
@@ -346,6 +357,38 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
     }
 }
 
+dss::BrowserSourceInfo CoreService::browserSourceInfo(const QUuid &overlayId) const
+{
+    dss::BrowserSourceInfo info{overlayId, QString(), QString()};
+    const dss::Overlay *o = m_store->overlay(overlayId);
+    const QString token = m_store->token(overlayId);
+    if (!o)
+        info.problem = QStringLiteral("Kein Overlay mit dieser Kennung.");
+    else if (token.isEmpty())
+        info.problem = QStringLiteral("Das Overlay hat keinen Token. «Neuer Token» erzeugt einen.");
+    else if (!m_settings)
+        info.problem = QStringLiteral("Der Kern hat keine Einstellungen.");
+    else if (m_settings->settings().homeAddress.isEmpty())
+        info.problem = QStringLiteral("Keine Adresse im Heimnetz eingestellt (Dialog «Einstellungen»).");
+    else
+        info.url = dss::browserSourceUrl(m_settings->settings().homeAddress, m_settings->settings().port,
+                                         o->address, token);
+    return info;
+}
+
+void CoreService::updateBrowserSources()
+{
+    for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+        if (!it->greeted || it->browserSource.isNull())
+            continue;
+        const dss::BrowserSourceInfo info = browserSourceInfo(it->browserSource);
+        if (info == it->browserSourceSent)
+            continue;
+        it->browserSourceSent = info;
+        send(it.key(), dss::browserSourceMessage(info));
+    }
+}
+
 QJsonObject CoreService::settingsMessage() const
 {
     return dss::settingsMessage({m_settings->settings(), dss::kPortMin, dss::kPortMax,
@@ -380,6 +423,7 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
         qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
               after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
         broadcast(settingsMessage());
+        updateBrowserSources();
     }
     send(socket, dss::changeResultMessage({update.requestId, true, QUuid(), QString(), QString()}));
 }
@@ -461,6 +505,7 @@ void CoreService::finishChange(QLocalSocket *socket, const dss::ChangeRequest &r
     // Zuerst an alle (auch an das Fenster, das die Änderung geschickt hat), dann die Antwort:
     // Das Fenster übernimmt den Zustand nur aus diesen Nachrichten (Teil A).
     broadcastDifferences(before, listBefore);
+    updateBrowserSources();
     if (m_store->hasPendingWrites())
         m_saver->changed();
     if (!result.ok)
@@ -613,6 +658,16 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
     }
     if (is(msg::kSetOverlaySize))
         return done(m_store->setOverlaySize(r.overlayId, r.width, r.height, &error), error);
+    if (is(msg::kNewToken)) {
+        const bool ok = m_store->newToken(r.overlayId, &error);
+        if (ok) {
+            // Ohne Token (Regel 12)
+            const Overlay *o = m_store->overlay(r.overlayId);
+            qInfo("Neuer Token für Overlay «%s» (%s): die alte Adresse gilt nicht mehr",
+                  qPrintable(o->name), qPrintable(browserSourceLogPath(o->address)));
+        }
+        return done(ok, error);
+    }
     if (is(msg::kSetOverlayOutput))
         return done(m_store->setOverlayOutput(r.overlayId, r.output, &error), error);
 

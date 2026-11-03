@@ -406,6 +406,27 @@ private slots:
         QVERIFY(reloaded->loadWarnings().first().contains(ref));
     }
 
+    // P10 (Teil A 8): neuer Token ersetzt den alten, sofort in tokens.json, Rechte 0600.
+    void newToken()
+    {
+        QString error;
+        auto store = openStore();
+        const QUuid a = create(store.get(), QStringLiteral("A"));
+        const QUuid b = create(store.get(), QStringLiteral("B"));
+        const QString oldA = store->token(a);
+        const QString oldB = store->token(b);
+        QVERIFY2(store->newToken(a, &error), qPrintable(error));
+        QVERIFY(store->token(a) != oldA);
+        QCOMPARE(store->token(a).size(), 43);
+        QCOMPARE(store->token(b), oldB);
+        QCOMPARE(readTokens(dataDir()).value(a.toString(QUuid::WithoutBraces)).toString(), store->token(a));
+        QCOMPARE(QFile::permissions(dataDir() + QStringLiteral("/tokens.json")) & kUnixBits,
+                 QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        QCOMPARE(openStore()->token(a), store->token(a));
+        QVERIFY(!store->newToken(QUuid::createUuid(), &error));
+        QVERIFY2(error.endsWith(QStringLiteral("nicht gefunden.")), qPrintable(error));
+    }
+
     void tokenFile()
     {
         auto store = openStore();

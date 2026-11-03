@@ -106,6 +106,19 @@ void CoreClient::requestSettings()
         send(simpleMessage(msg::kGetSettings));
 }
 
+void CoreClient::requestBrowserSource(const QUuid &id)
+{
+    if (id == m_browserSourceWanted)
+        return;
+    m_browserSourceWanted = id;
+    if (m_browserSource) {
+        m_browserSource.reset();
+        emit browserSourceChanged();
+    }
+    if (m_connected)
+        send(getBrowserSourceMessage(id));
+}
+
 qint64 CoreClient::sendSettingsUpdate(SettingsUpdate update)
 {
     if (!m_connected)
@@ -305,6 +318,8 @@ void CoreClient::handleMessage(const QJsonObject &message)
         m_wasConnected = true;
         setConnected(true);
         setStatus(QStringLiteral("Mit dem Kern verbunden (%1 %2)").arg(hello.program, hello.version));
+        if (!m_browserSourceWanted.isNull())
+            send(getBrowserSourceMessage(m_browserSourceWanted));
         return;
     }
     if (!m_connected) {
@@ -405,6 +420,17 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_settings = info;
         emit settingsChanged();
+    } else if (type == QLatin1String(msg::kBrowserSource)) {
+        BrowserSourceInfo info;
+        if (!parseBrowserSource(message, &info, &error)) {
+            qWarning("Kern: browser_source ungültig: %s", qPrintable(error));
+            return;
+        }
+        // Antwort auf eine frühere Anfrage (inzwischen anderes Overlay gewählt): übergehen.
+        if (info.overlayId != m_browserSourceWanted)
+            return;
+        m_browserSource = info;
+        emit browserSourceChanged();
     } else if (type == QLatin1String(msg::kChangeResult)) {
         ChangeResult result;
         if (!parseChangeResult(message, &result, &error)) {
@@ -477,6 +503,10 @@ void CoreClient::clearData()
     m_settings.reset();
     if (hadSettings)
         emit settingsChanged();
+    if (m_browserSource) {
+        m_browserSource.reset();
+        emit browserSourceChanged();
+    }
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);
     emit overlayListChanged();

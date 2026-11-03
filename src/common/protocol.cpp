@@ -823,6 +823,7 @@ const QList<std::pair<const char *, unsigned>> &changeFieldTable()
         {msg::kReplaceImageFile, FOverlay | FSource | FFile},
         {msg::kSetOverlaySize, FOverlay | FSize},
         {msg::kSetOverlayOutput, FOverlay | FOutput},
+        {msg::kNewToken, FOverlay},
     };
     return table;
 }
@@ -1088,6 +1089,57 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
         return false;
     }
     *update = u;
+    return true;
+}
+
+QJsonObject browserSourceMessage(const BrowserSourceInfo &info)
+{
+    QJsonObject o = typed(msg::kBrowserSource);
+    o.insert(QStringLiteral("overlay_id"), idText(info.overlayId));
+    o.insert(QStringLiteral("url"), info.url.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(info.url));
+    o.insert(QStringLiteral("problem"),
+             info.problem.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(info.problem));
+    return o;
+}
+
+bool parseBrowserSource(const QJsonObject &message, BrowserSourceInfo *info, QString *error)
+{
+    BrowserSourceInfo i;
+    if (!requireUuid(message, QStringLiteral("overlay_id"), &i.overlayId, error))
+        return false;
+    for (const auto &[key, value] : {std::pair{QStringLiteral("url"), &i.url},
+                                     std::pair{QStringLiteral("problem"), &i.problem}}) {
+        const QJsonValue v = message.value(key);
+        if (v.isString()) {
+            *value = v.toString();
+        } else if (!v.isNull()) {
+            *error = QStringLiteral("Feld %1 fehlt oder ist weder Text noch null").arg(key);
+            return false;
+        }
+    }
+    if (i.url.isEmpty() == i.problem.isEmpty()) {
+        *error = QStringLiteral("browser_source braucht genau eines von url und problem");
+        return false;
+    }
+    *info = i;
+    return true;
+}
+
+QJsonObject getBrowserSourceMessage(const QUuid &overlayId)
+{
+    QJsonObject o = typed(msg::kGetBrowserSource);
+    o.insert(QStringLiteral("overlay_id"),
+             overlayId.isNull() ? QJsonValue(QJsonValue::Null) : QJsonValue(idText(overlayId)));
+    return o;
+}
+
+bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString *error)
+{
+    QUuid id;
+    if (!message.value(QStringLiteral("overlay_id")).isNull()
+        && !requireUuid(message, QStringLiteral("overlay_id"), &id, error))
+        return false;
+    *overlayId = id;
     return true;
 }
 
