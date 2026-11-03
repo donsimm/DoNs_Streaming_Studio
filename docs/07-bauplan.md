@@ -14,7 +14,7 @@ Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach k
 | P05 | Nachträge Modell, Fenster-Gerüst | Fenster nach Bild, ohne Daten |
 | P06 | Aussehen wie OBS | Design «Yami», Open Sans, Zahlenfelder mit Pfeilen, Verbindungsknöpfe mit vier Zuständen; abgenommen (2026-11-02), einschliesslich Handtest; Bericht `docs/berichte/P06-bericht.md` |
 | P07 | Kern als Dienst, Verbindung Fenster–Kern | abgenommen (2026-11-02), einschliesslich Handtest. Eigene Symbole aus `~/.config/dons-streaming-studio/symbole/`, Punkt 33 behoben; `dss-core` als Benutzerdienst (startet durch das Fenster, nicht bei der Anmeldung), Sperre im Datenordner, Unix-Socket mit JSON pro Zeile (`docs/08-kern-schnittstelle.md`), echte Werte CPU, RAM, LAN; Fenster zeigt Overlays und Quellen (nur anzeigen). Bericht `docs/berichte/P07-bericht.md` |
-| P08 | Bearbeiten im Fenster | ausgeführt, Handtest offen (2026-11-03). Änderungen als Nachrichten an den Kern (Schnittstelle Version 2), verzögertes Speichern, Reihenfolge und Ordner in `liste.json`, Docks Overlays, Quellen, Eigenschaften bedienbar (Schalter `DSS_APP_EDITING`), Be Vietnam Pro im Repo, Auswahl der Schriften über fontconfig. Bericht `docs/berichte/P08-bericht.md` |
+| P08 | Bearbeiten im Fenster | abgenommen (2026-11-03), einschliesslich Handtest. Änderungen als Nachrichten an den Kern (Schnittstelle Version 2), verzögertes Speichern, Reihenfolge und Ordner in `liste.json`, Docks Overlays, Quellen, Eigenschaften bedienbar (Schalter `DSS_APP_EDITING`), Be Vietnam Pro im Repo, Auswahl der Schriften über fontconfig. Bericht `docs/berichte/P08-bericht.md` |
 
 ## Geplant
 

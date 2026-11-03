@@ -4,7 +4,7 @@ Stand: 2026-11-03. Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.
 
 Auftrag: `prompts/P08-bearbeiten.md`. Entscheide des Nutzers vor dem Auftrag (2026-11-02): 1 Löschen mit Rückfrage, 2 Änderungen wirken sofort, 3 kein Rückgängig (E-22, SOLL), 4 Be Vietnam Pro als Datei im Repo und Standard, 5 Auswahl installierte Schriften + Be Vietnam Pro + «Datei wählen …», der Kern kopiert die Datei, 6 Overlays frei verschiebbar, Ordner mit einer Ebene, Reihenfolge in einer Datei des Kerns, 7 Umbenennen fragt nach der Adresse, Standard «nein», 8 vorderste Quelle oben.
 
-Abnahme Handtest: offen (Schritte unten).
+Abnahme Handtest: erledigt am 2026-11-03, alle 5 Schritte in Ordnung (Rückmeldung des Nutzers im Chat). Beobachtungen: In Schritt 2/3 zeigte `dss-cli quelle-liste` bei «alpha.webm» Sichtbar «ja» und Wiederholen «nein»; der Nutzer hatte die Schritte mehrmals ausgeführt und beurteilt die Funktion als in Ordnung, nicht weiter untersucht. In Schritt 4 hat der Nutzer bewusst «Adresse ändern» gewählt (Adresse `handtest-p08-new`), Verhalten richtig. Kern endete erst nach Schliessen des letzten Fensters, wie vorgesehen. Wünsche aus dem Handtest: E-23 (Kopfbereich fest, P09), E-24 (Schalter Ausgabe ein/aus, P10), Punkt 48 entfernen (P09). Test-Overlays am Ende gelöscht, `dss-cli overlay-liste` → «Keine Overlays vorhanden.»
 
 ## Kurzfassung
 
@@ -14,7 +14,7 @@ Abnahme Handtest: offen (Schritte unten).
 | `ctest --test-dir build`, auch im frischen Klon | 23 von 23 im Arbeitsordner und im frischen Klon (neu: `tst_overlayliste`, `tst_schriften`, `tst_aenderungen`, `tst_windowedit`, `tst_bearbeiten`, `tst_fensterbearbeiten`) |
 | Startprüfung `--runs 20` | 20/20 sauber in allen vier Fällen |
 | `docs/06-overlay-format.md`, `docs/08-kern-schnittstelle.md` | nachgeführt: `liste.json` (06), Schnittstelle Version 2 mit allen Änderungen, `change_result`, `get_fonts`/`font_list`, Speichern (08) |
-| Handtest | offen, 5 Schritte unten |
+| Handtest | ja: 5 Schritte in Ordnung (2026-11-03) |
 
 **Es wurde kein Paket installiert.** fontconfig 2.15.0-2.3 (Programme `fc-list`, `fc-query`) war schon installiert. Die Header der Bibliothek (`libfontconfig-dev`) fehlen; statt sie zu installieren, ruft der Kern die Programme auf (Begründung in Teil F).
 
