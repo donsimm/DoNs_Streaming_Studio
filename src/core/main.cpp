@@ -5,6 +5,7 @@
 
 #include "configpaths.h"
 #include "coreservice.h"
+#include "dataformat.h"
 #include "datalock.h"
 #include "logging.h"
 #include "overlaystore.h"
@@ -28,6 +29,51 @@ namespace {
 constexpr int kExitOk = 0;
 constexpr int kExitError = 1;
 constexpr int kExitAlreadyRunning = 3;
+// --format-pruefen (P10a, Teil B 4): 4 = Dateien in älterem Format, Umwandeln nötig;
+// 5 = Dateien in neuerem Format, als dieses Programm lesen kann (nicht installieren).
+constexpr int kExitConversionNeeded = 4;
+constexpr int kExitNewerFormat = 5;
+
+// --format-pruefen und --umwandeln: Meldungen auf stdout, Fehler auf stderr.
+int checkFormat(const QString &dataDir)
+{
+    QTextStream out(stdout);
+    QTextStream err(stderr);
+    const dss::DataFormatStatus status = dss::checkDataFormat(dataDir);
+    if (!status.error.isEmpty()) {
+        err << "Fehler: " << status.error << '\n';
+        return kExitError;
+    }
+    for (const QString &f : status.unreadable)
+        err << "Warnung: nicht lesbar, bleibt unverändert: " << f << '\n';
+    for (const QString &f : status.newer)
+        err << "Fehler: neueres Format, als dieses Programm lesen kann: " << f << '\n';
+    for (const QString &f : status.older)
+        out << "älteres Format: " << f << '\n';
+    if (!status.newer.isEmpty())
+        return kExitNewerFormat;
+    if (status.needsConversion())
+        return kExitConversionNeeded;
+    out << "Format aktuell: " << dataDir << '\n';
+    return kExitOk;
+}
+
+int convertFormat(const QString &dataDir)
+{
+    QStringList converted;
+    QString error;
+    if (!dss::convertDataFormat(dataDir, &converted, &error)) {
+        QTextStream(stderr) << "Fehler: Umwandeln gescheitert, Dateien unverändert: " << error << '\n';
+        return error.startsWith(QStringLiteral("Datenordner gesperrt")) ? kExitAlreadyRunning
+                                                                        : kExitError;
+    }
+    QTextStream out(stdout);
+    for (const QString &f : converted)
+        out << "umgewandelt: " << f << '\n';
+    out << converted.size() << (converted.size() == 1 ? " Datei" : " Dateien")
+        << " umgewandelt: " << dataDir << '\n';
+    return kExitOk;
+}
 
 } // namespace
 
@@ -55,13 +101,29 @@ int main(int argc, char *argv[])
         QStringLiteral("Unix-Socket für die Fenster (Standard: $XDG_RUNTIME_DIR/%1/kern.sock).")
             .arg(dss::appDirName()),
         QStringLiteral("PFAD"));
+    const QCommandLineOption checkFormatOption(
+        QStringLiteral("format-pruefen"),
+        QStringLiteral("Format der Dateien im Datenordner prüfen und beenden (P10a). Exit-Code 0 = "
+                       "aktuell, 4 = Umwandeln nötig, 5 = neueres Format, 1 = Fehler."));
+    const QCommandLineOption convertOption(
+        QStringLiteral("umwandeln"),
+        QStringLiteral("Dateien in älterem Format ins aktuelle umwandeln und beenden (P10a). Nur "
+                       "bei angehaltenem Kern. Exit-Code 0 = erledigt, 3 = Kern läuft, 1 = Fehler "
+                       "(Dateien unverändert)."));
     parser.addOption(versionOption);
     parser.addOption(dataDirOption);
     parser.addOption(connectionOption);
+    parser.addOption(checkFormatOption);
+    parser.addOption(convertOption);
     parser.process(app);
     if (parser.isSet(versionOption)) {
         QTextStream(stdout) << dss::versionLine(name) << '\n';
         return kExitOk;
+    }
+    if (parser.isSet(checkFormatOption) || parser.isSet(convertOption)) {
+        const QString dir = parser.isSet(dataDirOption) ? parser.value(dataDirOption)
+                                                        : dss::defaultDataDir();
+        return parser.isSet(convertOption) ? convertFormat(dir) : checkFormat(dir);
     }
 
     dss::setupLogging();

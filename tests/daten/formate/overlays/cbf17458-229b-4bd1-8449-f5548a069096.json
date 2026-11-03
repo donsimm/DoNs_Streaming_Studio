@@ -1,0 +1,26 @@
+{
+    "address": "format-zwei",
+    "format_version": 2,
+    "height": 720,
+    "id": "cbf17458-229b-4bd1-8449-f5548a069096",
+    "name": "Format zwei",
+    "sources": [
+        {
+            "height": 32,
+            "id": "90948afd-d545-4551-bb94-f96a3eddcd3d",
+            "kind": "video",
+            "name": "drehung-0.mp4",
+            "rotation": 0,
+            "video": {
+                "file": "media/50419e73048d008d6852b951f6e82e929f2aa1c985ac18c2133ed196062dedae.mp4",
+                "hold_at_end": true,
+                "loop": false
+            },
+            "visible": true,
+            "width": 64,
+            "x": 0,
+            "y": 0
+        }
+    ],
+    "width": 1280
+}

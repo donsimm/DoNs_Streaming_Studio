@@ -1,0 +1,39 @@
+{
+    "address": "format-eins",
+    "format_version": 1,
+    "height": 1080,
+    "id": "f5bb9bc6-06f4-4762-a15b-47c37e24f82c",
+    "name": "Format eins",
+    "sources": [
+        {
+            "height": 32,
+            "id": "251ec4c2-8c11-4c12-9d16-1325ec511bc2",
+            "image": {
+                "file": "media/30f6b536a683782576e8349c9f7375e6e375ebe4c5e8f319f77ce560133026d3.png"
+            },
+            "kind": "image",
+            "name": "orientierung-1.png",
+            "rotation": 0,
+            "visible": true,
+            "width": 64,
+            "x": 0,
+            "y": 0
+        },
+        {
+            "height": 32,
+            "id": "5c652567-2027-45bf-a513-91c895c7a5b3",
+            "kind": "video",
+            "name": "drehung-90.mp4",
+            "rotation": 0,
+            "video": {
+                "file": "media/4cbc5e0e173bf2171e32ced41e534938ee98c5adfaabe60fc8668517bd3a5560.mp4",
+                "loop": true
+            },
+            "visible": true,
+            "width": 64,
+            "x": 0,
+            "y": 0
+        }
+    ],
+    "width": 1920
+}

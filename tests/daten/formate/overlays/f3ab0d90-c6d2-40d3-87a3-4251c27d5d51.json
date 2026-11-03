@@ -1,0 +1,48 @@
+{
+    "address": "format-drei",
+    "format_version": 3,
+    "height": 1080,
+    "id": "f3ab0d90-c6d2-40d3-87a3-4251c27d5d51",
+    "name": "Format drei",
+    "sources": [
+        {
+            "flip_horizontal": false,
+            "flip_vertical": false,
+            "height": 1080,
+            "id": "d9d35236-6b86-4502-b8b7-0d1267ecb187",
+            "kind": "text",
+            "name": "Text: Hallo Zürich",
+            "rotation": 0,
+            "text": {
+                "align": "left",
+                "color": "#FFFFFFFF",
+                "content": "Hallo Zürich",
+                "font_file": "media/57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e.ttf",
+                "font_size": 48,
+                "italic": false,
+                "weight": 400
+            },
+            "visible": true,
+            "width": 1920,
+            "x": 0,
+            "y": 0
+        },
+        {
+            "flip_horizontal": true,
+            "flip_vertical": false,
+            "height": 32,
+            "id": "f694eedd-cd24-4672-aba8-37b1e16dcfb0",
+            "image": {
+                "file": "media/30f6b536a683782576e8349c9f7375e6e375ebe4c5e8f319f77ce560133026d3.png"
+            },
+            "kind": "image",
+            "name": "orientierung-1.png",
+            "rotation": 125,
+            "visible": true,
+            "width": 64,
+            "x": 100,
+            "y": 200
+        }
+    ],
+    "width": 1920
+}

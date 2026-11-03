@@ -55,6 +55,12 @@ dss_add_test(tst_kernverbindung)
 target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
 add_dependencies(tst_kernverbindung dss-core)
+
+# P10a, Teil B 4: Datenformate prüfen und umwandeln, mit Testdaten im Format 1 bis 3
+dss_add_test(tst_datenformat)
+target_compile_definitions(tst_datenformat PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_TEST_FORMAT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/formate")
+add_dependencies(tst_datenformat dss-core)
 set_tests_properties(tst_kernverbindung PROPERTIES FIXTURES_REQUIRED dss_media)
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
