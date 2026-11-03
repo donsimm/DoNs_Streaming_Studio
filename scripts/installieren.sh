@@ -16,7 +16,11 @@
 #      den neuen dss-core umwandeln. Scheitert das, bleiben die Dateien unverändert, das Skript
 #      nennt die Sicherung und installiert nicht. Sind Dateien in neuerem Format, als die neue
 #      Version lesen kann, installiert es nicht.
-#   5. Installiert nach ~/.local/opt/dons-streaming-studio/ (bin/, share/dons-streaming-studio/).
+#   5. Leert <ZIEL>/bin/ und <ZIEL>/share/dons-streaming-studio/ (Dateien, die eine neuere
+#      Version nicht mehr mitbringt, bleiben sonst liegen; Punkt 69) und installiert nach
+#      ~/.local/opt/dons-streaming-studio/ (bin/, share/dons-streaming-studio/). Die Daten und
+#      <ZIEL>/version.txt sind davon nicht betroffen; geleert wird erst nach erfolgreichem Bau
+#      und Prüfen des Formats.
 #   6. Schreibt die Einheit dss-core.service (scripts/dienst-einrichten.sh --einsatz), den
 #      Menüeintrag ~/.local/share/applications/dons-streaming-studio.desktop und das
 #      Programm-Symbol ~/.local/share/icons/hicolor/<N>x<N>/apps/dons-streaming-studio.png.
@@ -54,7 +58,7 @@ CONNECTION=""
 TEST_OPTIONS=0
 
 usage() {
-    sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//' >&2
+    sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//' >&2
     exit 2
 }
 
@@ -170,7 +174,16 @@ else
     echo "Datenordner $DATA_DIR fehlt noch; der Kern legt ihn beim ersten Start an."
 fi
 
-# 5. Installieren
+# 5. Programmordner leeren (Punkt 69), dann installieren. Bau und Prüfen des Formats sind hier
+#    schon gelungen; scheitert eines davon, endet das Skript vorher und es ist nichts gelöscht.
+#    Nur diese zwei Ordner, nie die Daten oder version.txt.
+[[ -n "$TARGET" && "$TARGET" != / && "$TARGET" == /* ]] || fail "Ziel $TARGET ungültig"
+for dir in "$TARGET/bin" "$TARGET/share/dons-streaming-studio"; do
+    if [[ -e "$dir" ]]; then
+        rm -rf -- "$dir" || fail "$dir lässt sich nicht leeren; nichts installiert"
+    fi
+done
+echo "Programmordner geleert: $TARGET/bin, $TARGET/share/dons-streaming-studio"
 cmake --install "$BUILD_DIR" > /dev/null || fail "cmake --install nach $TARGET gescheitert"
 printf 'DoNs Streaming Studio %s\nCommit %s\nInstalliert %s aus %s\n' \
     "$VERSION" "$COMMIT" "$(date '+%Y-%m-%d %H:%M:%S %z')" "$REPO" > "$TARGET/version.txt" \
