@@ -23,7 +23,7 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P10 | Browserquelle | Dazu: Schalter «Ausgabe ein/aus» pro Overlay in der Liste (E-24); fester Installationsort ausserhalb des Repos mit Installationsskript (Punkt 42), Überwachung eines hängenden Kerns (Punkt 41). Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
+| P10 | Browserquelle | Dazu: Bau im Release-Modus für den festen Installationsort (Punkt 56); Schalter «Ausgabe ein/aus» pro Overlay in der Liste (E-24); fester Installationsort ausserhalb des Repos mit Installationsskript (Punkt 42), Überwachung eines hängenden Kerns (Punkt 41). Webserver im Kern, Seite pro Overlay mit Token, zweiter Zeichner als Webseite, Aktualisierung ohne Neuladen, Videos stumm, Adresse kopieren im Dock Steuerung | P09 | E-12 |
 | P11 | Bildvergleich der zwei Zeichner | K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen | P10 | (Voraussetzung für K-07) |
 | P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar | P09 | E-20, E-21 |
 
