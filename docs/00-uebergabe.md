@@ -57,7 +57,7 @@ P10a und P10-vor sind abgenommen, einschliesslich Handtest. Die erste echte Inst
 
 **Als Nächstes, in dieser Reihenfolge:**
 
-1. Neue offene Punkte aus P10-vor einzeln mit dem Nutzer besprechen: 73 bis 77 (78 ist schon entschieden: Umsetzung in P10).
+1. Offene Punkte aus P10-vor: 73 bis 78 alle entschieden (2026-11-03): 73 und 74 mit P10b, 75 bestätigt (CLAUDE.md Regel 9), 76, 77 und 78 Nacharbeit in P10.
 2. P10 (Browserquelle) fertig planen und den Prompt schreiben. Entscheide: `docs/04-offene-punkte.md`, «Entschieden für P10» (Port 8080/8081, Start von Videos, Token, Form der Adresse `/o/<adresse>/<token>/`, alte Adressen leer und durchsichtig, Prüfung in zwei Stufen mit Qt WebEngine und Handtest in OBS, nur IPv4, Adresse im Heimnetz) sowie Punkt 78 und «Verhalten eines Videos beim Wechsel des Overlays» (Anker aus P10a). Noch offen für P10: ob OBS (CEF) EXIF in PNG beachtet (prüft der Handtest), ob es «Token neu erzeugen» schon in P10 gibt. Vorgaben für den zweiten Zeichner: gleiche Schriftdatei, Zeilen vom Kern (K-04), Spiegeln, EXIF und Video-Drehung, Text an der Box abgeschnitten, Video beim Einblenden von vorne, stumm. Nach P10 echte Installation durch den Nutzer als Teil des Handtests.
 3. Danach P10b (Dock «Medien», E-28), P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
 
