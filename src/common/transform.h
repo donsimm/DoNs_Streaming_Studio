@@ -25,11 +25,12 @@
 //     - CenterSelectedSceneItems (1281-1366), on_actionCenterToScreen/VerticalCenter/
 //       HorizontalCenter (1368-1408): Mitte des umschliessenden Kastens auf die Mitte der
 //       Leinwand; «senkrecht» verschiebt nur in y, «waagrecht» nur in x
-//   frontend/widgets/OBSBasic_Scenes.cpp, reset_tr (Zeilen 952-982): Lage 0/0, Massstab 1,
+//   frontend/widgets/OBSBasic_Scenes.cpp, reset_tr (Zeilen 952-983): Lage 0/0, Massstab 1,
 //     Drehung 0, keine Begrenzung, kein Zuschnitt
-//   frontend/widgets/OBSBasic_Clipboard.cpp (Zeilen 28-63): kopiert und setzt obs_transform_info
-//   libobs/obs-scene.c, calculate_bounds_data (Zeilen 446-500): SCALE_INNER mit dem Verhältnis
-//     der Quelle, Abstand mittig (add_alignment, Zeilen 325-336, ganzzahlig halbiert)
+//   frontend/widgets/OBSBasic_Clipboard.cpp (Zeilen 28-68): kopiert und setzt obs_transform_info
+//   libobs/obs-scene.c, calculate_bounds_data (Zeilen 446-558, Massstab 466-497): SCALE_INNER
+//     mit dem Verhältnis der Quelle, Abstand mittig (add_alignment, Zeilen 325-336, ganzzahlig
+//     halbiert)
 //
 // Abweichungen (P09b-Bericht): Einpassen und Strecken setzen feste Pixel, OBS behält eine
 // Begrenzung (bounds), die auch später gilt. Einfügen übernimmt die Grösse in Pixeln, OBS den
