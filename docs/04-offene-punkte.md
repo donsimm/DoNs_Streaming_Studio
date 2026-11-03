@@ -195,3 +195,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
   - Ansicht (Entscheid 2026-11-03): Liste mit Spalten wie im Dateimanager: kleines Vorschaubild, Name, Typ, Grösse; Ordner auf- und zuklappbar; Sortieren per Klick auf den Spaltenkopf.
   - Hinzufügen (Entscheid 2026-11-03): Knopf «Hinzufügen» unten im Dock, Dateiauswahl für mehrere Dateien; die Dateien kommen in den gewählten Ordner, ohne dass eine Quelle entsteht. Übernehmen im eigenen Thread des Kerns (Punkt 67).
   - Lage (Entscheid 2026-11-03): beim ersten Start eigenes Dock «Medien» in der unteren Reihe zwischen «Quellen» und «Eigenschaften»; lösbar, verschiebbar, über das Menü «Docks» ein- und ausblendbar wie die anderen Docks.
+
+## Entschieden für P10 (2026-11-03)
+
+- Port des Overlay-Servers: Standard 8080, änderbar in einer Einstellung. Ist der Port beim Start belegt, meldet der Kern das deutlich im Fenster (nicht still ohne Server weiterlaufen).
