@@ -11,6 +11,8 @@
 //     und waagrecht gespiegelt plus 90° gedreht (erst spiegeln, dann drehen)
 //   - EXIF-Ausrichtung (P09b): tests/daten/exif/orientierung-1 bis -8 als JPEG und PNG; jedes
 //     zeigt nach der Ausrichtung 64x32 mit rot, grün (oben), blau, gelb (unten)
+//   - Drehung aus den Metadaten von Videos (P10a, Punkt 65): tests/daten/video-drehung, 0°, 90°,
+//     180°, 270°; jedes zeigt nach der Drehung dasselbe Bild wie die EXIF-Bilder
 // Mit DSS_LEINWAND_BILD=DATEI wird das Bild der Leinwand gespeichert (Bericht).
 
 #include "canvaswidget.h"
@@ -19,6 +21,8 @@
 #include "sourcerenderer.h"
 #include "theme.h"
 #include "windowdata.h"
+
+#include <algorithm>
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -55,9 +59,26 @@ class TestLeinwand : public QObject
     QUuid m_image, m_rotated, m_jpeg, m_video, m_text, m_hidden, m_light, m_heavy, m_flipped, m_flippedRotated;
     // P09b: Ausrichtung 1 bis 8, erst JPEG, dann PNG; Lage links oben im Overlay
     QList<std::pair<QUuid, QPoint>> m_oriented;
+    QList<std::pair<QUuid, QPoint>> m_rotatedVideos; // P10a
     std::unique_ptr<SourceRenderer> m_renderer;
     std::unique_ptr<CanvasWidget> m_canvas;
     Theme m_theme = darkTheme();
+
+    bool videosShown() const
+    {
+        const QList<SourceRenderer::VideoInfo> infos = m_renderer->videoInfo();
+        return infos.size() == 5
+               && std::all_of(infos.begin(), infos.end(), [](const auto &v) { return v.hasFrame; });
+    }
+
+    SourceRenderer::VideoInfo videoInfo(const QUuid &id) const
+    {
+        for (const SourceRenderer::VideoInfo &v : m_renderer->videoInfo()) {
+            if (v.sourceId == id)
+                return v;
+        }
+        return {};
+    }
 
     QImage grabCanvas()
     {
@@ -143,6 +164,20 @@ private slots:
             c.y = at.y();
             QVERIFY2(store.updateSource(id, s, c, &error), qPrintable(error));
         }
+        // P10a: 4 gedrehte Videos darunter in der freien Fläche (1650, 560) bis (1918, 592)
+        for (int i = 0; i < 4; ++i) {
+            const QString file = QStringLiteral(DSS_TEST_VIDEO_ROTATION_DIR "/drehung-%1.mp4").arg(i * 90);
+            const QUuid s = store.addVideoSource(id, file, true, &error);
+            QVERIFY2(!s.isNull(), qPrintable(error));
+            const QPoint at(1650 + i * 68, 560);
+            m_rotatedVideos.append({s, at});
+            const Source *added = findSource(*store.overlay(id), s);
+            QCOMPARE(QSize(added->width, added->height), QSize(64, 32));
+            SourceChanges c;
+            c.x = at.x();
+            c.y = at.y();
+            QVERIFY2(store.updateSource(id, s, c, &error), qPrintable(error));
+        }
         const auto geometry = [&](const QUuid &s, int x, int y, int w, int h, int r) {
             QVERIFY2(store.setSourceGeometry(id, s, x, y, w, h, r, &error), qPrintable(error));
         };
@@ -187,7 +222,7 @@ private slots:
         m_canvas->show();
         QVERIFY(QTest::qWaitForWindowExposed(m_canvas.get()));
         QTRY_VERIFY_WITH_TIMEOUT(m_renderer->imagesLoaded(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(!m_renderer->videoInfo().isEmpty() && m_renderer->videoInfo().first().hasFrame, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(videosShown(), 5000);
         QCOMPARE(m_canvas->toWidget(QPointF(0, 0)), QPointF(28, 28));
     }
 
@@ -221,7 +256,7 @@ private slots:
         // Streifen oben links: Alpha X/2 ≈ 5 bei X = 10, fast nur JPEG
         QVERIFY(distance(at(image, QPointF(600 + 10, 100 + 30)), QColor(255, 80, 80)) <= 12);
         // Alpha-Mittel des ersten Bildes wie P02 (Gegenprobe ffmpeg: tst_medien)
-        const SourceRenderer::VideoInfo v = m_renderer->videoInfo().first();
+        const SourceRenderer::VideoInfo v = videoInfo(m_video);
         QCOMPARE(v.decoderName, QStringLiteral("libvpx-vp9"));
         qInfo("Alpha-Mittel erstes Bild: %.4f", v.firstAlphaMean);
         QVERIFY(std::abs(v.firstAlphaMean - 52.8726) < 0.001);
@@ -263,6 +298,27 @@ private slots:
                                         .arg(i < 8 ? QStringLiteral("JPEG") : QStringLiteral("PNG"))
                                         .arg(q.offset.x())
                                         .arg(q.offset.y())
+                                        .arg(c.name(), q.color.name())));
+            }
+        }
+    }
+
+    void videoRotation()
+    {
+        // P10a, Punkt 65: alle vier Videos sehen nach der Drehung gleich aus (H.264, verlustbehaftet)
+        const QImage image = grabCanvas();
+        // Ohne DSS_VIDEO_ROTATION nur das ungedrehte Video prüfen
+        const int count = DSS_VIDEO_ROTATION ? int(m_rotatedVideos.size()) : 1;
+        for (int i = 0; i < count; ++i) {
+            const QPoint o = m_rotatedVideos.at(i).second;
+            const struct { QPoint offset; QColor color; } quarters[] = {
+                {{16, 8}, QColor(255, 0, 0)}, {{48, 8}, QColor(0, 255, 0)},
+                {{16, 24}, QColor(0, 0, 255)}, {{48, 24}, QColor(255, 255, 0)}};
+            for (const auto &q : quarters) {
+                const QColor c = at(image, QPointF(o + q.offset));
+                QVERIFY2(distance(c, q.color) <= 12,
+                         qPrintable(QStringLiteral("Video %1° bei %2/%3: %4 statt %5")
+                                        .arg(i * 90).arg(q.offset.x()).arg(q.offset.y())
                                         .arg(c.name(), q.color.name())));
             }
         }

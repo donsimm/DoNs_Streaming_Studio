@@ -8,8 +8,13 @@
 //     https://ffmpeg.org/doxygen/7.1/matroskadec_8c_source.html
 //   FFmpegs eigener VP9-Decoder verwirft den Alpha, libvpx-vp9 liefert ihn: https://trac.ffmpeg.org/ticket/8344
 //   av_log_set_level: https://ffmpeg.org/doxygen/7.1/group__lavu__log.html
+//   Display-Matrix als Seitendaten des Stroms (AVCodecParameters::coded_side_data,
+//     AV_PKT_DATA_DISPLAYMATRIX, 9 x int32_t), av_packet_side_data_get:
+//     https://ffmpeg.org/doxygen/7.1/group__lavc__packet__side__data.html
 
 #include "avsupport.h"
+
+#include "mediainfo.h"
 
 extern "C" {
 #include <libavutil/dict.h>
@@ -68,6 +73,13 @@ bool AvInput::open(const QString &path, QString *error)
         return false;
     }
     decoderName = QString::fromLatin1(decoder->name);
+#if DSS_VIDEO_ROTATION
+    // Drehung aus den Metadaten (P10a, Punkt 65), zum Beispiel Box tkhd in MP4.
+    const AVPacketSideData *matrix = av_packet_side_data_get(
+        s->codecpar->coded_side_data, s->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+    if (matrix && matrix->size >= 9 * sizeof(int32_t))
+        orientation = displayMatrixOrientation(reinterpret_cast<const int32_t *>(matrix->data));
+#endif
     return true;
 }
 

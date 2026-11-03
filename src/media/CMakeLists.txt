@@ -11,4 +11,8 @@ add_library(dss_media STATIC
   videoplayer.h videoplayer.cpp
 )
 target_include_directories(dss_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(dss_media PUBLIC Qt6::Core Threads::Threads PRIVATE PkgConfig::DSS_FFMPEG dss_warnings)
+target_link_libraries(dss_media PUBLIC Qt6::Core Threads::Threads dss_common
+                                PRIVATE PkgConfig::DSS_FFMPEG dss_warnings)
+# P10a (Punkt 65): Drehung aus den Metadaten von Videos (Display-Matrix) beachten.
+# Aus: Videos werden gezeigt, wie sie gespeichert sind (wie bis P09b).
+target_compile_definitions(dss_media PRIVATE DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)

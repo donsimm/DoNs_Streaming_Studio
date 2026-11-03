@@ -252,7 +252,9 @@ void SourceRenderer::paint(QPainter *painter, const dss::Overlay &overlay,
             if (frame) {
                 const QImage image(frame->data.data(), frame->width, frame->height, frame->stride,
                                    QImage::Format_ARGB32_Premultiplied);
-                drawImage(painter, image, s);
+                // Drehung aus den Metadaten (P10a, Punkt 65): beim Zeichnen statt das Bild
+                // jedes Mal umzurechnen.
+                drawImage(painter, image, s, dss::orientationSteps(frame->orientation));
             }
             break;
         }
@@ -265,10 +267,28 @@ void SourceRenderer::paint(QPainter *painter, const dss::Overlay &overlay,
     painter->restore();
 }
 
-void SourceRenderer::drawImage(QPainter *painter, const QImage &image, const dss::Source &source) const
+void SourceRenderer::drawImage(QPainter *painter, const QImage &image, const dss::Source &source,
+                               const dss::OrientationSteps &steps) const
 {
     // Bild und Video füllen den Kasten, gestreckt (Entscheid 6).
-    painter->drawImage(QRectF(0, 0, source.width, source.height), image);
+    if (steps == dss::OrientationSteps()) {
+        painter->drawImage(QRectF(0, 0, source.width, source.height), image);
+        return;
+    }
+    // Mit Ausrichtung (P10a): Wie dss::orientationSteps es beschreibt, zuerst waagrecht spiegeln,
+    // dann im Uhrzeigersinn drehen, beides um die Mitte des Kastens. Vor dem Drehen um 90° oder
+    // 270° hat der Kasten Breite und Höhe vertauscht. QPainter wendet die zuletzt gesetzte
+    // Umformung zuerst an. https://doc.qt.io/qt-6.8/qpainter.html#coordinate-transformations
+    const bool swap = steps.rotation % 180 != 0;
+    const double w = swap ? source.height : source.width;
+    const double h = swap ? source.width : source.height;
+    painter->save();
+    painter->translate(source.width / 2.0, source.height / 2.0);
+    painter->rotate(steps.rotation);
+    if (steps.mirror)
+        painter->scale(-1, 1);
+    painter->drawImage(QRectF(-w / 2, -h / 2, w, h), image);
+    painter->restore();
 }
 
 void SourceRenderer::drawText(QPainter *painter, const dss::Source &source) const

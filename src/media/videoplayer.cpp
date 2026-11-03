@@ -296,6 +296,7 @@ void VideoPlayer::run()
                           ? lastPts + frameDuration
                           : frame->best_effort_timestamp * timeBase;
             out->pts = lastPts;
+            out->orientation = input.orientation;
             if (!started) {
                 // Abstand 0: das erste Bild ist beim ersten frameAt fällig (Anker).
                 firstPts = lastPts;

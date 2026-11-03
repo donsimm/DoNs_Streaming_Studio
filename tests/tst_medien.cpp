@@ -5,10 +5,11 @@
 //   P02 (Gegenprobe mit ffmpeg … alphaextract,signalstats), Takt, Ende ohne Einstellung (leer),
 //   «Am Ende anhalten» (letztes Bild bleibt) und «Wiederholen»
 // - dss-cli quelle-video --am-ende-anhalten und die Spalte in quelle-liste
-// - P10a: Toleranz der Zeitpunkte und Anker (Punkt 66)
+// - P10a: Toleranz der Zeitpunkte (Punkt 66), Drehung aus der Display-Matrix von Videos (Punkt 65)
 // Daten wie im Handtest: prototypes/media (alpha.webm, video.webm, bild1.png); JPEG und MP4
 // werden mit ffmpeg aus Kopien davon erzeugt.
 
+#include "imageorientation.h"
 #include "mediainfo.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
@@ -24,6 +25,7 @@
 #include <QThread>
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <thread>
 
@@ -45,6 +47,28 @@ QString runFfmpeg(const QStringList &args, bool *ok)
     p.start(QStringLiteral("ffmpeg"), QStringList{QStringLiteral("-hide_banner"), QStringLiteral("-nostats")} + args);
     *ok = p.waitForFinished(60000) && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
     return QString::fromUtf8(p.readAllStandardError());
+}
+
+QString rotationVideo(int degrees)
+{
+    return QStringLiteral(DSS_TEST_VIDEO_ROTATION_DIR "/drehung-%1.mp4").arg(degrees);
+}
+
+// Farbe des angezeigten Bildes eines Videos an (x, y): Pixel im gespeicherten Bild suchen, das die
+// Ausrichtung dorthin bringt (Pixelmitten, orientedPoint).
+std::array<int, 3> shownPixel(const VideoFrame &f, int x, int y)
+{
+    for (int sy = 0; sy < f.height; ++sy) {
+        for (int sx = 0; sx < f.width; ++sx) {
+            const QPointF p = orientedPoint(QPointF(sx + 0.5, sy + 0.5), QSize(f.width, f.height),
+                                            f.orientation);
+            if (int(p.x()) == x && int(p.y()) == y) {
+                const uint8_t *b = f.data.data() + size_t(sy) * f.stride + 4 * sx; // BGRA
+                return {b[2], b[1], b[0]};
+            }
+        }
+    }
+    return {-1, -1, -1};
 }
 
 bool waitFor(const std::function<bool()> &condition, int timeoutMs)
@@ -431,6 +455,120 @@ private slots:
         // Grenze: genau 1 ms nach dem gefragten Zeitpunkt noch fällig, 1 ns später nicht
         QVERIFY(VideoPlayer::isDue(base + std::chrono::milliseconds(1), base));
         QVERIFY(!VideoPlayer::isDue(base + std::chrono::milliseconds(1) + std::chrono::nanoseconds(1), base));
+    }
+
+    // P10a, Punkt 65: Display-Matrix → EXIF-Ausrichtung wie ffmpeg mit autorotate. Matrizen
+    // [a b 0; c d 0; 0 0 1] in 16.16 Festkomma wie libavutil/display.h.
+    void displayMatrix_data()
+    {
+        QTest::addColumn<int>("a");
+        QTest::addColumn<int>("b");
+        QTest::addColumn<int>("c");
+        QTest::addColumn<int>("d");
+        QTest::addColumn<int>("orientation");
+        QTest::newRow("ohne Drehung") << 1 << 0 << 0 << 1 << 1;
+        QTest::newRow("90° im Uhrzeigersinn (clock)") << 0 << 1 << -1 << 0 << 6;
+        QTest::newRow("180°") << -1 << 0 << 0 << -1 << 3;
+        QTest::newRow("270° im Uhrzeigersinn (cclock)") << 0 << -1 << 1 << 0 << 8;
+        QTest::newRow("hflip") << -1 << 0 << 0 << 1 << 2;
+        QTest::newRow("vflip") << 1 << 0 << 0 << -1 << 4;
+        QTest::newRow("transpose (cclock_flip)") << 0 << 1 << 1 << 0 << 5;
+        QTest::newRow("transverse (clock_flip)") << 0 << -1 << -1 << 0 << 7;
+        QTest::newRow("keine Matrix (alles 0)") << 0 << 0 << 0 << 0 << 1;
+    }
+
+    void displayMatrix()
+    {
+        QFETCH(int, a);
+        QFETCH(int, b);
+        QFETCH(int, c);
+        QFETCH(int, d);
+        QFETCH(int, orientation);
+        const int32_t m[9] = {a * 65536, b * 65536, 0, c * 65536, d * 65536, 0, 0, 0, 1 << 30};
+        QCOMPARE(displayMatrixOrientation(m), orientation);
+        // Massstab ändert nichts (Matrix mit doppelter Grösse)
+        const int32_t m2[9] = {2 * m[0], 2 * m[1], 0, 2 * m[3], 2 * m[4], 0, 0, 0, 1 << 30};
+        QCOMPARE(displayMatrixOrientation(m2), orientation);
+        QCOMPARE(displayMatrixOrientation(nullptr), 1);
+    }
+
+    // P10a, Punkt 65: Testvideos aus tests/daten/video-drehung (erzeugen.sh). Alle zeigen nach der
+    // Drehung das Bild 64x32 mit den Vierteln rot, grün / blau, gelb: Originalgrösse, Ausrichtung
+    // der Bilder des Players und die Farben, gegengeprüft mit ffmpeg (dreht von sich aus).
+    void videoRotation_data()
+    {
+        QTest::addColumn<int>("degrees");
+        QTest::addColumn<int>("orientation");
+        QTest::addColumn<QSize>("stored");
+        QTest::newRow("0") << 0 << 1 << QSize(64, 32);
+        QTest::newRow("90") << 90 << 6 << QSize(32, 64);
+        QTest::newRow("180") << 180 << 3 << QSize(64, 32);
+        QTest::newRow("270") << 270 << 8 << QSize(32, 64);
+    }
+
+    void videoRotation()
+    {
+        QFETCH(int, degrees);
+        QFETCH(int, orientation);
+        QFETCH(QSize, stored);
+        const QString file = rotationVideo(degrees);
+        int w = 0;
+        int h = 0;
+        QString error;
+        QVERIFY2(readMediaSize(file, &w, &h, &error), qPrintable(error));
+#if DSS_VIDEO_ROTATION
+        QCOMPARE(QSize(w, h), QSize(64, 32));
+#else
+        QCOMPARE(QSize(w, h), stored);
+        orientation = 1;
+#endif
+        VideoPlayer p(file, true, false);
+        QVERIFY(waitFor([&] { return p.currentFrame() != nullptr; }, 3000));
+        const std::shared_ptr<const VideoFrame> f = p.currentFrame();
+        QCOMPARE(QSize(f->width, f->height), stored);
+        QCOMPARE(f->orientation, orientation);
+        if (!DSS_VIDEO_ROTATION)
+            return;
+        // Gegenprobe: ffmpeg dreht beim Dekodieren selbst (autorotate), Ausgabe RGB 64x32
+        QProcess ff;
+        ff.start(QStringLiteral("ffmpeg"), {QStringLiteral("-v"), QStringLiteral("error"), QStringLiteral("-i"), file,
+                                            QStringLiteral("-frames:v"), QStringLiteral("1"), QStringLiteral("-f"),
+                                            QStringLiteral("rawvideo"), QStringLiteral("-pix_fmt"),
+                                            QStringLiteral("rgb24"), QStringLiteral("-")});
+        QVERIFY(ff.waitForFinished(30000) && ff.exitCode() == 0);
+        const QByteArray reference = ff.readAllStandardOutput();
+        QCOMPARE(reference.size(), qsizetype(64 * 32 * 3));
+        const struct { QPoint at; std::array<int, 3> color; } quarters[] = {
+            {{16, 8}, {255, 0, 0}}, {{48, 8}, {0, 255, 0}}, {{16, 24}, {0, 0, 255}}, {{48, 24}, {255, 255, 0}}};
+        for (const auto &q : quarters) {
+            const std::array<int, 3> mine = shownPixel(*f, q.at.x(), q.at.y());
+            for (int i = 0; i < 3; ++i) {
+                const int ref = uint8_t(reference.at((q.at.y() * 64 + q.at.x()) * 3 + i));
+                QVERIFY2(std::abs(mine[i] - q.color[i]) <= 12 && std::abs(mine[i] - ref) <= 4,
+                         qPrintable(QStringLiteral("%1° bei %2/%3 Kanal %4: %5, ffmpeg %6, erwartet %7")
+                                        .arg(degrees).arg(q.at.x()).arg(q.at.y()).arg(i)
+                                        .arg(mine[i]).arg(ref).arg(q.color[i])));
+            }
+        }
+    }
+
+    // P10a, Punkt 65: Grösse einer neuen Videoquelle folgt der Drehung (Kern, OverlayStore)
+    void storeVideoRotation()
+    {
+        QTemporaryDir data;
+        OverlayStore store(data.path());
+        QString error;
+        QVERIFY(store.load(&error));
+        store.setMediaSizeReader(readMediaSize);
+        const QUuid id = store.createOverlay(QStringLiteral("Drehung"), 1920, 1080, &error);
+        for (int degrees : {0, 90, 180, 270}) {
+            const QUuid s = store.addVideoSource(id, rotationVideo(degrees), true, &error);
+            QVERIFY2(!s.isNull(), qPrintable(error));
+            const Source *added = findSource(*store.overlay(id), s);
+            const QSize expected = DSS_VIDEO_ROTATION || degrees % 180 == 0 ? QSize(64, 32) : QSize(32, 64);
+            QCOMPARE(QSize(added->width, added->height), expected);
+            QCOMPARE(store.mediaSizes(*store.overlay(id)).value(added->file), expected);
+        }
     }
 
 #ifdef DSS_CLI_BIN

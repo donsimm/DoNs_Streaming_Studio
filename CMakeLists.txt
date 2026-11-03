@@ -16,6 +16,9 @@ option(DSS_APP_RENDERER "Quellen auf der Leinwand zeichnen (P09)" ON)
 # P09: Quellen auf der Leinwand wählen, verschieben, skalieren, drehen (Teil C).
 # Aus: Leinwand nur zur Anzeige.
 option(DSS_APP_CANVAS_EDIT "Quellen auf der Leinwand bearbeiten (P09)" ON)
+# P10a (Punkt 65): Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner.
+# Aus: Videos wie gespeichert, Originalgrösse ohne Drehung (wie P09b).
+option(DSS_VIDEO_ROTATION "Drehung aus den Metadaten von Videos beachten (P10a)" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

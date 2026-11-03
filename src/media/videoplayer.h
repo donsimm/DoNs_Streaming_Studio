@@ -36,6 +36,9 @@ struct VideoFrame
     int stride = 0;            // Bytes pro Zeile
     std::vector<uint8_t> data; // BGRA, vormultipliziert (Byte-Folge wie QImage ARGB32 auf x86)
     double pts = 0.0;          // Sekunden ab Beginn der Datei
+    // P10a (Punkt 65): Drehung aus den Metadaten als EXIF-Ausrichtung 1 bis 8; das Bild selbst
+    // bleibt, wie es gespeichert ist, der Zeichner wendet orientationSteps() an.
+    int orientation = 1;
 };
 
 class VideoPlayer

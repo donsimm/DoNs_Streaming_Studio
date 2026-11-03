@@ -1,6 +1,7 @@
 #pragma once
 
 #include "canvasview.h"
+#include "imageorientation.h"
 #include "overlay.h"
 #include "sourcegeometry.h"
 
@@ -98,7 +99,10 @@ private:
     void requestImage(const QString &reference);
     FontEntry *font(const QString &reference) const; // lädt beim ersten Mal
     void onTick();
-    void drawImage(QPainter *painter, const QImage &image, const dss::Source &source) const;
+    // steps: Ausrichtung eines Videos aus seinen Metadaten (P10a); Bilder sind beim Laden schon
+    // ausgerichtet.
+    void drawImage(QPainter *painter, const QImage &image, const dss::Source &source,
+                   const dss::OrientationSteps &steps = {}) const;
     void drawText(QPainter *painter, const dss::Source &source) const;
 
     QString m_dataDir;

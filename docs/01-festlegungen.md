@@ -181,6 +181,11 @@ Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09b:
 - **EXIF-Ausrichtung:** Bilder werden so gezeigt, wie ihre EXIF-Ausrichtung es verlangt (wie der Browser mit `image-orientation: from-image`); die Originalgrösse ist die angezeigte Grösse.
 - **Zweiter Zeichner (P10, K-07):** Die Browserquelle muss Spiegeln und EXIF-Ausrichtung genauso umsetzen wie der Editor: Reihenfolge Ausrichtung des Bildes → Strecken in den Kasten → Spiegeln um die Mitte → Drehung um die Mitte (CSS etwa `transform: rotate(<Winkel>) scale(-1, 1)`), EXIF bei JPEG und bei PNG (`eXIf` vor `IDAT`). Ob die Chromium-Version der Browserquelle in OBS die EXIF-Ausrichtung von PNG beachtet, ist nicht geprüft (Chromium unterstützt sie seit dem Commit 694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6 vom 2024-02-05, https://chromium.googlesource.com/chromium/src/+/694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6); das klärt der Bildvergleich (K-08) bzw. T-04.
 
+Entschieden (2026-11-03, vom Nutzer bestätigt, Punkt 65), umgesetzt mit P10a:
+
+- **Drehung von Videos:** Videos werden so gezeigt, wie die Drehung in ihren Metadaten (Display-Matrix `AV_PKT_DATA_DISPLAYMATRIX`, https://ffmpeg.org/doxygen/7.1/group__lavc__packet__side__data.html; ffprobe zeigt sie als «Display Matrix» mit `rotation`) es verlangt; die Originalgrösse ist die angezeigte Grösse (bei 90° und 270° Breite und Höhe vertauscht). Eine gespiegelte Matrix wird wie die EXIF-Ausrichtungen 2, 4, 5 und 7 umgesetzt. Reihenfolge wie bei Bildern: Drehung aus den Metadaten → Strecken in den Kasten → Spiegeln → Drehung der Quelle. Schalter beim Bau: `DSS_VIDEO_ROTATION`.
+- **Zweiter Zeichner (P10):** Die Browserquelle muss die Drehung aus den Metadaten genauso beachten. P10 prüft das mit OBS (Browserquelle) und den Testvideos `tests/daten/video-drehung/drehung-{0,90,180,270}.mp4`: alle vier sehen gleich aus. Ob die Chromium-Version der Browserquelle in OBS die Drehung von Videos beachtet, ist nicht geprüft.
+
 ## Einsatz (Version im Stream)
 
 Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P10a:

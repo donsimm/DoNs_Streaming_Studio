@@ -19,6 +19,10 @@ struct AvInput
     AVCodecContext *codec = nullptr;
     int stream = -1;
     QString decoderName;
+    // Ausrichtung aus der Display-Matrix des Stroms als Wert der EXIF-Ausrichtung 1 bis 8
+    // (P10a, Punkt 65; displayMatrixOrientation in mediainfo.h). 1 ohne Matrix und ohne
+    // DSS_VIDEO_ROTATION.
+    int orientation = 1;
 
     AvInput() = default;
     AvInput(const AvInput &) = delete;
