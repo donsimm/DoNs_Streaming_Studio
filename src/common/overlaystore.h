@@ -11,6 +11,8 @@
 #include <QUuid>
 
 #include <functional>
+#include <optional>
+#include <utility>
 
 // Datenordner mit allen Overlays (E-01, E-02, E-07, Datenteil von E-08, K-01, K-03).
 // Aufbau des Ordners: docs/06-overlay-format.md
@@ -82,6 +84,8 @@ public:
     // Die Kopie steht in der Liste direkt nach dem Original.
     QUuid copyOverlay(const QUuid &overlayId, QString *error);
     bool removeOverlay(const QUuid &overlayId, QString *error);
+    // P09 (Entscheid 5): Auflösung ändern; die Quellen behalten ihre Pixelwerte.
+    bool setOverlaySize(const QUuid &overlayId, int width, int height, QString *error);
 
     // Liste (P08, Teil B): jede Änderung wird sofort atomar in liste.json gespeichert. Ist
     // liste.json kaputt, werden diese Änderungen abgewiesen (die Datei wird nicht überschrieben).
@@ -97,12 +101,24 @@ public:
     // und gibt den Verweis "media/…" zurück, bei Fehler einen leeren Text.
     QString importMedia(const QString &filePath, MediaUse use, QString *error);
 
-    // Quellen (E-07). Neue Quellen liegen zuoberst, an Lage 0/0 in der Grösse des Overlays.
+    // Liest die Grösse einer Bild- oder Videodatei in Pixeln (Bild: Pixel, Video: erstes Bild).
+    // false mit Meldung, wenn die Datei nicht lesbar ist. Gesetzt von Kern und dss-cli
+    // (dss_media, libavformat); Qt Gui und libav gehören nicht in dss_common (Regel 9).
+    using MediaSizeReader =
+        std::function<bool(const QString &path, int *width, int *height, QString *error)>;
+    void setMediaSizeReader(MediaSizeReader reader) { m_mediaSizeReader = std::move(reader); }
+
+    // Quellen (E-07). Neue Quellen liegen zuoberst an Lage 0/0. Bild und Video bekommen die
+    // Grösse der Datei (P09, Entscheid 6), wenn ein MediaSizeReader gesetzt ist; kann er sie
+    // nicht lesen, gilt die Grösse des Overlays und *warning (falls nicht nullptr) nennt den
+    // Grund. Text und Bild/Video ohne MediaSizeReader: Grösse des Overlays.
     // Name: ursprünglicher Dateiname bzw. «Text: <erste Zeile>».
-    QUuid addImageSource(const QUuid &overlayId, const QString &filePath, QString *error);
-    // loop: am Ende wiederholen (Standard im Modell: nicht wiederholen)
+    QUuid addImageSource(const QUuid &overlayId, const QString &filePath, QString *error,
+                         QString *warning = nullptr);
+    // loop: am Ende wiederholen (Standard im Modell: nicht wiederholen); holdAtEnd: am Ende
+    // anhalten (P09, Standard aus).
     QUuid addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
-                         QString *error);
+                         QString *error, QString *warning = nullptr, bool holdAtEnd = false);
     QUuid addTextSource(const QUuid &overlayId, const QString &content,
                         const QString &fontFilePath, QString *error);
     bool removeSource(const QUuid &overlayId, const QUuid &sourceId, QString *error);
@@ -149,8 +165,10 @@ private:
     bool modify(const QUuid &overlayId, const std::function<QString(Overlay *)> &change,
                 QString *error);
     QUuid addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                         bool loop, QString *error);
-    QUuid addPreparedSource(const QUuid &overlayId, Source source, QString *error);
+                         bool loop, bool holdAtEnd, QString *error, QString *warning);
+    // size: Grösse der neuen Quelle, ohne Angabe die des Overlays.
+    QUuid addPreparedSource(const QUuid &overlayId, Source source, QString *error,
+                            std::optional<std::pair<int, int>> size = std::nullopt);
     void insertSorted(const Overlay &overlay);
     int indexOf(const QUuid &overlayId) const;
     QList<QUuid> idsByName() const;
@@ -164,6 +182,7 @@ private:
                       QString *error);
 
     QString m_dataDir;
+    MediaSizeReader m_mediaSizeReader;
     TokenStore m_tokens;
     QList<Overlay> m_overlays;
     OverlayLayout m_layout;

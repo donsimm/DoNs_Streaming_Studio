@@ -29,6 +29,7 @@ signals:
 
 protected:
     void dropEvent(QDropEvent *event) override;
+    void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
 };
 
 // Liste der Quellen, vorderste oben. Klick auf das Auge schaltet die Sichtbarkeit um.

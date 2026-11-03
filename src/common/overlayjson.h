@@ -9,8 +9,11 @@
 
 namespace dss {
 
-// Version des Dateiformats, die dieses Programm schreibt und lesen kann.
-inline constexpr int kOverlayFormatVersion = 1;
+// Version des Dateiformats, die dieses Programm schreibt. 2 seit P09: Feld video.hold_at_end
+// (Entscheid 9). Gelesen werden 1 und 2; in Version 1 fehlt das Feld und gilt als false.
+// Begründung: docs/06-overlay-format.md, Feld format_version.
+inline constexpr int kOverlayFormatVersion = 2;
+inline constexpr int kOverlayFormatVersionMin = 1;
 
 QJsonObject overlayToJson(const Overlay &overlay);
 // Liest streng: fehlende, überzählige oder ungültige Felder und eine unbekannte

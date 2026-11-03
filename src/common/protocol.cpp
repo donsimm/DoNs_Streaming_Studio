@@ -171,6 +171,8 @@ QJsonObject helloMessage(const Hello &hello)
     o.insert(QStringLiteral("program"), hello.program);
     o.insert(QStringLiteral("version"), hello.version);
     o.insert(QStringLiteral("protocol_version"), hello.protocolVersion);
+    if (!hello.dataDir.isEmpty())
+        o.insert(QStringLiteral("data_dir"), hello.dataDir);
     return o;
 }
 
@@ -181,6 +183,10 @@ bool parseHello(const QJsonObject &message, Hello *hello, QString *error)
         || !requireString(message, QStringLiteral("version"), &h.version, error)
         || !requireIntField(message, QStringLiteral("protocol_version"), 1,
                             std::numeric_limits<int>::max(), &h.protocolVersion, error))
+        return false;
+    // data_dir ist freiwillig (nur der Kern schickt es); wenn vorhanden, muss es Text sein.
+    if (message.contains(QStringLiteral("data_dir"))
+        && !requireString(message, QStringLiteral("data_dir"), &h.dataDir, error))
         return false;
     *hello = h;
     return true;
@@ -590,8 +596,13 @@ QJsonObject sourceChangesToJson(const SourceChanges &c)
         o.insert(QStringLiteral("rotation"), *c.rotation);
     if (c.visible)
         o.insert(QStringLiteral("visible"), *c.visible);
+    QJsonObject v;
     if (c.loop)
-        o.insert(QStringLiteral("video"), QJsonObject{{QStringLiteral("loop"), *c.loop}});
+        v.insert(QStringLiteral("loop"), *c.loop);
+    if (c.holdAtEnd)
+        v.insert(QStringLiteral("hold_at_end"), *c.holdAtEnd);
+    if (!v.isEmpty())
+        o.insert(QStringLiteral("video"), v);
     QJsonObject t;
     if (c.content)
         t.insert(QStringLiteral("content"), *c.content);
@@ -684,8 +695,10 @@ bool sourceChangesFromJson(const QJsonObject &o, SourceChanges *changes, QString
             return false;
         }
         const QJsonObject v = o.value(QStringLiteral("video")).toObject();
-        if (!onlyKnownKeys(v, {QStringLiteral("loop")}, QStringLiteral("changes.video."), error)
-            || !optionalBoolChange(v, QStringLiteral("loop"), &c.loop, error))
+        if (!onlyKnownKeys(v, {QStringLiteral("loop"), QStringLiteral("hold_at_end")},
+                           QStringLiteral("changes.video."), error)
+            || !optionalBoolChange(v, QStringLiteral("loop"), &c.loop, error)
+            || !optionalBoolChange(v, QStringLiteral("hold_at_end"), &c.holdAtEnd, error))
             return false;
     }
     if (o.contains(QStringLiteral("text"))) {
@@ -755,6 +768,7 @@ const QList<std::pair<const char *, unsigned>> &changeFieldTable()
         {msg::kUpdateSource, FOverlay | FSource | FChanges},
         {msg::kSetTextFont, FOverlay | FSource | FFile | FFontStyle},
         {msg::kReplaceImageFile, FOverlay | FSource | FFile},
+        {msg::kSetOverlaySize, FOverlay | FSize},
     };
     return table;
 }
@@ -909,6 +923,9 @@ QJsonObject changeResultMessage(const ChangeResult &result)
              result.ok ? QJsonValue(QJsonValue::Null) : QJsonValue(result.code));
     o.insert(QStringLiteral("message"),
              result.ok ? QJsonValue(QJsonValue::Null) : QJsonValue(result.message));
+    o.insert(QStringLiteral("warning"), result.ok && !result.warning.isEmpty()
+                                            ? QJsonValue(result.warning)
+                                            : QJsonValue(QJsonValue::Null));
     return o;
 }
 
@@ -929,6 +946,14 @@ bool parseChangeResult(const QJsonObject &message, ChangeResult *result, QString
     if (!r.ok && (!requireString(message, QStringLiteral("code"), &r.code, error)
                   || !requireString(message, QStringLiteral("message"), &r.message, error)))
         return false;
+    // warning (P09) ist freiwillig: Text oder null.
+    const QJsonValue warning = message.value(QStringLiteral("warning"));
+    if (warning.isString()) {
+        r.warning = warning.toString();
+    } else if (!warning.isNull() && !warning.isUndefined()) {
+        *error = QStringLiteral("Feld warning muss Text oder null sein");
+        return false;
+    }
     *result = r;
     return true;
 }

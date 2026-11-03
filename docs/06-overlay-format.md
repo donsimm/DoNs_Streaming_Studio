@@ -166,7 +166,7 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
 <!-- beispiel-anfang -->
 ```json
 {
-    "format_version": 1,
+    "format_version": 2,
     "id": "db7f47a9-dee3-4de5-b056-40b5b3507607",
     "name": "Überblick Start",
     "address": "ueberblick-start",
@@ -199,7 +199,8 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "visible": false,
             "video": {
                 "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm",
-                "loop": false
+                "loop": false,
+                "hold_at_end": true
             }
         },
         {

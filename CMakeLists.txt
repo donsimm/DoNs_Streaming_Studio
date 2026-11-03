@@ -8,6 +8,9 @@ project(DoNsStreamingStudio VERSION 0.1.0 LANGUAGES CXX)
 option(DSS_BUILD_APP "Fenster dss-app bauen" ON)
 option(DSS_BUILD_TESTS "Tests bauen (ctest)" ON)
 option(DSS_BUILD_CLI "Werkzeug dss-cli bauen" ON)
+# P09: Kern und dss-cli lesen die Grösse neuer Bild- und Videoquellen aus der Datei (Entscheid 6).
+# Aus: neue Quellen bekommen die Grösse des Overlays wie in P08.
+option(DSS_MEDIA_SIZE "Grösse neuer Bild- und Videoquellen aus der Datei lesen (P09)" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +35,9 @@ add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
 add_subdirectory(src/common)
+if(DSS_MEDIA_SIZE)
+  add_subdirectory(src/media)
+endif()
 add_subdirectory(src/core)
 if(DSS_BUILD_CLI)
   add_subdirectory(src/cli)

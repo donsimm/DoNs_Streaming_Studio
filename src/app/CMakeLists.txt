@@ -13,6 +13,7 @@ add_library(dss_app_ui STATIC
   dockviews.h dockviews.cpp
   dialogs.h dialogs.cpp
   mainwindowedit.cpp
+  translation.h translation.cpp
 )
 target_include_directories(dss_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Symbole werden zur Laufzeit aus dem Quellordner geladen, damit der Nutzer sie ohne neuen
@@ -25,6 +26,21 @@ target_link_libraries(dss_app_ui PUBLIC dss_common Qt6::Widgets PRIVATE dss_warn
 # Bearbeiten im Fenster (P08, CLAUDE.md Regel 8). Aus: Docks nur zur Anzeige wie in P07.
 option(DSS_APP_EDITING "Bearbeiten im Fenster (P08)" ON)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_EDITING=$<BOOL:${DSS_APP_EDITING}>)
+
+# Übersetzung von Qt ohne «ß» (P09, Punkt 44): qtbase_de.qm beim Bau kopieren, «ß» → «ss».
+# Quelle: Paket qt6-translations-l10n (Ordner der Übersetzungen von Qt, QtInstallPaths.cmake).
+set(DSS_QT_TRANSLATION "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}/qtbase_de.qm"
+    CACHE FILEPATH "Übersetzung von Qt, die ohne «ß» kopiert wird")
+set(DSS_TRANSLATION_DIR "${CMAKE_CURRENT_BINARY_DIR}/uebersetzung")
+qt_add_executable(dss-qm-ohne-ss qm-ohne-ss.cpp)
+target_link_libraries(dss-qm-ohne-ss PRIVATE dss_common dss_warnings)
+add_custom_command(OUTPUT ${DSS_TRANSLATION_DIR}/qtbase_de.qm
+  COMMAND dss-qm-ohne-ss ${DSS_QT_TRANSLATION} ${DSS_TRANSLATION_DIR}/qtbase_de.qm
+  DEPENDS dss-qm-ohne-ss ${DSS_QT_TRANSLATION}
+  COMMENT "Übersetzung von Qt ohne «ß»")
+add_custom_target(dss_uebersetzung ALL DEPENDS ${DSS_TRANSLATION_DIR}/qtbase_de.qm)
+add_dependencies(dss_app_ui dss_uebersetzung)
+target_compile_definitions(dss_app_ui PRIVATE DSS_TRANSLATION_DIR="${DSS_TRANSLATION_DIR}")
 
 qt_add_executable(dss-app main.cpp)
 target_link_libraries(dss-app PRIVATE dss_app_ui dss_warnings)

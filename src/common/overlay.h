@@ -61,6 +61,9 @@ struct Source
     TextProperties text; // nur bei SourceKind::Text
     QString file;        // nur bei Image und Video: Verweis "media/<sha256>.<endung>"
     bool loop = false;   // nur bei Video: am Ende wieder von vorne, Standard nicht wiederholen
+    // Nur bei Video (P09, Entscheid 9): am Ende das letzte Bild stehen lassen. Ohne beides wird
+    // die Quelle am Ende leer (durchsichtig). Mit loop hat holdAtEnd keine Wirkung.
+    bool holdAtEnd = false;
 
     bool operator==(const Source &) const = default;
 };
@@ -89,6 +92,10 @@ QString validateSource(const Source &source);
 // Prüft das ganze Overlay einschliesslich aller Quellen und eindeutiger Kennungen.
 QString validateOverlay(const Overlay &overlay);
 
+// Auflösung eines bestehenden Overlays ändern (P09, Entscheid 5). Die Quellen behalten ihre
+// Pixelwerte; was danach ausserhalb liegt, ist teilweise ausserhalb der Leinwand.
+QString setOverlaySize(Overlay *overlay, int width, int height);
+
 // Bearbeiten der Quellen eines Overlays (E-07, Datenteil von E-08).
 // Bei einem Fehler bleibt das Overlay unverändert und die Meldung wird zurückgegeben.
 int sourceIndex(const Overlay &overlay, const QUuid &sourceId); // -1, wenn nicht vorhanden
@@ -115,6 +122,7 @@ struct SourceChanges
     std::optional<int> rotation; // Zehntelgrad
     std::optional<bool> visible;
     std::optional<bool> loop;        // nur Video
+    std::optional<bool> holdAtEnd;   // nur Video (P09)
     std::optional<QString> content;  // nur Text
     std::optional<int> fontSize;     // nur Text
     std::optional<QString> color;    // nur Text, #RRGGBBAA

@@ -22,9 +22,10 @@
 namespace dss {
 
 // Version der Schnittstelle; steht in der Begrüssung beider Seiten. 2 seit P08: Änderungen vom
-// Fenster an den Kern, overlay_list mit Ordnern in der Reihenfolge der Liste
+// Fenster an den Kern, overlay_list mit Ordnern in der Reihenfolge der Liste. 3 seit P09: Overlays
+// im Format 2 der Overlay-Datei (video.hold_at_end), set_overlay_size
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 2;
+inline constexpr int kProtocolVersion = 3;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -64,6 +65,8 @@ inline constexpr char kMoveSource[] = "move_source";
 inline constexpr char kUpdateSource[] = "update_source";
 inline constexpr char kSetTextFont[] = "set_text_font";
 inline constexpr char kReplaceImageFile[] = "replace_image_file";
+// P09: Auflösung eines Overlays (Entscheid 5)
+inline constexpr char kSetOverlaySize[] = "set_overlay_size";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -113,6 +116,9 @@ struct Hello
     QString program;        // «dss-core», «dss-app», …
     QString version;        // Version des Programms
     int protocolVersion = 0;
+    // Nur vom Kern (P09): Datenordner als absoluter Pfad. Das Fenster liest Bilder, Videos und
+    // Schriften für den Zeichner von dort (K-03). Leer = nicht angegeben.
+    QString dataDir = {};
 
     bool operator==(const Hello &) const = default;
 };
@@ -233,6 +239,7 @@ struct ChangeResult
     QUuid id;         // neu angelegtes Overlay, Ordner oder Quelle (sonst null)
     QString code;     // bei !ok, siehe err
     QString message;  // bei !ok, auf Deutsch
+    QString warning = {}; // P09: bei ok ein Hinweis (zum Beispiel Grösse der Datei nicht lesbar)
 
     bool operator==(const ChangeResult &) const = default;
 };

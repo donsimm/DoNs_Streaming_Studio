@@ -294,7 +294,9 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #chatBotPage QLabel { color: @textMuted@; }
 
 /* P08: Baum der Overlays wie die Listen, mehrzeiliges Textfeld wie QLineEdit. */
-QTreeView { border-radius: 4px; padding: 2px; outline: none; }
+/* P09, Punkt 48: Den Einzug links vom gewählten Eintrag füllt OverlayTree::drawBranches
+   (dockviews.cpp); show-decoration-selected allein reicht mit Stylesheet nicht. */
+QTreeView { border-radius: 4px; padding: 2px; outline: none; show-decoration-selected: 0; }
 QTreeView::item { border-radius: 4px; border: 1px solid transparent; padding: 3px 2px; color: @text@; }
 QTreeView::item:hover { background: @input@; border: 1px solid @buttonHover@; }
 QTreeView::item:selected { background-color: @primary@; border-color: @primaryLight@; }

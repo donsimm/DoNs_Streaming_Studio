@@ -16,6 +16,7 @@ class HeaderBar;
 class QLabel;
 class QListWidgetItem;
 class QMenu;
+class QMenuBar;
 class QStackedWidget;
 class QTreeWidgetItem;
 
@@ -65,6 +66,7 @@ protected:
 
 private:
     void createMenus();
+    void createHeader();
     void createCentralArea();
     void createDocks();
     void createStatusBar();
@@ -114,6 +116,7 @@ private:
     void onSourceDropped(const QUuid &id, int insertRow);
     void updateSelectedSource(const dss::SourceChanges &changes, const QString &field);
     void onNameEdited();
+    void onOverlaySizeEdited();
     void onFamilyChosen(int index);
     void onFontStyleChosen();
     void chooseColor();
@@ -123,12 +126,14 @@ private:
     Theme m_theme;
     bool m_keepLayout = false;
     QMenu *m_docksMenu = nullptr;
+    QMenuBar *m_menuBar = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     CanvasWidget *m_canvas = nullptr;
     OverlaysDock m_overlaysDock;
     SourcesDock m_sourcesDock;
     PropertiesDock m_propertiesDock;
+    ControlDock m_controlDock;
     QLabel *m_statusMessage = nullptr;
     QLabel *m_coreStatus = nullptr;
     bool m_firstPaintReported = false;

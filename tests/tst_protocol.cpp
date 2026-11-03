@@ -135,7 +135,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 2); // seit P08
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 3); // seit P09
     }
 
     void helloInvalid()

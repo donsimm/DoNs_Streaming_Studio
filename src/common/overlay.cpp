@@ -138,6 +138,8 @@ QString validateSource(const Source &source)
     // Wiederholen wird nur bei Video gespeichert; anderswo ginge der Wert beim Speichern verloren.
     if (source.loop && source.kind != SourceKind::Video)
         return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
+    if (source.holdAtEnd && source.kind != SourceKind::Video)
+        return QStringLiteral("Am Ende anhalten gibt es nur bei Quellen der Art Video.");
     switch (source.kind) {
     case SourceKind::Text:
         return validateTextProperties(source.text);
@@ -168,6 +170,15 @@ QString validateOverlay(const Overlay &overlay)
                 .arg(i + 1).arg(source.id.toString(QUuid::WithoutBraces));
         ids.insert(source.id);
     }
+    return {};
+}
+
+QString setOverlaySize(Overlay *overlay, int width, int height)
+{
+    if (const QString e = validateOverlaySize(width, height); !e.isEmpty())
+        return e;
+    overlay->width = width;
+    overlay->height = height;
     return {};
 }
 
@@ -280,6 +291,8 @@ QString applySourceChanges(Source *source, const SourceChanges &changes)
                               "der Art Text.");
     if (changes.loop && source->kind != SourceKind::Video)
         return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
+    if (changes.holdAtEnd && source->kind != SourceKind::Video)
+        return QStringLiteral("Am Ende anhalten gibt es nur bei Quellen der Art Video.");
     Source changed = *source;
     if (changes.name)
         changed.name = *changes.name;
@@ -297,6 +310,8 @@ QString applySourceChanges(Source *source, const SourceChanges &changes)
         changed.visible = *changes.visible;
     if (changes.loop)
         changed.loop = *changes.loop;
+    if (changes.holdAtEnd)
+        changed.holdAtEnd = *changes.holdAtEnd;
     if (changes.content)
         changed.text.content = *changes.content;
     if (changes.fontSize)

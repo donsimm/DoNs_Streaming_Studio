@@ -130,6 +130,11 @@ QString changeKey(const QUuid &sourceId, const QString &field)
     return sourceId.toString(QUuid::WithoutBraces) + QLatin1Char('/') + field;
 }
 
+QString overlaySizeKey(const QUuid &overlayId)
+{
+    return overlayId.toString(QUuid::WithoutBraces) + QStringLiteral("/size");
+}
+
 ChangeRequest sourceUpdate(const QUuid &overlayId, const QUuid &sourceId,
                            const SourceChanges &changes)
 {

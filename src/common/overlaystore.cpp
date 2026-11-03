@@ -445,6 +445,12 @@ bool OverlayStore::removeOverlay(const QUuid &overlayId, QString *error)
                         QStringLiteral("Overlay gelöscht"), error);
 }
 
+bool OverlayStore::setOverlaySize(const QUuid &overlayId, int width, int height, QString *error)
+{
+    return modify(overlayId, [&](Overlay *o) { return dss::setOverlaySize(o, width, height); },
+                  error);
+}
+
 bool OverlayStore::moveOverlayInList(const QUuid &overlayId, const QUuid &folderId, int index,
                                      QString *error)
 {
@@ -543,7 +549,8 @@ QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString
     return reference;
 }
 
-QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QString *error)
+QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QString *error,
+                                      std::optional<std::pair<int, int>> size)
 {
     const Overlay *target = overlay(overlayId);
     if (!target) {
@@ -553,15 +560,15 @@ QUuid OverlayStore::addPreparedSource(const QUuid &overlayId, Source source, QSt
     source.id = QUuid::createUuid();
     source.x = 0;
     source.y = 0;
-    source.width = target->width;
-    source.height = target->height;
+    source.width = size ? size->first : target->width;
+    source.height = size ? size->second : target->height;
     if (!modify(overlayId, [&](Overlay *o) { return dss::addSource(o, source); }, error))
         return {};
     return source.id;
 }
 
 QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePath, SourceKind kind,
-                                   bool loop, QString *error)
+                                   bool loop, bool holdAtEnd, QString *error, QString *warning)
 {
     if (!overlay(overlayId)) {
         *error = unknownOverlay(overlayId);
@@ -576,18 +583,40 @@ QUuid OverlayStore::addMediaSource(const QUuid &overlayId, const QString &filePa
     source.name = QFileInfo(filePath).fileName(); // ursprünglicher Dateiname als Vorschlag
     source.file = reference;
     source.loop = loop;
-    return addPreparedSource(overlayId, source, error);
+    source.holdAtEnd = holdAtEnd;
+    // Grösse der Datei (Entscheid 6), gelesen aus der Kopie im Datenordner.
+    std::optional<std::pair<int, int>> size;
+    if (m_mediaSizeReader) {
+        int width = 0;
+        int height = 0;
+        QString reason;
+        if (m_mediaSizeReader(mediaFilePath(reference), &width, &height, &reason)
+            && width >= kSourceMinSize && height >= kSourceMinSize) {
+            size = std::pair(width, height);
+        } else {
+            if (reason.isEmpty())
+                reason = QStringLiteral("Grösse %1x%2").arg(width).arg(height);
+            const Overlay *target = overlay(overlayId);
+            const QString text = QStringLiteral("Grösse von «%1» nicht lesbar (%2), die Quelle "
+                                                "bekommt die Grösse des Overlays %3x%4.")
+                                     .arg(source.name, reason).arg(target->width).arg(target->height);
+            if (warning)
+                *warning = text;
+        }
+    }
+    return addPreparedSource(overlayId, source, error, size);
 }
 
-QUuid OverlayStore::addImageSource(const QUuid &overlayId, const QString &filePath, QString *error)
+QUuid OverlayStore::addImageSource(const QUuid &overlayId, const QString &filePath, QString *error,
+                                   QString *warning)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Image, false, error);
+    return addMediaSource(overlayId, filePath, SourceKind::Image, false, false, error, warning);
 }
 
 QUuid OverlayStore::addVideoSource(const QUuid &overlayId, const QString &filePath, bool loop,
-                                   QString *error)
+                                   QString *error, QString *warning, bool holdAtEnd)
 {
-    return addMediaSource(overlayId, filePath, SourceKind::Video, loop, error);
+    return addMediaSource(overlayId, filePath, SourceKind::Video, loop, holdAtEnd, error, warning);
 }
 
 QUuid OverlayStore::addTextSource(const QUuid &overlayId, const QString &content,

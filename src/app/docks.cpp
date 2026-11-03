@@ -234,8 +234,14 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     QWidget *videoPage = page(r.kindPages, &g);
     r.loop = new QCheckBox(QStringLiteral("Wiederholen"), videoPage);
     g->addWidget(r.loop, 0, 0);
+    r.holdAtEnd = new QCheckBox(QStringLiteral("Am Ende anhalten"), videoPage);
+    r.holdAtEnd->setToolTip(QStringLiteral("Letztes Bild bleibt stehen. Ohne beides wird die Quelle "
+                                           "am Ende leer."));
+    g->addWidget(r.holdAtEnd, 1, 0);
     g->setColumnStretch(1, 1);
     g->setRowStretch(1, 1);
+    g->setRowStretch(1, 0);
+    g->setRowStretch(2, 1);
     r.kindPages->addWidget(videoPage);
 
     QWidget *textPage = page(r.kindPages, &g);
@@ -312,17 +318,20 @@ PropertiesDock createPropertiesDock(QWidget *parent)
                  {r.width, "propertyWidth"}, {r.height, "propertyHeight"},
                  {r.rotation, "propertyRotation"}, {r.kindPages, "propertyPages"},
                  {r.replaceImage, "imageReplace"}, {r.loop, "videoLoop"},
+                 {r.holdAtEnd, "videoHoldAtEnd"},
                  {r.content, "textContent"}, {r.family, "textFamily"}, {r.weight, "textWeight"},
                  {r.italic, "textItalic"}, {r.fontSize, "textSize"}, {r.align, "textAlign"}});
     for (QWidget *w : std::initializer_list<QWidget *>{
-             r.name, r.x, r.y, r.width, r.height, r.rotation, r.replaceImage, r.loop, r.content,
+             r.name, r.x, r.y, r.width, r.height, r.rotation, r.replaceImage, r.loop, r.holdAtEnd,
+             r.content,
              r.family, r.weight, r.italic, r.fontSize, r.color, r.align})
         w->setEnabled(false);
     return r;
 }
 
-QDockWidget *createControlDock(QWidget *parent)
+ControlDock createControlDock(QWidget *parent)
 {
+    ControlDock result;
     auto *content = new QWidget;
     auto *grid = new QGridLayout(content);
     grid->setContentsMargins(8, 8, 8, 8);
@@ -372,8 +381,25 @@ QDockWidget *createControlDock(QWidget *parent)
     grid->addLayout(snapRow, 3, 0, 1, 2);
     grid->addWidget(gridSize, 3, 2);
     grid->addWidget(clearGuides, 3, 3);
+    // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
+    result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
+    result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
+    result.overlayWidth->setToolTip(QStringLiteral("Breite des Overlays"));
+    result.overlayWidth->setAccessibleName(QStringLiteral("Breite des Overlays"));
+    result.overlayHeight = pixelBox(1080, dss::kOverlayMinSize, content);
+    result.overlayHeight->setMaximum(dss::kOverlayMaxHeight);
+    result.overlayHeight->setToolTip(QStringLiteral("Höhe des Overlays"));
+    result.overlayHeight->setAccessibleName(QStringLiteral("Höhe des Overlays"));
+    result.overlayWidth->setEnabled(false);
+    result.overlayHeight->setEnabled(false);
+    nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 4, 0);
+    grid->addWidget(result.overlayWidth, 4, 1);
+    grid->addWidget(result.overlayHeight, 4, 2);
+
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(4, 1);
-    return dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
+    grid->setRowStretch(5, 1);
+    result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
+    return result;
 }

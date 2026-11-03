@@ -56,7 +56,11 @@ void MainWindow::onChangeFinished(const dss::ChangeResult &result)
     const SelectNew select = m_selectOnResult.take(result.requestId);
     if (!result.ok) {
         showStatus(result.message);
-    } else if (selectNew && !result.id.isNull()) {
+    } else if (!result.warning.isEmpty()) {
+        // Zum Beispiel: Grösse der Datei nicht lesbar, Grösse des Overlays genommen (P09).
+        showStatus(result.warning);
+    }
+    if (result.ok && selectNew && !result.id.isNull()) {
         // Neues oder kopiertes Overlay bzw. neue Quelle wählen. Liste und Overlay sind schon da:
         // Der Kern schickt sie vor der Antwort (Teil A).
         if (select == SelectNew::Overlay) {
@@ -160,6 +164,17 @@ void MainWindow::connectEditing()
         c.loop = checked;
         updateSelectedSource(c, QStringLiteral("loop"));
     });
+    connect(d.holdAtEnd, &QCheckBox::clicked, this, [this](bool checked) {
+        dss::SourceChanges c;
+        c.holdAtEnd = checked;
+        updateSelectedSource(c, QStringLiteral("holdAtEnd"));
+    });
+
+    // Auflösung des Overlays im Dock «Steuerung» (P09, Entscheid 5)
+    connect(m_controlDock.overlayWidth, &QSpinBox::valueChanged, this,
+            &MainWindow::onOverlaySizeEdited);
+    connect(m_controlDock.overlayHeight, &QSpinBox::valueChanged, this,
+            &MainWindow::onOverlaySizeEdited);
     connect(d.family, &QComboBox::activated, this, &MainWindow::onFamilyChosen);
     connect(d.weight, &QComboBox::activated, this, &MainWindow::onFontStyleChosen);
     connect(d.italic, &QCheckBox::clicked, this, &MainWindow::onFontStyleChosen);
@@ -503,6 +518,17 @@ void MainWindow::updateSelectedSource(const dss::SourceChanges &changes, const Q
         return;
     sendChange(dss::sourceUpdate(m_selectedOverlay, m_selectedSource, changes),
                dss::changeKey(m_selectedSource, field));
+}
+
+void MainWindow::onOverlaySizeEdited()
+{
+    if (m_selectedOverlay.isNull())
+        return;
+    dss::ChangeRequest r = request(dss::msg::kSetOverlaySize);
+    r.overlayId = m_selectedOverlay;
+    r.width = m_controlDock.overlayWidth->value();
+    r.height = m_controlDock.overlayHeight->value();
+    sendChange(r, dss::overlaySizeKey(m_selectedOverlay));
 }
 
 void MainWindow::onNameEdited()

@@ -58,6 +58,7 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
     setWindowTitle(QStringLiteral("DoNs Streaming Studio"));
     resize(1280, 800);
     createMenus();
+    createHeader();
     createCentralArea();
     createDocks();
     createStatusBar();
@@ -75,30 +76,50 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
 void MainWindow::createMenus()
 {
     // Nur Datei → Beenden, Docks und Hilfe → Über tun etwas; die übrigen Menüs sind
-    // noch leer und ausgegraut (Auftrag P05).
-    QMenu *file = menuBar()->addMenu(QStringLiteral("&Datei"));
+    // noch leer und ausgegraut (Auftrag P05). Eigene Menüleiste, weil sie mit dem Kopfbereich
+    // zusammen als Menü-Widget des Fensters steht (createHeader); menuBar() würde sie ersetzen.
+    m_menuBar = new QMenuBar(this);
+    QMenuBar *bar = m_menuBar;
+    QMenu *file = bar->addMenu(QStringLiteral("&Datei"));
     QAction *quit = file->addAction(QStringLiteral("&Beenden"), this, &QWidget::close);
     quit->setShortcut(QKeySequence::Quit);
     quit->setMenuRole(QAction::QuitRole);
 
     for (const QString &title : {QStringLiteral("&Bearbeiten"), QStringLiteral("&Ansicht")})
-        menuBar()->addMenu(title)->setEnabled(false);
-    m_docksMenu = menuBar()->addMenu(QStringLiteral("D&ocks"));
-    menuBar()->addMenu(QStringLiteral("&Werkzeuge"))->setEnabled(false);
+        bar->addMenu(title)->setEnabled(false);
+    m_docksMenu = bar->addMenu(QStringLiteral("D&ocks"));
+    bar->addMenu(QStringLiteral("&Werkzeuge"))->setEnabled(false);
 
-    QMenu *help = menuBar()->addMenu(QStringLiteral("&Hilfe"));
+    QMenu *help = bar->addMenu(QStringLiteral("&Hilfe"));
     help->addAction(QStringLiteral("Ü&ber …"), this, &MainWindow::showAbout);
+}
+
+void MainWindow::createHeader()
+{
+    // Kopfbereich fest über die ganze Fensterbreite (E-23, P09): Menüleiste und Kopfbereich
+    // zusammen als Menü-Widget. QMainWindow legt es über die Bereiche der Docks; links oder rechts
+    // angedockte Docks beginnen darunter. https://doc.qt.io/qt-6.8/qmainwindow.html#setMenuWidget
+    auto *top = new QWidget(this);
+    top->setObjectName(QStringLiteral("menuAndHeader"));
+    auto *column = new QVBoxLayout(top);
+    column->setContentsMargins(0, 0, 0, 0);
+    column->setSpacing(0);
+    column->addWidget(m_menuBar);
+    auto *headerRow = new QWidget(top);
+    auto *headerLayout = new QVBoxLayout(headerRow);
+    headerLayout->setContentsMargins(4, 4, 4, 6); // wie vorher im mittleren Bereich
+    m_header = new HeaderBar(m_theme, headerRow);
+    headerLayout->addWidget(m_header);
+    column->addWidget(headerRow);
+    setMenuWidget(top);
 }
 
 void MainWindow::createCentralArea()
 {
     auto *central = new QWidget(this);
     auto *column = new QVBoxLayout(central);
-    column->setContentsMargins(4, 4, 4, 0);
+    column->setContentsMargins(4, 0, 4, 0);
     column->setSpacing(6);
-
-    m_header = new HeaderBar(m_theme, central);
-    column->addWidget(m_header);
 
     m_modules = new QStackedWidget(central);
     m_canvas = new CanvasWidget(m_theme, m_modules);
@@ -130,8 +151,9 @@ void MainWindow::createDocks()
     m_overlaysDock = createOverlaysDock(this);
     m_sourcesDock = createSourcesDock(this);
     m_propertiesDock = createPropertiesDock(this);
+    m_controlDock = createControlDock(this);
     const QList<QDockWidget *> docks = {m_overlaysDock.dock, m_sourcesDock.dock,
-                                        m_propertiesDock.dock, createControlDock(this)};
+                                        m_propertiesDock.dock, m_controlDock.dock};
     addDockWidget(Qt::BottomDockWidgetArea, docks.first());
     for (qsizetype i = 1; i < docks.size(); ++i)
         splitDockWidget(docks.at(i - 1), docks.at(i), Qt::Horizontal);
@@ -402,6 +424,13 @@ void MainWindow::refreshOverlay()
         m_selectedSource = QUuid();
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
+    // Auflösung im Dock «Steuerung» (P09); während eine Änderung unterwegs ist, bleibt der Wert.
+    if (!m_client || !m_client->isChangePending(dss::overlaySizeKey(m_selectedOverlay))) {
+        const QSignalBlocker blockWidth(m_controlDock.overlayWidth);
+        const QSignalBlocker blockHeight(m_controlDock.overlayHeight);
+        m_controlDock.overlayWidth->setValue(overlay ? overlay->width : dss::kNewOverlayWidth);
+        m_controlDock.overlayHeight->setValue(overlay ? overlay->height : dss::kNewOverlayHeight);
+    }
     refreshProperties();
 }
 
@@ -466,6 +495,8 @@ void MainWindow::refreshProperties()
     if (source && source->kind == dss::SourceKind::Video) {
         const QSignalBlocker block(d.loop);
         d.loop->setChecked(source->loop);
+        const QSignalBlocker blockHold(d.holdAtEnd);
+        d.holdAtEnd->setChecked(source->holdAtEnd);
     }
     if (source && source->kind == dss::SourceKind::Text) {
         const dss::TextProperties &t = source->text;
@@ -544,6 +575,10 @@ void MainWindow::refreshActions()
                                                        d.content, d.family, d.weight,
                                                        d.fontSize, d.color, d.align})
         w->setEnabled(edit && source);
+    // «Am Ende anhalten» ist mit «Wiederholen» ausgegraut (Entscheid 9).
+    d.holdAtEnd->setEnabled(edit && source && !source->loop);
+    m_controlDock.overlayWidth->setEnabled(edit && overlay);
+    m_controlDock.overlayHeight->setEnabled(edit && overlay);
     if (!(edit && source))
         d.italic->setEnabled(false);
     // Ausrichten auf der Leinwand bleibt in P08 ausgegraut.

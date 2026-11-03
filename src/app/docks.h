@@ -65,6 +65,7 @@ struct PropertiesDock
     QPushButton *replaceImage = nullptr;
     // Video
     QCheckBox *loop = nullptr;
+    QCheckBox *holdAtEnd = nullptr; // P09: am Ende anhalten, ausgegraut mit «Wiederholen»
     // Text
     QPlainTextEdit *content = nullptr;
     QComboBox *family = nullptr;
@@ -85,4 +86,13 @@ struct PropertiesDock
 OverlaysDock createOverlaysDock(QWidget *parent);
 SourcesDock createSourcesDock(QWidget *parent);
 PropertiesDock createPropertiesDock(QWidget *parent);
-QDockWidget *createControlDock(QWidget *parent);
+// Dock «Steuerung». Seit P09 lässt sich die Auflösung des gewählten Overlays ändern
+// (Entscheid 5); die übrigen Elemente bleiben ausgegraut bis P10.
+struct ControlDock
+{
+    QDockWidget *dock = nullptr;
+    QSpinBox *overlayWidth = nullptr;
+    QSpinBox *overlayHeight = nullptr;
+};
+
+ControlDock createControlDock(QWidget *parent);

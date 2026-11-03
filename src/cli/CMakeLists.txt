@@ -1,3 +1,8 @@
 # dss-cli: Werkzeug ohne Fenster für den Handtest des Overlay-Modells (P04)
 qt_add_executable(dss-cli main.cpp)
 target_link_libraries(dss-cli PRIVATE dss_common dss_warnings)
+# Grösse neuer Bild- und Videoquellen aus der Datei wie im Kern (P09, Schalter DSS_MEDIA_SIZE)
+if(DSS_MEDIA_SIZE)
+  target_link_libraries(dss-cli PRIVATE dss_media)
+  target_compile_definitions(dss-cli PRIVATE DSS_MEDIA_SIZE=1)
+endif()

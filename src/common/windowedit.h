@@ -67,6 +67,8 @@ bool colorParts(const QString &color, int *red, int *green, int *blue, int *alph
 // Schlüssel für das Zusammenfassen häufiger Änderungen (CoreClient::sendChange): je Quelle
 // und Feld, zum Beispiel «<Kennung>/x».
 QString changeKey(const QUuid &sourceId, const QString &field);
+// Schlüssel für die Auflösung eines Overlays (set_overlay_size, P09): «<Kennung>/size».
+QString overlaySizeKey(const QUuid &overlayId);
 
 // Einzelne Änderung einer Quelle als Nachricht update_source.
 ChangeRequest sourceUpdate(const QUuid &overlayId, const QUuid &sourceId,

@@ -5,6 +5,7 @@
 #include "mainwindow.h"
 #include "symbols.h"
 #include "theme.h"
+#include "translation.h"
 
 #include "configpaths.h"
 #include "coreclient.h"
@@ -117,6 +118,8 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(name);
     QApplication::setApplicationVersion(dss::version());
     dss::setupLogging();
+    // Texte von Qt selbst deutsch, ohne «ß» (P09, Punkt 44).
+    installQtTranslation(&app);
 
     // Fusion: derselbe Grundstil unabhängig von der Desktop-Umgebung.
     // https://doc.qt.io/qt-6.8/qstylefactory.html

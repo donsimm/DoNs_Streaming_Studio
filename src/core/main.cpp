@@ -8,6 +8,9 @@
 #include "datalock.h"
 #include "logging.h"
 #include "overlaystore.h"
+#if DSS_MEDIA_SIZE
+#include "mediainfo.h"
+#endif
 #include "systemdnotify.h"
 #include "unixsignals.h"
 #include "version.h"
@@ -83,6 +86,10 @@ int main(int argc, char *argv[])
     }
 
     dss::OverlayStore store(dataDir);
+#if DSS_MEDIA_SIZE
+    // Grösse neuer Bild- und Videoquellen aus der Datei (P09, Entscheid 6)
+    store.setMediaSizeReader(dss::readMediaSize);
+#endif
     if (!store.load(&error)) {
         qCritical("Datenordner %s: %s", qPrintable(store.dataDir()), qPrintable(error));
         return kExitError;

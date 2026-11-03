@@ -8,6 +8,9 @@
 #include "configpaths.h"
 #include "datalock.h"
 #include "overlaystore.h"
+#if DSS_MEDIA_SIZE
+#include "mediainfo.h"
+#endif
 #include "version.h"
 
 #include <QCoreApplication>
@@ -49,11 +52,13 @@ const char *const kUsage =
     "  overlay-loeschen ADRESSE\n"
     "  quelle-liste ADRESSE\n"
     "  quelle-bild ADRESSE DATEI\n"
-    "  quelle-video ADRESSE DATEI [--wiederholen]\n"
+    "  quelle-video ADRESSE DATEI [--wiederholen] [--am-ende-anhalten]\n"
     "  quelle-text ADRESSE TEXT SCHRIFTDATEI\n"
     "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
+    "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
+    "quelle-bild und quelle-video: Grösse der Quelle = Grösse der Datei (Video: erstes Bild).\n"
     "NR: Nummer der Quelle aus quelle-liste (1 = ganz hinten).\n"
     "DREHUNG: Grad mit höchstens einer Nachkommastelle, 0 bis 359.9 (zum Beispiel 12.5).\n"
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/dons-streaming-studio).\n"
@@ -67,6 +72,7 @@ struct Arguments
     QString dataDir;
     bool changeAddress = false;
     bool loop = false;
+    bool holdAtEnd = false;
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -86,6 +92,8 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->changeAddress = true;
         } else if (a == QLatin1String("--wiederholen")) {
             result->loop = true;
+        } else if (a == QLatin1String("--am-ende-anhalten")) {
+            result->holdAtEnd = true;
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -161,6 +169,8 @@ public:
             return usage(QStringLiteral("--adresse-mitaendern gilt nur für overlay-umbenennen."));
         if (command != QLatin1String("quelle-video") && m_args.loop)
             return usage(QStringLiteral("--wiederholen gilt nur für quelle-video."));
+        if (command != QLatin1String("quelle-video") && m_args.holdAtEnd)
+            return usage(QStringLiteral("--am-ende-anhalten gilt nur für quelle-video."));
 
         struct Command
         {
@@ -324,13 +334,15 @@ private:
                                     QStringLiteral("Sichtbar"), QStringLiteral("X"),
                                     QStringLiteral("Y"), QStringLiteral("Breite"),
                                     QStringLiteral("Höhe"), QStringLiteral("Drehung"),
-                                    QStringLiteral("Wiederholen"), QStringLiteral("Name")}};
+                                    QStringLiteral("Wiederholen"), QStringLiteral("Am Ende anhalten"),
+                                    QStringLiteral("Name")}};
         for (qsizetype i = 0; i < o->sources.size(); ++i) {
             const dss::Source &s = o->sources.at(i);
             rows.append({QString::number(i + 1), dss::sourceKindName(s.kind), yesNo(s.visible),
                          QString::number(s.x), QString::number(s.y), QString::number(s.width),
                          QString::number(s.height), dss::rotationDisplay(s.rotation),
                          s.kind == dss::SourceKind::Video ? yesNo(s.loop) : QStringLiteral("–"),
+                         s.kind == dss::SourceKind::Video ? yesNo(s.holdAtEnd) : QStringLiteral("–"),
                          s.name});
         }
         printTable(rows);
@@ -346,7 +358,9 @@ private:
         out() << QStringLiteral("Quelle %1 «%2» (%3) hinzugefügt, Datei %4")
                      .arg(index + 1).arg(s.name, dss::sourceKindName(s.kind), file);
         if (s.kind == dss::SourceKind::Video)
-            out() << QStringLiteral(", Wiederholen %1").arg(yesNo(s.loop));
+            out() << QStringLiteral(", Wiederholen %1, Am Ende anhalten %2")
+                         .arg(yesNo(s.loop), yesNo(s.holdAtEnd));
+        out() << QStringLiteral(", Grösse %1x%2").arg(s.width).arg(s.height);
         out() << '\n';
         return kExitOk;
     }
@@ -358,11 +372,16 @@ private:
         if (!o)
             return fail(error);
         const QUuid overlayId = o->id;
-        const QUuid sourceId = kind == dss::SourceKind::Image
-                                   ? m_store->addImageSource(overlayId, a.at(1), &error)
-                                   : m_store->addVideoSource(overlayId, a.at(1), m_args.loop, &error);
+        QString warning;
+        const QUuid sourceId =
+            kind == dss::SourceKind::Image
+                ? m_store->addImageSource(overlayId, a.at(1), &error, &warning)
+                : m_store->addVideoSource(overlayId, a.at(1), m_args.loop, &error, &warning,
+                                          m_args.holdAtEnd);
         if (sourceId.isNull())
             return fail(error);
+        if (!warning.isEmpty())
+            err() << "Warnung: " << warning << '\n';
         return printAdded(overlayId, sourceId);
     }
 
@@ -459,6 +478,10 @@ int main(int argc, char *argv[])
     }
 
     dss::OverlayStore store(dataDir);
+#if DSS_MEDIA_SIZE
+    // Grösse neuer Bild- und Videoquellen aus der Datei wie im Kern (P09, Entscheid 6)
+    store.setMediaSizeReader(dss::readMediaSize);
+#endif
     if (!store.load(&error, readOnly ? dss::OverlayStore::LoadMode::ReadOnly
                                      : dss::OverlayStore::LoadMode::ReadWrite)) {
         err() << "Fehler: Datenordner " << store.dataDir() << ": " << error << '\n';

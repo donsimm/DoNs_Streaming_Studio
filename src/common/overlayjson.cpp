@@ -46,8 +46,10 @@ QJsonObject sourceToJson(const Source &source)
     case SourceKind::Video: {
         QJsonObject f;
         f.insert(QStringLiteral("file"), source.file);
-        if (source.kind == SourceKind::Video)
+        if (source.kind == SourceKind::Video) {
             f.insert(QStringLiteral("loop"), source.loop);
+            f.insert(QStringLiteral("hold_at_end"), source.holdAtEnd);
+        }
         o.insert(sourceKindName(source.kind), f);
         break;
     }
@@ -169,7 +171,8 @@ private:
     QString *m_error;
 };
 
-bool sourceFromJson(const QJsonObject &object, const QString &path, Source *source, QString *error)
+bool sourceFromJson(const QJsonObject &object, const QString &path, int version, Source *source,
+                    QString *error)
 {
     Reader r(object, path, error);
     source->id = r.uuid(QStringLiteral("id"));
@@ -220,9 +223,16 @@ bool sourceFromJson(const QJsonObject &object, const QString &path, Source *sour
         if (p.ok())
             p.check(QString(), validateTextProperties(t));
     } else if (source->kind == SourceKind::Video) {
-        p.allowOnly({QStringLiteral("file"), QStringLiteral("loop")});
+        // hold_at_end gibt es erst ab Version 2 (P09); in Version 1 gilt false.
+        if (version >= 2) {
+            p.allowOnly({QStringLiteral("file"), QStringLiteral("loop"), QStringLiteral("hold_at_end")});
+        } else {
+            p.allowOnly({QStringLiteral("file"), QStringLiteral("loop")});
+        }
         source->file = p.string(QStringLiteral("file"));
         source->loop = p.boolean(QStringLiteral("loop"));
+        if (version >= 2)
+            source->holdAtEnd = p.boolean(QStringLiteral("hold_at_end"));
         if (p.ok())
             p.check(QStringLiteral("file"), validateMediaReference(source->file));
     } else {
@@ -265,9 +275,9 @@ bool overlayFromJson(const QJsonObject &object, Overlay *overlay, QString *error
                      .arg(version).arg(kOverlayFormatVersion);
         return false;
     }
-    if (version != kOverlayFormatVersion) {
-        *error = QStringLiteral("format_version %1 ist unbekannt, erwartet %2.")
-                     .arg(version).arg(kOverlayFormatVersion);
+    if (version < kOverlayFormatVersionMin) {
+        *error = QStringLiteral("format_version %1 ist unbekannt, erwartet %2 bis %3.")
+                     .arg(version).arg(kOverlayFormatVersionMin).arg(kOverlayFormatVersion);
         return false;
     }
     r.allowOnly({QStringLiteral("format_version"), QStringLiteral("id"), QStringLiteral("name"),
@@ -297,7 +307,7 @@ bool overlayFromJson(const QJsonObject &object, Overlay *overlay, QString *error
             return false;
         }
         Source source;
-        if (!sourceFromJson(sources.at(i).toObject(), path, &source, error))
+        if (!sourceFromJson(sources.at(i).toObject(), path, version, &source, error))
             return false;
         if (ids.contains(source.id)) {
             *error = QStringLiteral("Feld «%1.id»: Kennung kommt mehrfach vor").arg(path);

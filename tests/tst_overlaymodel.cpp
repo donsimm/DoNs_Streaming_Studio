@@ -307,7 +307,7 @@ private slots:
         QVERIFY2(parseOverlay(serializeOverlay(original), &loaded, &error), qPrintable(error));
         QCOMPARE(loaded, original);
         QCOMPARE(loaded.sources[1].loop, true);
-        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 1);
+        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 2);
     }
 
     void jsonRejected_data()
@@ -320,7 +320,7 @@ private slots:
         QTest::newRow("Kommazahl") << 4 << QStringLiteral("sources[0].x");
         QTest::newRow("unbekanntes Feld") << 5 << QStringLiteral("unbekanntes Feld");
         QTest::newRow("fehlendes Feld") << 6 << QStringLiteral("«width»: fehlt");
-        QTest::newRow("format_version 2") << 7 << QStringLiteral("neuer");
+        QTest::newRow("format_version 3") << 7 << QStringLiteral("neuer");
         QTest::newRow("format_version 0") << 8 << QStringLiteral("unbekannt");
         QTest::newRow("format_version fehlt") << 9 << QStringLiteral("format_version");
         QTest::newRow("Ausrichtung") << 10 << QStringLiteral("justify");
@@ -347,7 +347,7 @@ private slots:
             case 4: setInSource(o, 0, QStringLiteral("x"), 1.5); break;
             case 5: o.insert(QStringLiteral("token"), QStringLiteral("x")); break;
             case 6: o.remove(QStringLiteral("width")); break;
-            case 7: o.insert(QStringLiteral("format_version"), 2); break;
+            case 7: o.insert(QStringLiteral("format_version"), 3); break;
             case 8: o.insert(QStringLiteral("format_version"), 0); break;
             case 9: o.remove(QStringLiteral("format_version")); break;
             case 10: setInText(o, QStringLiteral("align"), QStringLiteral("justify")); break;

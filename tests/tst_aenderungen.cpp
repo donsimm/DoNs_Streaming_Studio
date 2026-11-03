@@ -162,7 +162,8 @@ private slots:
         QCOMPARE(keys(msg::kUpdateSource), QStringLiteral("changes,overlay_id,source_id"));
         QCOMPARE(keys(msg::kSetTextFont), QStringLiteral("file,italic,overlay_id,source_id,weight"));
         QCOMPARE(keys(msg::kReplaceImageFile), QStringLiteral("file,overlay_id,source_id"));
-        QCOMPARE(changeTypes().size(), 18);
+        QCOMPARE(keys(msg::kSetOverlaySize), QStringLiteral("height,overlay_id,width"));
+        QCOMPARE(changeTypes().size(), 19);
         QVERIFY(!isChangeType(QStringLiteral("get_overlay")));
         QVERIFY(!isChangeType(QStringLiteral("set_token")));
     }

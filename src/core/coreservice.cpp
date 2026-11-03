@@ -189,8 +189,10 @@ void CoreService::onNewConnection()
         connect(socket, &QLocalSocket::readyRead, this, [this, socket] { onReadyRead(socket); });
         connect(socket, &QLocalSocket::disconnected, this, [this, socket] { onDisconnected(socket); });
         // Der Kern grüsst zuerst (docs/08-kern-schnittstelle.md, «Ablauf»).
+        // Datenordner im hello (P09): Das Fenster liest Bilder, Videos und Schriften von dort.
         send(socket, dss::helloMessage({QStringLiteral("dss-core"), dss::version(),
-                                        dss::kProtocolVersion}));
+                                        dss::kProtocolVersion,
+                                        QFileInfo(m_store->dataDir()).absoluteFilePath()}));
     }
 }
 
@@ -434,15 +436,22 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r)
         return done(m_store->moveFolderInList(r.folderId, r.index, &error), error);
     if (is(msg::kSetFolderExpanded))
         return done(m_store->setFolderExpanded(r.folderId, r.expanded, &error), error);
-    if (is(msg::kAddImageSource)) {
-        const QUuid id = m_store->addImageSource(r.overlayId, r.file, &error);
-        return done(!id.isNull(), error, id);
+    if (is(msg::kAddImageSource) || is(msg::kAddVideoSource)) {
+        // Grösse der Datei (P09, Entscheid 6); nicht lesbar: Grösse des Overlays und Hinweis.
+        // Video: Standard «nicht wiederholen» und «nicht anhalten» (docs/01-festlegungen.md).
+        QString warning;
+        const QUuid id = is(msg::kAddImageSource)
+                             ? m_store->addImageSource(r.overlayId, r.file, &error, &warning)
+                             : m_store->addVideoSource(r.overlayId, r.file, false, &error, &warning);
+        ChangeResult result = done(!id.isNull(), error, id);
+        if (result.ok && !warning.isEmpty()) {
+            qWarning("%s", qPrintable(warning));
+            result.warning = warning;
+        }
+        return result;
     }
-    if (is(msg::kAddVideoSource)) {
-        // Standard «nicht wiederholen» (docs/01-festlegungen.md, «Overlay-Daten»)
-        const QUuid id = m_store->addVideoSource(r.overlayId, r.file, false, &error);
-        return done(!id.isNull(), error, id);
-    }
+    if (is(msg::kSetOverlaySize))
+        return done(m_store->setOverlaySize(r.overlayId, r.width, r.height, &error), error);
     if (is(msg::kAddTextSource)) {
         // Inhalt «Text», Standardschrift Be Vietnam Pro (Entscheid 4, E-11)
         const QUuid id = m_store->addTextSource(r.overlayId, QStringLiteral("Text"),

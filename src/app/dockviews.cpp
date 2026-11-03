@@ -3,6 +3,7 @@
 #include <QDropEvent>
 #include <QMetaMethod>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QStyle>
 #include <QStyleOptionViewItem>
 
@@ -29,6 +30,19 @@ OverlayTree::OverlayTree(QWidget *parent) : QTreeWidget(parent)
     setDropIndicatorShown(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
     setIndentation(14);
+}
+
+// P09, Punkt 48: Einzug links vom Eintrag ohne Auswahlfarbe (dort kommt mit P10 der Schalter
+// «Ausgabe ein/aus», E-24). QTreeView::drawRow füllt den Einzug vor drawBranches mit
+// PE_PanelItemViewRow, und das Stylesheet nimmt dafür den Hintergrund von ::item:selected
+// (Qt 6.8.2: qtreeview.cpp Zeilen 1803-1841, qstylesheetstyle.cpp Zeilen 4840-4869,
+// https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/itemviews/qtreeview.cpp,
+// https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/styles/qstylesheetstyle.cpp).
+// Deshalb hier zuerst mit dem Hintergrund der Liste übermalen, dann Pfeile wie bisher.
+void OverlayTree::drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const
+{
+    painter->fillRect(rect, viewport()->palette().brush(viewport()->backgroundRole()));
+    QTreeWidget::drawBranches(painter, rect, index);
 }
 
 void OverlayTree::dropEvent(QDropEvent *event)
