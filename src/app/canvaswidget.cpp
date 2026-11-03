@@ -1,12 +1,15 @@
 #include "canvaswidget.h"
 
 #include "canvasview.h"
+#include "sourcegeometry.h"
 #if DSS_APP_RENDERER
 #include "sourcerenderer.h"
 #endif
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 
 namespace {
 
@@ -37,6 +40,52 @@ CanvasWidget::CanvasWidget(const Theme &theme, QWidget *parent)
     setMouseTracking(true);
     setMinimumSize(200, 120);
     setAccessibleName(QStringLiteral("Leinwand"));
+#if DSS_APP_CANVAS_EDIT
+    // Pfeiltasten wirken, wenn die Leinwand den Fokus hat (wie die Vorschau in OBS).
+    setFocusPolicy(Qt::StrongFocus);
+#endif
+}
+
+QRect CanvasWidget::area() const
+{
+    return QRect(kRulerSize, kRulerSize, width() - kRulerSize, height() - kRulerSize);
+}
+
+dss::CanvasFit CanvasWidget::fit() const
+{
+    return dss::fitCanvas(m_canvasSize, area().size(), kCanvasMargin);
+}
+
+QPointF CanvasWidget::overlayPoint(QPointF widgetPoint) const
+{
+    return dss::areaToOverlay(fit(), widgetPoint - QPointF(area().topLeft()));
+}
+
+const dss::Source *CanvasWidget::selectedSource() const
+{
+    if (!m_overlay || m_selected.isNull())
+        return nullptr;
+    const int index = dss::sourceIndex(*m_overlay, m_selected);
+    return index < 0 ? nullptr : &m_overlay->sources.at(index);
+}
+
+void CanvasWidget::setSelectedSource(const QUuid &id)
+{
+    if (id == m_selected)
+        return;
+    m_selected = id;
+    if (m_drag && m_drag->start.id != id)
+        m_drag.reset();
+    updateCursor();
+    update();
+}
+
+void CanvasWidget::setEditable(bool editable)
+{
+    m_editable = editable;
+    if (!editable)
+        m_drag.reset();
+    updateCursor();
 }
 
 void CanvasWidget::setCanvasSize(const QSize &size)
@@ -68,7 +117,204 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent *event)
 {
     m_pointer = event->position().toPoint();
     m_pointerOver = true;
+    if (m_drag) {
+        m_drag->pointer = overlayPoint(event->position());
+        updateDrag(event->modifiers() & Qt::ShiftModifier);
+    }
+    updateCursor();
     update();
+}
+
+void CanvasWidget::mousePressEvent(QMouseEvent *event)
+{
+#if DSS_APP_CANVAS_EDIT
+    if (event->button() != Qt::LeftButton || !m_overlay || fit().scale <= 0) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+    const QPointF point = overlayPoint(event->position());
+    const dss::CanvasPress press = dss::canvasPress(*m_overlay, m_selected, point, fit().scale);
+    if (press.sourceId != m_selected) {
+        m_selected = press.sourceId;
+        emit sourceClicked(press.sourceId);
+    }
+    const dss::Source *source = selectedSource();
+    if (m_editable && source && press.handle != dss::CanvasHandle::None) {
+        Drag drag;
+        drag.handle = press.handle;
+        drag.start = *source;
+        drag.startPointer = point;
+        drag.pointer = point;
+        drag.last = dss::geometryOf(*source);
+        m_drag = drag;
+    }
+    updateCursor();
+    update();
+#else
+    QWidget::mousePressEvent(event);
+#endif
+}
+
+void CanvasWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton || !m_drag) {
+        QWidget::mouseReleaseEvent(event);
+        return;
+    }
+    const Drag drag = *m_drag;
+    m_drag.reset();
+    if (drag.changed)
+        emit geometryEdited(drag.start.id, drag.last, true);
+    updateCursor();
+}
+
+void CanvasWidget::updateDrag(bool shift)
+{
+    Drag &d = *m_drag;
+    dss::SourceGeometry g;
+    switch (d.handle) {
+    case dss::CanvasHandle::Move:
+        g = dss::moveGeometry(d.start, d.startPointer, d.pointer);
+        break;
+    case dss::CanvasHandle::Rotate:
+        g = dss::rotateGeometry(d.start, d.pointer, shift);
+        break;
+    default:
+        g = dss::resizeGeometry(d.start, d.handle, d.pointer, shift);
+        break;
+    }
+    if (g == d.last)
+        return;
+    d.last = g;
+    d.changed = true;
+    emit geometryEdited(d.start.id, g, false);
+}
+
+void CanvasWidget::keyPressEvent(QKeyEvent *event)
+{
+    // Shift während des Ziehens: neu rechnen (frei skalieren bzw. einrasten).
+    if (m_drag && event->key() == Qt::Key_Shift) {
+        updateDrag(true);
+        return;
+    }
+    const dss::Source *source = selectedSource();
+    if (!m_editable || !source || m_drag) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+    const int step = event->modifiers() & Qt::ShiftModifier ? dss::kNudgeStepLarge : dss::kNudgeStep;
+    int dx = 0;
+    int dy = 0;
+    switch (event->key()) {
+    case Qt::Key_Left:
+        dx = -step;
+        break;
+    case Qt::Key_Right:
+        dx = step;
+        break;
+    case Qt::Key_Up:
+        dy = -step;
+        break;
+    case Qt::Key_Down:
+        dy = step;
+        break;
+    default:
+        QWidget::keyPressEvent(event);
+        return;
+    }
+    emit geometryEdited(source->id, dss::nudgeGeometry(*source, dx, dy), true);
+}
+
+void CanvasWidget::keyReleaseEvent(QKeyEvent *event)
+{
+    if (m_drag && event->key() == Qt::Key_Shift) {
+        updateDrag(false);
+        return;
+    }
+    QWidget::keyReleaseEvent(event);
+}
+
+void CanvasWidget::updateCursor()
+{
+    dss::CanvasHandle handle = dss::CanvasHandle::None;
+    int rotation = 0;
+    if (m_drag) {
+        handle = m_drag->handle;
+        rotation = m_drag->last.rotation;
+    } else if (const dss::Source *source = selectedSource();
+               m_editable && source && source->visible && m_pointerOver && fit().scale > 0) {
+        handle = dss::handleAt(*source, overlayPoint(m_pointer), fit().scale);
+        rotation = source->rotation;
+    }
+    switch (dss::cursorFor(handle, rotation, m_drag.has_value())) {
+    case dss::CanvasCursor::Arrow:
+        unsetCursor();
+        break;
+    case dss::CanvasCursor::Move:
+        setCursor(Qt::SizeAllCursor);
+        break;
+    case dss::CanvasCursor::SizeHorizontal:
+        setCursor(Qt::SizeHorCursor);
+        break;
+    case dss::CanvasCursor::SizeVertical:
+        setCursor(Qt::SizeVerCursor);
+        break;
+    case dss::CanvasCursor::SizeFDiagonal:
+        setCursor(Qt::SizeFDiagCursor);
+        break;
+    case dss::CanvasCursor::SizeBDiagonal:
+        setCursor(Qt::SizeBDiagCursor);
+        break;
+    case dss::CanvasCursor::OpenHand:
+        setCursor(Qt::OpenHandCursor);
+        break;
+    case dss::CanvasCursor::ClosedHand:
+        setCursor(Qt::ClosedHandCursor);
+        break;
+    }
+}
+
+void CanvasWidget::paintSelection(QPainter *p, const QRect &area, const dss::CanvasFit &fit) const
+{
+    const dss::Source *source = selectedSource();
+    if (!source || !source->visible || fit.scale <= 0)
+        return;
+    // Rahmen, Griffe und Drehgriff in Bildschirm-Pixeln, mit der Quelle gedreht. Dunkler Rand
+    // unter heller Linie: sichtbar auf dunklem und hellem Grund.
+    const auto toWidget = [&](QPointF overlayPoint) {
+        return QPointF(area.topLeft()) + dss::overlayToArea(fit, overlayPoint);
+    };
+    const QColor dark(0, 0, 0, 200);
+    const QColor light = m_theme.primaryLighter;
+    p->save();
+    p->setRenderHint(QPainter::Antialiasing);
+    QPolygonF frame;
+    for (const QPointF &c : dss::sourceCorners(*source))
+        frame << toWidget(c);
+    const QPointF topCenter = toWidget(dss::handlePosition(*source, dss::CanvasHandle::Top, fit.scale));
+    const QPointF rotateAt = toWidget(dss::handlePosition(*source, dss::CanvasHandle::Rotate, fit.scale));
+    for (const auto &[color, width] : {std::pair{dark, 3.0}, std::pair{light, 1.0}}) {
+        p->setPen(QPen(color, width));
+        p->setBrush(Qt::NoBrush);
+        p->drawPolygon(frame);
+        p->drawLine(topCenter, rotateAt);
+    }
+    // Griffe: Quadrate mit der Kante 2 * kHandleRadius, mit der Quelle gedreht.
+    p->setPen(QPen(dark, 1.0));
+    p->setBrush(light);
+    for (dss::CanvasHandle h : {dss::CanvasHandle::TopLeft, dss::CanvasHandle::Top,
+                                dss::CanvasHandle::TopRight, dss::CanvasHandle::Right,
+                                dss::CanvasHandle::BottomRight, dss::CanvasHandle::Bottom,
+                                dss::CanvasHandle::BottomLeft, dss::CanvasHandle::Left}) {
+        p->save();
+        p->translate(toWidget(dss::handlePosition(*source, h, fit.scale)));
+        p->rotate(dss::rotationDegrees(source->rotation));
+        const double r = dss::kHandleRadius;
+        p->drawRect(QRectF(-r, -r, 2 * r, 2 * r));
+        p->restore();
+    }
+    p->drawEllipse(rotateAt, dss::kHandleRadius + 1, dss::kHandleRadius + 1);
+    p->restore();
 }
 
 void CanvasWidget::leaveEvent(QEvent *)
@@ -83,8 +329,8 @@ void CanvasWidget::paintEvent(QPaintEvent *)
     p.fillRect(rect(), m_theme.preview);
 
     // Fläche ohne Lineale; darin wird die Leinwand eingepasst.
-    const QRect area(kRulerSize, kRulerSize, width() - kRulerSize, height() - kRulerSize);
-    const dss::CanvasFit fit = dss::fitCanvas(m_canvasSize, area.size(), kCanvasMargin);
+    const QRect area = this->area();
+    const dss::CanvasFit fit = this->fit();
     const QRectF canvas(area.left() + fit.origin.x(), area.top() + fit.origin.y(),
                         m_canvasSize.width() * fit.scale, m_canvasSize.height() * fit.scale);
 
@@ -109,6 +355,10 @@ void CanvasWidget::paintEvent(QPaintEvent *)
     }
 #endif
     p.restore();
+#if DSS_APP_CANVAS_EDIT
+    // Rahmen der gewählten Quelle, auch über den Rand der Leinwand hinaus (Teil C).
+    paintSelection(&p, area, fit);
+#endif
 
     // Lineale oben und links, in Pixeln der Leinwand.
     p.fillRect(0, 0, width(), kRulerSize, m_theme.preview);

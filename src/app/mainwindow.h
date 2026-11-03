@@ -1,5 +1,6 @@
 #pragma once
 
+#include "canvasedit.h"
 #include "connectionstate.h"
 #include "docks.h"
 #include "theme.h"
@@ -122,6 +123,10 @@ private:
     void updateSelectedSource(const dss::SourceChanges &changes, const QString &field);
     void onNameEdited();
     void onOverlaySizeEdited();
+    // Leinwand (P09, Teil C)
+    void onCanvasSourceClicked(const QUuid &id);
+    void onCanvasGeometryEdited(const QUuid &id, const dss::SourceGeometry &geometry, bool finished);
+    void clearFinishedPreview();
     void onFamilyChosen(int index);
     void onFontStyleChosen();
     void chooseColor();
@@ -149,6 +154,16 @@ private:
     QUuid m_selectedOverlay;
     QUuid m_selectedFolder;
     QUuid m_selectedSource;
+    // Lage einer Quelle beim Ziehen auf der Leinwand (P09, Teil C): gilt, bis der Kern die letzte
+    // Änderung beantwortet hat, damit Leinwand und «Eigenschaften» nicht zurückspringen.
+    struct GeometryPreview
+    {
+        QUuid overlayId;
+        QUuid sourceId;
+        dss::SourceGeometry geometry;
+        bool dragging = false;
+    };
+    std::optional<GeometryPreview> m_geometryPreview;
     // Nach der Antwort auf diese Änderungen das neue Overlay bzw. die neue Quelle wählen.
     enum class SelectNew { Overlay, Source };
     QHash<qint64, SelectNew> m_selectOnResult;

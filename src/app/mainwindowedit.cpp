@@ -4,6 +4,8 @@
 
 #include "mainwindow.h"
 
+#include "canvaswidget.h"
+
 #include "coreclient.h"
 #include "dialogs.h"
 #include "dockviews.h"
@@ -52,6 +54,7 @@ qint64 MainWindow::sendChange(const dss::ChangeRequest &request, const QString &
 
 void MainWindow::onChangeFinished(const dss::ChangeResult &result)
 {
+    clearFinishedPreview();
     const bool selectNew = m_selectOnResult.contains(result.requestId);
     const SelectNew select = m_selectOnResult.take(result.requestId);
     if (!result.ok) {
@@ -88,6 +91,9 @@ void MainWindow::selectOverlay(const QUuid &id)
 
 void MainWindow::connectEditing()
 {
+    // Ziehen und Pfeiltasten auf der Leinwand (P09, Teil C)
+    connect(m_canvas, &CanvasWidget::geometryEdited, this, &MainWindow::onCanvasGeometryEdited);
+
     // Overlays (Teil C)
     OverlayTree *tree = m_overlaysDock.tree;
     connect(m_overlaysDock.add, &QToolButton::clicked, this, &MainWindow::addOverlay);
@@ -529,6 +535,49 @@ void MainWindow::onOverlaySizeEdited()
     r.width = m_controlDock.overlayWidth->value();
     r.height = m_controlDock.overlayHeight->value();
     sendChange(r, dss::overlaySizeKey(m_selectedOverlay));
+}
+
+void MainWindow::onCanvasSourceClicked(const QUuid &id)
+{
+    SourceList *list = m_sourcesDock.list;
+    for (int row = 0; row < list->count(); ++row) {
+        if (list->item(row)->data(SourceList::kIdRole).toUuid() == id) {
+            list->setCurrentRow(row);
+            return;
+        }
+    }
+    list->setCurrentItem(nullptr); // Klick daneben: Auswahl aufheben
+}
+
+void MainWindow::onCanvasGeometryEdited(const QUuid &id, const dss::SourceGeometry &geometry,
+                                        bool finished)
+{
+    if (m_selectedOverlay.isNull())
+        return;
+    m_geometryPreview = GeometryPreview{m_selectedOverlay, id, geometry, !finished};
+    // Alle fünf Werte in einer Änderung; häufige Änderungen fasst CoreClient zusammen (wie P08):
+    // unterwegs ist höchstens eine, danach geht die neueste.
+    dss::SourceChanges c;
+    c.x = geometry.x;
+    c.y = geometry.y;
+    c.width = geometry.width;
+    c.height = geometry.height;
+    c.rotation = geometry.rotation;
+    sendChange(dss::sourceUpdate(m_selectedOverlay, id, c), dss::changeKey(id, QStringLiteral("geometry")));
+    // Sofort zeigen: Leinwand und Felder der Eigenschaften (ohne die Liste neu zu bauen).
+    m_canvas->setOverlay(selectedOverlay());
+    refreshProperties();
+}
+
+void MainWindow::clearFinishedPreview()
+{
+    if (!m_geometryPreview || m_geometryPreview->dragging)
+        return;
+    if (m_client && m_client->isChangePending(
+            dss::changeKey(m_geometryPreview->sourceId, QStringLiteral("geometry"))))
+        return;
+    m_geometryPreview.reset();
+    m_canvas->setOverlay(selectedOverlay());
 }
 
 void MainWindow::onNameEdited()

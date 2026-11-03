@@ -244,6 +244,8 @@ void MainWindow::connectCore()
             &MainWindow::onOverlayItemChanged);
     connect(m_sourcesDock.list, &QListWidget::currentItemChanged, this,
             &MainWindow::onSourceItemChanged);
+    // Wählen auf der Leinwand: dieselbe Auswahl wie im Dock «Quellen» (P09, Teil C).
+    connect(m_canvas, &CanvasWidget::sourceClicked, this, &MainWindow::onCanvasSourceClicked);
     m_statusMessage->setText(m_client->statusText());
     refreshGauges(dss::SystemStats());
     if (editingAllowed())
@@ -409,7 +411,11 @@ std::optional<dss::Overlay> MainWindow::selectedOverlay() const
 {
     if (!m_client || m_selectedOverlay.isNull())
         return std::nullopt;
-    return m_client->overlay(m_selectedOverlay);
+    std::optional<dss::Overlay> overlay = m_client->overlay(m_selectedOverlay);
+    // Beim Ziehen auf der Leinwand die Vorschau zeigen (P09, Teil C).
+    if (overlay && m_geometryPreview && m_geometryPreview->overlayId == m_selectedOverlay)
+        dss::applyGeometry(&*overlay, m_geometryPreview->sourceId, m_geometryPreview->geometry);
+    return overlay;
 }
 
 void MainWindow::refreshOverlay()
@@ -438,6 +444,7 @@ void MainWindow::refreshOverlay()
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
     m_canvas->setOverlay(overlay);
+    m_canvas->setSelectedSource(m_selectedSource);
 #if DSS_APP_RENDERER
     m_renderer->setOverlay(overlay ? &*overlay : nullptr);
 #endif
@@ -456,6 +463,7 @@ void MainWindow::onSourceItemChanged(QListWidgetItem *current)
     if (m_filling)
         return;
     m_selectedSource = current ? current->data(Qt::UserRole).toUuid() : QUuid();
+    m_canvas->setSelectedSource(m_selectedSource);
     refreshProperties();
 }
 
@@ -577,6 +585,7 @@ void MainWindow::refreshActions()
     const bool edit = editingAllowed() && m_client && m_client->isConnected();
     const std::optional<dss::Overlay> overlay = selectedOverlay();
     const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
+    m_canvas->setEditable(edit && DSS_APP_CANVAS_EDIT);
     m_overlaysDock.add->setEnabled(edit);
     m_overlaysDock.remove->setEnabled(edit && overlay);
     m_overlaysDock.copy->setEnabled(edit && overlay);
