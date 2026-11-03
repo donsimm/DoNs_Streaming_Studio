@@ -152,3 +152,9 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 57: so lassen (Meldung auf der Konsole).
 - Punkt 59: so lassen (Videos laufen in Echtzeit weiter).
 - Punkt 58: Editor und Kern beachten die EXIF-Ausrichtung von Bildern, wie der Browser (Standard `image-orientation: from-image`, bei Seiten ohne HTTPS nicht abschaltbar, https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation). Grund: K-07, beide Zeichner zeigen dasselbe. Umsetzung mit dem nächsten Baustein. Erledigt in P09b (2026-11-03) für Kern und Editor; der zweite Zeichner folgt mit P10.
+
+## Wünsche aus dem Handtest P09b (2026-11-03)
+
+- Verbindungsknöpfe waagrecht in der Mitte des Kopfbereichs, mittig zwischen den Reitern «Overlays / Chat-Bot» und der Leistungsanzeige.
+- Logos in den Verbindungsknöpfen etwa zwei Drittel der heutigen Grösse, ohne eigenen Rand ums Logo; der Rahmen des Knopfes (Farbe des Zustands) bleibt die einzige Umrandung.
+- Umsetzung: mit dem nächsten Baustein (P10), Teil «Vorab».
