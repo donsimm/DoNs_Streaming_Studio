@@ -76,6 +76,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 69. Aus P10a: `cmake --install` überschreibt und ergänzt, entfernt aber keine Dateien, die eine neuere Version nicht mehr mitbringt (zum Beispiel ein umbenanntes Symbol unter `share/dons-streaming-studio/symbole/`). Bisher ohne Folgen; zu entscheiden, ob `installieren.sh` den Ordner `share/` vorher leert.
 70. Aus P10a: Das Zurückschreiben, wenn beim Umwandeln eine spätere Datei nicht geschrieben werden kann (`convertDataFormat`), ist nicht geprüft; ein Fehler genau dann liess sich ohne Eingriff in den Code nicht erzeugen. Geprüft sind: Sperre, neueres Format, unlesbare Datei, fehlender Ordner (Dateien jeweils unverändert).
 71. Aus P10a: Bis zur ersten Installation durch den Nutzer zeigt die bisherige Einheit `dss-core.service` noch auf `build/src/core/dss-core`. Dieser Bau ist jetzt die Version in Arbeit und nutzt den Entwicklungsordner. Das Fenster aus `build/` startet `dss-core-entwicklung.service`, die erst `scripts/dienst-einrichten.sh` anlegt. `installieren.sh` schreibt `dss-core.service` neu (Programm aus `~/.local/opt/…`). Erledigt (2026-11-03): erste Installation durch den Nutzer im Handtest P10a, Commit `6d83c93`.
+72. Aus P10a: `tst_fensterbearbeiten::headerGaugesWidth` scheiterte einmal in 50 Wiederholungen (Fenster 1280 breit, Leistungsanzeige noch für 1920). Korrigiert nur im Test (`acdace6`, wartet, bis beide zur Sollbreite passen); Ursache nicht geprüft (Vermutung: verspätete Bestätigung des Fenstermanagers). Entscheid 2026-11-03: In P10 läuft der Test wieder 50 Mal; scheitert er erneut, sucht Claude Code die Ursache, bevor P10 abgeschlossen wird.
 
 ## Machbarkeitstests
 
@@ -182,6 +183,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 69 (alte Dateien nach `cmake --install`): `installieren.sh` leert `<Ziel>/bin/` und `<Ziel>/share/dons-streaming-studio/` erst nach erfolgreichem Bau und Prüfen des Formats, direkt vor dem Kopieren. Die Daten sind nicht betroffen. Umsetzung in P10.
 - Punkt 70 (Zurückschreiben beim Umwandeln ungeprüft): `convertDataFormat` bekommt eine Testmöglichkeit, die nur im Test greift (Scheitern beim Schreiben der n-ten Datei); ein Test prüft, dass danach alle Dateien wie vorher sind. Umsetzung in P10.
 - Anker gegen das Ruckeln (Annahme im Bericht P10a, Punkt 66): übernommen. Ein Video beginnt im Editor, wenn die Leinwand das erste Bild abholt, also beim Anzeigen von vorne (wie «Video beim Einblenden von vorne» in der Browserquelle, K-07). Nicht geprüft: Verhalten beim Wechsel auf ein anderes Overlay und zurück (läuft weiter oder beginnt neu). P10 prüft das und legt es für beide Zeichner gleich fest.
+- Punkt 72 (Korrektur nur im Test): siehe Punkt 72; Prüfung in P10.
 
 ## Wünsche nach P10a (2026-11-03)
 
