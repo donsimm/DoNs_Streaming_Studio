@@ -108,6 +108,10 @@ public:
     using MediaSizeReader =
         std::function<bool(const QString &path, int *width, int *height, QString *error)>;
     void setMediaSizeReader(MediaSizeReader reader) { m_mediaSizeReader = std::move(reader); }
+    // Wird beim Übernehmen einer Datei nach jedem MiB aufgerufen (P10a, Punkt 41): Der Kern
+    // meldet sich damit beim Watchdog von systemd, weil eine grosse Datei die Hauptschleife lange
+    // anhält (1 GiB etwa 16 s auf dem Studio-PC, Bericht P10a).
+    void setProgressCallback(std::function<void()> callback) { m_progress = std::move(callback); }
 
     // Originalgrösse aller Bild- und Videodateien eines Overlays (P09b, Entscheid 3), für die
     // Nachrichten an die Fenster. Die Dateien in media/ sind nach Inhalt benannt und ändern sich
@@ -193,6 +197,7 @@ private:
     std::optional<QSize> mediaSize(const QString &reference, QString *reason) const;
 
     MediaSizeReader m_mediaSizeReader;
+    std::function<void()> m_progress;
     struct CachedSize
     {
         std::optional<QSize> size;

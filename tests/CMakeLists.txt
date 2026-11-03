@@ -22,6 +22,9 @@ dss_add_test(tst_windowsize)
 
 dss_add_test(tst_configpaths)
 
+# P10a, Punkt 41: Watchdog-Zeit und Meldung an systemd
+dss_add_test(tst_systemdnotify)
+
 # Testdateien wie im Handtest (CLAUDE.md Regel 7): Bild und Video aus
 # prototypes/messung/media_erzeugen.sh, Schriftdatei aus dem System (fc-list).
 set(DSS_TEST_MEDIA_DIR "${PROJECT_SOURCE_DIR}/prototypes/media" CACHE PATH "Testdateien (Bild, Video)")

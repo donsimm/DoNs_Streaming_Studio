@@ -27,6 +27,9 @@ option(DSS_INSTALLED_EDITION "Version im Einsatz bauen (scripts/installieren.sh,
 # P10a (Teil B): Commit, aus dem gebaut wird; setzt scripts/installieren.sh. Leer: kein Commit
 # in --version.
 set(DSS_COMMIT "" CACHE STRING "Commit des Baus für --version (scripts/installieren.sh)")
+# P10a (Punkt 41): Der Kern meldet sich regelmässig bei systemd (Watchdog). Aus: keine Meldung,
+# WatchdogSec in der Einheit darf dann nicht gesetzt sein.
+option(DSS_CORE_WATCHDOG "Kern meldet sich beim Watchdog von systemd (P10a)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html

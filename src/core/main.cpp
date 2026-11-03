@@ -18,8 +18,11 @@
 
 #include <QCommandLineParser>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QTextStream>
+#include <QTimer>
 
+#include <algorithm>
 #include <csignal>
 
 namespace {
@@ -192,6 +195,33 @@ int main(int argc, char *argv[])
     // Bereit: erst jetzt kehrt «systemctl --user start» zurück (Type=notify).
     if (dss::notifySystemd("READY=1"))
         qInfo("systemd: bereit gemeldet");
+#if DSS_CORE_WATCHDOG
+    // Watchdog (P10a, Punkt 41): «WATCHDOG=1» alle halbe Zeit aus der Hauptschleife. Hängt sie,
+    // bleibt die Meldung aus, und systemd beendet und startet den Kern neu (WatchdogSec in der
+    // Einheit, scripts/dienst-einrichten.sh).
+    // https://www.freedesktop.org/software/systemd/man/latest/sd_watchdog_enabled.html
+    QTimer watchdog;
+    const auto watchdogTime = dss::watchdogTimeout();
+    QElapsedTimer sinceWatchdog;
+    if (watchdogTime.count() > 0) {
+        // Beim Übernehmen einer grossen Datei steht die Hauptschleife lange still (1 GiB etwa
+        // 16 s, Bericht P10a); das ist kein Hängen. Dann höchstens einmal je Sekunde melden.
+        sinceWatchdog.start();
+        store.setProgressCallback([&sinceWatchdog] {
+            if (sinceWatchdog.elapsed() < 1000)
+                return;
+            dss::notifySystemd("WATCHDOG=1");
+            sinceWatchdog.restart();
+        });
+        const auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(watchdogTime / 2);
+        watchdog.setInterval(std::max<std::chrono::milliseconds>(interval, std::chrono::milliseconds(1)));
+        QObject::connect(&watchdog, &QTimer::timeout, [] { dss::notifySystemd("WATCHDOG=1"); });
+        watchdog.start();
+        qInfo("systemd: Watchdog %lld ms, Meldung alle %lld ms",
+              static_cast<long long>(watchdogTime.count() / 1000),
+              static_cast<long long>(watchdog.interval()));
+    }
+#endif
     const int rc = app.exec();
     dss::notifySystemd("STOPPING=1");
     // Änderungen, die noch nicht in der Datei sind, vor dem Beenden speichern (P08, Teil A).

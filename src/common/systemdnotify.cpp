@@ -10,6 +10,24 @@
 
 namespace dss {
 
+std::chrono::microseconds watchdogTimeout(const QByteArray &usec, const QByteArray &pid,
+                                          qint64 ownPid)
+{
+    if (!pid.isEmpty()) {
+        bool ok = false;
+        if (pid.toLongLong(&ok) != ownPid || !ok)
+            return std::chrono::microseconds(0);
+    }
+    bool ok = false;
+    const qlonglong value = usec.toLongLong(&ok);
+    return std::chrono::microseconds(ok && value > 0 ? value : 0);
+}
+
+std::chrono::microseconds watchdogTimeout()
+{
+    return watchdogTimeout(qgetenv("WATCHDOG_USEC"), qgetenv("WATCHDOG_PID"), qint64(::getpid()));
+}
+
 bool notifySystemd(const QByteArray &state)
 {
     const QByteArray path = qgetenv("NOTIFY_SOCKET");

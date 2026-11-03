@@ -508,10 +508,17 @@ QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString
         *error = QStringLiteral("%1 kann nicht gelesen werden (%2)").arg(filePath, source.errorString());
         return {};
     }
+    // Stückweise statt addData(QIODevice *), damit m_progress dazwischen laufen kann.
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    if (!hash.addData(&source)) {
-        *error = QStringLiteral("%1 kann nicht gelesen werden (%2)").arg(filePath, source.errorString());
-        return {};
+    while (!source.atEnd()) {
+        const QByteArray chunk = source.read(1 << 20);
+        if (chunk.isEmpty() && source.error() != QFileDevice::NoError) {
+            *error = QStringLiteral("%1 kann nicht gelesen werden (%2)").arg(filePath, source.errorString());
+            return {};
+        }
+        hash.addData(chunk);
+        if (m_progress)
+            m_progress();
     }
     const QString reference = QStringLiteral("media/") + QString::fromLatin1(hash.result().toHex())
                               + QLatin1Char('.') + suffix;
@@ -537,6 +544,8 @@ QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString
             break;
         check.addData(chunk);
         copy.write(chunk);
+        if (m_progress)
+            m_progress();
     }
     if (source.error() != QFileDevice::NoError || check.result() != hash.result()) {
         copy.cancelWriting();
