@@ -1,0 +1,17 @@
+Klon: 85ac702 P10a: scripts/installieren.sh und Einheiten beider Versionen
+commit-0dbba12: Exit 0, Warnungen 0, 66 s
+commit-0e447aa: Exit 0, Warnungen 0, 68 s
+commit-439c979: Exit 0, Warnungen 0, 68 s
+release: Exit 0, Warnungen 0, 77 s
+aus-DSS_BUILD_APP: Exit 0, Warnungen 0, 48 s
+aus-DSS_BUILD_TESTS: Exit 0, Warnungen 0, 38 s
+aus-DSS_BUILD_CLI: Exit 0, Warnungen 0, 67 s
+aus-DSS_MEDIA_SIZE: Exit 0, Warnungen 0, 70 s
+aus-DSS_APP_RENDERER: Exit 0, Warnungen 0, 66 s
+aus-DSS_APP_CANVAS_EDIT: Exit 0, Warnungen 0, 68 s
+aus-DSS_VIDEO_ROTATION: Exit 0, Warnungen 0, 68 s
+aus-DSS_CORE_WATCHDOG: Exit 0, Warnungen 0, 69 s
+aus-DSS_APP_EDITING: Exit 0, Warnungen 0, 67 s
+aus-DSS_APP_TRANSFORM: Exit 0, Warnungen 0, 68 s
+ein-DSS_INSTALLED_EDITION: Exit 0, Warnungen 0, 68 s
+fertig

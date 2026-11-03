@@ -195,3 +195,22 @@ Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P10a:
 - Installationsort: `~/.local/opt/dons-streaming-studio/` im Benutzerordner, ohne `sudo`. Bau dafür im Release-Modus.
 - Daten getrennt: Die installierte Version nutzt die echten Daten (`~/.local/share/dons-streaming-studio`). Die Version aus dem Repo nutzt einen eigenen Entwicklungsordner mit eigenem Kern, eigener Verbindung und eigenen Fenster-Einstellungen; beide können gleichzeitig laufen. Beim Installieren werden die echten Dateien bei Bedarf in ein neues Format umgewandelt, vorher mit Sicherungskopie.
 - Start der installierten Version über einen Eintrag «DoNs Streaming Studio» im Anwendungsmenü von Xfce, mit dem eigenen Programm-Symbol des Nutzers (Fernseher, aus dem alten Repo `donstv_Studio`, `assets/branding/`, eigenes Werk des Nutzers). Dasselbe Symbol im Fenster und in der Taskleiste.
+
+Umgesetzt mit P10a (2026-11-03), Wahl von Claude Code mit Begründung im Bericht P10a:
+
+- **Erkennen der Version:** Schalter beim Bau `DSS_INSTALLED_EDITION` (Standard aus = in Arbeit), nicht der Ort zur Laufzeit. Ein Bau aus dem Repo nutzt so immer den Entwicklungsordner, auch wenn er von woanders startet, und kann die echten Daten nicht treffen. `scripts/installieren.sh` baut mit `DSS_INSTALLED_EDITION=ON`.
+
+| | Version im Einsatz | Version in Arbeit (Repo) |
+|---|---|---|
+| Programme | `~/.local/opt/dons-streaming-studio/bin/` | `build/src/…` |
+| Daten | `~/.local/share/dons-streaming-studio` | `~/.local/share/dons-streaming-studio-entwicklung` |
+| Einheit | `dss-core.service` | `dss-core-entwicklung.service` |
+| Verbindung | `$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock` | `$XDG_RUNTIME_DIR/dons-streaming-studio-entwicklung/kern.sock` |
+| Fenster-Einstellungen | `~/.config/dons-streaming-studio/fenster.ini` | `~/.config/dons-streaming-studio-entwicklung/fenster.ini` |
+| Fenstertitel | «DoNs Streaming Studio» | «DoNs Streaming Studio – Entwicklung» |
+| Symbole, Schriften, Übersetzung | `~/.local/opt/dons-streaming-studio/share/dons-streaming-studio/` | aus dem Repo bzw. `build/` |
+| Eigene Symbole des Nutzers | `~/.config/dons-streaming-studio/symbole/` (beide lesen nur) | ebenso |
+
+- `--version` und die Startzeile im Protokoll nennen Version und Commit, zum Beispiel «dss-app 0.1.0 (Einsatz, Commit 85ac702)».
+- **Sicherung beim Umwandeln:** `~/.local/share/dons-streaming-studio-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/`, eine vollständige Kopie des Datenordners (`cp -a`). Zurückspielen: `README.md`, Abschnitt «Einsatz».
+- **Watchdog (Punkt 41):** `WatchdogSec=10s`, `TimeoutAbortSec=5s` in beiden Einheiten. Hängt der Kern, startet systemd ihn nach höchstens etwa 11 s neu (gemessen mit `kill -STOP`, Bericht P10a).

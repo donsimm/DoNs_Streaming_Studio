@@ -1,0 +1,6 @@
+läuft nach 25 s: PID 172465 -> 172465 (gleich)
+Lauf 1: angehalten PID 172465, neu PID 172983 nach 11.016368030 s
+Lauf 2: angehalten PID 172983, neu PID 173389 nach 9.171309012 s
+Lauf 3: angehalten PID 173389, neu PID 173800 nach 9.087682367 s
+NRestarts=3
+Zustand nach stop: inactive

@@ -151,7 +151,7 @@ Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und
 | 2 | P09 | neues Pflichtfeld `video.hold_at_end`. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 1 gibt (geprüft 2026-11-03, Bericht P09) |
 | 3 | P09b | neue Pflichtfelder `flip_horizontal` und `flip_vertical` je Quelle. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 2 gibt (geprüft 2026-11-03, Bericht P09b) |
 
-Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. Beim nächsten Speichern wird die Datei als Version 3 geschrieben.
+Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. Beim nächsten Speichern wird die Datei als Version 3 geschrieben. Seit P10a wandelt `scripts/installieren.sh` beim Installieren alle Dateien in älterem Format um (`dss-core --umwandeln`, nach einer Sicherung des ganzen Datenordners); eine Datei in neuerem Format, als die neue Version lesen kann, bricht die Installation ab (`dss-core --format-pruefen`, Exit-Code 5).
 
 ## Regeln beim Lesen
 

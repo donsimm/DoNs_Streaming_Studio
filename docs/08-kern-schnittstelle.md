@@ -21,7 +21,7 @@ Die Version stieg von 1 auf 2, weil sich `overlay_list` so geändert hat, dass e
 | Punkt | Festlegung |
 |---|---|
 | Art | Unix-Socket (`QLocalServer` / `QLocalSocket`), Datenstrom (`SOCK_STREAM`), kein Netzwerk |
-| Pfad | `$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock`, auf dem Studio-PC `/run/user/1000/dons-streaming-studio/kern.sock`. Anderer Pfad: `dss-core --verbindung PFAD`, `dss-app --verbindung PFAD` |
+| Pfad | Version im Einsatz: `$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock`, auf dem Studio-PC `/run/user/1000/dons-streaming-studio/kern.sock`. Version in Arbeit (Bau aus dem Repo, seit P10a): `$XDG_RUNTIME_DIR/dons-streaming-studio-entwicklung/kern.sock`. Anderer Pfad: `dss-core --verbindung PFAD`, `dss-app --verbindung PFAD` |
 | Länge des Pfads | höchstens 107 Byte (`sun_path` hat 108 Byte mit abschliessender Null, unix(7)); sonst startet der Kern nicht und nennt den Grund |
 | Zugriff | Ordner mit Rechten 0700, Socket mit `QLocalServer::UserAccessOption` (nur derselbe Benutzer). `XDG_RUNTIME_DIR` selbst hat 0700 |
 | Mehrere Fenster | erlaubt; jedes bekommt alle Nachrichten an «alle» |
@@ -389,8 +389,9 @@ Auf der Fenster-Seite gibt es keine Fehlermeldungen an den Kern: Ungültige Nach
 
 | Punkt | Festlegung |
 |---|---|
-| Einheit | `~/.config/systemd/user/dss-core.service`, angelegt von `scripts/dienst-einrichten.sh` (entfernen: `--entfernen`) |
+| Einheit | `~/.config/systemd/user/dss-core.service` (Version im Einsatz, angelegt von `scripts/installieren.sh` über `scripts/dienst-einrichten.sh --einsatz`) bzw. `dss-core-entwicklung.service` (Version in Arbeit, `scripts/dienst-einrichten.sh`); entfernen: `--entfernen`. Unten steht `dss-core.service`, für die Version in Arbeit gilt dasselbe mit dem anderen Namen |
 | Start | nicht bei der Anmeldung (kein `[Install]`); das Fenster prüft beim Start, ob der Kern antwortet, und startet sonst `systemctl --user start dss-core.service` |
+| Watchdog | seit P10a: `WatchdogSec=10s`. Der Kern meldet `WATCHDOG=1` alle 5 s aus seiner Hauptschleife, beim Übernehmen einer Datei zusätzlich jede Sekunde. Bleibt die Meldung aus, beendet systemd ihn (SIGABRT, nach `TimeoutAbortSec=5s` SIGKILL) und startet ihn neu (`Restart=on-failure` gilt auch für den Watchdog). Ohne Watchdog: `scripts/dienst-einrichten.sh --watchdog 0`, Schalter `DSS_CORE_WATCHDOG` |
 | Bereit | `Type=notify`: Der Kern meldet `READY=1`, sobald er Verbindungen annimmt; erst dann kehrt `systemctl start` zurück |
 | Neustart | `Restart=on-failure`, `RestartSec=1s`: nach Exit-Code ≠ 0 oder Signal wie SIGKILL/SIGSEGV. Nicht nach Exit-Code 0, SIGTERM, SIGINT, SIGHUP, SIGPIPE oder `systemctl stop` |
 | Kein Neustart bei | Exit-Code 3 (`RestartPreventExitStatus=3`): Datenordner gesperrt oder Verbindung belegt (anderer Kern läuft) |
@@ -398,6 +399,6 @@ Auf der Fenster-Seite gibt es keine Fehlermeldungen an den Kern: Ungültige Nach
 | Protokoll | Journal: `journalctl --user -u dss-core.service` |
 | Sperre | `<Datenordner>/kern.lock` (`QLockFile`, `staleLockTime` 0). Solange der Kern läuft, ändert nur er die Overlay-Dateien; `dss-cli` zeigt dann nur an und bricht Änderungen mit Exit-Code 3 ab |
 
-Quellen: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html (`Type=`, `Restart=`, `RestartSec=`, `RestartPreventExitStatus=`, `NotifyAccess=`), https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html, https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html (`READY=1`, `STOPPING=1`, `NOTIFY_SOCKET`, eigene Umsetzung ohne libsystemd), https://doc.qt.io/qt-6.8/qlockfile.html.
+Quellen: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html (`Type=`, `Restart=`, `RestartSec=`, `RestartPreventExitStatus=`, `NotifyAccess=`), https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html, https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html (`READY=1`, `STOPPING=1`, `NOTIFY_SOCKET`, eigene Umsetzung ohne libsystemd), https://www.freedesktop.org/software/systemd/man/latest/sd_watchdog_enabled.html (`WATCHDOG_USEC`, `WATCHDOG_PID`, Meldung alle halbe Zeit), https://www.freedesktop.org/software/systemd/man/latest/systemd.kill.html (SIGCONT nach dem Signal), https://doc.qt.io/qt-6.8/qlockfile.html.
 
 Exit-Codes von `dss-core`: 0 = beendet (auch nach SIGTERM/SIGINT oder `quit_request`), 1 = Fehler (zum Beispiel Datenordner nicht lesbar, Pfad der Verbindung zu lang), 3 = anderer Kern läuft. Ein falscher Aufruf (unbekannte Option) endet ebenfalls mit 1 (geprüft 2026-11-02: `build/src/core/dss-core --gibt-es-nicht; echo $?` → 1).
