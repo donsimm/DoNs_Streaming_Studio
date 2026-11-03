@@ -98,6 +98,14 @@ PropertiesDock createPropertiesDock(QWidget *parent);
 struct ControlDock
 {
     QDockWidget *dock = nullptr;
+    // P10, Teil C: Adresse der Browserquelle des gewählten Overlays (mit Token)
+    QLineEdit *browserSource = nullptr;
+    QPushButton *copyAddress = nullptr;
+    QPushButton *newToken = nullptr;
+    QLabel *outputState = nullptr;
+    // Meldungen des Overlay-Servers (Port belegt, Adresse fehlt, ungültige Adresse benutzt);
+    // immer da, leer ohne Meldung (keine Änderung der Anordnung).
+    QLabel *serverMessage = nullptr;
     QSpinBox *overlayWidth = nullptr;
     QSpinBox *overlayHeight = nullptr;
 };

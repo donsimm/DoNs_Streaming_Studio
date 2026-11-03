@@ -99,6 +99,55 @@ private slots:
         SettingsInfo info{current, 1024, 32767, QStringLiteral("/x/kern.ini"), QStringLiteral("kaputt")};
         QCOMPARE(settingsDialogProblem(true, info), QStringLiteral("kaputt"));
     }
+
+    // P10, Teil C
+    void browserSourceTexts()
+    {
+        const QUuid a = QUuid::createUuid();
+        const QUuid b = QUuid::createUuid();
+        BrowserSourceField f = browserSourceField(QUuid(), std::nullopt);
+        QVERIFY(f.text.isEmpty() && !f.canCopy);
+        QCOMPARE(f.placeholder, QStringLiteral("Kein Overlay gewählt"));
+        f = browserSourceField(a, BrowserSourceInfo{b, QStringLiteral("http://x/"), QString()});
+        QVERIFY(f.text.isEmpty() && !f.canCopy); // Antwort zu einem anderen Overlay
+        f = browserSourceField(a, BrowserSourceInfo{a, QStringLiteral("http://192.168.1.9:8081/o/a/t/"), QString()});
+        QCOMPARE(f.text, QStringLiteral("http://192.168.1.9:8081/o/a/t/"));
+        QVERIFY(f.canCopy);
+        f = browserSourceField(a, BrowserSourceInfo{a, QString(), QStringLiteral("Keine Adresse")});
+        QVERIFY(f.text.isEmpty() && !f.canCopy);
+        QCOMPARE(f.placeholder, QStringLiteral("Keine Adresse"));
+
+        QCOMPARE(outputStateText(std::nullopt, 3), QStringLiteral("Ausgabe: –"));
+        QCOMPARE(outputStateText(true, std::nullopt), QStringLiteral("Ausgabe: ein"));
+        QCOMPARE(outputStateText(true, 0), QStringLiteral("Ausgabe: ein, keine Browserquelle verbunden"));
+        QCOMPARE(outputStateText(true, 1), QStringLiteral("Ausgabe: ein, 1 Browserquelle verbunden"));
+        QCOMPARE(outputStateText(false, 2), QStringLiteral("Ausgabe: aus (Browserquelle leer), 2 Browserquellen verbunden"));
+        QVERIFY(outputToolTip(true).startsWith(QStringLiteral("Ausgabe ein")));
+        QVERIFY(outputToolTip(false).startsWith(QStringLiteral("Ausgabe aus")));
+
+        ServerStatusInfo s;
+        s.enabled = true;
+        QCOMPARE(serverMessages(true, s).text, QString());
+        QCOMPARE(serverMessages(true, std::nullopt).shortText, QString());
+        s.problems = {QStringLiteral("Port 8081 ist belegt, vermutlich von DoNs Streaming Studio im Einsatz (Prozess 12). "
+                                     "Die Browserquelle ist nicht erreichbar. Anderen Port wählen.")};
+        s.invalidUse = QStringLiteral("Eine Browserquelle (192.168.1.116) benutzt eine ungültige Adresse (/o/a/…).");
+        QCOMPARE(serverMessages(false, s).text, QString()); // ohne Verbindung nichts
+        const ServerMessages m = serverMessages(true, s);
+        QCOMPARE(m.text, s.problems.first() + QLatin1Char('\n') + s.invalidUse);
+        QCOMPARE(m.shortText, QStringLiteral("Browserquelle: Port 8081 ist belegt, vermutlich von DoNs Streaming Studio im "
+                                             "Einsatz (Pro… (+1)"));
+        s.problems = {QStringLiteral("Die Adresse im Heimnetz 192.168.1.9 ist auf diesem PC gerade nicht vorhanden "
+                                     "(Netzwerkkabel?). Die Browserquelle ist nur auf diesem PC erreichbar (127.0.0.1) "
+                                     "und wird es dort, sobald die Adresse da ist.")};
+        s.invalidUse.clear();
+        // Punkte in der Adresse beenden den Satz nicht; höchstens 90 Zeichen
+        QCOMPARE(serverMessages(true, s).shortText,
+                 QStringLiteral("Browserquelle: Die Adresse im Heimnetz 192.168.1.9 ist auf diesem PC gerade nicht vorhand…"));
+        QCOMPARE(serverMessages(true, s).shortText.size(), 90);
+        s = ServerStatusInfo();
+        QVERIFY(serverMessages(true, s).text.contains(QStringLiteral("ohne Overlay-Server")));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestWindowData)

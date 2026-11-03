@@ -17,4 +17,10 @@ QString browserSourceLogPath(const QString &address)
     return QStringLiteral("/o/%1/…").arg(address);
 }
 
+QString newTokenQuestion()
+{
+    return QStringLiteral("Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue "
+                          "Adresse eingetragen werden. Fortfahren?");
+}
+
 } // namespace dss

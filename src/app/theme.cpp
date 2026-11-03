@@ -316,6 +316,9 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #coreStatus { font-weight: bold; padding: 0 8px; }
 #coreStatus[state="disconnected"] { color: @coreDisconnected@; }
 #coreStatus[state="connected"] { color: @coreConnected@; }
+/* P10, Teil C 2: Meldungen des Overlay-Servers in der Farbe für «nicht verbunden». */
+#serverStatus { font-weight: bold; padding: 0 8px; color: @coreDisconnected@; }
+#serverMessage { font-weight: bold; color: @coreDisconnected@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},

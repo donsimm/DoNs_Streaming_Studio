@@ -52,6 +52,12 @@ if(DSS_APP_SETTINGS_DIALOG)
   target_sources(dss_app_ui PRIVATE settingsdialog.h settingsdialog.cpp)
 endif()
 
+# Browserquelle im Fenster (P10, Teil C): Feld mit Adresse, «Kopieren», «Neuer Token», Anzeige
+# «Ausgabe: …» im Dock «Steuerung», Schalter «Ausgabe ein/aus» in der Liste «Overlays», Meldungen
+# des Overlay-Servers. Aus: Felder ausgegraut wie bis P10-vor; dss-cli kann weiter alles.
+option(DSS_APP_BROWSER_SOURCE "Browserquelle im Fenster (P10)" ON)
+target_compile_definitions(dss_app_ui PUBLIC DSS_APP_BROWSER_SOURCE=$<BOOL:${DSS_APP_BROWSER_SOURCE}>)
+
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
 # Seit P10-vor in dss_render (src/render, ohne Qt Widgets).
 if(DSS_APP_RENDERER)

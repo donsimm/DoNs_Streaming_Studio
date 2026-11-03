@@ -142,4 +142,66 @@ QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> 
     return {};
 }
 
+BrowserSourceField browserSourceField(const QUuid &selectedOverlay,
+                                      const std::optional<BrowserSourceInfo> &info)
+{
+    if (selectedOverlay.isNull())
+        return {QString(), QStringLiteral("Kein Overlay gewählt"), false};
+    if (!info || info->overlayId != selectedOverlay)
+        return {QString(), QStringLiteral("Adresse wird vom Kern geholt …"), false};
+    if (!info->url.isEmpty())
+        return {info->url, QString(), true};
+    return {QString(), info->problem, false};
+}
+
+QString outputStateText(const std::optional<bool> &output, const std::optional<int> &pages)
+{
+    if (!output)
+        return QStringLiteral("Ausgabe: –");
+    QString text = *output ? QStringLiteral("Ausgabe: ein")
+                           : QStringLiteral("Ausgabe: aus (Browserquelle leer)");
+    if (pages) {
+        if (*pages <= 0)
+            text += QStringLiteral(", keine Browserquelle verbunden");
+        else if (*pages == 1)
+            text += QStringLiteral(", 1 Browserquelle verbunden");
+        else
+            text += QStringLiteral(", %1 Browserquellen verbunden").arg(*pages);
+    }
+    return text;
+}
+
+QString outputToolTip(bool output)
+{
+    return output ? QStringLiteral("Ausgabe ein: Die Browserquelle zeigt das Overlay. Klicken schaltet aus.")
+                  : QStringLiteral("Ausgabe aus: Die Browserquelle ist leer. Klicken schaltet ein.");
+}
+
+ServerMessages serverMessages(bool connected, const std::optional<ServerStatusInfo> &info)
+{
+    if (!connected || !info)
+        return {};
+    QStringList lines;
+    if (!info->enabled)
+        lines.append(QStringLiteral("Der Kern ist ohne Overlay-Server gebaut (Schalter "
+                                    "DSS_CORE_OVERLAY_SERVER); es gibt keine Browserquelle."));
+    lines.append(info->problems);
+    if (!info->invalidUse.isEmpty())
+        lines.append(info->invalidUse);
+    if (lines.isEmpty())
+        return {};
+    // Erster Satz: bis zum ersten «. » (Adressen wie 192.168.1.9 enthalten Punkte ohne Leerzeichen).
+    QString first = lines.first();
+    const qsizetype end = first.indexOf(QLatin1String(". "));
+    if (end >= 0)
+        first = first.left(end + 1);
+    constexpr int kMaxShort = 90;
+    QString shortText = QStringLiteral("Browserquelle: ") + first;
+    if (shortText.size() > kMaxShort)
+        shortText = shortText.left(kMaxShort - 1) + QStringLiteral("…");
+    if (lines.size() > 1)
+        shortText += QStringLiteral(" (+%1)").arg(lines.size() - 1);
+    return {lines.join(QLatin1Char('\n')), shortText};
+}
+
 } // namespace dss

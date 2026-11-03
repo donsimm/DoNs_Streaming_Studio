@@ -392,6 +392,11 @@ ControlDock createControlDock(QWidget *parent)
     auto *address = new QLineEdit(content);
     address->setReadOnly(true);
     auto *copy = new QPushButton(QStringLiteral("Kopieren"), content);
+    auto *newToken = new QPushButton(QStringLiteral("Neuer Token"), content);
+    newToken->setToolTip(QStringLiteral("Neue Adresse der Browserquelle; die alte gilt danach nicht mehr"));
+    auto *message = new QLabel(content);
+    message->setWordWrap(true);
+    message->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *output = new QComboBox(content);
     output->addItem(QStringLiteral("Browserquelle"));
     auto *outputState = new QLabel(QStringLiteral("Ausgabe: –"), content);
@@ -410,28 +415,40 @@ ControlDock createControlDock(QWidget *parent)
     gridSize->setSuffix(QStringLiteral(" px"));
     keepValueVisible(gridSize);
     auto *clearGuides = new QPushButton(QStringLiteral("Hilfslinien löschen"), content);
-    for (QWidget *w : std::initializer_list<QWidget *>{address, copy, output, outputState, preview,
-                                                       previewSmall, snap, gridCheck, gridSize,
-                                                       clearGuides})
+    for (QWidget *w : std::initializer_list<QWidget *>{address, copy, newToken, output, outputState,
+                                                       preview, previewSmall, snap, gridCheck,
+                                                       gridSize, clearGuides})
         w->setEnabled(false);
+    nameWidgets({{address, "browserSource"}, {copy, "browserSourceCopy"}, {newToken, "browserSourceNewToken"},
+                 {outputState, "outputState"}, {message, "serverMessage"}});
+    result.browserSource = address;
+    result.copyAddress = copy;
+    result.newToken = newToken;
+    result.outputState = outputState;
+    result.serverMessage = message;
 
     grid->addWidget(new QLabel(QStringLiteral("Browserquelle"), content), 0, 0);
     grid->addWidget(address, 0, 1, 1, 2);
-    grid->addWidget(copy, 0, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Ausgabe"), content), 1, 0);
-    grid->addWidget(output, 1, 1);
-    grid->addWidget(outputState, 1, 2, 1, 2);
-    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 2, 0);
-    grid->addWidget(preview, 2, 1);
-    grid->addWidget(previewSmall, 2, 2, 1, 2);
+    auto *addressButtons = new QHBoxLayout;
+    addressButtons->setSpacing(8);
+    addressButtons->addWidget(copy);
+    addressButtons->addWidget(newToken);
+    grid->addLayout(addressButtons, 0, 3);
+    grid->addWidget(message, 1, 1, 1, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Ausgabe"), content), 2, 0);
+    grid->addWidget(output, 2, 1);
+    grid->addWidget(outputState, 2, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 3, 0);
+    grid->addWidget(preview, 3, 1);
+    grid->addWidget(previewSmall, 3, 2, 1, 2);
     auto *snapRow = new QHBoxLayout;
     snapRow->setSpacing(8);
     snapRow->addWidget(snap);
     snapRow->addStretch(1);
     snapRow->addWidget(gridCheck);
-    grid->addLayout(snapRow, 3, 0, 1, 2);
-    grid->addWidget(gridSize, 3, 2);
-    grid->addWidget(clearGuides, 3, 3);
+    grid->addLayout(snapRow, 4, 0, 1, 2);
+    grid->addWidget(gridSize, 4, 2);
+    grid->addWidget(clearGuides, 4, 3);
     // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
     result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
     result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
@@ -444,13 +461,13 @@ ControlDock createControlDock(QWidget *parent)
     result.overlayWidth->setEnabled(false);
     result.overlayHeight->setEnabled(false);
     nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
-    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 4, 0);
-    grid->addWidget(result.overlayWidth, 4, 1);
-    grid->addWidget(result.overlayHeight, 4, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 5, 0);
+    grid->addWidget(result.overlayWidth, 5, 1);
+    grid->addWidget(result.overlayHeight, 5, 2);
 
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(5, 1);
+    grid->setRowStretch(6, 1);
     result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
     return result;
 }

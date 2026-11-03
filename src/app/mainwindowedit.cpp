@@ -6,6 +6,7 @@
 
 #include "canvaswidget.h"
 
+#include "browsersource.h"
 #include "coreclient.h"
 #include "dialogs.h"
 #include "dockviews.h"
@@ -111,6 +112,10 @@ void MainWindow::connectEditing()
             [this](QTreeWidgetItem *item) { onFolderExpanded(item, true); });
     connect(tree, &QTreeWidget::itemCollapsed, this,
             [this](QTreeWidgetItem *item) { onFolderExpanded(item, false); });
+#if DSS_APP_BROWSER_SOURCE
+    connect(tree, &OverlayTree::outputClicked, this, &MainWindow::toggleOutput);
+    connect(m_controlDock.newToken, &QPushButton::clicked, this, &MainWindow::newToken);
+#endif
     connect(tree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem *item) {
         const QUuid id = item->data(0, OverlayTree::kIdRole).toUuid();
         if (item->data(0, OverlayTree::kFolderRole).toBool())
@@ -483,6 +488,33 @@ void MainWindow::toggleVisibility(const QUuid &id)
     dss::SourceChanges c;
     c.visible = !source->visible;
     sendChange(dss::sourceUpdate(overlay->id, id, c), dss::changeKey(id, QStringLiteral("visible")));
+}
+
+// P10 (E-24): Ausgabe des Overlays umschalten; die Liste zeigt den neuen Zustand erst, wenn der
+// Kern ihn schickt.
+void MainWindow::toggleOutput(const QUuid &overlayId)
+{
+    const dss::OverlaySummary *summary = m_client->listData().summary(overlayId);
+    if (!summary || !m_client->isConnected())
+        return;
+    dss::ChangeRequest r = request(dss::msg::kSetOverlayOutput);
+    r.overlayId = overlayId;
+    r.output = !summary->output;
+    sendChange(r, overlayId.toString(QUuid::WithoutBraces) + QStringLiteral("/output"));
+}
+
+// P10, Teil A 8: neuer Token nach Rückfrage; die neue Adresse kommt mit browser_source.
+void MainWindow::newToken()
+{
+    const QUuid id = m_selectedOverlay;
+    if (id.isNull() || !m_client->isConnected())
+        return;
+    if (!confirm(this, QStringLiteral("Neuer Token?"), dss::newTokenQuestion(),
+                 QStringLiteral("Neuer Token"), QStringLiteral("Abbrechen")))
+        return;
+    dss::ChangeRequest r = request(dss::msg::kNewToken);
+    r.overlayId = id;
+    sendChange(r);
 }
 
 void MainWindow::showSourceMenu(const QPoint &position)

@@ -15,5 +15,7 @@ QString browserSourcePath(const QString &address, const QString &token);
 QString browserSourceUrl(const QString &host, int port, const QString &address, const QString &token);
 // Pfad für das Protokoll: "/o/<adresse>/…" (Token ausgelassen).
 QString browserSourceLogPath(const QString &address);
+// Rückfrage vor «Neuer Token» (Teil A 8), im Fenster und in dss-cli gleich.
+QString newTokenQuestion();
 
 } // namespace dss

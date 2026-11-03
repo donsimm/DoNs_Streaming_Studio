@@ -102,6 +102,10 @@ private:
     void onSourceItemChanged(QListWidgetItem *current);
     void onCoreError(const dss::ErrorInfo &error);
     void showStatus(const QString &text);
+    // P10, Teil C: Browserquelle des gewählten Overlays und Meldungen des Overlay-Servers
+    void refreshBrowserSource();
+    void refreshServerStatus();
+    void copyBrowserSource();
     std::optional<dss::Overlay> selectedOverlay() const;
 
     // Bearbeiten (mainwindowedit.cpp)
@@ -127,6 +131,8 @@ private:
     void renameSource(const QUuid &id);
     void stepSource(const QUuid &id, int step);
     void toggleVisibility(const QUuid &id);
+    void toggleOutput(const QUuid &overlayId); // P10 (E-24)
+    void newToken();                           // P10, Teil A 8
     void showSourceMenu(const QPoint &position);
     // Einträge für eine Quelle (Dock «Quellen» und Leinwand), danach die zum Hinzufügen.
     void fillSourceMenu(QMenu *menu, const dss::Overlay &overlay, const QUuid &id);
@@ -176,6 +182,7 @@ private:
     QLabel *m_statusMessage = nullptr;
     QLabel *m_importStatus = nullptr; // P10-vor: «Übernehme …», solange der Kern Dateien kopiert
     QLabel *m_coreStatus = nullptr;
+    QLabel *m_serverStatus = nullptr; // P10: Meldungen des Overlay-Servers, leer ohne Meldung
     bool m_firstPaintReported = false;
 
     dss::CoreClient *m_client = nullptr;

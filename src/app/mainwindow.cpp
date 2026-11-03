@@ -18,10 +18,13 @@
 #include "sourcerenderer.h"
 #endif
 #include "version.h"
+#include "windowdata.h"
 #include "windowedit.h"
 
 #include <QAction>
 #include <QCheckBox>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
@@ -210,6 +213,11 @@ void MainWindow::createDocks()
     resizeDocks({docks.first()}, {215}, Qt::Vertical);
     for (QDockWidget *d : docks)
         m_docksMenu->addAction(d->toggleViewAction());
+#if DSS_APP_BROWSER_SOURCE
+    // Schalter «Ausgabe» links neben jedem Overlay (E-24), wie ein Kästchen.
+    m_overlaysDock.tree->setOutputIcons(loadSymbol(QStringLiteral("kaestchen-an.svg"), QSize(12, 12)),
+                                        loadSymbol(QStringLiteral("kaestchen-aus.svg"), QSize(12, 12)));
+#endif
 }
 
 void MainWindow::createStatusBar()
@@ -227,6 +235,10 @@ void MainWindow::createStatusBar()
     m_importStatus = new QLabel(this);
     m_importStatus->setObjectName(QStringLiteral("importStatus"));
     statusBar()->addPermanentWidget(m_importStatus);
+    // Meldungen des Overlay-Servers (P10, Teil C 2): immer da, leer ohne Meldung.
+    m_serverStatus = new QLabel(this);
+    m_serverStatus->setObjectName(QStringLiteral("serverStatus"));
+    statusBar()->addPermanentWidget(m_serverStatus);
     m_coreStatus = new QLabel(dss::coreStatusText(false), this);
     m_coreStatus->setObjectName(QStringLiteral("coreStatus"));
     m_coreStatus->setProperty("state", QStringLiteral("disconnected"));
@@ -290,6 +302,14 @@ void MainWindow::connectCore()
     connect(m_client, &dss::CoreClient::pendingImportsChanged, this, [this] {
         m_importStatus->setText(dss::importStatusText(m_client->pendingImports()));
     });
+#if DSS_APP_BROWSER_SOURCE
+    connect(m_client, &dss::CoreClient::browserSourceChanged, this, &MainWindow::refreshBrowserSource);
+    connect(m_client, &dss::CoreClient::serverStatusChanged, this, [this] {
+        refreshServerStatus();
+        refreshBrowserSource(); // verbundene Seiten in «Ausgabe: …»
+    });
+    connect(m_controlDock.copyAddress, &QPushButton::clicked, this, &MainWindow::copyBrowserSource);
+#endif
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
     connect(m_sourcesDock.list, &QListWidget::currentItemChanged, this,
@@ -353,6 +373,9 @@ void MainWindow::onCoreConnectedChanged(bool connected)
     // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
     m_coreStatus->style()->unpolish(m_coreStatus);
     m_coreStatus->style()->polish(m_coreStatus);
+#if DSS_APP_BROWSER_SOURCE
+    refreshServerStatus();
+#endif
     if (!connected) {
         // Ohne Verbindung keine Werte und keinen Verlauf zeigen.
         m_cpuHistory.clear();
@@ -423,9 +446,15 @@ void MainWindow::refreshOverlayList()
         // Auf ein Overlay lässt sich etwas fallen lassen (es landet daneben), auf einen Ordner hinein.
         item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled
                        | Qt::ItemIsDropEnabled);
-        if (o)
-            item->setToolTip(0, QStringLiteral("%1 · %2x%3 · %4 Quelle(n)")
-                                    .arg(o->address).arg(o->width).arg(o->height).arg(o->sourceCount));
+        if (o) {
+            QString tip = QStringLiteral("%1 · %2x%3 · %4 Quelle(n)")
+                              .arg(o->address).arg(o->width).arg(o->height).arg(o->sourceCount);
+#if DSS_APP_BROWSER_SOURCE
+            item->setData(0, OverlayTree::kOutputRole, o->output);
+            tip += QLatin1Char('\n') + dss::outputToolTip(o->output);
+#endif
+            item->setToolTip(0, tip);
+        }
         if (id == m_selectedOverlay)
             selected = item;
         return item;
@@ -537,7 +566,54 @@ void MainWindow::refreshOverlay()
         m_controlDock.overlayWidth->setValue(overlay ? overlay->width : dss::kNewOverlayWidth);
         m_controlDock.overlayHeight->setValue(overlay ? overlay->height : dss::kNewOverlayHeight);
     }
+#if DSS_APP_BROWSER_SOURCE
+    // Adresse der Browserquelle zum gewählten Overlay (fragt nur bei einem anderen Overlay neu).
+    if (m_client)
+        m_client->requestBrowserSource(m_selectedOverlay);
+    refreshBrowserSource();
+#endif
     refreshProperties();
+}
+
+void MainWindow::refreshBrowserSource()
+{
+    if (!m_client)
+        return;
+    const dss::BrowserSourceField field =
+        dss::browserSourceField(m_selectedOverlay, m_client->browserSource());
+    QLineEdit *edit = m_controlDock.browserSource;
+    if (edit->text() != field.text)
+        edit->setText(field.text);
+    edit->setPlaceholderText(field.placeholder);
+    edit->setToolTip(field.text.isEmpty() ? field.placeholder : field.text); // Feld schneidet ab
+    edit->setCursorPosition(0);
+    const dss::OverlaySummary *summary = m_client->listData().summary(m_selectedOverlay);
+    const std::optional<dss::ServerStatusInfo> status = m_client->serverStatus();
+    std::optional<int> pages;
+    if (status && status->enabled)
+        pages = status->pages.value(m_selectedOverlay, 0);
+    m_controlDock.outputState->setText(
+        dss::outputStateText(summary ? std::optional<bool>(summary->output) : std::nullopt, pages));
+    refreshActions();
+}
+
+void MainWindow::refreshServerStatus()
+{
+    const dss::ServerMessages messages =
+        dss::serverMessages(m_client && m_client->isConnected(), m_client ? m_client->serverStatus() : std::nullopt);
+    m_controlDock.serverMessage->setText(messages.text);
+    m_serverStatus->setText(messages.shortText);
+    m_serverStatus->setToolTip(messages.text);
+}
+
+void MainWindow::copyBrowserSource()
+{
+    const dss::BrowserSourceField field =
+        dss::browserSourceField(m_selectedOverlay, m_client->browserSource());
+    if (!field.canCopy)
+        return;
+    QGuiApplication::clipboard()->setText(field.text);
+    showStatus(QStringLiteral("Adresse der Browserquelle kopiert"));
 }
 
 void MainWindow::onSourceItemChanged(QListWidgetItem *current)
@@ -706,6 +782,17 @@ void MainWindow::refreshActions()
     d.holdAtEnd->setEnabled(edit && source && !source->loop);
     m_controlDock.overlayWidth->setEnabled(edit && overlay);
     m_controlDock.overlayHeight->setEnabled(edit && overlay);
+#if DSS_APP_BROWSER_SOURCE
+    // Browserquelle (Teil C 1): ohne gewähltes Overlay ausgegraut. Kopieren geht auch ohne
+    // Bearbeiten, ein neuer Token ist eine Änderung.
+    const bool connected = m_client && m_client->isConnected();
+    const bool canCopy = connected && overlay
+                         && dss::browserSourceField(m_selectedOverlay, m_client->browserSource()).canCopy;
+    m_controlDock.browserSource->setEnabled(connected && overlay);
+    m_controlDock.copyAddress->setEnabled(canCopy);
+    m_controlDock.newToken->setEnabled(edit && overlay);
+    m_controlDock.outputState->setEnabled(connected && overlay);
+#endif
     if (!(edit && source))
         d.italic->setEnabled(false);
     // Ausrichten auf der Leinwand bleibt in P08 ausgegraut.

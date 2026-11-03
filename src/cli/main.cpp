@@ -5,6 +5,7 @@
 // Befehle lesen dann nur (nichts wird geschrieben); Änderungs-Befehle nehmen die Sperre im
 // Datenordner und brechen ab, wenn sie belegt ist.
 
+#include "browsersource.h"
 #include "configpaths.h"
 #include "coresession.h"
 #include "coresettings.h"
@@ -390,8 +391,7 @@ private:
         if (!o)
             return fail(error);
         if (!m_args.yes) {
-            out() << "Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue Adresse "
-                     "eingetragen werden. Fortfahren? [j/N] ";
+            out() << dss::newTokenQuestion() << " [j/N] ";
             out().flush();
             QTextStream in(stdin);
             const QString answer = in.readLine().trimmed().toLower();

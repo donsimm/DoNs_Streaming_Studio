@@ -79,4 +79,36 @@ QString settingsDialogHint();
 // Meldung im Dialog: Datei ungültig (settings_error) bzw. ohne Verbindung; sonst leer.
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info);
 
+// --- Browserquelle (P10, Teil C) ---
+
+// Feld «Browserquelle» im Dock «Steuerung»: die Adresse mit Token (Antwort auf
+// get_browser_source zum gewählten Overlay) oder, solange es keine gibt, ein grauer Platzhalter
+// mit dem Grund. canCopy: «Kopieren» ist möglich.
+struct BrowserSourceField
+{
+    QString text;
+    QString placeholder;
+    bool canCopy = false;
+};
+BrowserSourceField browserSourceField(const QUuid &selectedOverlay,
+                                      const std::optional<BrowserSourceInfo> &info);
+
+// Anzeige im Dock «Steuerung»: «Ausgabe: ein, 1 Browserquelle verbunden», «Ausgabe: aus
+// (Browserquelle leer), keine Browserquelle verbunden», «Ausgabe: –» ohne Overlay. pages:
+// verbundene Seiten (server_status), leer = unbekannt (dann ohne diesen Teil).
+QString outputStateText(const std::optional<bool> &output, const std::optional<int> &pages);
+// Schalter links neben dem Eintrag im Dock «Overlays» (E-24).
+QString outputToolTip(bool output);
+
+// Meldungen des Overlay-Servers (Port belegt, Adresse fehlt, ungültige Adresse benutzt) für das
+// Fenster: text ganz (eine Meldung pro Zeile, im Dock «Steuerung» und als Tooltip), shortText für
+// die Statuszeile («Browserquelle: <erster Satz>», höchstens 90 Zeichen, «(+1)» bei weiteren).
+// Beide leer, wenn es nichts zu melden gibt oder keine Verbindung besteht.
+struct ServerMessages
+{
+    QString text;
+    QString shortText;
+};
+ServerMessages serverMessages(bool connected, const std::optional<ServerStatusInfo> &info);
+
 } // namespace dss

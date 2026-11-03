@@ -39,10 +39,74 @@ OverlayTree::OverlayTree(QWidget *parent) : QTreeWidget(parent)
 // https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/itemviews/qtreeview.cpp,
 // https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/styles/qstylesheetstyle.cpp).
 // Deshalb hier zuerst mit dem Hintergrund der Liste übermalen, dann Pfeile wie bisher.
+// P10 (E-24): Im letzten Stück des Einzugs eines Overlays steht der Schalter «Ausgabe». Bei einem
+// Overlay ganz oben ist dort kein Pfeil (keine Kinder), bei einem Overlay im Ordner steht der Pfeil
+// des Ordners eine Stufe weiter links.
 void OverlayTree::drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const
 {
     painter->fillRect(rect, viewport()->palette().brush(viewport()->backgroundRole()));
     QTreeWidget::drawBranches(painter, rect, index);
+    const QVariant output = index.data(kOutputRole);
+    if (m_outputOn.isNull() || !output.isValid() || index.data(kFolderRole).toBool())
+        return;
+    const QRect area(rect.right() + 1 - indentation(), rect.top(), indentation(), rect.height());
+    const int side = qMin(12, qMin(area.width(), area.height()));
+    const QRect box(area.center().x() - side / 2, area.center().y() - side / 2, side, side);
+    (output.toBool() ? m_outputOn : m_outputOff).paint(painter, box);
+}
+
+void OverlayTree::setOutputIcons(const QIcon &on, const QIcon &off)
+{
+    m_outputOn = on;
+    m_outputOff = off;
+    viewport()->update();
+}
+
+QRect OverlayTree::outputSwitchRect(const QTreeWidgetItem *item) const
+{
+    if (!item || m_outputOn.isNull() || item->data(0, kFolderRole).toBool()
+        || !item->data(0, kOutputRole).isValid())
+        return {};
+    const QRect row = visualItemRect(item);
+    if (row.isEmpty())
+        return {};
+    // Der Eintrag beginnt nach dem Einzug; der Schalter steht im Stück direkt davor.
+    return QRect(row.left() - indentation(), row.top(), indentation(), row.height());
+}
+
+bool OverlayTree::onOutputSwitch(const QPoint &position, QUuid *id) const
+{
+    const QTreeWidgetItem *item = itemAt(position);
+    if (!outputSwitchRect(item).contains(position))
+        return false;
+    *id = item->data(0, kIdRole).toUuid();
+    return true;
+}
+
+void OverlayTree::mousePressEvent(QMouseEvent *event)
+{
+    // Klick auf den Schalter: nur melden, Auswahl bleibt. Ohne Empfänger wie ein gewöhnlicher Klick.
+    QUuid id;
+    if (event->button() == Qt::LeftButton
+        && isSignalConnected(QMetaMethod::fromSignal(&OverlayTree::outputClicked))
+        && onOutputSwitch(event->position().toPoint(), &id)) {
+        emit outputClicked(id);
+        event->accept();
+        return;
+    }
+    QTreeWidget::mousePressEvent(event);
+}
+
+void OverlayTree::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // Doppelklick auf den Schalter: kein Umbenennen (zweiter Klick schaltet nicht noch einmal).
+    QUuid id;
+    if (isSignalConnected(QMetaMethod::fromSignal(&OverlayTree::outputClicked))
+        && onOutputSwitch(event->position().toPoint(), &id)) {
+        event->accept();
+        return;
+    }
+    QTreeWidget::mouseDoubleClickEvent(event);
 }
 
 void OverlayTree::dropEvent(QDropEvent *event)

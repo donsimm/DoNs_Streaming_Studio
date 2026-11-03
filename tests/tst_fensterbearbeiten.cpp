@@ -9,6 +9,7 @@
 // tst_windowedit.
 // Daten wie im Handtest: Bild und Video aus prototypes/media, Be Vietnam Pro.
 
+#include "browsersource.h"
 #include "canvaswidget.h"
 #include "coreclient.h"
 #include "coresettings.h"
@@ -29,6 +30,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
@@ -54,6 +56,7 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QStyleOptionViewItem>
+#include <QTcpServer>
 #include <QTimer>
 #include <QToolButton>
 
@@ -1213,6 +1216,118 @@ private slots:
 #if DSS_APP_SETTINGS_DIALOG
     // P10-vor, Teil B 1: Werkzeuge → Einstellungen … liest die Werte vom Kern, schickt Änderungen
     // als Nachricht und zeigt die Meldung des Kerns.
+    // P10, Teil C: Feld «Browserquelle», «Kopieren», «Neuer Token», Schalter «Ausgabe» in der
+    // Liste, Anzeige «Ausgabe: …», ohne Overlay ausgegraut, Meldung «Port belegt» sichtbar.
+    void browserSource()
+    {
+        if (!DSS_APP_BROWSER_SOURCE || !DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_BROWSER_SOURCE oder DSS_APP_EDITING ist aus");
+        auto *tree = child<OverlayTree>("overlayTree");
+        auto *field = child<QLineEdit>("browserSource");
+        auto *copy = child<QPushButton>("browserSourceCopy");
+        auto *newToken = child<QPushButton>("browserSourceNewToken");
+        auto *state = child<QLabel>("outputState");
+        auto *message = child<QLabel>("serverMessage");
+        auto *status = child<QLabel>("serverStatus");
+        QVERIFY(field && copy && newToken && state && message && status);
+        const auto itemNamed = [tree](const QString &name) -> QTreeWidgetItem * {
+            for (QTreeWidgetItemIterator it(tree); *it; ++it)
+                if ((*it)->text(0) == name)
+                    return *it;
+            return nullptr;
+        };
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        m_client->requestSettings();
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->settings().has_value(), 3000);
+        const int port = m_client->settings()->settings.port;
+        QTRY_VERIFY_WITH_TIMEOUT(field->text().contains(QStringLiteral(":%1/o/test-szene/").arg(port)), 3000);
+        QVERIFY(field->text().startsWith(QStringLiteral("http://")));
+        QVERIFY(field->isEnabled() && copy->isEnabled() && newToken->isEnabled());
+        QVERIFY(message->text().isEmpty());
+        QVERIFY(status->text().isEmpty());
+
+        // Kopieren in die Zwischenablage (Inhalt des Nutzers danach zurück)
+        QClipboard *clipboard = QGuiApplication::clipboard();
+        const QString saved = clipboard->text();
+        copy->click();
+        QCOMPARE(clipboard->text(), field->text());
+        clipboard->setText(saved);
+
+        // Schalter «Ausgabe» links neben dem Eintrag; die Auswahl bleibt
+        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("Ausgabe: ein")), 3000);
+        QRect onSwitch = tree->outputSwitchRect(itemNamed(QStringLiteral("Test Szene")));
+        QVERIFY(!onSwitch.isEmpty());
+        QVERIFY(onSwitch.right() < tree->visualItemRect(itemNamed(QStringLiteral("Test Szene"))).left());
+        QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, onSwitch.center());
+        QTRY_VERIFY_WITH_TIMEOUT(!m_check->listData().summary(m_scene)->output, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Ausgabe: aus (Browserquelle leer), keine Browserquelle verbunden"), 3000);
+        QCOMPARE(itemNamed(QStringLiteral("Test Szene"))->data(0, OverlayTree::kOutputRole).toBool(), false);
+        QCOMPARE(tree->currentItem()->text(0), QStringLiteral("Test Szene"));
+        // Ein anderes Overlay umschalten, ohne es zu wählen
+        const QUuid chat = itemNamed(QStringLiteral("Chat Ecke"))->data(0, OverlayTree::kIdRole).toUuid();
+        QTest::mouseClick(tree->viewport(), Qt::LeftButton, {},
+                          tree->outputSwitchRect(itemNamed(QStringLiteral("Chat Ecke"))).center());
+        QTRY_VERIFY_WITH_TIMEOUT(!m_check->listData().summary(chat)->output, 3000);
+        QCOMPARE(tree->currentItem()->text(0), QStringLiteral("Test Szene"));
+        for (const QString &name : {QStringLiteral("Test Szene"), QStringLiteral("Chat Ecke")}) {
+            QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, tree->outputSwitchRect(itemNamed(name)).center());
+            QTest::qWait(300); // neue Liste vom Kern abwarten (die Einträge werden neu angelegt)
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->listData().summary(m_scene)->output && m_check->listData().summary(chat)->output, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("Ausgabe: ein")), 3000);
+        // Ordner haben keinen Schalter
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+            if ((*it)->data(0, OverlayTree::kFolderRole).toBool())
+                QVERIFY(tree->outputSwitchRect(*it).isEmpty());
+
+        // Neuer Token: Abbrechen lässt die Adresse, Bestätigen gibt eine neue
+        const QString before = field->text();
+        QString question;
+        answerDialog([&question](QWidget *dialog) {
+            if (auto *box = qobject_cast<QMessageBox *>(dialog))
+                question = box->text();
+            clickButton(dialog, QStringLiteral("Abbrechen"));
+        });
+        newToken->click();
+        QCOMPARE(question, newTokenQuestion());
+        QTest::qWait(300);
+        QCOMPARE(field->text(), before);
+        answerDialog([](QWidget *dialog) { clickButton(dialog, QStringLiteral("Neuer Token")); });
+        newToken->click();
+        QTRY_VERIFY_WITH_TIMEOUT(field->text() != before && field->text().contains(QStringLiteral("/o/test-szene/")), 3000);
+
+        // Port belegt: Meldung im Dock und in der Statuszeile, danach wieder weg
+        // Port im erlaubten Bereich (kPortMin bis kPortMax), den dieser Test selbst belegt
+        QTcpServer blocker;
+        for (int p = 30000 + int(QCoreApplication::applicationPid() % 2000); !blocker.isListening() && p <= kPortMax; ++p)
+            static_cast<void>(blocker.listen(QHostAddress::LocalHost, quint16(p)));
+        QVERIFY(blocker.isListening());
+        SettingsUpdate update;
+        update.port = blocker.serverPort();
+        QVERIFY(m_client->sendSettingsUpdate(update) > 0);
+        QTRY_VERIFY_WITH_TIMEOUT(message->text().contains(QStringLiteral("Port %1 ist belegt").arg(blocker.serverPort())), 5000);
+        QVERIFY(message->text().contains(QStringLiteral("tst_fensterbearbeiten")));
+        QVERIFY(status->text().startsWith(QStringLiteral("Browserquelle: Port %1 ist belegt").arg(blocker.serverPort())));
+        QCOMPARE(status->toolTip(), message->text());
+        QVERIFY(status->isVisible());
+        update.port = port;
+        QVERIFY(m_client->sendSettingsUpdate(update) > 0);
+        QTRY_VERIFY_WITH_TIMEOUT(message->text().isEmpty() && status->text().isEmpty(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(field->text().contains(QStringLiteral(":%1/o/test-szene/").arg(port)), 3000);
+
+        // Ohne gewähltes Overlay (Ordner gewählt) ausgegraut
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+            if ((*it)->data(0, OverlayTree::kFolderRole).toBool()) {
+                tree->setCurrentItem(*it);
+                break;
+            }
+        QTRY_VERIFY_WITH_TIMEOUT(!field->isEnabled() && !copy->isEnabled() && !newToken->isEnabled(), 3000);
+        QCOMPARE(field->text(), QString());
+        QCOMPARE(state->text(), QStringLiteral("Ausgabe: –"));
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        QTRY_VERIFY_WITH_TIMEOUT(field->isEnabled() && !field->text().isEmpty(), 3000);
+    }
+
     void settingsDialog()
     {
         auto *action = child<QAction>("settingsAction");
