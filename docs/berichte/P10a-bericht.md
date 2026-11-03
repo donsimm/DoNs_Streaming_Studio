@@ -10,8 +10,8 @@ Auftrag: `prompts/P10a-nacharbeiten-einsatz.md`. Teil A: Nacharbeiten am Editor 
 
 | Abnahme | Ergebnis |
 |---|---|
-| Bau ohne Warnungen mit `-Wall -Wextra`, jeder Schalter einzeln abschaltbar, Release-Bau | ja: 0 Warnungen im Arbeitsordner (Debug), im frischen Klon, im Release-Bau, mit jedem der 10 Schalter einzeln aus, mit `DSS_INSTALLED_EDITION=ON` und in den Zwischenständen `0dbba12`, `0e447aa`, `439c979` (`docs/berichte/P10a-daten/schalter-ergebnis.txt`). Die Bauten mit abgeschaltetem Schalter sind nur gebaut, ihre Tests nicht ausgeführt. Neue Schalter: `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_INSTALLED_EDITION` |
-| `ctest`, auch im frischen Klon | 32 von 32 im Arbeitsordner und im frischen Klon von `0c0da23` (2026-11-03 18:19 bzw. 18:22, Bau im Klon ohne Warnungen) |
+| Bau ohne Warnungen mit `-Wall -Wextra`, jeder Schalter einzeln abschaltbar, Release-Bau | ja: 0 Warnungen im Arbeitsordner (Debug), im frischen Klon, im Release-Bau, mit jedem der 10 Schalter einzeln aus, mit `DSS_INSTALLED_EDITION=ON` und in den Zwischenständen `f4ae362`, `647a275`, `12245b3` (`docs/berichte/P10a-daten/schalter-ergebnis.txt`). Die Bauten mit abgeschaltetem Schalter sind nur gebaut, ihre Tests nicht ausgeführt. Neue Schalter: `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_INSTALLED_EDITION` |
+| `ctest`, auch im frischen Klon | 32 von 32 im Arbeitsordner und im frischen Klon von `acdace6` (2026-11-03 18:19 bzw. 18:22, Bau im Klon ohne Warnungen) |
 | `tst_medien` und `tst_fensterbearbeiten` je 50 Mal | je 50 von 50 (`--repeat until-fail:50`, 2026-11-03 17:52 bis 18:16), nach einer Korrektur am Test `tst_fensterbearbeiten` (der erste Lauf scheiterte in Wiederholung 40, siehe «Tests») |
 | Startprüfung `--runs 20` | 20 von 20 in allen vier Fällen (2026-11-03 18:16 bis 18:18) |
 | Dokumente | nachgeführt: `docs/01-festlegungen.md` (Video-Drehung, zweiter Zeichner; Tabelle der Orte je Version, Sicherung, Watchdog), `docs/04-offene-punkte.md` (41, 56, 60, 65, 66 erledigt; neu 67 bis 71), `docs/06-overlay-format.md` (Umwandeln beim Installieren), `docs/07-bauplan.md` (P10a unter «Erledigt»), `docs/08-kern-schnittstelle.md` (Verbindung und Einheit je Version, Watchdog), `README.md` (Abschnitt «Einsatz», Schalter), `CLAUDE.md` (Regel 18) |
@@ -21,11 +21,11 @@ Auftrag: `prompts/P10a-nacharbeiten-einsatz.md`. Teil A: Nacharbeiten am Editor 
 
 ### 1 – Verbindungsknöpfe mittig, Logos kleiner
 
-Die vier Verbindungsknöpfe stehen waagrecht in der Mitte zwischen dem rechten Ende der Reiter «Overlays / Chat-Bot» und dem linken Rand der Leistungsanzeige (`headerCenteredX` in `src/common/windowsize.cpp`, Rest der Teilung rechts). Logos: **vorher 28×28, jetzt 19×19 Pixel** (≈ ⅔), ohne eigenen Rand; der Knopf bleibt 46×40 Pixel mit dem Rahmen in der Farbe des Zustands. Der feste Abstand von 70 Pixel vor den Knöpfen ist entfernt. Commit `9fcddc1`. Geprüft in `tst_windowsize::headerCentered` (Rechnung) und `tst_fensterbearbeiten::headerGaugesWidth` (Abstand links und rechts gleich bis auf 1 Pixel, Symbol 19×19).
+Die vier Verbindungsknöpfe stehen waagrecht in der Mitte zwischen dem rechten Ende der Reiter «Overlays / Chat-Bot» und dem linken Rand der Leistungsanzeige (`headerCenteredX` in `src/common/windowsize.cpp`, Rest der Teilung rechts). Logos: **vorher 28×28, jetzt 19×19 Pixel** (≈ ⅔), ohne eigenen Rand; der Knopf bleibt 46×40 Pixel mit dem Rahmen in der Farbe des Zustands. Der feste Abstand von 70 Pixel vor den Knöpfen ist entfernt. Commit `da7c927`. Geprüft in `tst_windowsize::headerCentered` (Rechnung) und `tst_fensterbearbeiten::headerGaugesWidth` (Abstand links und rechts gleich bis auf 1 Pixel, Symbol 19×19).
 
 ### 2 – Knöpfe Kopieren, Einfügen, Zurücksetzen bei «Transformation»
 
-Drei Symbolknöpfe am rechten Rand der Titelzeile des Bereichs «Transformation» im Dock «Eigenschaften». Symbole: vorhandenes `kopieren.svg`, neu `src/app/symbole/einfuegen.svg` (Klemmbrett) und `zuruecksetzen.svg` (Pfeil gegen den Uhrzeigersinn), selbst gezeichnet, einfarbig wie die übrigen (Maske, eingefärbt mit der Textfarbe). Hinweis beim Darüberfahren mit Kürzel, zum Beispiel «Transformation kopieren (Strg+Umschalt+C)». «Einfügen» ist ausgegraut, solange nichts kopiert ist. Die Knöpfe lösen dieselben Aktionen aus wie das Menü (E-25). Ohne `DSS_APP_TRANSFORM` sind sie verborgen. Commit `81963d9`.
+Drei Symbolknöpfe am rechten Rand der Titelzeile des Bereichs «Transformation» im Dock «Eigenschaften». Symbole: vorhandenes `kopieren.svg`, neu `src/app/symbole/einfuegen.svg` (Klemmbrett) und `zuruecksetzen.svg` (Pfeil gegen den Uhrzeigersinn), selbst gezeichnet, einfarbig wie die übrigen (Maske, eingefärbt mit der Textfarbe). Hinweis beim Darüberfahren mit Kürzel, zum Beispiel «Transformation kopieren (Strg+Umschalt+C)». «Einfügen» ist ausgegraut, solange nichts kopiert ist. Die Knöpfe lösen dieselben Aktionen aus wie das Menü (E-25). Ohne `DSS_APP_TRANSFORM` sind sie verborgen. Commit `89311bc`.
 
 ### 3 – Tastenkürzel wie OBS
 
@@ -45,7 +45,7 @@ Strg+Umschalt+C / Strg+Umschalt+V (Transformation kopieren / einfügen), Strg+R 
 
 Ursache: Die Zeitstempel in ganzen Millisekunden weichen bis 1/3 ms vom Raster n/30 s ab. Liegt der Takt der Leinwand fast genau auf den Zeitpunkten der Bilder, wird jedes dritte Bild einen Takt zu spät fällig. Ob das geschieht, hing vom zufälligen Abstand zwischen Beginn des Decoders und Takt der Leinwand ab.
 
-Umsetzung (Commit `895a4cf`):
+Umsetzung (Commit `a78098c`):
 - **Toleranz 1 ms** (`VideoPlayer::kDueTolerance`): Ein Bild gilt als fällig, wenn sein Zeitpunkt höchstens 1 ms nach dem gefragten liegt. Wahl: Runden auf ganze Millisekunden verschiebt höchstens um 0,5 ms (bei 30 Bildern/s um 1/3 ms); 1 ms deckt das mit Reserve und ist klein gegen einen halben Takt (16,7 ms bei 30, 8,3 ms bei 60 Bildern/s), es zieht also nie ein Bild einen ganzen Takt vor.
 - **Anker:** Die Messung zeigt, dass die Toleranz allein das schlechte Fenster nur verschiebt (6 statt 3 Läufe). Deshalb ist der Beginn eines Videos jetzt der Zeitpunkt der ersten Abfrage `frameAt`, die ein Bild vorfindet, statt der Zeit, zu der der Decoder das erste Bild fertig hat. Die Warteschlange speichert den Abstand zum ersten Bild. So liegen die Bilder auf dem Raster des Takts, und die Toleranz deckt die Rundung. Bis zur ersten Abfrage wartet der Decoder mit vollem Vorrat und verwirft nichts.
 - Die Leinwand überspringt nach langer Beschäftigung (mehr als 4 Takte im Rückstand) die verpassten Takte und behält ihr Raster, statt es neu zu beginnen. Sonst wären laufende Videos nach dem Rückstand nicht mehr auf dem Raster ihres Ankers.
@@ -61,13 +61,13 @@ FFmpeg liefert die Drehung als Display-Matrix (`AV_PKT_DATA_DISPLAYMATRIX` in `c
 
 Testvideos selbst erzeugt (`tests/daten/video-drehung/erzeugen.sh`): H.264, yuv420p, 64×32 angezeigt, aus `tests/daten/exif/orientierung-1.png`. Gespeichert gedreht (`transpose=cclock`, `hflip,vflip`, `transpose=clock`) mit `-display_rotation` 270, 180, 90. ffprobe meldet die Drehung −90, −180 und 90; das automatische Drehen von `ffmpeg` gibt bei allen vier das Testbild in der richtigen Lage.
 
-Tests: `tst_medien::displayMatrix` (9 Matrizen, doppelter Massstab, nullptr), `videoRotation` (Grösse 64×32, Ausrichtung 1/6/3/8, Farben der vier Viertel gegen das automatische Drehen von ffmpeg, Abweichung höchstens 4, gegen die Sollfarbe höchstens 12), `storeVideoRotation` (Grösse neuer Quellen im Kern), `tst_leinwand::videoRotation` (alle vier Videos auf der Leinwand gleich, Abweichung höchstens 12). Gegenprobe: Mit `orientationSteps(1)` statt der Ausrichtung des Videos schlägt `tst_leinwand::videoRotation` fehl («Video 90° bei 16/8: #00ff00 statt #ff0000»). In `docs/01-festlegungen.md` steht, dass der zweite Zeichner (P10) das auch umsetzen muss und P10 es mit OBS und diesen Testvideos prüft. Commit `0036f8f`.
+Tests: `tst_medien::displayMatrix` (9 Matrizen, doppelter Massstab, nullptr), `videoRotation` (Grösse 64×32, Ausrichtung 1/6/3/8, Farben der vier Viertel gegen das automatische Drehen von ffmpeg, Abweichung höchstens 4, gegen die Sollfarbe höchstens 12), `storeVideoRotation` (Grösse neuer Quellen im Kern), `tst_leinwand::videoRotation` (alle vier Videos auf der Leinwand gleich, Abweichung höchstens 12). Gegenprobe: Mit `orientationSteps(1)` statt der Ausrichtung des Videos schlägt `tst_leinwand::videoRotation` fehl («Video 90° bei 16/8: #00ff00 statt #ff0000»). In `docs/01-festlegungen.md` steht, dass der zweite Zeichner (P10) das auch umsetzen muss und P10 es mit OBS und diesen Testvideos prüft. Commit `4b98726`.
 
 ## Teil B
 
 ### Unterscheidung der Versionen
 
-Festlegung: **Schalter beim Bau** `DSS_INSTALLED_EDITION` (Standard aus = Version in Arbeit). Begründung: Ein Bau aus dem Repo nutzt so immer den Entwicklungsordner, auch wenn er von einem anderen Ort startet oder kopiert wird; er kann die echten Daten nicht treffen. Eine Erkennung nach dem Ort zur Laufzeit hätte genau dieses Risiko (ein verschobener oder verlinkter Bau). `scripts/installieren.sh` baut mit `DSS_INSTALLED_EDITION=ON`. Orte und Namen in `src/common/configpaths.cpp`, Tabelle in `docs/01-festlegungen.md`, Abschnitt «Einsatz»: Daten, Einstellungen und Verbindung mit dem Zusatz `-entwicklung`, Einheit `dss-core-entwicklung.service`, Fenstertitel «DoNs Streaming Studio – Entwicklung». Die eigenen Symbole liest jede Version aus `~/.config/dons-streaming-studio/symbole/`. Im Einsatz liegen Symbole, Schriften, Be Vietnam Pro, Übersetzung und Programm-Symbol unter `<Ziel>/share/dons-streaming-studio/` (Regeln für `cmake --install`, https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html); die installierten Programme enthalten keinen Pfad ins Repo (`strings -el`). `--version` und die Startzeile nennen Version und Commit, zum Beispiel «dss-core 0.1.0 (Einsatz, Commit 0036f8f-geändert)» (Testinstallation aus einem Stand mit nicht committeten Änderungen). Commit `0dbba12`.
+Festlegung: **Schalter beim Bau** `DSS_INSTALLED_EDITION` (Standard aus = Version in Arbeit). Begründung: Ein Bau aus dem Repo nutzt so immer den Entwicklungsordner, auch wenn er von einem anderen Ort startet oder kopiert wird; er kann die echten Daten nicht treffen. Eine Erkennung nach dem Ort zur Laufzeit hätte genau dieses Risiko (ein verschobener oder verlinkter Bau). `scripts/installieren.sh` baut mit `DSS_INSTALLED_EDITION=ON`. Orte und Namen in `src/common/configpaths.cpp`, Tabelle in `docs/01-festlegungen.md`, Abschnitt «Einsatz»: Daten, Einstellungen und Verbindung mit dem Zusatz `-entwicklung`, Einheit `dss-core-entwicklung.service`, Fenstertitel «DoNs Streaming Studio – Entwicklung». Die eigenen Symbole liest jede Version aus `~/.config/dons-streaming-studio/symbole/`. Im Einsatz liegen Symbole, Schriften, Be Vietnam Pro, Übersetzung und Programm-Symbol unter `<Ziel>/share/dons-streaming-studio/` (Regeln für `cmake --install`, https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html); die installierten Programme enthalten keinen Pfad ins Repo (`strings -el`). `--version` und die Startzeile nennen Version und Commit, zum Beispiel «dss-core 0.1.0 (Einsatz, Commit 0036f8f-geändert)» (Testinstallation aus einem Stand mit nicht committeten Änderungen). Commit `f4ae362`.
 
 Tests ohne Qt Gui: `tst_configpaths::editions` (alle Orte und Namen beider Versionen), `tst_overlaystore::defaultDataDir` (beide Datenordner), `tst_version::versionLine`, `tst_sperre` (Hinweis nennt `dss-core-entwicklung.service`).
 
@@ -77,7 +77,7 @@ Tests ohne Qt Gui: `tst_configpaths::editions` (alle Orte und Namen beider Versi
 
 ### Umwandeln beim Installieren
 
-Neues Modul `src/common/dataformat.*` (ohne Qt Gui) und `dss-core --format-pruefen` (Exit-Code 0 aktuell, 4 Umwandeln nötig, 5 neueres Format, 1 Fehler) bzw. `--umwandeln` (nimmt die Sperre; liest alle Dateien streng, schreibt erst danach, jede atomar mit `QSaveFile`; bei einem Fehler werden schon geschriebene Dateien zurückgeschrieben). Umgewandelt werden Overlay-Dateien im Format 1 und 2 genau so, wie das Programm sie beim nächsten Speichern schreibt. Unlesbare Dateien bleiben unverändert (wie beim Laden). Commit `0e447aa`.
+Neues Modul `src/common/dataformat.*` (ohne Qt Gui) und `dss-core --format-pruefen` (Exit-Code 0 aktuell, 4 Umwandeln nötig, 5 neueres Format, 1 Fehler) bzw. `--umwandeln` (nimmt die Sperre; liest alle Dateien streng, schreibt erst danach, jede atomar mit `QSaveFile`; bei einem Fehler werden schon geschriebene Dateien zurückgeschrieben). Umgewandelt werden Overlay-Dateien im Format 1 und 2 genau so, wie das Programm sie beim nächsten Speichern schreibt. Unlesbare Dateien bleiben unverändert (wie beim Laden). Commit `647a275`.
 
 Sicherung: `installieren.sh` kopiert vor dem Umwandeln den ganzen Datenordner mit `cp -a` nach `<Datenordner>-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/`, also für die echten Daten `~/.local/share/dons-streaming-studio-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/`, und vergleicht sie mit `diff -r -q`. Testdaten im Format 1, 2 und 3: `tests/daten/formate/` (angelegt mit `dss-cli`, zurückgestuft nach `docs/06-overlay-format.md`).
 
@@ -87,7 +87,7 @@ Mit einer **Kopie der echten Daten** (Scratch-Ordner, danach gelöscht): `instal
 
 ### Watchdog (Punkt 41)
 
-Der Kern liest `WATCHDOG_USEC` und `WATCHDOG_PID` wie `sd_watchdog_enabled(3)` und meldet `WATCHDOG=1` alle halbe Zeit über einen `QTimer` in der Hauptschleife (https://www.freedesktop.org/software/systemd/man/latest/sd_watchdog_enabled.html). Hängt die Hauptschleife, bleibt die Meldung aus. Einheit: `WatchdogSec=10s`, `TimeoutAbortSec=5s` (https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html: der Watchdog wirkt ab dem Ende des Starts, bei Ablauf SIGABRT bzw. `WatchdogSignal=`, `Restart=on-failure` startet neu; `TimeoutAbortSec` begrenzt das Warten danach, sonst gilt `DefaultTimeoutAbortSec`, auf dem Studio-PC 1 min 30 s laut `systemctl --user show`). Commit `439c979`.
+Der Kern liest `WATCHDOG_USEC` und `WATCHDOG_PID` wie `sd_watchdog_enabled(3)` und meldet `WATCHDOG=1` alle halbe Zeit über einen `QTimer` in der Hauptschleife (https://www.freedesktop.org/software/systemd/man/latest/sd_watchdog_enabled.html). Hängt die Hauptschleife, bleibt die Meldung aus. Einheit: `WatchdogSec=10s`, `TimeoutAbortSec=5s` (https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html: der Watchdog wirkt ab dem Ende des Starts, bei Ablauf SIGABRT bzw. `WatchdogSignal=`, `Restart=on-failure` startet neu; `TimeoutAbortSec` begrenzt das Warten danach, sonst gilt `DefaultTimeoutAbortSec`, auf dem Studio-PC 1 min 30 s laut `systemctl --user show`). Commit `12245b3`.
 
 Wahl der Zeit: Gemessen (2026-11-03 16:18, `dss-cli quelle-bild` mit 1 GiB bzw. 4 GiB grossen PNG-Dateien, derselbe Code wie im Kern, Datei im Seitencache): Übernehmen 16,0 s bzw. 64,0 s. Das ist die längste Arbeit in der Hauptschleife; ein Watchdog unter 64 s würde den Kern dabei beenden. Deshalb meldet sich der Kern beim Übernehmen nach jedem MiB (höchstens einmal je Sekunde) zusätzlich; Fortschritt heisst, er hängt nicht. Damit genügt eine kurze Zeit. **10 s:** im normalen Lauf ist die Hauptschleife nur Millisekunden beschäftigt, Laden beim Start fällt nicht darunter (der Watchdog beginnt nach `READY=1`), und ein hängender Kern ist nach höchstens etwa 11 s wieder da. 5 s für `TimeoutAbortSec` reichen, weil der Kern auf SIGABRT sofort endet (gemessen 2 bis 3 ms).
 
@@ -106,7 +106,7 @@ Journal: «Watchdog timeout (limit 10s)!», «Killing process … with signal SI
 
 ### `scripts/installieren.sh` und `scripts/dienst-einrichten.sh`
 
-`installieren.sh` (Commit `85ac702`): Abbruch mit Exit-Code 3, wenn `/proc/*/exe` auf `<Ziel>/bin/dss-app` zeigt (auch « (deleted)», proc(5)); Bau im Release-Modus in `build-einsatz/` mit `DSS_INSTALLED_EDITION=ON`, `DSS_BUILD_TESTS=OFF`, `DSS_COMMIT=<git rev-parse --short HEAD>` (mit «-geändert» bei nicht committeten Änderungen); Kern anhalten; Format prüfen, sichern, umwandeln; `cmake --install`; `version.txt`; Einheit über `dienst-einrichten.sh --einsatz`; Programm-Symbol nach `~/.local/share/icons/hicolor/<N>x<N>/apps/dons-streaming-studio.png`; Menüeintrag `~/.local/share/applications/dons-streaming-studio.desktop` (`Type=Application`, `Version=1.5`, `Exec`, `Icon=dons-streaming-studio`, `Categories=AudioVideo;Video;`, `StartupWMClass=dss-app` nach `xprop` WM_CLASS «dss-app», «dss-app»; https://specifications.freedesktop.org/desktop-entry/latest/recognized-keys.html, https://specifications.freedesktop.org/menu/latest/category-registry.html: «Video» verlangt «AudioVideo»). `desktop-file-validate` ohne Meldung. Zum Prüfen gibt es fünf Optionen für Testorte (`--ziel`, `--datenordner`, `--einheit`, `--menue-ordner`, `--symbol-ordner`), die nur alle zusammen gelten; die Einheit darf dann nicht `dss-core.service` oder `dss-core-entwicklung.service` heissen. So kann ein Test nie den echten Kern anhalten oder die echten Daten umwandeln.
+`installieren.sh` (Commit `7e88aa9`): Abbruch mit Exit-Code 3, wenn `/proc/*/exe` auf `<Ziel>/bin/dss-app` zeigt (auch « (deleted)», proc(5)); Bau im Release-Modus in `build-einsatz/` mit `DSS_INSTALLED_EDITION=ON`, `DSS_BUILD_TESTS=OFF`, `DSS_COMMIT=<git rev-parse --short HEAD>` (mit «-geändert» bei nicht committeten Änderungen); Kern anhalten; Format prüfen, sichern, umwandeln; `cmake --install`; `version.txt`; Einheit über `dienst-einrichten.sh --einsatz`; Programm-Symbol nach `~/.local/share/icons/hicolor/<N>x<N>/apps/dons-streaming-studio.png`; Menüeintrag `~/.local/share/applications/dons-streaming-studio.desktop` (`Type=Application`, `Version=1.5`, `Exec`, `Icon=dons-streaming-studio`, `Categories=AudioVideo;Video;`, `StartupWMClass=dss-app` nach `xprop` WM_CLASS «dss-app», «dss-app»; https://specifications.freedesktop.org/desktop-entry/latest/recognized-keys.html, https://specifications.freedesktop.org/menu/latest/category-registry.html: «Video» verlangt «AudioVideo»). `desktop-file-validate` ohne Meldung. Zum Prüfen gibt es fünf Optionen für Testorte (`--ziel`, `--datenordner`, `--einheit`, `--menue-ordner`, `--symbol-ordner`), die nur alle zusammen gelten; die Einheit darf dann nicht `dss-core.service` oder `dss-core-entwicklung.service` heissen. So kann ein Test nie den echten Kern anhalten oder die echten Daten umwandeln.
 
 `dienst-einrichten.sh`: ohne Option `dss-core-entwicklung.service` mit `build/src/core/dss-core`; mit `--einsatz ZIEL` `dss-core.service` mit `ZIEL/bin/dss-core`; `--watchdog SEKUNDEN` (Standard 10, 0 = aus).
 
@@ -139,7 +139,7 @@ cmake -S . -B build && cmake --build build -j8          # Debug, 0 Warnungen
 docs/berichte/P10a-daten/schalter-lauf.sh               # frischer Klon, Zwischenstände, Release, Schalter (17:41 fertig)
 ```
 
-Ergebnis `schalter-ergebnis.txt`: alle 15 Bauten Exit 0 und 0 Warnungen (Zwischenstände `0dbba12`, `0e447aa`, `439c979`; Release; `DSS_BUILD_APP`, `DSS_BUILD_TESTS`, `DSS_BUILD_CLI`, `DSS_MEDIA_SIZE`, `DSS_APP_RENDERER`, `DSS_APP_CANVAS_EDIT`, `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_APP_EDITING`, `DSS_APP_TRANSFORM` je aus; `DSS_INSTALLED_EDITION` ein). Der Teil-A-Commit `895a4cf` (Punkt 66) wurde einzeln gebaut und `tst_medien` bestand dort (2 von 2 Tests); die übrigen Teil-A-Commits sind nicht einzeln gebaut.
+Ergebnis `schalter-ergebnis.txt`: alle 15 Bauten Exit 0 und 0 Warnungen (Zwischenstände `f4ae362`, `647a275`, `12245b3`; Release; `DSS_BUILD_APP`, `DSS_BUILD_TESTS`, `DSS_BUILD_CLI`, `DSS_MEDIA_SIZE`, `DSS_APP_RENDERER`, `DSS_APP_CANVAS_EDIT`, `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_APP_EDITING`, `DSS_APP_TRANSFORM` je aus; `DSS_INSTALLED_EDITION` ein). Der Teil-A-Commit `a78098c` (Punkt 66) wurde einzeln gebaut und `tst_medien` bestand dort (2 von 2 Tests); die übrigen Teil-A-Commits sind nicht einzeln gebaut.
 
 ### Tests
 
@@ -152,14 +152,14 @@ ctest --test-dir build --repeat until-fail:50 -R '^tst_medien$' --output-on-fail
 
 | Lauf | Datum | Ergebnis |
 |---|---|---|
-| `ctest` Arbeitsordner, Stand vor `0c0da23` | 2026-11-03 16:34 | 32 von 32 |
-| `ctest` frischer Klon von `85ac702` | 2026-11-03 17:41 | `tst_datenformat` fehlgeschlagen: `tokens.json` hat im Klon die Rechte 0644 (git speichert nur das Ausführungsrecht), das Format prüft 0600. Behoben in `1a8aeca` (der Test setzt 0600, wie `installieren.sh` es mit `cp -a` übernimmt) |
-| `ctest` frischer Klon von `1a8aeca` | 2026-11-03 17:44:20 | `tst_fensterbearbeiten` einmal fehlgeschlagen, `ctest --rerun-failed` 2 von 2 bestanden. Die Ausgabe ist durch den zweiten Lauf überschrieben; vermutlich dieselbe Ursache wie in der nächsten Zeile (nicht geprüft) |
-| `tst_fensterbearbeiten` 50 Mal, Stand `1a8aeca` | 2026-11-03 17:45:38 bis 17:50:00 | 39 bestanden, Wiederholung 40 fehlgeschlagen: `headerGaugesWidth`, «Actual (cpu->width() + ram->width() + lan->width()): 600, Expected (total): 426». Das Fenster hatte nach `resize(1280, 800)` die Breite 1280, die Anzeige noch die Breite für 1920. Vermutung, nicht geprüft: `resize()` setzt die Breite sofort, die Bestätigung des Fenstermanagers für die vorherige Grösse 1920 traf erst im folgenden `processEvents()` ein. Korrektur nur im Test (`0c0da23`): warten, bis Fensterbreite und Summe der Anzeige zusammen zur Sollbreite passen, dann ohne Ereignisverarbeitung prüfen; die Meldung nennt bei einem Fehler beide Werte |
-| `tst_fensterbearbeiten` 50 Mal, Stand `0c0da23` | 2026-11-03 17:52:37 bis 17:58:04 | **50 von 50** |
-| `tst_medien` 50 Mal, Stand `0c0da23` | 2026-11-03 17:58:04 bis 18:16:14 | **50 von 50** (1089,6 s) |
-| `ctest` Arbeitsordner, `0c0da23` | 2026-11-03 18:19:19 bis 18:20:11 | **32 von 32** |
-| `ctest` frischer Klon von `0c0da23` | 2026-11-03 18:20:11 bis 18:22:29 | Bau 0 Warnungen, **32 von 32** |
+| `ctest` Arbeitsordner, Stand vor `acdace6` | 2026-11-03 16:34 | 32 von 32 |
+| `ctest` frischer Klon von `7e88aa9` | 2026-11-03 17:41 | `tst_datenformat` fehlgeschlagen: `tokens.json` hat im Klon die Rechte 0644 (git speichert nur das Ausführungsrecht), das Format prüft 0600. Behoben in `7c5c2c2` (der Test setzt 0600, wie `installieren.sh` es mit `cp -a` übernimmt) |
+| `ctest` frischer Klon von `7c5c2c2` | 2026-11-03 17:44:20 | `tst_fensterbearbeiten` einmal fehlgeschlagen, `ctest --rerun-failed` 2 von 2 bestanden. Die Ausgabe ist durch den zweiten Lauf überschrieben; vermutlich dieselbe Ursache wie in der nächsten Zeile (nicht geprüft) |
+| `tst_fensterbearbeiten` 50 Mal, Stand `7c5c2c2` | 2026-11-03 17:45:38 bis 17:50:00 | 39 bestanden, Wiederholung 40 fehlgeschlagen: `headerGaugesWidth`, «Actual (cpu->width() + ram->width() + lan->width()): 600, Expected (total): 426». Das Fenster hatte nach `resize(1280, 800)` die Breite 1280, die Anzeige noch die Breite für 1920. Vermutung, nicht geprüft: `resize()` setzt die Breite sofort, die Bestätigung des Fenstermanagers für die vorherige Grösse 1920 traf erst im folgenden `processEvents()` ein. Korrektur nur im Test (`acdace6`): warten, bis Fensterbreite und Summe der Anzeige zusammen zur Sollbreite passen, dann ohne Ereignisverarbeitung prüfen; die Meldung nennt bei einem Fehler beide Werte |
+| `tst_fensterbearbeiten` 50 Mal, Stand `acdace6` | 2026-11-03 17:52:37 bis 17:58:04 | **50 von 50** |
+| `tst_medien` 50 Mal, Stand `acdace6` | 2026-11-03 17:58:04 bis 18:16:14 | **50 von 50** (1089,6 s) |
+| `ctest` Arbeitsordner, `acdace6` | 2026-11-03 18:19:19 bis 18:20:11 | **32 von 32** |
+| `ctest` frischer Klon von `acdace6` | 2026-11-03 18:20:11 bis 18:22:29 | Bau 0 Warnungen, **32 von 32** |
 
 Ohne Qt Gui (geprüft mit `ldd build/tests/<Test>`, nur `libQt6Core` und `libQt6Test`): `tst_configpaths`, `tst_version`, `tst_overlaystore`, `tst_datenformat`, `tst_systemdnotify`, `tst_sperre`, `tst_medien`. `tst_symbols` (Programm-Symbol) braucht Qt Gui und läuft nur mit dem Fenster (`DSS_BUILD_APP`).
 
@@ -238,17 +238,19 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten) und `dons-streaming-s
 
 | Commit | Inhalt |
 |---|---|
-| `9fcddc1` | Teil A 1: Verbindungsknöpfe mittig, Logos 19 statt 28 Pixel |
-| `81963d9` | Teil A 2 und 3: Knöpfe bei «Transformation», Tastenkürzel wie OBS |
-| `895a4cf` | Teil A 4: Toleranz 1 ms und Anker (Punkt 66) |
-| `0036f8f` | Teil A 5: Drehung aus den Video-Metadaten (Punkt 65), Festlegung für P10 |
-| `0dbba12` | Teil B 3 und 5: Versionen getrennt, Programm-Symbol, Installationsregeln |
-| `0e447aa` | Teil B 4: Datenformate prüfen und umwandeln |
-| `439c979` | Teil B 6: Watchdog |
-| `85ac702` | Teil B 1, 2, 5, 7: `installieren.sh`, `dienst-einrichten.sh` |
-| `1a8aeca` | `tst_datenformat` im frischen Klon (Rechte von `tokens.json`) |
-| `0c0da23` | `tst_fensterbearbeiten::headerGaugesWidth` wartet, bis Fenster und Anzeige zur Sollbreite passen |
-| letzter Commit («P10a: Dokumente und Bericht») | Dokumente, Bericht, Messdaten, `CLAUDE.md` Regel 18 |
+| `da7c927` | Teil A 1: Verbindungsknöpfe mittig, Logos 19 statt 28 Pixel |
+| `89311bc` | Teil A 2 und 3: Knöpfe bei «Transformation», Tastenkürzel wie OBS |
+| `a78098c` | Teil A 4: Toleranz 1 ms und Anker (Punkt 66) |
+| `4b98726` | Teil A 5: Drehung aus den Video-Metadaten (Punkt 65), Festlegung für P10 |
+| `f4ae362` | Teil B 3 und 5: Versionen getrennt, Programm-Symbol, Installationsregeln |
+| `647a275` | Teil B 4: Datenformate prüfen und umwandeln |
+| `12245b3` | Teil B 6: Watchdog |
+| `7e88aa9` | Teil B 1, 2, 5, 7: `installieren.sh`, `dienst-einrichten.sh` |
+| `7c5c2c2` | `tst_datenformat` im frischen Klon (Rechte von `tokens.json`) |
+| `acdace6` | `tst_fensterbearbeiten::headerGaugesWidth` wartet, bis Fenster und Anzeige zur Sollbreite passen |
+| `3c2d623` | Dokumente, Bericht, Messdaten, `CLAUDE.md` Regel 18 |
+
+Die Kennungen hier gelten nach `git pull --rebase origin main` (auf origin lag `7dd5d10`, «Übergabe: Stand für den nächsten Chat», nur `docs/00-uebergabe.md`). Gemessen und getestet wurde auf denselben Ständen vor dem Rebase; der Code ist gleich. In der wörtlichen Ausgabe «Commit 0036f8f-geändert» und in `docs/berichte/P10a-daten/schalter-*` stehen die Kennungen vor dem Rebase: `9fcddc1` = `da7c927`, `81963d9` = `89311bc`, `895a4cf` = `a78098c`, `0036f8f` = `4b98726`, `0dbba12` = `f4ae362`, `0e447aa` = `647a275`, `439c979` = `12245b3`, `85ac702` = `7e88aa9`, `1a8aeca` = `7c5c2c2`, `0c0da23` = `acdace6`, `91d90e7` = `3c2d623`.
 
 ## Geänderte und neue Dateien
 
