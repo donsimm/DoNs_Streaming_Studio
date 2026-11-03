@@ -12,7 +12,7 @@ Auftrag: `prompts/P09b-nacharbeiten-editor.md`. Entscheide des Nutzers (2026-11-
 | `ctest --test-dir build`, auch im frischen Klon | 30 von 30 im Arbeitsordner und im frischen Klon (neu: `tst_transform`, `tst_imageorientation`); `tst_medien` und `tst_fensterbearbeiten` 10 von 10 bei `--repeat until-fail:10`. Beim Einzelbau der Commits je ein seltener Fehlschlag in `tst_medien` (Test aus P09, Punkt 66) und in `tst_fensterbearbeiten` (nicht nachgestellt), siehe «Commits» |
 | Startprüfung `--runs 20` | 20/20 sauber in allen vier Fällen |
 | Dokumente | nachgeführt: `docs/06-overlay-format.md` (Format 3 mit `flip_horizontal`, `flip_vertical`, EXIF), `docs/08-kern-schnittstelle.md` (Version 4 mit `media_sizes` und Spiegeln in `update_source`), `docs/01-festlegungen.md` (zweiter Zeichner muss spiegeln und EXIF beachten), `docs/04-offene-punkte.md` (55 und 58 erledigt, neu 60 bis 66), `docs/07-bauplan.md` (P09b unter «Erledigt») |
-| Handtest | offen: 4 Prüfungen (unten) |
+| Handtest | ja: 4 Prüfungen in Ordnung (2026-11-03, Rückmeldung des Nutzers im Chat). Beobachtung: In Prüfung 3 stand das Bild in «Handtest Zweit» zuletzt nicht zentriert (X 666, Y 378); vermutlich «Zentrieren» dort nicht mehr ausgeführt. Wünsche aus dem Handtest: Verbindungsknöpfe mittig und Logos kleiner; Knöpfe Kopieren, Einfügen, Zurücksetzen im Bereich «Transformation» (`docs/04-offene-punkte.md`, «Wünsche aus dem Handtest P09b»). |
 
 **Es wurde kein Paket installiert.** Die EXIF-Testbilder erzeugt ein Python-Skript ohne Zusatzmodule und `ffmpeg` (seit P02 vorhanden).
 
