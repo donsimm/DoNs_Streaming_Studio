@@ -179,4 +179,59 @@ bool weightAxisValue(const QList<FontAxis> &axes, int weight, double *value)
     return false;
 }
 
+bool fontLineMetrics(const QByteArray &fontFile, FontLineMetrics *metrics)
+{
+    if (!sfntTable(fontFile, "EBLC").isEmpty() || !sfntTable(fontFile, "CBLC").isEmpty()
+        || !sfntTable(fontFile, "bdat").isEmpty())
+        return false;
+    const QByteArray head = sfntTable(fontFile, "head");
+    const QByteArray hhea = sfntTable(fontFile, "hhea");
+    if (head.size() < 54 || hhea.size() < 10)
+        return false;
+    const auto u16 = [](const QByteArray &t, int at) {
+        return int(qFromBigEndian<quint16>(reinterpret_cast<const uchar *>(t.constData()) + at));
+    };
+    const auto s16 = [](const QByteArray &t, int at) {
+        return int(qFromBigEndian<qint16>(reinterpret_cast<const uchar *>(t.constData()) + at));
+    };
+    FontLineMetrics m;
+    m.unitsPerEm = u16(head, 18);
+    if (m.unitsPerEm <= 0)
+        return false;
+    // hhea: ascender s16 @4, descender s16 @6, lineGap s16 @8
+    if (s16(hhea, 4) != 0 || s16(hhea, 6) != 0) {
+        m.ascent = s16(hhea, 4);
+        m.descent = -s16(hhea, 6);
+        m.leading = s16(hhea, 8);
+    }
+    // OS/2 (mindestens 78 Bytes): fsSelection u16 @62, sTypoAscender s16 @68,
+    // sTypoDescender s16 @70, sTypoLineGap s16 @72, usWinAscent u16 @74, usWinDescent u16 @76
+    const QByteArray os2 = sfntTable(fontFile, "OS/2");
+    if (os2.size() >= 78) {
+        constexpr int kUseTypoMetrics = 0x80;
+        if (u16(os2, 62) & kUseTypoMetrics) {
+            if (s16(os2, 68) != 0 || s16(os2, 70) != 0) {
+                m.ascent = s16(os2, 68);
+                m.descent = -s16(os2, 70);
+                m.leading = s16(os2, 72);
+            }
+        } else if (u16(os2, 74) != 0 || u16(os2, 76) != 0) {
+            m.ascent = u16(os2, 74);
+            m.descent = u16(os2, 76);
+            m.leading = 0;
+        }
+    }
+    *metrics = m;
+    return true;
+}
+
+double fontMetricPixels(int units, int pixelSize, int unitsPerEm)
+{
+    // QFixed: val in 1/64. fromReal(units * px) = units * px * 64; Division durch QFixed b:
+    // (val * 64 + b.val / 2) / b.val (qfixed_p.h), b.val = unitsPerEm * 64.
+    const qint64 val = qint64(units) * pixelSize * 64;
+    const qint64 b = qint64(unitsPerEm) * 64;
+    return double((val * 64 + b / 2) / b) / 64.0;
+}
+
 } // namespace dss

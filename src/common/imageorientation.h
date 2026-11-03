@@ -34,6 +34,19 @@ int tiffOrientation(QByteArrayView tiff);
 // Liest nur die Segmente bzw. Chunks vor den Bilddaten.
 int imageFileOrientation(const QString &path);
 
+// Lage der Angabe in der Datei (P10, Overlay-Server): Der Server setzt die Ausrichtung in den
+// ausgelieferten Bytes auf 1, damit der Browser das Bild wie gespeichert zeigt und die Seite die
+// Ausrichtung selbst anwendet (Ergebnis unabhängig von der Chromium-Version).
+struct OrientationLocation
+{
+    int orientation = kOrientationNormal;
+    qint64 valueOffset = -1;   // Lage des SHORT-Werts in der Datei; -1 ohne Angabe
+    bool littleEndian = false; // Byte-Reihenfolge der TIFF-Daten
+    qint64 pngChunk = -1;      // PNG: Lage des Chunks eXIf (Längenfeld); -1 bei JPEG
+    quint32 pngChunkLength = 0; // PNG: Länge der Daten des Chunks
+};
+OrientationLocation imageOrientationLocation(const QString &path);
+
 // Angezeigte Grösse: Bei 5 bis 8 sind Breite und Höhe vertauscht.
 QSize orientedSize(QSize stored, int orientation);
 

@@ -58,6 +58,13 @@ bool readMediaSize(const QString &path, int *width, int *height, QString *error)
     return found;
 }
 
+int readVideoOrientation(const QString &path)
+{
+    AvInput input;
+    QString error;
+    return input.open(path, &error) ? input.orientation : kOrientationNormal;
+}
+
 int displayMatrixOrientation(const int32_t *matrix)
 {
     if (!matrix)

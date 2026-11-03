@@ -12,10 +12,13 @@
 #include "mediainfo.h"
 #include "overlayimage.h"
 #include "overlaystore.h"
+#include "sourcegeometry.h"
 #include "sourcerenderer.h"
 
 #include <QDir>
 #include <QFile>
+#include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QGuiApplication>
 #include <QPainter>
 #include <QProcess>
@@ -268,6 +271,47 @@ private slots:
             QCOMPARE(dir, xdgDir + QStringLiteral("/DoNs Streaming Studio"));
         else
             qWarning("xdg-user-dir nicht gefunden, Vergleich übersprungen");
+    }
+
+    // P10: Zeilenmasse aus den Tabellen der Schrift (dss_common, für die Webseite) gleich wie
+    // QFontMetricsF im Editor, für alle mitgelieferten Schriften, DejaVu und eine variable Schrift.
+    void lineMetricsLikeQt()
+    {
+        QStringList files = {QStringLiteral(DSS_TEST_FONT),
+                             QStringLiteral("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+                             QStringLiteral(DSS_TEST_VARIABLE_FONT)};
+        const QDir builtin(QStringLiteral(DSS_TEST_BUILTIN_FONT_DIR));
+        for (const QString &f : builtin.entryList({QStringLiteral("*.ttf")}, QDir::Files))
+            files.append(builtin.filePath(f));
+        QCOMPARE_GE(files.size(), 21);
+        int compared = 0;
+        for (const QString &file : std::as_const(files)) {
+            QFile f(file);
+            QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(file));
+            FontLineMetrics m;
+            QVERIFY2(fontLineMetrics(f.readAll(), &m), qPrintable(file));
+            const int id = QFontDatabase::addApplicationFont(file);
+            const QString family = QFontDatabase::applicationFontFamilies(id).value(0);
+            QVERIFY2(!family.isEmpty(), qPrintable(file));
+            for (int px = 1; px <= 400; ++px) {
+                QFont font(family);
+                font.setPixelSize(px);
+                font.setHintingPreference(QFont::PreferNoHinting); // wie SourceRenderer::drawText
+                const QFontMetricsF qt(font);
+                const auto same = [&](double ours, double theirs, const char *what) {
+                    if (ours == theirs)
+                        return true;
+                    qWarning("%s %d px %s: berechnet %.6f, Qt %.6f", qPrintable(file), px, what, ours, theirs);
+                    return false;
+                };
+                QVERIFY(same(fontMetricPixels(m.ascent, px, m.unitsPerEm), qt.ascent(), "ascent"));
+                QVERIFY(same(fontMetricPixels(m.descent, px, m.unitsPerEm), qt.descent(), "descent"));
+                QVERIFY(same(fontMetricPixels(m.leading, px, m.unitsPerEm), qt.leading(), "leading"));
+                ++compared;
+            }
+            QFontDatabase::removeApplicationFont(id);
+        }
+        qInfo("Zeilenmasse: %d Kombinationen (Datei, Grösse) gleich wie QFontMetricsF", compared);
     }
 };
 

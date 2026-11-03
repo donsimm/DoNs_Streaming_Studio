@@ -82,4 +82,29 @@ QList<FontAxis> parseFvarAxes(const QByteArray &fvar);
 // false, wenn die Datei keine Achse wght hat.
 bool weightAxisValue(const QList<FontAxis> &axes, int weight, double *value);
 
+// --- Zeilenmasse (P10, zweiter Zeichner) ---
+
+// Oberlänge, Unterlänge und Zeilenabstand einer Schrift in Einheiten der Schrift, so wie Qt 6.8
+// sie für QFontMetricsF wählt (QFontEngine::initializeHeightMetrics): zuerst hhea, dann OS/2
+// darüber, mit USE_TYPO_METRICS (fsSelection Bit 7) die typo-Werte, sonst winAscent/winDescent
+// und Zeilenabstand 0. Die Webseite rechnet daraus dieselben Zeilen wie der Editor.
+// https://code.qt.io/cgit/qt/qtbase.git/tree/src/gui/text/qfontengine.cpp?h=v6.8.2
+// Tabellen: https://learn.microsoft.com/en-us/typography/opentype/spec/hhea,
+// https://learn.microsoft.com/en-us/typography/opentype/spec/os2,
+// https://learn.microsoft.com/en-us/typography/opentype/spec/head
+struct FontLineMetrics
+{
+    int unitsPerEm = 0;
+    int ascent = 0;
+    int descent = 0; // positiv = unter der Grundlinie
+    int leading = 0;
+    bool operator==(const FontLineMetrics &) const = default;
+};
+// false, wenn head oder hhea fehlen oder ungültig sind, oder bei eingebetteten Bitmaps (EBLC,
+// CBLC, bdat: dann nimmt Qt die Werte von FreeType, hier nicht nachgebaut).
+bool fontLineMetrics(const QByteArray &fontFile, FontLineMetrics *metrics);
+// Wert in Pixeln wie Qt: QFixed (1/64 Pixel), QFixed::fromReal(units * pixelSize) / unitsPerEm
+// mit gerundeter Division.
+double fontMetricPixels(int units, int pixelSize, int unitsPerEm);
+
 } // namespace dss

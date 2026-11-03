@@ -155,7 +155,8 @@ endif()
 # P09: Rechnungen des Zeichners und des Bearbeitens auf der Leinwand, ohne Qt Gui.
 dss_add_test(tst_sourcegeometry)
 target_compile_definitions(tst_sourcegeometry PRIVATE
-  DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften" DSS_TEST_FONT="${DSS_TEST_FONT}")
+  DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften" DSS_TEST_FONT="${DSS_TEST_FONT}"
+  DSS_TEST_BUILTIN_FONT="${PROJECT_SOURCE_DIR}/src/common/schriften/be-vietnam-pro/BeVietnamPro-Regular.ttf")
 dss_add_test(tst_canvasedit)
 # P09b: Befehle «Transformieren» wie OBS (E-25), ohne Qt Gui
 dss_add_test(tst_transform)
@@ -215,6 +216,8 @@ if(DSS_BUILD_APP AND DSS_APP_RENDERER)
   qt_add_executable(tst_leinwandbild tst_leinwandbild.cpp)
   target_link_libraries(tst_leinwandbild PRIVATE dss_render dss_warnings Qt6::Test)
   target_compile_definitions(tst_leinwandbild PRIVATE DSS_TEST_FONT="${DSS_TEST_FONT}"
+    DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf"
+    DSS_TEST_BUILTIN_FONT_DIR="${PROJECT_SOURCE_DIR}/src/common/schriften/be-vietnam-pro"
     DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
     DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
     DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)

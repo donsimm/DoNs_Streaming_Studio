@@ -70,6 +70,25 @@ private slots:
         QFETCH(QString, file);
         QFETCH(int, orientation);
         QCOMPARE(imageFileOrientation(file), orientation);
+        // P10: Lage des Werts in der Datei (der Overlay-Server setzt ihn in den gelieferten Bytes
+        // auf 1); dort steht der Wert in der Byte-Reihenfolge der TIFF-Daten.
+        const OrientationLocation l = imageOrientationLocation(file);
+        QCOMPARE(l.orientation, orientation);
+        if (orientation == 1 && l.valueOffset < 0)
+            return;
+        QFile f(file);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray all = f.readAll();
+        QVERIFY(l.valueOffset > 0 && l.valueOffset + 2 <= all.size());
+        const auto b0 = quint8(all.at(l.valueOffset));
+        const auto b1 = quint8(all.at(l.valueOffset + 1));
+        QCOMPARE(l.littleEndian ? (b0 | b1 << 8) : (b0 << 8 | b1), orientation);
+        if (file.endsWith(QLatin1String(".png"))) {
+            QCOMPARE(all.mid(l.pngChunk + 4, 4), QByteArray("eXIf"));
+            QVERIFY(l.pngChunkLength > 0);
+        } else {
+            QCOMPARE(l.pngChunk, qint64(-1));
+        }
     }
 
     void pngAfterIdatIgnored()

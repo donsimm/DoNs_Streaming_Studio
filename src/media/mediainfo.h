@@ -30,4 +30,8 @@ bool readMediaSize(const QString &path, int *width, int *height, QString *error)
 // https://ffmpeg.org/doxygen/7.1/group__lavu__video__display.html (av_display_rotation_get)
 int displayMatrixOrientation(const int32_t *matrix);
 
+// Ausrichtung eines Videos wie im Zeichner des Editors (Display-Matrix, 1 bis 8; ohne
+// DSS_VIDEO_ROTATION oder bei Fehlern 1). Für den Overlay-Server (P10): die Seite dreht danach.
+int readVideoOrientation(const QString &path);
+
 } // namespace dss

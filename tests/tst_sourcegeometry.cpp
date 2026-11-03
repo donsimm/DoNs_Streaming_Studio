@@ -166,6 +166,26 @@ private slots:
         QVERIFY(parseFvarAxes(QByteArray(10, '\0')).isEmpty());
         QVERIFY(sfntTable(QByteArray("kein Font"), "fvar").isEmpty());
     }
+
+    // P10: Zeilenmasse wie Qt (Vergleich mit QFontMetricsF in tst_leinwandbild)
+    void lineMetrics()
+    {
+        QFile dejavu(QStringLiteral(DSS_TEST_FONT));
+        QVERIFY(dejavu.open(QIODevice::ReadOnly));
+        FontLineMetrics m;
+        QVERIFY(fontLineMetrics(dejavu.readAll(), &m));
+        // DejaVu Sans: fsSelection ohne USE_TYPO_METRICS → winAscent 1901, winDescent 483, Abstand 0
+        QCOMPARE(m, (FontLineMetrics{2048, 1901, 483, 0}));
+        QCOMPARE(fontMetricPixels(1901, 48, 2048), 44.5625); // 2851.5/64 aufgerundet
+        QCOMPARE(fontMetricPixels(483, 48, 2048), 11.328125);
+        QCOMPARE(fontMetricPixels(1000, 33, 1000), 33.0);
+        QFile vietnam(QStringLiteral(DSS_TEST_BUILTIN_FONT));
+        QVERIFY(vietnam.open(QIODevice::ReadOnly));
+        QVERIFY(fontLineMetrics(vietnam.readAll(), &m));
+        // Be Vietnam Pro: USE_TYPO_METRICS → typo 1000/-265/0
+        QCOMPARE(m, (FontLineMetrics{1000, 1000, 265, 0}));
+        QVERIFY(!fontLineMetrics(QByteArray("keine Schrift"), &m));
+    }
 };
 
 QTEST_APPLESS_MAIN(TestSourceGeometry)
