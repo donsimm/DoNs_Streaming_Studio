@@ -144,3 +144,4 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 56: Der feste Installationsort (P10) wird im Release-Modus gebaut.
 - Punkt 57: so lassen (Meldung auf der Konsole).
 - Punkt 59: so lassen (Videos laufen in Echtzeit weiter).
+- Punkt 58: Editor und Kern beachten die EXIF-Ausrichtung von Bildern, wie der Browser (Standard `image-orientation: from-image`, bei Seiten ohne HTTPS nicht abschaltbar, https://developer.mozilla.org/en-US/docs/Web/CSS/image-orientation). Grund: K-07, beide Zeichner zeigen dasselbe. Umsetzung mit dem nächsten Baustein.
