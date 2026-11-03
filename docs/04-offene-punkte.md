@@ -127,3 +127,9 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - Punkt 50: alle drei Annahmen vom Nutzer bestätigt (neue Quelle wird gewählt; letzte Änderung beim Kern gilt; nach hartem Absturz des Kerns höchstens 1 s Änderungen verloren).
 - Punkt 46 (Datei- und Farbwahl nur im Handtest geprüft): im Handtest P08 geprüft, in Ordnung; keine weitere Massnahme.
 - Punkt 51 (Ausrichten ausgegraut): gehört zu E-10 (SOLL), keine Massnahme bis dahin.
+
+## Wünsche aus dem Handtest P09 (2026-11-03)
+
+- Einrasten beim Drehen mit Umschalttaste in 1°-Schritten statt 15° (entschieden, siehe `docs/01-festlegungen.md`). Umsetzung mit dem nächsten Baustein.
+- Leistungsanzeige (CPU, RAM, LAN) im Kopfbereich: feste Grösse, höchstens ein Drittel der Fensterbreite. Noch zu besprechen.
+- Symbole fehlten im Handtest-Fenster, weil `handtest.sh` ein eigenes `XDG_CONFIG_HOME` nutzt; kein Fehler der Software. Prüfung im normalen Fenster nach dem Handtest.
