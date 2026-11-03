@@ -22,6 +22,7 @@
 #   --einheit NAME.service   anderer Name der Einheit
 #   --datenordner PFAD       an dss-core weitergeben
 #   --verbindung PFAD        an dss-core weitergeben
+#   --einstellungen PFAD     an dss-core weitergeben (kern.ini, P10-vor)
 #
 # Der Pfad zu dss-core wird hier ermittelt, nicht fest eingetragen. Nach einem Verschieben des
 # Repos bzw. des Installationsordners neu ausführen.
@@ -43,7 +44,7 @@ REMOVE=0
 CORE_ARGS=()
 
 usage() {
-    sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//' >&2
+    sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//' >&2
     exit 2
 }
 
@@ -59,7 +60,7 @@ while [[ $# -gt 0 ]]; do
         --watchdog)
             [[ $# -ge 2 && "$2" =~ ^[0-9]+$ ]] || usage
             WATCHDOG="$2"; shift 2 ;;
-        --datenordner|--verbindung)
+        --datenordner|--verbindung|--einstellungen)
             [[ $# -ge 2 ]] || usage
             CORE_ARGS+=("$1" "$(readlink -m "$2")"); shift 2 ;;
         -h|--help) usage ;;

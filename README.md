@@ -56,7 +56,7 @@ python3 scripts/startpruefung.py      # je 20 Starts von dss-core und dss-app pr
 python3 scripts/dienstpruefung.py     # Dienst mit eigener Testeinheit und Testdaten prüfen
 ```
 
-Optionen für Tests und Prüfungen (echte Daten bleiben unberührt): `dss-core --datenordner PFAD --verbindung PFAD`, `dss-app --verbindung PFAD --einheit NAME.service`, `dss-cli --datenordner PFAD`. Schliesst man das letzte Fenster normal, beendet sich der Kern; stürzt das Fenster ab, läuft er weiter. Solange der Kern läuft, zeigt `dss-cli` nur an (`overlay-liste`, `quelle-liste`) und bricht Änderungen ab. Eigene Symbole (zum Beispiel `ndi.svg`) legt man nach `~/.config/dons-streaming-studio/symbole/`; sie haben Vorrang vor `src/app/symbole/` und gelten für beide Versionen.
+Optionen für Tests und Prüfungen (echte Daten bleiben unberührt): `dss-core --datenordner PFAD --verbindung PFAD --einstellungen PFAD`, `dss-app --verbindung PFAD --einheit NAME.service`, `dss-cli --datenordner PFAD`, `dss-cli --verbindung PFAD einstellungen`. Schliesst man das letzte Fenster normal, beendet sich der Kern; stürzt das Fenster ab, läuft er weiter. Solange der Kern läuft, zeigt `dss-cli` nur an (`overlay-liste`, `quelle-liste`) und bricht Änderungen ab. Eigene Symbole (zum Beispiel `ndi.svg`) legt man nach `~/.config/dons-streaming-studio/symbole/`; sie haben Vorrang vor `src/app/symbole/` und gelten für beide Versionen.
 
 Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 
@@ -71,10 +71,13 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_APP_CANVAS_EDIT` | `ON` | Quellen auf der Leinwand mit Maus und Pfeiltasten bearbeiten (P09); aus: Leinwand zeigt nur an |
 | `DSS_APP_TRANSFORM` | `ON` | Befehle «Transformieren» im Menü «Bearbeiten» und per Rechtsklick (P09b); aus: kein Menü «Transformieren» |
 | `DSS_VIDEO_ROTATION` | `ON` | Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner (P10a); aus: Videos wie gespeichert |
+| `DSS_CORE_IMPORT_THREAD` | `ON` | Kern übernimmt neue Dateien (SHA-256, Kopie) in eigenen Threads und antwortet dabei weiter (P10-vor); aus: in der Hauptschleife wie in P10a |
 | `DSS_CORE_WATCHDOG` | `ON` | Kern meldet sich beim Watchdog von systemd (P10a); aus: ohne Meldung, dann `scripts/dienst-einrichten.sh --watchdog 0` |
 | `DSS_INSTALLED_EDITION` | `OFF` | Version im Einsatz bauen (nur `scripts/installieren.sh`, P10a): echte Daten, `dss-core.service`, Laufzeit-Dateien aus dem Installationsordner |
 
 Das Fenster speichert Grösse, Lage und Anordnung der Docks beim Beenden in `~/.config/dons-streaming-studio-entwicklung/fenster.ini` (Version in Arbeit) bzw. `~/.config/dons-streaming-studio/fenster.ini` (Version im Einsatz, jeweils `$XDG_CONFIG_HOME/…`). Löschen der Datei stellt die Standardanordnung her.
+
+Der Kern hält seine Einstellungen (Port des Overlay-Servers, Adresse im Heimnetz, seit P10-vor) in `kern.ini` im selben Ordner; nur der Kern schreibt sie. Anzeigen und ändern: im Fenster unter «Werkzeuge → Einstellungen …» oder mit `dss-cli einstellungen`, `dss-cli einstellung-port PORT`, `dss-cli einstellung-adresse ADRESSE` (Aufbau und gültige Werte: `docs/08-kern-schnittstelle.md`, «Einstellungen»).
 
 ## Einsatz
 

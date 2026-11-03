@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-03 (P09b). Version der Schnittstelle: **4**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart).
+Stand: 2026-11-03 (P10-vor). Version der Schnittstelle: **5**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays wird nie übertragen, weder gelesen noch geändert (kommt mit P10; CLAUDE.md Regel 12).
+
+### Version 5 (P10-vor)
+
+Die Version stieg von 4 auf 5 wegen der neuen Nachrichten `get_settings`, `settings` und `update_settings` (Abschnitt «Einstellungen»). Ein Kern der Version 4 würde `get_settings` mit `unknown_type` beantworten, und das Fenster der Version 5 erwartet die Einstellungen für den Dialog «Werkzeuge → Einstellungen …». Die übrigen Nachrichten sind unverändert. Neu ist auch, dass `change_result` für Änderungen mit einer neuen Datei später kommen kann und andere Nachrichten in der Zwischenzeit beantwortet werden (Abschnitt «Übernehmen von Dateien»); das ändert kein Feld.
 
 ### Version 4 (P09b)
 
@@ -63,13 +67,19 @@ Fenster                                 Kern
    | ---- get_fonts ---------------------> |
    | <--- font_list ---------------------- |
    |                ...                    |
+   | ---- get_settings ------------------> |   seit Version 5 (P10-vor)
+   | <--- settings ----------------------- |
+   | ---- update_settings {request_id 9} > |
+   | <--- settings ----------------------- |   an alle Fenster, wenn geändert
+   | <--- change_result {request_id 9} --- |   nur an dieses Fenster, zuletzt
+   |                ...                    |
    | ---- quit_request ------------------> |   normales Schliessen des Fensters
    | <--- quit_reply {accepted} ---------- |
    | ---- trennt -------------------------X|
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 4 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 4».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 5 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 5».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `connections` und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
@@ -101,11 +111,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `4` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `5` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":4,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":5,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -271,19 +281,22 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`), `version` (Text), `protocol_version` (ganze Zahl, `4`) | `overlay_list`, `connections`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `5`) | `overlay_list`, `connections`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
 | `quit_request` | – | `quit_reply` |
+| `get_settings` | – (seit Version 5) | `settings` |
+| `update_settings` | siehe Abschnitt «Einstellungen» (seit Version 5) | `settings` an alle (wenn geändert), dann `change_result` |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":4,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":5,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
 {"type":"quit_request"}
+{"type":"get_settings"}
 ```
 
 ## Änderungen (P08)
@@ -350,6 +363,18 @@ Grenzen und Meldungen kommen aus dem Modell (`docs/06-overlay-format.md`). Eine 
 
 Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `request_id`, antwortet der Kern mit `change_result` `ok: false`, `code: invalid_message`; sonst mit `error` `invalid_message`.
 
+### Übernehmen von Dateien (P10-vor, Punkt 67)
+
+Änderungen mit einer neuen Datei (`add_image_source`, `add_video_source`, `replace_image_file`, `add_text_source` mit Schrift, `set_text_font` mit einem Pfad statt `media/…`) prüft der Kern zuerst (Overlay und Quelle vorhanden). Dann rechnet er SHA-256 und kopiert die Datei in einem **eigenen Thread** (höchstens 2 gleichzeitig, `MediaImporter` in `src/common/mediaimport.h/.cpp`), stückweise zu 1 MiB, mit `QSaveFile`. Die Hauptschleife beantwortet in der Zwischenzeit alle Nachrichten und schickt `stats` weiter. Erst wenn die Kopie fertig ist, ändert der Kern das Overlay (in der Hauptschleife, wie jede Änderung), verteilt es und schickt `change_result`. Gemessen in `tst_uebernehmen` (2026-11-03, 256 MiB): Antwortzeit auf `get_overlay_list` während des Übernehmens höchstens 25 ms.
+
+- Nur der Kern schreibt Dateien; Änderungen an Overlays und `liste.json` bleiben in der Hauptschleife.
+- Zwei Änderungen mit derselben Datei gleichzeitig: Die zweite wartet auf die erste und findet dann die Kopie vor (eine Kopie, Protokoll «war schon vorhanden»).
+- Wird das Overlay oder die Quelle während des Übernehmens gelöscht, antwortet der Kern mit `change_result` `unknown_overlay` bzw. `unknown_source`; die Kopie bleibt in `media/` (gleicher Inhalt wird später wieder verwendet).
+- Beim Beenden (SIGTERM, SIGINT, `quit_request`) bricht der Kern laufende Übernahmen ab; die vorläufige Datei verschwindet (`QSaveFile::cancelWriting`), unter dem endgültigen Namen bleibt nichts. Protokoll: «N Übernahmen abgebrochen (… ms)».
+- Schalter `DSS_CORE_IMPORT_THREAD` (Standard ON). OFF: wie bis P10a in der Hauptschleife.
+
+Vorläufige Dateien, die nach einem Absturz übrig bleiben könnten (`<SHA-256>.<Endung>.XXXXXX`), löscht der Kern beim Start nach dem Nehmen der Sperre (Protokoll «Aufräumen media/: N vorläufige Dateien von QSaveFile gelöscht (… Byte)»). Muster und Quellen in `src/common/mediaimport.h`.
+
 ### Häufige Änderungen zusammenfassen
 
 Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele Änderungen pro Sekunde. Zwei Stufen verhindern, dass der Kern überlastet wird oder die Datei bei jedem Schritt schreibt:
@@ -367,6 +392,50 @@ Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele 
 | `kill -9` / Absturz | höchstens etwa die Änderungen der letzten Sekunde gehen verloren |
 | Fehler | Kann eine Datei nicht geschrieben werden, schreibt der Kern das ins Protokoll (kritisch), schickt `error` `save_failed` an alle und versucht es mit der nächsten Änderung und beim Beenden wieder. Im Speicher bleibt die Änderung gültig |
 
+## Einstellungen (P10-vor)
+
+Einstellungen des Kerns stehen in `kern.ini` im Ordner der Einstellungen der Version: `~/.config/dons-streaming-studio/kern.ini` (Version im Einsatz), `~/.config/dons-streaming-studio-entwicklung/kern.ini` (Version in Arbeit); anderer Pfad: `dss-core --einstellungen PFAD`. Nur der Kern schreibt die Datei, atomar (`QSaveFile`). Code: `src/common/coresettings.h/.cpp`. Beide Werte wirken erst mit dem Overlay-Server (P10).
+
+```ini
+[overlay-server]
+port=8081
+adresse-im-heimnetz=192.168.1.9
+```
+
+| Wert | Festlegung |
+|---|---|
+| `port` | Port des Overlay-Servers. Standard 8080 im Einsatz, 8081 in Arbeit (beide Versionen können gleichzeitig laufen). Gültig **1024 bis 32767**: Ports unter 1024 darf unter Linux nur ein Prozess mit besonderen Rechten öffnen (`/proc/sys/net/ipv4/ip_unprivileged_port_start` = 1024); ab 32768 vergibt Linux Ports für ausgehende Verbindungen (`/proc/sys/net/ipv4/ip_local_port_range` = 32768 60999), ein Port dort kann beim Start des Servers zufällig belegt sein. Werte gemessen auf dem Studio-PC am 2026-11-03 mit `cat`. Quelle: ip(7), https://man7.org/linux/man-pages/man7/ip.7.html |
+| `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Fehlt sie beim Start, trägt der Kern einmal die Adresse der Netzwerkkarte der Standardroute ein und schreibt die Datei; danach ermittelt er sie nie neu. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch beim nächsten Start |
+
+Ist die Datei ungültig (unbekannte Angabe oder Abschnitt, doppelte Angabe, ungültiger Wert), gelten die Standardwerte, der Kern schreibt eine Warnung ins Protokoll, überschreibt die Datei nicht und weist `update_settings` ab, bis sie von Hand repariert oder gelöscht ist.
+
+### `settings` (Kern → Fenster)
+
+Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verbindungen.
+
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `port` | ganze Zahl | Port |
+| `home_address` | Text | Adresse im Heimnetz, leer = nicht gesetzt |
+| `port_min`, `port_max` | ganze Zahlen | gültiger Bereich (1024, 32767); das Fenster stellt sein Zahlenfeld danach ein |
+| `file` | Text | Pfad von `kern.ini` |
+| `settings_error` | Text oder `null` | Meldung, wenn die Datei ungültig ist |
+
+```json
+{"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"192.168.1.9","port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
+```
+
+### `update_settings` (Fenster → Kern)
+
+Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl) und `home_address` (Text, leer erlaubt). Nur angegebene Werte ändern sich. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
+
+```json
+{"type":"update_settings","request_id":9,"port":8090}
+{"type":"update_settings","request_id":10,"home_address":"192.168.1.9"}
+```
+
+`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4).
+
 ## Fehlerfälle
 
 | Code | Wann | Folge |
@@ -379,7 +448,7 @@ Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele 
 | `unknown_overlay` | `get_overlay` oder eine Änderung mit einer Kennung, die es nicht gibt | – |
 | `unknown_source` | Änderung mit einer Quelle, die es im Overlay nicht gibt (nur in `change_result`) | – |
 | `unknown_folder` | Änderung mit einem Ordner, den es nicht gibt (nur in `change_result`) | – |
-| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen, zum Beispiel ungültiger Wert, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
+| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen oder ungültige Einstellung (`update_settings`), zum Beispiel ungültiger Wert, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
 | `save_failed` | verzögertes Speichern gescheitert (als `error` an alle, `request` `null`) | Änderung bleibt im Speicher, neuer Versuch |
 | `message_too_long` | Zeile länger als 16 MiB | Kern trennt die Verbindung |
 
@@ -391,7 +460,7 @@ Auf der Fenster-Seite gibt es keine Fehlermeldungen an den Kern: Ungültige Nach
 |---|---|
 | Einheit | `~/.config/systemd/user/dss-core.service` (Version im Einsatz, angelegt von `scripts/installieren.sh` über `scripts/dienst-einrichten.sh --einsatz`) bzw. `dss-core-entwicklung.service` (Version in Arbeit, `scripts/dienst-einrichten.sh`); entfernen: `--entfernen`. Unten steht `dss-core.service`, für die Version in Arbeit gilt dasselbe mit dem anderen Namen |
 | Start | nicht bei der Anmeldung (kein `[Install]`); das Fenster prüft beim Start, ob der Kern antwortet, und startet sonst `systemctl --user start dss-core.service` |
-| Watchdog | seit P10a: `WatchdogSec=10s`. Der Kern meldet `WATCHDOG=1` alle 5 s aus seiner Hauptschleife, beim Übernehmen einer Datei zusätzlich jede Sekunde. Bleibt die Meldung aus, beendet systemd ihn (SIGABRT, nach `TimeoutAbortSec=5s` SIGKILL) und startet ihn neu (`Restart=on-failure` gilt auch für den Watchdog). Ohne Watchdog: `scripts/dienst-einrichten.sh --watchdog 0`, Schalter `DSS_CORE_WATCHDOG` |
+| Watchdog | seit P10a: `WatchdogSec=10s`. Der Kern meldet `WATCHDOG=1` alle 5 s aus seiner Hauptschleife. Seit P10-vor (Übernehmen im eigenen Thread) keine zusätzliche Meldung beim Übernehmen mehr: Die Hauptschleife blockiert dabei nicht, und eine Meldung aus dem Thread würde eine hängende Hauptschleife verdecken. Nur mit `DSS_CORE_IMPORT_THREAD=OFF` meldet der Kern beim Übernehmen wie bis P10a zusätzlich jede Sekunde. Bleibt die Meldung aus, beendet systemd ihn (SIGABRT, nach `TimeoutAbortSec=5s` SIGKILL) und startet ihn neu (`Restart=on-failure` gilt auch für den Watchdog). Ohne Watchdog: `scripts/dienst-einrichten.sh --watchdog 0`, Schalter `DSS_CORE_WATCHDOG` |
 | Bereit | `Type=notify`: Der Kern meldet `READY=1`, sobald er Verbindungen annimmt; erst dann kehrt `systemctl start` zurück |
 | Neustart | `Restart=on-failure`, `RestartSec=1s`: nach Exit-Code ≠ 0 oder Signal wie SIGKILL/SIGSEGV. Nicht nach Exit-Code 0, SIGTERM, SIGINT, SIGHUP, SIGPIPE oder `systemctl stop` |
 | Kein Neustart bei | Exit-Code 3 (`RestartPreventExitStatus=3`): Datenordner gesperrt oder Verbindung belegt (anderer Kern läuft) |

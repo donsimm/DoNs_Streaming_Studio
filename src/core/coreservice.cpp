@@ -22,10 +22,12 @@ constexpr int kImportThreads = 2;
 
 } // namespace
 
-CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath, QObject *parent)
+CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
+                         dss::CoreSettingsStore *settings, QObject *parent)
     : QObject(parent)
     , m_store(store)
     , m_socketPath(socketPath)
+    , m_settings(settings)
     , m_server(new QLocalServer(this))
     , m_statsTimer(new QTimer(this))
     , m_saver(new dss::SaveScheduler(this))
@@ -299,6 +301,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleChange(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetFonts)) {
         handleGetFonts(socket);
+    } else if (type == QLatin1String(dss::msg::kGetSettings) && m_settings) {
+        send(socket, settingsMessage());
+    } else if (type == QLatin1String(dss::msg::kUpdateSettings) && m_settings) {
+        handleSettingsUpdate(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetOverlay)) {
@@ -338,6 +344,44 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         sendError(socket, dss::err::kUnknownType,
                   QStringLiteral("Unbekannte Nachricht «%1»").arg(type), type);
     }
+}
+
+QJsonObject CoreService::settingsMessage() const
+{
+    return dss::settingsMessage({m_settings->settings(), dss::kPortMin, dss::kPortMax,
+                                 m_settings->path(), m_settings->fileError()});
+}
+
+void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message)
+{
+    dss::SettingsUpdate update;
+    QString error;
+    if (!dss::parseSettingsUpdate(message, &update, &error)) {
+        const qint64 id = dss::messageRequestId(message);
+        if (id < 0) {
+            sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        } else {
+            qWarning("Einstellungen ungültig: %s", qPrintable(error));
+            send(socket, dss::changeResultMessage(
+                             {id, false, QUuid(), QString::fromLatin1(dss::err::kInvalidMessage), error}));
+        }
+        return;
+    }
+    const dss::CoreSettings before = m_settings->settings();
+    if (!m_settings->change(update.port, update.homeAddress, &error)) {
+        qWarning("Einstellungen abgelehnt: %s", qPrintable(error));
+        send(socket, dss::changeResultMessage({update.requestId, false, QUuid(),
+                                               QString::fromLatin1(dss::err::kRejected), error}));
+        return;
+    }
+    const dss::CoreSettings after = m_settings->settings();
+    if (!(after == before)) {
+        // Port und Adresse wirken erst mit dem Overlay-Server (P10).
+        qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
+              after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
+        broadcast(settingsMessage());
+    }
+    send(socket, dss::changeResultMessage({update.requestId, true, QUuid(), QString(), QString()}));
 }
 
 void CoreService::send(QLocalSocket *socket, const QJsonObject &message)

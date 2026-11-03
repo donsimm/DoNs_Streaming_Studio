@@ -997,4 +997,80 @@ bool parseChangeResult(const QJsonObject &message, ChangeResult *result, QString
     return true;
 }
 
+QJsonObject settingsMessage(const SettingsInfo &info)
+{
+    QJsonObject o = typed(msg::kSettings);
+    o.insert(QStringLiteral("port"), info.settings.port);
+    o.insert(QStringLiteral("home_address"), info.settings.homeAddress);
+    o.insert(QStringLiteral("port_min"), info.portMin);
+    o.insert(QStringLiteral("port_max"), info.portMax);
+    o.insert(QStringLiteral("file"), info.file);
+    o.insert(QStringLiteral("settings_error"),
+             info.error.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(info.error));
+    return o;
+}
+
+bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *error)
+{
+    SettingsInfo i;
+    const int maxPort = 65535;
+    if (!requireIntField(message, QStringLiteral("port"), 0, maxPort, &i.settings.port, error)
+        || !requireString(message, QStringLiteral("home_address"), &i.settings.homeAddress, error)
+        || !requireIntField(message, QStringLiteral("port_min"), 0, maxPort, &i.portMin, error)
+        || !requireIntField(message, QStringLiteral("port_max"), 0, maxPort, &i.portMax, error)
+        || !requireString(message, QStringLiteral("file"), &i.file, error))
+        return false;
+    const QJsonValue e = message.value(QStringLiteral("settings_error"));
+    if (e.isString()) {
+        i.error = e.toString();
+    } else if (!e.isNull()) {
+        *error = QStringLiteral("Feld settings_error fehlt oder ist weder Text noch null");
+        return false;
+    }
+    if (i.portMin > i.portMax) {
+        *error = QStringLiteral("port_min grösser als port_max");
+        return false;
+    }
+    *info = i;
+    return true;
+}
+
+QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
+{
+    QJsonObject o = typed(msg::kUpdateSettings);
+    o.insert(QStringLiteral("request_id"), double(update.requestId));
+    if (update.port)
+        o.insert(QStringLiteral("port"), *update.port);
+    if (update.homeAddress)
+        o.insert(QStringLiteral("home_address"), *update.homeAddress);
+    return o;
+}
+
+bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QString *error)
+{
+    SettingsUpdate u;
+    if (!requireInt(message, QStringLiteral("request_id"), 0, qint64(1) << 53, &u.requestId, error))
+        return false;
+    if (message.contains(QStringLiteral("port"))) {
+        int port = 0;
+        // Bereich prüft der Kern mit eigener Meldung (validatePort); hier nur «ganze Zahl».
+        if (!requireIntField(message, QStringLiteral("port"), std::numeric_limits<int>::min(),
+                             std::numeric_limits<int>::max(), &port, error))
+            return false;
+        u.port = port;
+    }
+    if (message.contains(QStringLiteral("home_address"))) {
+        QString address;
+        if (!requireString(message, QStringLiteral("home_address"), &address, error))
+            return false;
+        u.homeAddress = address;
+    }
+    if (!u.port && !u.homeAddress) {
+        *error = QStringLiteral("update_settings ohne port und home_address");
+        return false;
+    }
+    *update = u;
+    return true;
+}
+
 } // namespace dss

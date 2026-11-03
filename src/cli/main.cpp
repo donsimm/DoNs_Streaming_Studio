@@ -6,6 +6,8 @@
 // Datenordner und brechen ab, wenn sie belegt ist.
 
 #include "configpaths.h"
+#include "coresession.h"
+#include "coresettings.h"
 #include "datalock.h"
 #include "overlaystore.h"
 #if DSS_MEDIA_SIZE
@@ -14,6 +16,7 @@
 #include "version.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QRegularExpression>
 #include <QTextStream>
 
@@ -25,9 +28,13 @@ constexpr int kExitOk = 0;
 constexpr int kExitError = 1;
 constexpr int kExitUsage = 2;
 constexpr int kExitLocked = 3;
+constexpr int kExitCoreNotRunning = 4;
 
 // Befehle, die nur anzeigen; alle anderen ändern den Datenordner.
 const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringLiteral("quelle-liste")};
+// Befehle für die Einstellungen des Kerns (P10-vor): ohne Datenordner und ohne Sperre.
+const QStringList kSettingsCommands = {QStringLiteral("einstellungen"), QStringLiteral("einstellung-port"),
+                                       QStringLiteral("einstellung-adresse")};
 
 QTextStream &out()
 {
@@ -42,7 +49,7 @@ QTextStream &err()
 }
 
 const char *const kUsageTemplate =
-    "Aufruf: dss-cli [--datenordner PFAD] BEFEHL [ARGUMENTE]\n"
+    "Aufruf: dss-cli [--datenordner PFAD] [--verbindung PFAD] BEFEHL [ARGUMENTE]\n"
     "\n"
     "Befehle:\n"
     "  overlay-liste\n"
@@ -56,6 +63,9 @@ const char *const kUsageTemplate =
     "  quelle-text ADRESSE TEXT SCHRIFTDATEI\n"
     "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG [--waagrecht-gespiegelt]\n"
     "                   [--senkrecht-gespiegelt]\n"
+    "  einstellungen\n"
+    "  einstellung-port PORT\n"
+    "  einstellung-adresse ADRESSE\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -67,8 +77,14 @@ const char *const kUsageTemplate =
     "Ohne --datenordner: Datenordner des Programms (~/.local/share/%1).\n"
     "overlay-liste und quelle-liste gehen immer. Alle anderen Befehle ändern Overlays und gehen\n"
     "nur, wenn der Kern angehalten ist (systemctl --user stop %2).\n"
+    "einstellungen: Port und Adresse im Heimnetz des Kerns (kern.ini). Läuft der Kern, fragt dss-cli\n"
+    "ihn; sonst liest es die Datei ~/.config/%1/kern.ini (nur lesen).\n"
+    "einstellung-port, einstellung-adresse: ändern über den laufenden Kern (nur er schreibt die\n"
+    "Datei). PORT 1024 bis 32767; ADRESSE IPv4 wie 192.168.1.9, \"\" = leer (beim nächsten Start\n"
+    "aus der Standardroute eintragen). Beides wirkt erst mit der Browserquelle (P10).\n"
+    "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
-    "gesperrt).\n";
+    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -79,6 +95,7 @@ QString usageText()
 struct Arguments
 {
     QString dataDir;
+    QString connection; // P10-vor: Verbindung zum Kern (nur Einstellungen)
     bool changeAddress = false;
     bool loop = false;
     bool holdAtEnd = false;
@@ -99,6 +116,12 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
                 return false;
             }
             result->dataDir = args.at(++i);
+        } else if (a == QLatin1String("--verbindung")) {
+            if (i + 1 >= args.size()) {
+                *error = QStringLiteral("--verbindung braucht einen Pfad.");
+                return false;
+            }
+            result->connection = args.at(++i);
         } else if (a == QLatin1String("--adresse-mitaendern")) {
             result->changeAddress = true;
         } else if (a == QLatin1String("--wiederholen")) {
@@ -469,6 +492,116 @@ private:
     Arguments m_args;
 };
 
+void printSettings(const dss::CoreSettings &s, const QString &file, const QString &origin)
+{
+    printTable({{QStringLiteral("Port"), QStringLiteral("%1 (erlaubt %2 bis %3)")
+                                             .arg(s.port).arg(dss::kPortMin).arg(dss::kPortMax)},
+                {QStringLiteral("Adresse im Heimnetz"),
+                 s.homeAddress.isEmpty() ? QStringLiteral("leer") : s.homeAddress},
+                {QStringLiteral("Datei"), file},
+                {QStringLiteral("Quelle"), origin}});
+}
+
+// Einstellungen des Kerns anzeigen oder ändern (P10-vor, Teil A 3). Nur der Kern schreibt
+// kern.ini; ohne laufenden Kern zeigt dss-cli die Datei nur an.
+int runSettings(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const int expected = command == QLatin1String("einstellungen") ? 0 : 1;
+    if (a.size() != expected) {
+        err() << "Fehler: " << QStringLiteral("%1 erwartet %2 Argument(e), erhalten %3.")
+                                   .arg(command).arg(expected).arg(a.size())
+              << "\n\n" << usageText();
+        return kExitUsage;
+    }
+    dss::SettingsUpdate update;
+    if (command == QLatin1String("einstellung-port")) {
+        int port = 0;
+        QString error;
+        if (!parseInt(a.at(0), QStringLiteral("PORT"), &port, &error)) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        update.port = port;
+    } else if (command == QLatin1String("einstellung-adresse")) {
+        update.homeAddress = a.at(0);
+    }
+
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        if (!notRunning) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        if (expected == 1) {
+            err() << "Fehler: " << error << ".\n"
+                  << "Die Einstellungen ändert nur der Kern. Kern starten:  systemctl --user start "
+                  << dss::coreUnitName() << '\n';
+            return kExitCoreNotRunning;
+        }
+        // Kern läuft nicht: Datei nur lesen.
+        const QString path = dss::coreSettingsPath();
+        const dss::CoreSettings defaults = dss::defaultCoreSettings();
+        QFile file(path);
+        if (!file.exists()) {
+            printSettings(defaults, path, QStringLiteral("Standardwerte, Kern läuft nicht, Datei fehlt "
+                                                         "(legt der Kern beim Start an)"));
+            return kExitOk;
+        }
+        dss::CoreSettings s;
+        if (!file.open(QIODevice::ReadOnly)) {
+            err() << "Fehler: " << path << " nicht lesbar (" << file.errorString() << ")\n";
+            return kExitError;
+        }
+        if (!dss::parseCoreSettings(file.readAll(), defaults, &s, &error)) {
+            err() << "Fehler: " << path << " ungültig: " << error << '\n';
+            return kExitError;
+        }
+        printSettings(s, path, QStringLiteral("Datei, Kern läuft nicht"));
+        return kExitOk;
+    }
+
+    if (expected == 0) {
+        const std::optional<dss::SettingsInfo> info = session.getSettings(&error);
+        if (!info) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        printSettings(info->settings, info->file, QStringLiteral("Kern"));
+        if (!info->error.isEmpty()) {
+            err() << "Fehler in der Datei: " << info->error << '\n';
+            return kExitError;
+        }
+        return kExitOk;
+    }
+    const std::optional<dss::ChangeResult> result = session.updateSettings(update, &error);
+    if (!result) {
+        err() << "Fehler: " << error << '\n';
+        return kExitError;
+    }
+    if (!result->ok) {
+        err() << "Fehler: " << result->message << '\n';
+        return kExitError;
+    }
+    const std::optional<dss::SettingsInfo> info = session.getSettings(&error);
+    if (!info) {
+        err() << "Fehler: " << error << '\n';
+        return kExitError;
+    }
+    if (update.port)
+        out() << QStringLiteral("Port: %1\n").arg(info->settings.port);
+    else
+        out() << QStringLiteral("Adresse im Heimnetz: %1\n")
+                     .arg(info->settings.homeAddress.isEmpty() ? QStringLiteral("leer")
+                                                               : info->settings.homeAddress);
+    out() << "Gespeichert in " << info->file << "; wirkt erst mit der Browserquelle (P10).\n";
+    return kExitOk;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -494,6 +627,18 @@ int main(int argc, char *argv[])
     }
     if (args.positional.isEmpty()) {
         err() << "Fehler: Befehl fehlt.\n\n" << usageText();
+        return kExitUsage;
+    }
+
+    if (kSettingsCommands.contains(args.positional.first())) {
+        const int rc = runSettings(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
+    if (!args.connection.isEmpty()) {
+        err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port und "
+                 "einstellung-adresse.\n\n" << usageText();
         return kExitUsage;
     }
 

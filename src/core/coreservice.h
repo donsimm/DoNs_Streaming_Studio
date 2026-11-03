@@ -30,7 +30,10 @@ public:
     // Name in der Begrüssung, an dem der Kern Fenster erkennt (Beenden nur ohne andere Fenster).
     static constexpr char kWindowProgram[] = "dss-app";
 
-    CoreService(dss::OverlayStore *store, const QString &socketPath, QObject *parent = nullptr);
+    // settings: Einstellungen des Kerns (kern.ini, P10-vor); nullptr = keine (get_settings wird
+    // dann mit einem Fehler beantwortet).
+    CoreService(dss::OverlayStore *store, const QString &socketPath,
+                dss::CoreSettingsStore *settings = nullptr, QObject *parent = nullptr);
     ~CoreService() override;
 
     enum class ListenResult { Ok, InUse, Failed };
@@ -99,6 +102,9 @@ private:
     // Datei, die die Änderung zuerst übernehmen muss, und wofür; leer, wenn keine.
     QString fileToImport(const dss::ChangeRequest &request, dss::MediaUse *use) const;
     void onImportFinished(quint64 job, const dss::MediaImportResult &result);
+    // Einstellungen (P10-vor)
+    QJsonObject settingsMessage() const;
+    void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
     void onSaveRequested();
     // Schriften (Teil F): beim ersten get_fonts geladen, danach aus dem Zwischenspeicher.
     void handleGetFonts(QLocalSocket *socket);
@@ -110,6 +116,7 @@ private:
 
     dss::OverlayStore *m_store;
     QString m_socketPath;
+    dss::CoreSettingsStore *m_settings = nullptr;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;
     QTimer *m_statsTimer = nullptr;

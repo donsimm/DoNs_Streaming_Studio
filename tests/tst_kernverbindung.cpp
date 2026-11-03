@@ -7,6 +7,7 @@
 // DejaVu Sans.
 
 #include "coreclient.h"
+#include "coresettings.h"
 #include "overlayjson.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
@@ -99,6 +100,7 @@ class TestKernVerbindung : public QObject
 
 private:
     QTemporaryDir m_data;
+    QTemporaryDir m_config; // XDG_CONFIG_HOME des Kerns (kern.ini), bleibt über Neustarts
     std::unique_ptr<QTemporaryDir> m_run;
     QString m_socket;
     std::unique_ptr<QProcess> m_core;
@@ -119,7 +121,7 @@ private:
 
     bool startCore()
     {
-        m_core = testhelp::startCore(m_data.path(), m_socket);
+        m_core = testhelp::startCore(m_data.path(), m_socket, m_config.path());
         m_coreLog.clear();
         return waitForLog(m_core.get(), QStringLiteral("Verbindung offen"), &m_coreLog);
     }
@@ -183,7 +185,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 4); // seit P09b
+        QCOMPARE(c->coreHello().protocolVersion, 5); // seit P10-vor
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -351,6 +353,149 @@ private slots:
         QCOMPARE(changedB.count(), 0);
     }
 
+    // P10-vor, Teil A 3: Einstellungen über die Schnittstelle lesen und ändern. Der Kern hat
+    // kern.ini beim Start im eigenen XDG_CONFIG_HOME angelegt und die Adresse eingetragen.
+    void settingsReadAndChange()
+    {
+        const QString path = m_config.filePath(QFileInfo(coreSettingsPath()).dir().dirName()
+                                               + QStringLiteral("/kern.ini"));
+        QVERIFY2(QFile::exists(path), qPrintable(path));
+        const QString detected = detectHomeAddress();
+        QVERIFY(m_coreLog.contains(QStringLiteral("Einstellungen: %1 angelegt").arg(path)));
+        if (!detected.isEmpty())
+            QVERIFY(m_coreLog.contains(QStringLiteral("Einstellungen: Adresse im Heimnetz %1 eingetragen")
+                                           .arg(detected)));
+
+        RawConnection one(m_socket);
+        RawConnection two(m_socket);
+        one.hello(QStringLiteral("dss-app"));
+        two.hello(QStringLiteral("dss-cli"));
+        QVERIFY(!one.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        QVERIFY(!two.waitFor(QStringLiteral("overlay_list")).isEmpty());
+        one.sendLine("{\"type\":\"get_settings\"}");
+        SettingsInfo info;
+        QString error;
+        QVERIFY2(parseSettings(one.waitFor(QStringLiteral("settings")), &info, &error), qPrintable(error));
+        QCOMPARE(info, (SettingsInfo{{defaultCoreSettings().port, detected}, 1024, 32767, path, QString()}));
+
+        // Ungültige Werte: abgewiesen mit Meldung, Datei unverändert, keine Nachricht an andere.
+        const QByteArray before = [&] {
+            QFile f(path);
+            return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+        }();
+        const QList<QPair<QByteArray, QString>> invalid = {
+            {"{\"type\":\"update_settings\",\"request_id\":1,\"port\":80}", QStringLiteral("Port 80 ungültig")},
+            {"{\"type\":\"update_settings\",\"request_id\":2,\"port\":40000}", QStringLiteral("Port 40000 ungültig")},
+            {"{\"type\":\"update_settings\",\"request_id\":3,\"home_address\":\"192.168.1\"}",
+             QStringLiteral("Adresse «192.168.1» ungültig")},
+            {"{\"type\":\"update_settings\",\"request_id\":4,\"port\":9000,\"home_address\":\"127.0.0.1\"}",
+             QStringLiteral("keine Adresse im Heimnetz")},
+            {"{\"type\":\"update_settings\",\"request_id\":5}", QStringLiteral("ohne port und home_address")},
+        };
+        for (const auto &[line, text] : invalid) {
+            one.sendLine(line);
+            ChangeResult r;
+            QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &r, &error));
+            QVERIFY2(!r.ok, line.constData());
+            QVERIFY2(r.message.contains(text), qPrintable(r.message));
+        }
+        QCOMPARE([&] { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }(), before);
+        QVERIFY(two.waitFor(QStringLiteral("settings"), 300).isEmpty());
+
+        // Gültig: Antwort an den Absender, neue Werte an alle, Datei geschrieben.
+        one.sendLine("{\"type\":\"update_settings\",\"request_id\":6,\"port\":9000,\"home_address\":\"10.0.0.2\"}");
+        ChangeResult r;
+        QVERIFY(parseChangeResult(one.waitFor(QStringLiteral("change_result")), &r, &error));
+        QVERIFY2(r.ok, qPrintable(r.message));
+        QCOMPARE(r.requestId, 6);
+        SettingsInfo broadcast;
+        QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
+        QCOMPARE(broadcast.settings, (CoreSettings{9000, QStringLiteral("10.0.0.2")}));
+        // Der Absender bekommt die neuen Werte wie alle, vor change_result (wie bei Änderungen an
+        // Overlays, docs/08 «Einstellungen»).
+        QVERIFY2(one.allLines().contains("\"port\":9000,\"port_max\":32767"), one.allLines().constData());
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::ReadOnly));
+            CoreSettings stored;
+            QVERIFY(parseCoreSettings(f.readAll(), defaultCoreSettings(), &stored, &error));
+            QCOMPARE(stored, (CoreSettings{9000, QStringLiteral("10.0.0.2")}));
+        }
+        QVERIFY(waitForLog(m_core.get(), QStringLiteral("Einstellungen geändert: Port 9000, Adresse im Heimnetz 10.0.0.2"),
+                           &m_coreLog));
+
+        // dss-cli über dieselbe Verbindung
+        CliResult cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellungen")});
+        QCOMPARE(cli.exitCode, 0);
+        QVERIFY2(cli.out.contains(QStringLiteral("9000 (erlaubt 1024 bis 32767)")), qPrintable(cli.out));
+        QVERIFY(cli.out.contains(QStringLiteral("10.0.0.2")));
+        QVERIFY(cli.out.contains(QStringLiteral("Kern")));
+        cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
+                                     QStringLiteral("1023")});
+        QCOMPARE(cli.exitCode, 1);
+        QVERIFY2(cli.err.contains(QStringLiteral("Port 1023 ungültig")), qPrintable(cli.err));
+        cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
+                                     QStringLiteral("acht")});
+        QCOMPARE(cli.exitCode, 1);
+        cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
+                                     QString::number(defaultCoreSettings().port)});
+        QCOMPARE(cli.exitCode, 0);
+        QVERIFY(cli.out.startsWith(QStringLiteral("Port: %1\n").arg(defaultCoreSettings().port)));
+        cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-adresse"),
+                                     detected});
+        QCOMPARE(cli.exitCode, 0);
+        QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
+        QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
+        QCOMPARE(broadcast.settings, (CoreSettings{defaultCoreSettings().port, detected}));
+        // Ohne Kern: ändern geht nicht (Exit 4)
+        cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_run->filePath(QStringLiteral("keiner.sock")),
+                                     QStringLiteral("einstellung-port"), QStringLiteral("9000")});
+        QCOMPARE(cli.exitCode, 4);
+        QVERIFY2(cli.err.contains(QStringLiteral("ändert nur der Kern")), qPrintable(cli.err));
+    }
+
+    // Ungültige kern.ini: Kern startet mit Standardwerten, meldet den Fehler, schreibt die Datei
+    // nicht und weist Änderungen ab.
+    void invalidSettingsFile()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        const QString dir = config.filePath(QFileInfo(coreSettingsPath()).dir().dirName());
+        QVERIFY(QDir().mkpath(dir));
+        const QString path = dir + QStringLiteral("/kern.ini");
+        const QByteArray broken("[overlay-server]\nport=99999\n");
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(broken);
+        }
+        const QString socket = m_run->filePath(QStringLiteral("ungueltig.sock"));
+        auto core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("Port 99999 ungültig")), qPrintable(log));
+        QVERIFY(!log.contains(QStringLiteral("eingetragen")));
+        RawConnection c(socket);
+        c.hello(QStringLiteral("dss-app"));
+        c.sendLine("{\"type\":\"get_settings\"}");
+        SettingsInfo info;
+        QString error;
+        QVERIFY(parseSettings(c.waitFor(QStringLiteral("settings")), &info, &error));
+        QCOMPARE(info.settings, defaultCoreSettings());
+        QVERIFY2(info.error.contains(QStringLiteral("Port 99999 ungültig")), qPrintable(info.error));
+        c.sendLine("{\"type\":\"update_settings\",\"request_id\":1,\"port\":9000}");
+        ChangeResult r;
+        QVERIFY(parseChangeResult(c.waitFor(QStringLiteral("change_result")), &r, &error));
+        QVERIFY(!r.ok);
+        QVERIFY2(r.message.contains(QStringLiteral("von Hand reparieren")), qPrintable(r.message));
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        QCOMPARE(core->exitCode(), 0);
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(f.readAll(), broken);
+    }
+
     void quitRefusedWhileOtherWindowConnected()
     {
         RawConnection one(m_socket);
@@ -383,6 +528,10 @@ private slots:
         QVERIFY(c->statusText().contains(QStringLiteral("Verbindung zum Kern verloren")));
 
         QVERIFY2(startCore(), qPrintable(m_coreLog)); // übrig gebliebener Socket und Sperre
+        // kern.ini steht schon: nicht neu anlegen, Adresse nicht neu ermitteln (P10-vor)
+        QVERIFY2(m_coreLog.contains(QStringLiteral("Einstellungen: Port ")), qPrintable(m_coreLog));
+        QVERIFY(!m_coreLog.contains(QStringLiteral("angelegt")));
+        QVERIFY(!m_coreLog.contains(QStringLiteral("eingetragen")));
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         QCOMPARE(connectedSpy.count(), 3); // verbunden, getrennt, wieder verbunden

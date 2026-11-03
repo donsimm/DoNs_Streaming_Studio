@@ -136,7 +136,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 4); // seit P09b
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 5); // seit P10-vor
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -451,6 +451,55 @@ private slots:
             QVERIFY(parseError(o, &back, &error));
             QCOMPARE(back, e);
         }
+    }
+
+    // P10-vor: Einstellungen des Kerns
+    void settingsMessages()
+    {
+        const SettingsInfo info{{8081, QStringLiteral("192.168.1.9")}, 1024, 32767,
+                                QStringLiteral("/tmp/kern.ini"), QString()};
+        const QJsonObject o = settingsMessage(info);
+        QCOMPARE(QString::fromUtf8(encodeMessage(o)),
+                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.9\",\"port\":8081,"
+                                "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
+                                "\"type\":\"settings\"}\n"));
+        SettingsInfo back;
+        QString error;
+        QVERIFY2(parseSettings(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        QJsonObject bad = o;
+        bad.insert(QStringLiteral("settings_error"), 3);
+        QVERIFY(!parseSettings(bad, &back, &error));
+        bad = o;
+        bad.remove(QStringLiteral("home_address"));
+        QVERIFY(!parseSettings(bad, &back, &error));
+
+        SettingsUpdate update;
+        update.requestId = 7;
+        update.port = 8090;
+        QCOMPARE(QString::fromUtf8(encodeMessage(settingsUpdateMessage(update))),
+                 QStringLiteral("{\"port\":8090,\"request_id\":7,\"type\":\"update_settings\"}\n"));
+        SettingsUpdate parsed;
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(update), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, update);
+        update.port.reset();
+        update.homeAddress = QString();
+        QVERIFY(parseSettingsUpdate(settingsUpdateMessage(update), &parsed, &error));
+        QCOMPARE(parsed.homeAddress, std::optional<QString>(QString()));
+        // ohne Wert, Port keine ganze Zahl
+        QVERIFY(!parseSettingsUpdate(QJsonObject{{QStringLiteral("type"), QStringLiteral("update_settings")},
+                                                 {QStringLiteral("request_id"), 1}},
+                                     &parsed, &error));
+        QVERIFY(!parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                 {QStringLiteral("port"), 80.5}},
+                                     &parsed, &error));
+        QVERIFY(!parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                 {QStringLiteral("home_address"), 1}},
+                                     &parsed, &error));
+        // Bereich prüft erst der Kern
+        QVERIFY(parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                {QStringLiteral("port"), 80}},
+                                    &parsed, &error));
     }
 };
 

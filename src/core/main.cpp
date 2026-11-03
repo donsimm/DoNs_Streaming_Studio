@@ -5,6 +5,7 @@
 
 #include "configpaths.h"
 #include "coreservice.h"
+#include "coresettings.h"
 #include "dataformat.h"
 #include "datalock.h"
 #include "logging.h"
@@ -114,8 +115,14 @@ int main(int argc, char *argv[])
         QStringLiteral("Dateien in älterem Format ins aktuelle umwandeln und beenden (P10a). Nur "
                        "bei angehaltenem Kern. Exit-Code 0 = erledigt, 3 = Kern läuft, 1 = Fehler "
                        "(Dateien unverändert)."));
+    const QCommandLineOption settingsOption(
+        QStringLiteral("einstellungen"),
+        QStringLiteral("Datei der Einstellungen des Kerns (Standard: ~/.config/%1/kern.ini).")
+            .arg(dss::appDirName()),
+        QStringLiteral("PFAD"));
     parser.addOption(versionOption);
     parser.addOption(dataDirOption);
+    parser.addOption(settingsOption);
     parser.addOption(connectionOption);
     parser.addOption(checkFormatOption);
     parser.addOption(convertOption);
@@ -168,6 +175,21 @@ int main(int argc, char *argv[])
               cleanup.count, static_cast<long long>(cleanup.bytes));
     }
 
+    // Einstellungen (P10-vor): kern.ini lesen, eine fehlende Adresse im Heimnetz einmal aus der
+    // Standardroute eintragen.
+    dss::CoreSettingsStore settings(parser.isSet(settingsOption) ? parser.value(settingsOption)
+                                                                 : dss::coreSettingsPath(),
+                                    dss::defaultCoreSettings());
+    {
+        QStringList log;
+        QStringList warnings;
+        settings.load(&log, &warnings);
+        for (const QString &line : log)
+            qInfo("%s", qPrintable(line));
+        for (const QString &line : warnings)
+            qWarning("%s", qPrintable(line));
+    }
+
     dss::OverlayStore store(dataDir);
 #if DSS_MEDIA_SIZE
     // Grösse neuer Bild- und Videoquellen aus der Datei (P09, Entscheid 6)
@@ -184,7 +206,7 @@ int main(int argc, char *argv[])
     qInfo("Datenordner %s: %lld Overlays geladen", qPrintable(store.dataDir()),
           static_cast<long long>(store.overlays().size()));
 
-    CoreService service(&store, socketPath);
+    CoreService service(&store, socketPath, &settings);
     switch (service.listen(&error)) {
     case CoreService::ListenResult::Ok:
         break;

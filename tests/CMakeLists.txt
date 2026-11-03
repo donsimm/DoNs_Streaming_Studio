@@ -44,6 +44,9 @@ dss_add_test(tst_protocol)
 dss_add_test(tst_windowdata)
 dss_add_test(tst_systemstats)
 target_compile_definitions(tst_systemstats PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
+# P10-vor: Einstellungen des Kerns (kern.ini), ohne Qt Gui.
+dss_add_test(tst_kerneinstellungen)
+target_compile_definitions(tst_kerneinstellungen PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
 
 # P07: Tests mit dss-core (und dss-cli) als eigenen Prozessen, eigener Datenordner und eigene
 # Verbindung in $XDG_RUNTIME_DIR. Nur Qt Core, Network und Test.
@@ -56,8 +59,9 @@ endif()
 add_dependencies(tst_sperre dss-core)
 dss_add_test(tst_kernverbindung)
 target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_CLI_BIN="$<TARGET_FILE:dss-cli>"
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
-add_dependencies(tst_kernverbindung dss-core)
+add_dependencies(tst_kernverbindung dss-core dss-cli)
 
 # P10a, Teil B 4: Datenformate prüfen und umwandeln, mit Testdaten im Format 1 bis 3
 dss_add_test(tst_datenformat)

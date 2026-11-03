@@ -1,6 +1,7 @@
 #pragma once
 
 #include "connectionstate.h"
+#include "coresettings.h"
 #include "fontcatalog.h"
 #include "overlay.h"
 #include "overlaylist.h"
@@ -26,8 +27,9 @@ namespace dss {
 // im Format 2 der Overlay-Datei (video.hold_at_end), set_overlay_size
 // 4 seit P09b: Overlays im Format 3 (flip_horizontal, flip_vertical); overlay und
 //   overlay_changed mit media_sizes (Originalgrösse der Dateien)
+// 5 seit P10-vor: Einstellungen des Kerns (get_settings, settings, update_settings)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 4;
+inline constexpr int kProtocolVersion = 5;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -69,6 +71,10 @@ inline constexpr char kSetTextFont[] = "set_text_font";
 inline constexpr char kReplaceImageFile[] = "replace_image_file";
 // P09: Auflösung eines Overlays (Entscheid 5)
 inline constexpr char kSetOverlaySize[] = "set_overlay_size";
+// P10-vor: Einstellungen des Kerns (kern.ini)
+inline constexpr char kGetSettings[] = "get_settings";
+inline constexpr char kSettings[] = "settings";
+inline constexpr char kUpdateSettings[] = "update_settings";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -250,5 +256,33 @@ struct ChangeResult
 };
 QJsonObject changeResultMessage(const ChangeResult &result);
 bool parseChangeResult(const QJsonObject &message, ChangeResult *result, QString *error);
+
+// settings (P10-vor): Einstellungen des Kerns, Antwort auf get_settings und nach jeder Änderung an
+// alle. portMin/portMax: gültiger Bereich (das Fenster stellt sein Zahlenfeld danach ein).
+struct SettingsInfo
+{
+    CoreSettings settings;
+    int portMin = kPortMin;
+    int portMax = kPortMax;
+    QString file;  // Pfad von kern.ini
+    QString error; // Datei ungültig (Änderungen werden abgewiesen); leer, wenn gültig
+
+    bool operator==(const SettingsInfo &) const = default;
+};
+QJsonObject settingsMessage(const SettingsInfo &info);
+bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *error);
+
+// update_settings (P10-vor): nur angegebene Werte ändern sich, mindestens einer. Antwort wie bei
+// Änderungen: change_result (ungültiger Wert: ok false, code rejected, Meldung des Kerns).
+struct SettingsUpdate
+{
+    qint64 requestId = 0;
+    std::optional<int> port;
+    std::optional<QString> homeAddress;
+
+    bool operator==(const SettingsUpdate &) const = default;
+};
+QJsonObject settingsUpdateMessage(const SettingsUpdate &update);
+bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QString *error);
 
 } // namespace dss
