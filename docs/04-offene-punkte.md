@@ -199,3 +199,4 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 ## Entschieden für P10 (2026-11-03)
 
 - Port des Overlay-Servers: Standard 8080, änderbar in einer Einstellung. Ist der Port beim Start belegt, meldet der Kern das deutlich im Fenster (nicht still ohne Server weiterlaufen).
+- Start eines Videos in der Browserquelle: immer von vorne, beim Einblenden der Quelle (Punkt 53), beim Laden oder Neuladen der Seite durch OBS und beim Einschalten der Ausgabe (E-24). Die Browserquelle spielt unabhängig vom Editor ab, nicht zeitgleich mit ihm.
