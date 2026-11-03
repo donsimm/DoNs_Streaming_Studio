@@ -26,6 +26,10 @@ target_link_libraries(dss_app_ui PUBLIC dss_common Qt6::Widgets PRIVATE dss_warn
 # Bearbeiten im Fenster (P08, CLAUDE.md Regel 8). Aus: Docks nur zur Anzeige wie in P07.
 option(DSS_APP_EDITING "Bearbeiten im Fenster (P08)" ON)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_EDITING=$<BOOL:${DSS_APP_EDITING}>)
+# Befehle «Transformieren» wie OBS (P09b, E-25): Menü «Bearbeiten», Rechtsklick auf Leinwand und
+# Dock «Quellen». Aus: Menü «Bearbeiten» leer und ausgegraut, kein Rechtsklick auf der Leinwand.
+option(DSS_APP_TRANSFORM "Befehle Transformieren im Fenster (P09b)" ON)
+target_compile_definitions(dss_app_ui PUBLIC DSS_APP_TRANSFORM=$<BOOL:${DSS_APP_TRANSFORM}>)
 
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
 if(DSS_APP_RENDERER)

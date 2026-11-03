@@ -26,6 +26,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QContextMenuEvent>
 #include <QDialog>
 #include <QDockWidget>
 #include <QDoubleSpinBox>
@@ -95,6 +96,20 @@ void sendMouse(QWidget *w, QEvent::Type type, QPointF pos, Qt::MouseButton butto
 }
 
 // Ziehen von a nach b (Pixel des Widgets) in einigen Schritten.
+} // namespace
+
+namespace QTest {
+template <>
+char *toString(const dss::SourceGeometry &g)
+{
+    return qstrdup(QStringLiteral("(%1, %2, %3x%4, %5, h%6 v%7)")
+                       .arg(g.x).arg(g.y).arg(g.width).arg(g.height).arg(g.rotation)
+                       .arg(g.flipHorizontal).arg(g.flipVertical).toUtf8().constData());
+}
+} // namespace QTest
+
+namespace {
+
 void drag(QWidget *w, QPointF a, QPointF b, Qt::KeyboardModifiers modifiers = {})
 {
     sendMouse(w, QEvent::MouseButtonPress, a, Qt::LeftButton, Qt::LeftButton, modifiers);
@@ -836,6 +851,159 @@ private slots:
         sendMouse(canvas, QEvent::MouseButtonRelease, b, Qt::LeftButton, Qt::NoButton, {});
         QTRY_VERIFY_WITH_TIMEOUT(std::abs(sourceAtRow(2).x - 300) <= 2, 3000);
         QCOMPARE(x->value(), sourceAtRow(2).x);
+    }
+
+    // P09b, Entscheid 5 (E-25): Befehle «Transformieren» im Menü «Bearbeiten» und per Rechtsklick,
+    // an zwei Quellen und über zwei Overlays (kopieren in «Test Szene», einfügen in «Chat Ecke»).
+    void transformCommands()
+    {
+        if (!DSS_APP_EDITING || !DSS_APP_TRANSFORM || !DSS_APP_CANVAS_EDIT)
+            QSKIP("Schalter DSS_APP_EDITING, DSS_APP_TRANSFORM oder DSS_APP_CANVAS_EDIT ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        auto *menu = m_window->findChild<QMenu *>(QStringLiteral("transformMenu"));
+        QVERIFY(menu);
+        QStringList texts;
+        for (const QAction *a : menu->actions())
+            texts.append(a->isSeparator() ? QStringLiteral("-") : QString(a->text()).remove(QLatin1Char('&')));
+        QCOMPARE(texts, (QStringList{
+            QStringLiteral("Transformation kopieren"), QStringLiteral("Transformation einfügen"),
+            QStringLiteral("Transformation zurücksetzen"), QStringLiteral("-"),
+            QStringLiteral("90° im Uhrzeigersinn drehen"), QStringLiteral("90° gegen den Uhrzeigersinn drehen"),
+            QStringLiteral("180° drehen"), QStringLiteral("-"), QStringLiteral("Waagrecht spiegeln"),
+            QStringLiteral("Senkrecht spiegeln"), QStringLiteral("-"), QStringLiteral("An Leinwand anpassen"),
+            QStringLiteral("Auf Leinwand strecken"), QStringLiteral("Auf Leinwand zentrieren"),
+            QStringLiteral("Senkrecht zentrieren"), QStringLiteral("Waagrecht zentrieren")}));
+        const auto action = [this](const char *name) {
+            QAction *a = m_window->findChild<QAction *>(QString::fromLatin1(name));
+            if (!a)
+                qFatal("Aktion %s fehlt", name);
+            return a;
+        };
+        const Source image = sourceAtRow(2);
+        const Source video = sourceAtRow(1);
+        // Lage über die zweite Verbindung setzen und warten, bis auch das Fenster sie hat (die
+        // Befehle rechnen mit dem Stand des Fensters).
+        const auto place = [&](const Source &s, const QUuid &overlay, int x, int y, int w, int h, int r) {
+            SourceChanges c;
+            c.x = x;
+            c.y = y;
+            c.width = w;
+            c.height = h;
+            c.rotation = r;
+            c.flipHorizontal = false;
+            c.flipVertical = false;
+            m_check->sendChange(sourceUpdate(overlay, s.id, c));
+            const SourceGeometry expected{x, y, w, h, r, false, false};
+            const auto inWindow = [&] {
+                const std::optional<Overlay> o = m_client->overlay(overlay);
+                const Source *found = o ? findSource(*o, s.id) : nullptr;
+                return found && geometryOf(*found) == expected;
+            };
+            QTRY_VERIFY_WITH_TIMEOUT(inWindow(), 3000);
+        };
+        place(image, m_scene, 100, 100, 400, 200, 0);
+        place(video, m_scene, 1200, 600, 300, 300, 0);
+        const auto geometryAt = [this](int row) { return geometryOf(sourceAtRow(row)); };
+
+        // Ohne Auswahl ausgegraut, Einfügen erst nach dem Kopieren
+        child<SourceList>("sourceList")->setCurrentRow(-1);
+        QTRY_VERIFY_WITH_TIMEOUT(!action("transformReset")->isEnabled(), 2000);
+        QVERIFY(!action("transformCopy")->isEnabled());
+        selectSourceRow(2);
+        QTRY_VERIFY_WITH_TIMEOUT(action("transformReset")->isEnabled(), 2000);
+        QVERIFY(!action("transformPaste")->isEnabled());
+
+        // Bild: 90° im Uhrzeigersinn, linke obere Ecke des umschliessenden Kastens bleibt (100, 100)
+        action("transformRotate90Clockwise")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(2), (SourceGeometry{0, 200, 400, 200, 900, false, false}), 3000);
+        action("transformFlipHorizontal")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(2), (SourceGeometry{0, 200, 400, 200, 900, true, false}), 3000);
+        action("transformCopy")->trigger();
+        QVERIFY(action("transformPaste")->isEnabled());
+
+        // Video: einfügen, dann die übrigen Befehle
+        selectSourceRow(1);
+        action("transformPaste")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), (SourceGeometry{0, 200, 400, 200, 900, true, false}), 3000);
+        action("transformReset")->trigger();
+#if DSS_MEDIA_SIZE
+        const SourceGeometry reset{0, 0, 512, 512, 0, false, false}; // alpha.webm ist 512x512
+        const SourceGeometry fit{420, 0, 1080, 1080, 0, false, false};
+#else
+        const SourceGeometry reset{0, 0, 400, 200, 0, false, false}; // Grösse unbekannt: bleibt
+        const SourceGeometry fit{0, 60, 1920, 960, 0, false, false};
+#endif
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), reset, 3000);
+        action("transformFit")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), fit, 3000);
+        action("transformStretch")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), (SourceGeometry{0, 0, 1920, 1080, 0, false, false}), 3000);
+        place(video, m_scene, 10, 20, 300, 300, 450);
+        action("transformCenterVertically")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), (SourceGeometry{10, 390, 300, 300, 450, false, false}), 3000);
+        action("transformCenterHorizontally")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1), (SourceGeometry{810, 390, 300, 300, 450, false, false}), 3000);
+        action("transformRotate180")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1).rotation, 2250, 3000);
+        action("transformRotate90CounterClockwise")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1).rotation, 1350, 3000);
+        action("transformFlipVertical")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryAt(1).flipVertical, true, 3000);
+        place(video, m_scene, 1200, 600, 300, 300, 0);
+
+        // Über zwei Overlays: Bildquelle in «Chat Ecke» (800x600), kopierte Werte einfügen
+        QUuid chat;
+        for (const OverlaySummary &o : m_check->overlays()) {
+            if (o.name == QStringLiteral("Chat Ecke"))
+                chat = o.id;
+        }
+        QVERIFY(!chat.isNull());
+        ChangeRequest add;
+        add.type = QString::fromLatin1(msg::kAddImageSource);
+        add.overlayId = chat;
+        add.file = kMediaDir + QStringLiteral("/bild1.png");
+        m_check->sendChange(add);
+        QTRY_COMPARE_WITH_TIMEOUT(checked(chat).sources.size(), qsizetype(1), 3000);
+        selectOverlayNamed(QStringLiteral("Chat Ecke"));
+        selectSourceRow(0);
+        QTRY_VERIFY_WITH_TIMEOUT(action("transformPaste")->isEnabled(), 2000);
+        action("transformPaste")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(checked(chat).sources.first()),
+                                  (SourceGeometry{0, 200, 400, 200, 900, true, false}), 3000);
+        // Zentrieren mit der Auflösung dieses Overlays: (800 - 400) / 2, (600 - 200) / 2
+        action("transformCenter")->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(geometryOf(checked(chat).sources.first()),
+                                  (SourceGeometry{200, 200, 400, 200, 900, true, false}), 3000);
+
+        // Rechtsklick auf der Leinwand wählt die Quelle darunter und zeigt «Transformieren»;
+        // ebenso im Dock «Quellen».
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(1);
+        const auto popupTexts = [](QWidget *target, QPoint position) {
+            QStringList seen;
+            QTimer::singleShot(300, target, [&seen] {
+                if (auto *popup = qobject_cast<QMenu *>(QApplication::activePopupWidget())) {
+                    for (const QAction *a : popup->actions())
+                        seen.append(QString(a->text()).remove(QLatin1Char('&')));
+                    popup->close();
+                }
+            });
+            QContextMenuEvent event(QContextMenuEvent::Mouse, position, target->mapToGlobal(position));
+            QApplication::sendEvent(target, &event);
+            return seen;
+        };
+        CanvasWidget *canvas = m_window->canvas();
+        // Bild: 400x200 um 90° gedreht bei (0, 200), Mitte (200, 300)
+        const QStringList canvasMenu =
+            popupTexts(canvas, canvas->toWidget(QPointF(200, 300)).toPoint());
+        QCOMPARE(child<SourceList>("sourceList")->currentRow(), 2);
+        QVERIFY2(canvasMenu.contains(QStringLiteral("Transformieren")), qPrintable(canvasMenu.join(u'|')));
+        QVERIFY(canvasMenu.contains(QStringLiteral("Umbenennen …")));
+        auto *list = child<SourceList>("sourceList");
+        const QStringList listMenu = popupTexts(list->viewport(), list->visualItemRect(list->item(1)).center());
+        QCOMPARE(list->currentRow(), 1);
+        QVERIFY2(listMenu.contains(QStringLiteral("Transformieren")), qPrintable(listMenu.join(u'|')));
+        place(image, m_scene, 100, 100, 400, 200, 0);
     }
 };
 

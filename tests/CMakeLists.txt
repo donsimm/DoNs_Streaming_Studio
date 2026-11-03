@@ -123,6 +123,8 @@ if(DSS_BUILD_APP)
   # Kern liest die Originalgrösse nur mit DSS_MEDIA_SIZE (P09b, Seitenverhältnis an den Ecken)
   if(DSS_MEDIA_SIZE)
     target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_MEDIA_SIZE=1)
+  else()
+    target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_MEDIA_SIZE=0)
   endif()
   add_dependencies(tst_fensterbearbeiten dss-core)
   add_test(NAME tst_fensterbearbeiten COMMAND tst_fensterbearbeiten)
@@ -137,6 +139,8 @@ dss_add_test(tst_sourcegeometry)
 target_compile_definitions(tst_sourcegeometry PRIVATE
   DSS_TEST_FONT_DATA="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften" DSS_TEST_FONT="${DSS_TEST_FONT}")
 dss_add_test(tst_canvasedit)
+# P09b: Befehle «Transformieren» wie OBS (E-25), ohne Qt Gui
+dss_add_test(tst_transform)
 # P09b: EXIF-Ausrichtung (Lesen und Rechnen), ohne Qt Gui; Bilder aus tests/daten/exif/erzeugen.py
 dss_add_test(tst_imageorientation)
 target_compile_definitions(tst_imageorientation PRIVATE

@@ -11,6 +11,7 @@
 #include "dockviews.h"
 #include "windowedit.h"
 
+#include <QAction>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
@@ -93,6 +94,9 @@ void MainWindow::connectEditing()
 {
     // Ziehen und Pfeiltasten auf der Leinwand (P09, Teil C)
     connect(m_canvas, &CanvasWidget::geometryEdited, this, &MainWindow::onCanvasGeometryEdited);
+#if DSS_APP_TRANSFORM
+    connect(m_canvas, &CanvasWidget::sourceMenuRequested, this, &MainWindow::showCanvasMenu);
+#endif
 
     // Overlays (Teil C)
     OverlayTree *tree = m_overlaysDock.tree;
@@ -483,32 +487,132 @@ void MainWindow::toggleVisibility(const QUuid &id)
 
 void MainWindow::showSourceMenu(const QPoint &position)
 {
-    const QListWidgetItem *item = m_sourcesDock.list->itemAt(position);
+    QListWidgetItem *item = m_sourcesDock.list->itemAt(position);
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    if (!m_client->isConnected() || !overlay)
+        return;
+    // Die Befehle «Transformieren» gelten der gewählten Quelle: zuerst wählen (wie OBS).
+    if (item && item != m_sourcesDock.list->currentItem())
+        m_sourcesDock.list->setCurrentItem(item);
+    QMenu menu(this);
+    fillSourceMenu(&menu, *overlay, item ? item->data(SourceList::kIdRole).toUuid() : QUuid());
+    menu.exec(m_sourcesDock.list->viewport()->mapToGlobal(position));
+}
+
+void MainWindow::fillSourceMenu(QMenu *menu, const dss::Overlay &overlay, const QUuid &id)
+{
+    if (const dss::Source *source = id.isNull() ? nullptr : dss::findSource(overlay, id)) {
+        menu->addAction(QStringLiteral("Umbenennen …"), this, [this, id] { renameSource(id); });
+        menu->addAction(source->visible ? QStringLiteral("Ausblenden") : QStringLiteral("Einblenden"),
+                        this, [this, id] { toggleVisibility(id); });
+        QAction *forward =
+            menu->addAction(QStringLiteral("Nach vorne"), this, [this, id] { stepSource(id, +1); });
+        forward->setEnabled(dss::sourceStepIndex(overlay, id, +1).has_value());
+        QAction *backward =
+            menu->addAction(QStringLiteral("Nach hinten"), this, [this, id] { stepSource(id, -1); });
+        backward->setEnabled(dss::sourceStepIndex(overlay, id, -1).has_value());
+        menu->addAction(QStringLiteral("Entfernen …"), this, [this, id] { removeSource(id); });
+        if (m_transformMenu) {
+            menu->addSeparator();
+            menu->addMenu(m_transformMenu);
+        }
+        menu->addSeparator();
+    }
+    menu->addAction(QStringLiteral("Bild hinzufügen …"), this, [this] { addMediaSource(false); });
+    menu->addAction(QStringLiteral("Video hinzufügen …"), this, [this] { addMediaSource(true); });
+    menu->addAction(QStringLiteral("Text hinzufügen"), this, &MainWindow::addTextSource);
+}
+
+// --- Transformieren (P09b, E-25) ---
+
+void MainWindow::createTransformMenu(QMenu *edit)
+{
+    // Reihenfolge und Trennlinien wie das Menü «Transformieren» in OBS (frontend/forms/OBSBasic.ui,
+    // Zeilen 774-795, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524); Texte nach de-DE.ini
+    // (Zeilen 652-666) mit «waagrecht/senkrecht» und «Leinwand» statt «Bildschirm».
+    // «Transformation bearbeiten …» (Dialog) gibt es nicht, die Werte stehen im Dock
+    // «Eigenschaften».
+    m_transformMenu = edit->addMenu(QStringLiteral("&Transformieren"));
+    m_transformMenu->setObjectName(QStringLiteral("transformMenu"));
+    m_copyTransform = m_transformMenu->addAction(QStringLiteral("Transformation &kopieren"), this,
+                                                 &MainWindow::copyTransform);
+    m_copyTransform->setObjectName(QStringLiteral("transformCopy"));
+    m_pasteTransform = m_transformMenu->addAction(QStringLiteral("Transformation &einfügen"), this,
+                                                  &MainWindow::pasteTransform);
+    m_pasteTransform->setObjectName(QStringLiteral("transformPaste"));
+    using C = dss::TransformCommand;
+    const struct
+    {
+        C command;
+        const char *text;
+        const char *name;
+        bool separatorBefore;
+    } entries[] = {
+        {C::Reset, "Transformation &zurücksetzen", "transformReset", false},
+        {C::Rotate90Clockwise, "90° im &Uhrzeigersinn drehen", "transformRotate90Clockwise", true},
+        {C::Rotate90CounterClockwise, "90° &gegen den Uhrzeigersinn drehen",
+         "transformRotate90CounterClockwise", false},
+        {C::Rotate180, "180° &drehen", "transformRotate180", false},
+        {C::FlipHorizontal, "&Waagrecht spiegeln", "transformFlipHorizontal", true},
+        {C::FlipVertical, "&Senkrecht spiegeln", "transformFlipVertical", false},
+        {C::FitToCanvas, "An Leinwand &anpassen", "transformFit", true},
+        {C::StretchToCanvas, "Auf Leinwand s&trecken", "transformStretch", false},
+        {C::CenterOnCanvas, "Auf Leinwand &zentrieren", "transformCenter", false},
+        {C::CenterVertically, "Senkrecht zentrieren", "transformCenterVertically", false},
+        {C::CenterHorizontally, "Waagrecht zentrieren", "transformCenterHorizontally", false},
+    };
+    for (const auto &e : entries) {
+        if (e.separatorBefore)
+            m_transformMenu->addSeparator();
+        QAction *a = m_transformMenu->addAction(QString::fromUtf8(e.text), this,
+                                                [this, c = e.command] { runTransform(c); });
+        a->setObjectName(QString::fromLatin1(e.name));
+        m_transformActions.append(a);
+    }
+    for (QAction *a : m_transformMenu->actions())
+        a->setEnabled(false);
+}
+
+void MainWindow::showCanvasMenu(const QUuid &id, const QPoint &globalPosition)
+{
     const std::optional<dss::Overlay> overlay = selectedOverlay();
     if (!m_client->isConnected() || !overlay)
         return;
     QMenu menu(this);
-    if (item) {
-        const QUuid id = item->data(SourceList::kIdRole).toUuid();
-        const dss::Source *source = dss::findSource(*overlay, id);
-        if (!source)
-            return;
-        menu.addAction(QStringLiteral("Umbenennen …"), this, [this, id] { renameSource(id); });
-        menu.addAction(source->visible ? QStringLiteral("Ausblenden") : QStringLiteral("Einblenden"),
-                       this, [this, id] { toggleVisibility(id); });
-        QAction *forward =
-            menu.addAction(QStringLiteral("Nach vorne"), this, [this, id] { stepSource(id, +1); });
-        forward->setEnabled(dss::sourceStepIndex(*overlay, id, +1).has_value());
-        QAction *backward =
-            menu.addAction(QStringLiteral("Nach hinten"), this, [this, id] { stepSource(id, -1); });
-        backward->setEnabled(dss::sourceStepIndex(*overlay, id, -1).has_value());
-        menu.addAction(QStringLiteral("Entfernen …"), this, [this, id] { removeSource(id); });
-        menu.addSeparator();
-    }
-    menu.addAction(QStringLiteral("Bild hinzufügen …"), this, [this] { addMediaSource(false); });
-    menu.addAction(QStringLiteral("Video hinzufügen …"), this, [this] { addMediaSource(true); });
-    menu.addAction(QStringLiteral("Text hinzufügen"), this, &MainWindow::addTextSource);
-    menu.exec(m_sourcesDock.list->viewport()->mapToGlobal(position));
+    fillSourceMenu(&menu, *overlay, id);
+    menu.exec(globalPosition);
+}
+
+void MainWindow::runTransform(dss::TransformCommand command)
+{
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
+    if (!editingAllowed() || !source)
+        return;
+    const dss::SourceGeometry g =
+        dss::transformGeometry(*source, command, QSize(overlay->width, overlay->height),
+                               dss::originalSize(*source, m_client->mediaSizes()));
+    // Wie das Ziehen auf der Leinwand: eine Änderung mit allen Werten, sofort gezeigt.
+    onCanvasGeometryEdited(source->id, g, true);
+}
+
+void MainWindow::copyTransform()
+{
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
+    if (!source)
+        return;
+    m_copiedTransform = dss::geometryOf(*source);
+    refreshActions();
+}
+
+void MainWindow::pasteTransform()
+{
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const dss::Source *source = overlay ? dss::findSource(*overlay, m_selectedSource) : nullptr;
+    if (!editingAllowed() || !source || !m_copiedTransform)
+        return;
+    onCanvasGeometryEdited(source->id, *m_copiedTransform, true);
 }
 
 void MainWindow::onSourceDropped(const QUuid &id, int insertRow)

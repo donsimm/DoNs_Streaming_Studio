@@ -4,9 +4,11 @@
 #include "connectionstate.h"
 #include "docks.h"
 #include "theme.h"
+#include "transform.h"
 #include "windowdata.h"
 
 #include <QHash>
+#include <QList>
 #include <QMainWindow>
 #include <QUuid>
 
@@ -15,6 +17,7 @@
 class CanvasWidget;
 class HeaderBar;
 class SourceRenderer;
+class QAction;
 class QLabel;
 class QListWidgetItem;
 class QMenu;
@@ -119,6 +122,14 @@ private:
     void stepSource(const QUuid &id, int step);
     void toggleVisibility(const QUuid &id);
     void showSourceMenu(const QPoint &position);
+    // Einträge für eine Quelle (Dock «Quellen» und Leinwand), danach die zum Hinzufügen.
+    void fillSourceMenu(QMenu *menu, const dss::Overlay &overlay, const QUuid &id);
+    // P09b (E-25): Befehle «Transformieren» an der gewählten Quelle (Schalter DSS_APP_TRANSFORM)
+    void createTransformMenu(QMenu *edit);
+    void showCanvasMenu(const QUuid &id, const QPoint &globalPosition);
+    void runTransform(dss::TransformCommand command);
+    void copyTransform();
+    void pasteTransform();
     void onSourceDropped(const QUuid &id, int insertRow);
     void updateSelectedSource(const dss::SourceChanges &changes, const QString &field);
     void onNameEdited();
@@ -136,6 +147,10 @@ private:
     Theme m_theme;
     bool m_keepLayout = false;
     QMenu *m_docksMenu = nullptr;
+    QMenu *m_transformMenu = nullptr;      // P09b, nur mit DSS_APP_TRANSFORM
+    QAction *m_copyTransform = nullptr;
+    QAction *m_pasteTransform = nullptr;
+    QList<QAction *> m_transformActions;   // alle Befehle ausser Kopieren und Einfügen
     QMenuBar *m_menuBar = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
@@ -164,6 +179,9 @@ private:
         bool dragging = false;
     };
     std::optional<GeometryPreview> m_geometryPreview;
+    // Kopierte Transformation (P09b, E-25): Zwischenablage des Fensters, nicht im Kern; gilt auch
+    // beim Einfügen in eine Quelle eines anderen Overlays.
+    std::optional<dss::SourceGeometry> m_copiedTransform;
     // Nach der Antwort auf diese Änderungen das neue Overlay bzw. die neue Quelle wählen.
     enum class SelectNew { Overlay, Source };
     QHash<qint64, SelectNew> m_selectOnResult;

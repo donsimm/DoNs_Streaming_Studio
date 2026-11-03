@@ -6,6 +6,7 @@
 #include "sourcerenderer.h"
 #endif
 
+#include <QContextMenuEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -157,6 +158,26 @@ void CanvasWidget::mousePressEvent(QMouseEvent *event)
     update();
 #else
     QWidget::mousePressEvent(event);
+#endif
+}
+
+void CanvasWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+#if DSS_APP_TRANSFORM
+    if (!m_overlay || fit().scale <= 0 || m_drag) {
+        QWidget::contextMenuEvent(event);
+        return;
+    }
+    const dss::CanvasPress press =
+        dss::canvasPress(*m_overlay, m_selected, overlayPoint(event->pos()), fit().scale);
+    if (press.sourceId != m_selected) {
+        m_selected = press.sourceId;
+        emit sourceClicked(press.sourceId);
+        update();
+    }
+    emit sourceMenuRequested(press.sourceId, event->globalPos());
+#else
+    QWidget::contextMenuEvent(event);
 #endif
 }
 

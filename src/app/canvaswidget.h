@@ -53,6 +53,9 @@ signals:
     void sourceClicked(const QUuid &id);
     // Neue Lage beim Ziehen bzw. mit den Pfeiltasten; finished beim Loslassen und bei Tasten.
     void geometryEdited(const QUuid &id, const dss::SourceGeometry &geometry, bool finished);
+    // P09b (E-25): Rechtsklick wählt die Quelle unter dem Zeiger (wie Klick) und will ihr Menü;
+    // id null = keine Quelle unter dem Zeiger.
+    void sourceMenuRequested(const QUuid &id, const QPoint &globalPosition);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -60,6 +63,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
 

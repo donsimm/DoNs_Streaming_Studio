@@ -13,6 +13,7 @@
 #include "version.h"
 #include "windowedit.h"
 
+#include <QAction>
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
@@ -80,8 +81,8 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
 
 void MainWindow::createMenus()
 {
-    // Nur Datei → Beenden, Docks und Hilfe → Über tun etwas; die übrigen Menüs sind
-    // noch leer und ausgegraut (Auftrag P05). Eigene Menüleiste, weil sie mit dem Kopfbereich
+    // Datei → Beenden, Bearbeiten → Transformieren (P09b), Docks und Hilfe → Über tun etwas;
+    // die übrigen Menüs sind noch leer und ausgegraut (Auftrag P05). Eigene Menüleiste, weil sie mit dem Kopfbereich
     // zusammen als Menü-Widget des Fensters steht (createHeader); menuBar() würde sie ersetzen.
     m_menuBar = new QMenuBar(this);
     QMenuBar *bar = m_menuBar;
@@ -90,8 +91,13 @@ void MainWindow::createMenus()
     quit->setShortcut(QKeySequence::Quit);
     quit->setMenuRole(QAction::QuitRole);
 
-    for (const QString &title : {QStringLiteral("&Bearbeiten"), QStringLiteral("&Ansicht")})
-        bar->addMenu(title)->setEnabled(false);
+    QMenu *edit = bar->addMenu(QStringLiteral("&Bearbeiten"));
+#if DSS_APP_TRANSFORM
+    createTransformMenu(edit);
+#else
+    edit->setEnabled(false);
+#endif
+    bar->addMenu(QStringLiteral("&Ansicht"))->setEnabled(false);
     m_docksMenu = bar->addMenu(QStringLiteral("D&ocks"));
     bar->addMenu(QStringLiteral("&Werkzeuge"))->setEnabled(false);
 
@@ -613,6 +619,13 @@ void MainWindow::refreshActions()
                                                        d.content, d.family, d.weight,
                                                        d.fontSize, d.color, d.align})
         w->setEnabled(edit && source);
+    // Transformieren (P09b): Kopieren geht auch ohne Bearbeiten, Einfügen nach dem Kopieren.
+    if (m_transformMenu) {
+        for (QAction *a : std::as_const(m_transformActions))
+            a->setEnabled(edit && source);
+        m_copyTransform->setEnabled(source != nullptr);
+        m_pasteTransform->setEnabled(edit && source && m_copiedTransform);
+    }
     // «Am Ende anhalten» ist mit «Wiederholen» ausgegraut (Entscheid 9).
     d.holdAtEnd->setEnabled(edit && source && !source->loop);
     m_controlDock.overlayWidth->setEnabled(edit && overlay);
