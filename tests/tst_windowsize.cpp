@@ -74,6 +74,18 @@ private slots:
             QCOMPARE(sum, total);
         }
     }
+
+    // P10a Teil A 1: Verbindungsknöpfe mittig zwischen Reitern und Leistungsanzeige.
+    void headerCentered()
+    {
+        QCOMPARE(headerCenteredX(200, 1300, 200), 650);  // je 450 links und rechts
+        QCOMPARE(headerCenteredX(200, 1301, 200), 650);  // Rest nach rechts
+        QCOMPARE(headerCenteredX(200, 400, 200), 200);   // genau Platz
+        QCOMPARE(headerCenteredX(200, 300, 200), 200);   // zu wenig Platz: ab den Reitern
+        QCOMPARE(headerCenteredX(200, 100, 200), 200);
+        QCOMPARE(headerCenteredX(0, 10, 0), 5);
+        QCOMPARE(headerCenteredX(10, 20, -4), 15);       // negative Breite wie 0
+    }
 };
 
 QTEST_GUILESS_MAIN(TestWindowSize)

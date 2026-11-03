@@ -20,4 +20,10 @@ int headerGaugesWidth(int windowWidth);
 // vorderen Anzeigen, die Summe ist immer total.
 int headerGaugeWidth(int total, int index);
 
+// Verbindungsknöpfe im Kopfbereich (P10a, Teil A 1): waagrecht in der Mitte zwischen dem Ende der
+// Modul-Reiter (leftEnd, erste freie Spalte) und dem Beginn der Leistungsanzeige (rightStart), Breite
+// width. Gibt die linke Kante; ist zu wenig Platz, beginnen die Knöpfe bei leftEnd (nie über den
+// Reitern). Ein Rest der Teilung geht nach rechts.
+int headerCenteredX(int leftEnd, int rightStart, int width);
+
 } // namespace dss

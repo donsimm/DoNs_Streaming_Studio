@@ -34,4 +34,10 @@ int headerGaugeWidth(int total, int index)
     return total / kHeaderGaugeCount + (index < total % kHeaderGaugeCount ? 1 : 0);
 }
 
+int headerCenteredX(int leftEnd, int rightStart, int width)
+{
+    const int free = rightStart - leftEnd - std::max(0, width);
+    return free <= 0 ? leftEnd : leftEnd + free / 2;
+}
+
 } // namespace dss

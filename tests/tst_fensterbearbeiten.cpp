@@ -479,6 +479,15 @@ private slots:
             QVERIFY2(left->x() + left->width() <= cpu->x(),
                      qPrintable(QStringLiteral("links bis %1, Anzeige ab %2")
                                     .arg(left->x() + left->width()).arg(cpu->x())));
+            // P10a Teil A 1: Verbindungsknöpfe mittig zwischen Reitern und Anzeige (Rest rechts)
+            const auto *buttons = header->findChild<QWidget *>(QStringLiteral("headerConnections"));
+            QVERIFY(buttons);
+            const int gapLeft = buttons->x() - (left->x() + left->width());
+            const int gapRight = cpu->x() - (buttons->x() + buttons->width());
+            QVERIFY2(gapLeft > 0 && (gapRight == gapLeft || gapRight == gapLeft + 1),
+                     qPrintable(QStringLiteral("Abstand links %1, rechts %2").arg(gapLeft).arg(gapRight)));
+            for (const QToolButton *b : buttons->findChildren<QToolButton *>())
+                QCOMPARE(b->iconSize(), QSize(19, 19));
         }
         m_window->resize(before);
     }
