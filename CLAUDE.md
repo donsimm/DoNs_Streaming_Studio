@@ -22,7 +22,7 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 6. Tests laufen mit echtem Fenstersystem (X11-Sitzung), nicht nur offscreen. Wo ein Start geprüft wird: mindestens 20 Starts, Exit-Code und sauberes Beenden prüfen.
 7. Tests nutzen echte Daten (Kopie davon) und, wo es einen Handtest gibt, dieselben Daten wie dieser.
 8. Ein Commit pro Funktion. Neue grössere Teile lassen sich per Schalter abschalten.
-9. Logik und Daten laufen ohne die Oberflächen-Bibliothek und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern.
+9. Logik und Daten laufen ohne die Oberflächen-Bibliothek und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern. Qt-Module werden genutzt, wo sie nötig sind; «ohne Oberflächen-Bibliothek» heisst ohne Qt Widgets und ohne Fenster. Zeichnen (`QPainter`, `QImage`, Schriften) darf Qt Gui nutzen; Tests des Zeichners laufen ohne Fenster (entschieden vom Nutzer, P10-vor, 2026-11-03).
 10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
 11. Lage und Grösse von Quellen sind ganze Pixel der Overlay-Auflösung, keine Prozentwerte.
 12. Zugangsdaten (Twitch-Token, OBS-Passwort) nie im Klartext in Konfiguration, Protokoll oder Tests.
