@@ -10,9 +10,9 @@ Auftrag: `prompts/P10-vor-vorarbeiten-browserquelle.md`. Teil A: Kern (Übernehm
 
 | Abnahme | Ergebnis |
 |---|---|
-| Bau ohne Warnungen mit `-Wall -Wextra`, jeder Schalter einzeln aus, Release | ja, 0 Warnungen: Arbeitsordner (Debug), frischer Klon Release, alle 13 Schalter einzeln aus, `DSS_INSTALLED_EDITION=ON` (`docs/berichte/P10-vor-daten/schalter-ergebnis.txt`). Der Bau mit `DSS_BUILD_CLI=OFF` scheiterte zuerst (Fehler von mir in `tests/CMakeLists.txt`), behoben in `319856f`, danach 0 Warnungen und `tst_kernverbindung` 17 von 17. Mit den drei neuen Schaltern aus lief auch `ctest` (siehe «Bau») |
-| `ctest`, auch im frischen Klon | Frischer Klon von `f475bb6` (Debug, 2026-11-03 22:44 bis 22:48): Bau Exit 0, 0 Warnungen, `ctest --output-on-failure` **35 von 35** (115,5 s). Release im frischen Klon von `a7ff729`: 34 von 35 (siehe «Bau») |
-| `tst_medien` und `tst_fensterbearbeiten` je 50 Mal | `tst_medien` 50 von 50. `tst_fensterbearbeiten` zuerst 48 von 50; beide Fehler im neuen Test für 1 GiB (Fehler im Test, siehe «Punkt 72»), nach der Korrektur `f475bb6` (2026-11-03 22:22 bis 22:39): **50 von 50** |
+| Bau ohne Warnungen mit `-Wall -Wextra`, jeder Schalter einzeln aus, Release | ja, 0 Warnungen: Arbeitsordner (Debug), frischer Klon Release, alle 13 Schalter einzeln aus, `DSS_INSTALLED_EDITION=ON` (`docs/berichte/P10-vor-daten/schalter-ergebnis.txt`). Der Bau mit `DSS_BUILD_CLI=OFF` scheiterte zuerst (Fehler von mir in `tests/CMakeLists.txt`), behoben in `ff816ef`, danach 0 Warnungen und `tst_kernverbindung` 17 von 17. Mit den drei neuen Schaltern aus lief auch `ctest` (siehe «Bau») |
+| `ctest`, auch im frischen Klon | Frischer Klon von `5728e96` (Debug, 2026-11-03 22:44 bis 22:48): Bau Exit 0, 0 Warnungen, `ctest --output-on-failure` **35 von 35** (115,5 s). Release im frischen Klon von `5dc96d4`: 34 von 35 (siehe «Bau») |
+| `tst_medien` und `tst_fensterbearbeiten` je 50 Mal | `tst_medien` 50 von 50. `tst_fensterbearbeiten` zuerst 48 von 50; beide Fehler im neuen Test für 1 GiB (Fehler im Test, siehe «Punkt 72»), nach der Korrektur `5728e96` (2026-11-03 22:22 bis 22:39): **50 von 50** |
 | Startprüfung `--runs 20` | **20 von 20** in allen 4 Fällen (`core-sigterm`, `core-sigint`, `app-sigterm`, `app-kern-sigterm`), Exit-Code 0, Fenster sichtbar, keine Reste, keine unerwarteten Zeilen, neue Zeile «Einstellungen: » erwartet und vorhanden |
 | Dokumente | nachgeführt: `docs/01-festlegungen.md` (Tabelle der Orte: `kern.ini`, Port, Bilder), `docs/04-offene-punkte.md` (67 bis 70 und 72 erledigt, neu 73 bis 77), `docs/07-bauplan.md`, `docs/08-kern-schnittstelle.md` (Version 5, «Übernehmen von Dateien», «Einstellungen», Watchdog), `README.md` (Ordner `src/render/`, Schalter, `kern.ini`, Optionen) |
 | Handtest | offen, 3 Prüfungen und Aufräumen (Abschnitt «Handtest») |
@@ -21,7 +21,7 @@ Auftrag: `prompts/P10-vor-vorarbeiten-browserquelle.md`. Teil A: Kern (Übernehm
 
 ### 1 – Übernehmen von Dateien im eigenen Thread (Punkt 67)
 
-Umsetzung (`src/common/mediaimport.h/.cpp`, `src/core/coreservice.cpp`, Commit `67261ad`):
+Umsetzung (`src/common/mediaimport.h/.cpp`, `src/core/coreservice.cpp`, Commit `a37fb2b`):
 
 - `importMediaFile` rechnet SHA-256 und kopiert stückweise zu 1 MiB mit `QSaveFile`; beim Kopieren wird der Inhalt ein zweites Mal gehasht (Datei während des Übernehmens geändert → abgewiesen). Zwischen den Stücken prüft es ein Abbruchzeichen.
 - `MediaImporter` (QThreadPool, **höchstens 2 Threads**: eine kleine Datei muss nicht hinter einer grossen warten; mehr Threads teilen sich nur dieselbe Platte) meldet das Ergebnis in den Thread des Kerns zurück. Erst dann prüft und ändert der Kern das Overlay in der Hauptschleife, verteilt es und schickt `change_result`. **Nur der Kern schreibt; Overlays und `liste.json` ändern sich nur in der Hauptschleife.**
@@ -69,7 +69,7 @@ Gemessen am 2026-11-03 20:29 (kleines Programm mit `QSaveFile`, Abbruch mit `_ex
 
 ### 3 – Einstellungen in `kern.ini`
 
-Commit `fcbd377`. Datei `<Ordner der Einstellungen der Version>/kern.ini` (`~/.config/dons-streaming-studio/` bzw. `~/.config/dons-streaming-studio-entwicklung/`), Abschnitt `[overlay-server]`, Angaben `port` und `adresse-im-heimnetz`. Nur der Kern schreibt sie, atomar mit `QSaveFile` (`src/common/coresettings.h/.cpp`). Aufbau und Nachrichten: `docs/08-kern-schnittstelle.md`, «Einstellungen».
+Commit `8596ead`. Datei `<Ordner der Einstellungen der Version>/kern.ini` (`~/.config/dons-streaming-studio/` bzw. `~/.config/dons-streaming-studio-entwicklung/`), Abschnitt `[overlay-server]`, Angaben `port` und `adresse-im-heimnetz`. Nur der Kern schreibt sie, atomar mit `QSaveFile` (`src/common/coresettings.h/.cpp`). Aufbau und Nachrichten: `docs/08-kern-schnittstelle.md`, «Einstellungen».
 
 - **Port:** Standard 8080 im Einsatz, 8081 in Arbeit. Gültig **1024 bis 32767**. Begründung: Unter 1024 braucht ein Port besondere Rechte (`/proc/sys/net/ipv4/ip_unprivileged_port_start` = 1024); ab 32768 vergibt Linux die Ports für ausgehende Verbindungen (`/proc/sys/net/ipv4/ip_local_port_range` = `32768 60999`), ein Port dort kann beim Start des Servers zufällig belegt sein. Gemessen am 2026-11-03 mit `cat` der beiden Dateien (`sysctl` ist nicht installiert). Quelle: ip(7).
 - **Adresse im Heimnetz:** Fehlt sie beim Start, trägt der Kern einmal die IPv4-Adresse der Netzwerkkarte der Standardroute ein und schreibt die Datei; danach ermittelt er sie nie neu (auch nicht beim Neustart, geprüft in `tst_kernverbindung::reconnectAfterKillAndRestart`). Standardroute: die erste Zeile in `/proc/net/route` mit Destination und Mask `00000000` und Flag `RTF_UP` (dieselbe Funktion `defaultRouteInterface` wie die LAN-Anzeige); Adresse: die erste IPv4-Adresse dieser Karte ausser 127.x.x.x und 169.254.x.x (`QNetworkInterface::interfaceFromName`). Heute ergibt das **192.168.1.9 auf enp3s0** (`tst_kerneinstellungen::detectOnThisMachine`, 2026-11-03). Ohne IPv4-Standardroute bleibt der Wert leer, Warnung «Einstellungen: keine Standardroute mit IPv4, Adresse im Heimnetz bleibt leer»; neuer Versuch beim nächsten Start.
@@ -85,11 +85,11 @@ Tests: `tst_kerneinstellungen` (48 von 48, ohne Qt Gui): Standardwerte je Versio
 
 ### 1 – Dialog «Werkzeuge → Einstellungen …»
 
-Commit `fac3600`. `src/app/settingsdialog.h/.cpp`, nicht blockierend (`open()`). Der Dialog fragt beim Öffnen `get_settings` an, stellt das Zahlenfeld auf den Bereich aus der Nachricht (1024 bis 32767), schickt bei «OK» nur geänderte Werte als `update_settings` (`settingsUpdateFromForm` in `src/common/windowdata.cpp`, getestet in `tst_windowdata::settingsForm`) und schliesst erst nach `change_result` `ok`. Eine Meldung des Kerns erscheint im Dialog (Platz für drei Zeilen von Anfang an, damit das Setzen des Textes das Layout nicht ändert, Regel 9). Hinweis im Dialog: «Port und Adresse gelten erst mit der Browserquelle (P10). …». Ohne Verbindung ist der Menüeintrag ausgegraut; im offenen Dialog steht dann «Keine Verbindung zum Kern …». Schalter `DSS_APP_SETTINGS_DIALOG`. Geprüft in `tst_fensterbearbeiten::settingsDialog` (Menü, Werte vom Kern, ungültige Adresse mit Meldung des Kerns und gleicher Höhe der Meldung, gültige Änderung kommt bei der zweiten Verbindung an, Abbrechen ändert nichts).
+Commit `415e02a`. `src/app/settingsdialog.h/.cpp`, nicht blockierend (`open()`). Der Dialog fragt beim Öffnen `get_settings` an, stellt das Zahlenfeld auf den Bereich aus der Nachricht (1024 bis 32767), schickt bei «OK» nur geänderte Werte als `update_settings` (`settingsUpdateFromForm` in `src/common/windowdata.cpp`, getestet in `tst_windowdata::settingsForm`) und schliesst erst nach `change_result` `ok`. Eine Meldung des Kerns erscheint im Dialog (Platz für drei Zeilen von Anfang an, damit das Setzen des Textes das Layout nicht ändert, Regel 9). Hinweis im Dialog: «Port und Adresse gelten erst mit der Browserquelle (P10). …». Ohne Verbindung ist der Menüeintrag ausgegraut; im offenen Dialog steht dann «Keine Verbindung zum Kern …». Schalter `DSS_APP_SETTINGS_DIALOG`. Geprüft in `tst_fensterbearbeiten::settingsDialog` (Menü, Werte vom Kern, ungültige Adresse mit Meldung des Kerns und gleicher Höhe der Meldung, gültige Änderung kommt bei der zweiten Verbindung an, Abbrechen ändert nichts).
 
 ### 2 – «Datei → Leinwand als Bild speichern»
 
-Commit `3105aee`.
+Commit `9342388`.
 
 - **Kürzel Strg+Umschalt+B.** Geprüft am 2026-11-03 21:04: `xfconf-query -c xfce4-keyboard-shortcuts -l -v` enthält kein Kürzel mit B (belegt sind unter anderem Print, Alt+Print, Shift+Print, Super+P/E/R, viele Strg+Alt, Strg+Umschalt+Escape, Strg+Umschalt+Alt+Pfeile); im Fenster sind Strg+Q, Strg+Umschalt+C/V, Strg+R/F/S/D belegt (`grep setShortcut src/app`). Im Test wirkt das Kürzel mit Fokus auf der Leinwand.
 - **Bild:** PNG in der Auflösung des Overlays (1920×1080 im Test), `QImage::Format_ARGB32_Premultiplied`, durchsichtig gefüllt, gezeichnet vom Zeichner der Leinwand mit Massstab 1 und Ecke (0,0). Schachbrett, Auswahlrahmen, Lineale und Zoom zeichnet nur `CanvasWidget`, nicht der Zeichner; sie können also nicht ins Bild kommen. Videos: das Bild, das der Zeichner gerade hält, also das der Leinwand. Gespeichert atomar mit `QSaveFile`.
@@ -111,7 +111,7 @@ Neu: `DSS_CORE_IMPORT_THREAD`, `DSS_APP_SETTINGS_DIALOG`, `DSS_APP_CANVAS_IMAGE`
 
 ### 1 – Programmordner leeren (Punkt 69)
 
-Commit `dec3587`. `scripts/installieren.sh` prüft das Ziel (nicht leer, nicht `/`, absolut) und löscht `<Ziel>/bin/` und `<Ziel>/share/dons-streaming-studio/` direkt vor `cmake --install`, also nach erfolgreichem Bau und Prüfen bzw. Umwandeln des Formats. Daten und `version.txt` (liegt in `<Ziel>/`) bleiben. Geprüft **nur mit den Testoptionen** (`docs/berichte/P10-vor-daten/installieren-pruefen.sh`, Ergebnis `installieren-ergebnis.txt`, 2026-11-03 20:35 bis 20:36; Ziel, Datenordner, Einheit `dss-core-installtest.service`, Menü- und Symbolordner im Scratch-Ordner, Daten aus `tests/daten/formate/`):
+Commit `0771d52`. `scripts/installieren.sh` prüft das Ziel (nicht leer, nicht `/`, absolut) und löscht `<Ziel>/bin/` und `<Ziel>/share/dons-streaming-studio/` direkt vor `cmake --install`, also nach erfolgreichem Bau und Prüfen bzw. Umwandeln des Formats. Daten und `version.txt` (liegt in `<Ziel>/`) bleiben. Geprüft **nur mit den Testoptionen** (`docs/berichte/P10-vor-daten/installieren-pruefen.sh`, Ergebnis `installieren-ergebnis.txt`, 2026-11-03 20:35 bis 20:36; Ziel, Datenordner, Einheit `dss-core-installtest.service`, Menü- und Symbolordner im Scratch-Ordner, Daten aus `tests/daten/formate/`):
 
 | Lauf | Ergebnis |
 |---|---|
@@ -123,14 +123,14 @@ Testeinheit danach entfernt.
 
 ### 2 – Zurückschreiben beim Umwandeln (Punkt 70)
 
-Commit `fad744a`. `dss::testing::setConvertFailWriteAt(n)` (`src/common/dataformattesting.h`, nur `tst_datenformat` bindet die Datei ein; im Programm bleibt der Wert 0 und die Prüfung `g_failWriteAt == i + 1` greift nie). `tst_datenformat::failedWriteRestoresFiles` mit «erste Datei» und «zweite Datei»: Nach dem Fehler sind alle Dateien Byte für Byte wie vorher; bei der zweiten Datei hat die erste eine neue Inode (geschrieben und zurückgeschrieben), danach gelingt das Umwandeln ohne Testfehler. Gegenprobe: Ohne das Zurückschreiben scheitert die Zeile «zweite Datei». 11 von 11.
+Commit `3c5f086`. `dss::testing::setConvertFailWriteAt(n)` (`src/common/dataformattesting.h`, nur `tst_datenformat` bindet die Datei ein; im Programm bleibt der Wert 0 und die Prüfung `g_failWriteAt == i + 1` greift nie). `tst_datenformat::failedWriteRestoresFiles` mit «erste Datei» und «zweite Datei»: Nach dem Fehler sind alle Dateien Byte für Byte wie vorher; bei der zweiten Datei hat die erste eine neue Inode (geschrieben und zurückgeschrieben), danach gelingt das Umwandeln ohne Testfehler. Gegenprobe: Ohne das Zurückschreiben scheitert die Zeile «zweite Datei». 11 von 11.
 
 ### 3 – `tst_fensterbearbeiten` 50 Mal (Punkt 72)
 
 Aufruf `docs/berichte/P10-vor-daten/wiederholen.sh build tst_fensterbearbeiten 50 <Ordner>` (je Lauf `ctest -R '^tst_fensterbearbeiten$' -V`, also mit derselben Umgebung wie `ctest`; vor jedem Lauf Prüfung der X11-Sitzung; bei einem Fehler wird die ganze Ausgabe gespeichert).
 
-- **Erster Durchgang** (Stand `319856f`, 2026-11-03 21:44 bis 22:02): 48 von 50. `headerGaugesWidth` (der Test aus Punkt 72) bestand alle 50 Male. Beide Fehler (Läufe 9 und 24) im neuen Test `usableWhileImportingLargeFile`, Zeile 1346: «Actual (sourceAtRow(0).x): 0, Expected (before + 1): 1». Ursache, aus dem Ablauf hergeleitet: Der Test las die bearbeitete Quelle als «vorderste Zeile». Die neue Quelle aus dem Übernehmen kommt ganz nach vorne. Der Kern schickt das geänderte Overlay an alle, dann `change_result` an das Fenster; die zweite Verbindung des Tests kann die neue Quelle schon haben, während das Fenster noch auf `change_result` wartet (`pendingImports()` noch nicht leer). Dann ist `sourceAtRow(0)` die neue Quelle mit X 0, die Pfeiltaste ändert aber die gewählte, bisherige Quelle. Der Wert 0 passt dazu (neue Quelle bei 0,0). Nachprüfung mit vorübergehender Ausgabe im Test (nicht eingecheckt, 5 Läufe, 2026-11-03 22:40 bis 22:42): Die bearbeitete Quelle hat X 1500 zu Beginn und 1523 bis 1524 am Ende; der Wert 0 kann also nicht von ihr stammen, sondern nur von der neuen Quelle. In diesen 5 Läufen trat der Fall selbst nicht auf (Zeile 0 war vor jeder Pfeiltaste die bearbeitete Quelle; `wiederholen-ergebnis.txt`). Fehler im Test, nicht im Programm. Korrektur `f475bb6`: Der Test folgt der Quelle nach Kennung.
-- **Zweiter Durchgang** nach der Korrektur (Stand `f475bb6`, 2026-11-03 22:22 bis 22:39): **50 von 50**, auch `headerGaugesWidth` und `usableWhileImportingLargeFile`. Damit ist Punkt 72 erledigt: `headerGaugesWidth` 100 von 100; die Ursache des einen Fehlers aus P10a bleibt ungeklärt (trat nicht wieder auf).
+- **Erster Durchgang** (Stand `ff816ef`, 2026-11-03 21:44 bis 22:02): 48 von 50. `headerGaugesWidth` (der Test aus Punkt 72) bestand alle 50 Male. Beide Fehler (Läufe 9 und 24) im neuen Test `usableWhileImportingLargeFile`, Zeile 1346: «Actual (sourceAtRow(0).x): 0, Expected (before + 1): 1». Ursache, aus dem Ablauf hergeleitet: Der Test las die bearbeitete Quelle als «vorderste Zeile». Die neue Quelle aus dem Übernehmen kommt ganz nach vorne. Der Kern schickt das geänderte Overlay an alle, dann `change_result` an das Fenster; die zweite Verbindung des Tests kann die neue Quelle schon haben, während das Fenster noch auf `change_result` wartet (`pendingImports()` noch nicht leer). Dann ist `sourceAtRow(0)` die neue Quelle mit X 0, die Pfeiltaste ändert aber die gewählte, bisherige Quelle. Der Wert 0 passt dazu (neue Quelle bei 0,0). Nachprüfung mit vorübergehender Ausgabe im Test (nicht eingecheckt, 5 Läufe, 2026-11-03 22:40 bis 22:42): Die bearbeitete Quelle hat X 1500 zu Beginn und 1523 bis 1524 am Ende; der Wert 0 kann also nicht von ihr stammen, sondern nur von der neuen Quelle. In diesen 5 Läufen trat der Fall selbst nicht auf (Zeile 0 war vor jeder Pfeiltaste die bearbeitete Quelle; `wiederholen-ergebnis.txt`). Fehler im Test, nicht im Programm. Korrektur `5728e96`: Der Test folgt der Quelle nach Kennung.
+- **Zweiter Durchgang** nach der Korrektur (Stand `5728e96`, 2026-11-03 22:22 bis 22:39): **50 von 50**, auch `headerGaugesWidth` und `usableWhileImportingLargeFile`. Damit ist Punkt 72 erledigt: `headerGaugesWidth` 100 von 100; die Ursache des einen Fehlers aus P10a bleibt ungeklärt (trat nicht wieder auf).
 
 ### 4 – Tabelle der Orte je Version
 
@@ -142,10 +142,10 @@ Aufruf `docs/berichte/P10-vor-daten/wiederholen.sh build tst_fensterbearbeiten 5
 
 ```
 cmake -S . -B build && cmake --build build -j8                          # Debug, 0 Warnungen
-docs/berichte/P10-vor-daten/schalter-lauf.sh <Scratch>/schalter         # frischer Klon von a7ff729, 21:22 bis 21:47
+docs/berichte/P10-vor-daten/schalter-lauf.sh <Scratch>/schalter         # frischer Klon von 5dc96d4, 21:22 bis 21:47
 ```
 
-Ergebnis (`schalter-ergebnis.txt`): Release Exit 0, 0 Warnungen, `ctest` 34 von 35 (`tst_fensterbearbeiten` fehlgeschlagen; die Ausgabe war mit dem Bauordner gelöscht, siehe unten); `DSS_BUILD_APP`, `DSS_BUILD_TESTS`, `DSS_MEDIA_SIZE`, `DSS_APP_RENDERER`, `DSS_APP_CANVAS_EDIT`, `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_APP_EDITING`, `DSS_APP_TRANSFORM` je aus: Exit 0, 0 Warnungen (nur gebaut); `DSS_BUILD_CLI=OFF`: Exit 1 beim Konfigurieren (`tst_kernverbindung` brauchte `dss-cli`), behoben in `319856f`, danach Exit 0 und 0 Warnungen; `DSS_CORE_IMPORT_THREAD=OFF`: 0 Warnungen, `ctest` 33 von 35, `tst_uebernehmen` und `tst_fensterbearbeiten` scheitern wie erwartet (Gegenprobe, Kern antwortet beim Übernehmen nicht); `DSS_APP_SETTINGS_DIALOG=OFF` und `DSS_APP_CANVAS_IMAGE=OFF`: 0 Warnungen, `ctest` 35 von 35; `DSS_INSTALLED_EDITION=ON`: Exit 0, 0 Warnungen.
+Ergebnis (`schalter-ergebnis.txt`): Release Exit 0, 0 Warnungen, `ctest` 34 von 35 (`tst_fensterbearbeiten` fehlgeschlagen; die Ausgabe war mit dem Bauordner gelöscht, siehe unten); `DSS_BUILD_APP`, `DSS_BUILD_TESTS`, `DSS_MEDIA_SIZE`, `DSS_APP_RENDERER`, `DSS_APP_CANVAS_EDIT`, `DSS_VIDEO_ROTATION`, `DSS_CORE_WATCHDOG`, `DSS_APP_EDITING`, `DSS_APP_TRANSFORM` je aus: Exit 0, 0 Warnungen (nur gebaut); `DSS_BUILD_CLI=OFF`: Exit 1 beim Konfigurieren (`tst_kernverbindung` brauchte `dss-cli`), behoben in `ff816ef`, danach Exit 0 und 0 Warnungen; `DSS_CORE_IMPORT_THREAD=OFF`: 0 Warnungen, `ctest` 33 von 35, `tst_uebernehmen` und `tst_fensterbearbeiten` scheitern wie erwartet (Gegenprobe, Kern antwortet beim Übernehmen nicht); `DSS_APP_SETTINGS_DIALOG=OFF` und `DSS_APP_CANVAS_IMAGE=OFF`: 0 Warnungen, `ctest` 35 von 35; `DSS_INSTALLED_EDITION=ON`: Exit 0, 0 Warnungen.
 
 Nachprüfung des Fehlers im Release-Bau: neuer Klon, Release, `ctest -j4 --output-on-failure` 7 Mal hintereinander (2026-11-03 21:28 bis 21:41): **7 von 7 mit 35 von 35**. Die Ausgabe des einen Fehlers fehlt; vermutlich derselbe Fehler im Test wie unter «Punkt 72» (nicht geprüft).
 
@@ -156,11 +156,11 @@ Nachprüfung des Fehlers im Release-Bau: neuer Klon, Release, `ctest -j4 --outpu
 | `ctest` Arbeitsordner, nach A1/A2 | 2026-11-03 20:4x | 33 von 33 (79,5 s) |
 | `ctest` Arbeitsordner, nach A3 | 2026-11-03 21:00 | 34 von 34 |
 | `ctest` Arbeitsordner, nach B2 | 2026-11-03 21:10 | 35 von 35 |
-| `tst_medien` 50 Mal, Stand `319856f` | 2026-11-03 22:02 bis 22:20 | **50 von 50** |
+| `tst_medien` 50 Mal, Stand `ff816ef` | 2026-11-03 22:02 bis 22:20 | **50 von 50** |
 | `tst_fensterbearbeiten` 50 Mal | siehe Teil C 3 | |
-| `tst_fensterbearbeiten` 50 Mal, Stand `f475bb6` | 2026-11-03 22:22 bis 22:39 | **50 von 50**; Übernehmen 1 GiB 13 457 bis 13 898 ms (Median 13 585), 119 bis 123 Antworten je Lauf (Median je Lauf 0 ms, grösster Wert 75 bis 224 ms), Pfeiltaste bis zum Kern max 52 bis 61 ms, Lücke der Ereignisschleife 19 bis 25 ms |
+| `tst_fensterbearbeiten` 50 Mal, Stand `5728e96` | 2026-11-03 22:22 bis 22:39 | **50 von 50**; Übernehmen 1 GiB 13 457 bis 13 898 ms (Median 13 585), 119 bis 123 Antworten je Lauf (Median je Lauf 0 ms, grösster Wert 75 bis 224 ms), Pfeiltaste bis zum Kern max 52 bis 61 ms, Lücke der Ereignisschleife 19 bis 25 ms |
 | Startprüfung `--runs 20` | 2026-11-03 22:42 bis 22:44 | 20 von 20 in allen 4 Fällen |
-| `ctest` frischer Klon `f475bb6`, Debug | 2026-11-03 22:44 bis 22:48 | **35 von 35**, 0 Warnungen |
+| `ctest` frischer Klon `5728e96`, Debug | 2026-11-03 22:44 bis 22:48 | **35 von 35**, 0 Warnungen |
 | Prüfsummen echte Daten und `~/.local/opt` | 2026-11-03 22:27 | gleich wie 20:34:59 |
 
 ### Startprüfung
@@ -237,16 +237,19 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` 
 
 ## Commits
 
-- `fad744a` P10-vor: Testmöglichkeit beim Umwandeln, Zurückschreiben geprüft (Punkt 70)
-- `dec3587` P10-vor: installieren.sh leert die Programmordner vor dem Kopieren (Punkt 69)
-- `67261ad` P10-vor: Übernehmen von Dateien im eigenen Thread, Aufräumen beim Start (Punkte 67, 68)
-- `fcbd377` P10-vor: Einstellungen des Kerns in kern.ini, Schnittstelle Version 5, dss-cli
-- `fac3600` P10-vor: Dialog Werkzeuge → Einstellungen (Port, Adresse im Heimnetz)
-- `3105aee` P10-vor: Datei → Leinwand als Bild speichern (Strg+Umschalt+B)
-- `a7ff729` P10-vor: Test Fenster bedienbar während des Übernehmens von 1 GiB
-- `319856f` P10-vor: tst_kernverbindung ohne dss-cli baubar (DSS_BUILD_CLI=OFF)
-- `f475bb6` P10-vor: Test 1 GiB folgt der bearbeiteten Quelle nach Kennung
-- (dieser Commit) P10-vor: Bericht, Dokumente nachgeführt, Messdaten
+- `3c5f086` P10-vor: Testmöglichkeit beim Umwandeln, Zurückschreiben geprüft (Punkt 70)
+- `0771d52` P10-vor: installieren.sh leert die Programmordner vor dem Kopieren (Punkt 69)
+- `a37fb2b` P10-vor: Übernehmen von Dateien im eigenen Thread, Aufräumen beim Start (Punkte 67, 68)
+- `8596ead` P10-vor: Einstellungen des Kerns in kern.ini, Schnittstelle Version 5, dss-cli
+- `415e02a` P10-vor: Dialog Werkzeuge → Einstellungen (Port, Adresse im Heimnetz)
+- `9342388` P10-vor: Datei → Leinwand als Bild speichern (Strg+Umschalt+B)
+- `5dc96d4` P10-vor: Test Fenster bedienbar während des Übernehmens von 1 GiB
+- `ff816ef` P10-vor: tst_kernverbindung ohne dss-cli baubar (DSS_BUILD_CLI=OFF)
+- `5728e96` P10-vor: Test 1 GiB folgt der bearbeiteten Quelle nach Kennung
+- `47529d6` P10-vor: Bericht, Dokumente nachgeführt, Messdaten
+- (dieser Commit) P10-vor: Bericht, Kennungen der Commits nach dem Rebase
+
+Beim `git pull --rebase origin main` lag auf dem Server `220be67` (CLAUDE.md: Regel 19, nur `CLAUDE.md`); die Commits oben sind darauf neu aufgesetzt, Inhalt unverändert. Die Messdaten in `docs/berichte/P10-vor-daten/` nennen die Kennungen vor dem Rebase: `fad744a` = `3c5f086`, `dec3587` = `0771d52`, `67261ad` = `a37fb2b`, `fcbd377` = `8596ead`, `fac3600` = `415e02a`, `3105aee` = `9342388`, `a7ff729` = `5dc96d4`, `319856f` = `ff816ef`, `f475bb6` = `5728e96`. Getestet wurde also ohne Regel 19 in `CLAUDE.md`; der Code ist derselbe (`git diff 5728e96 f475bb6 -- . ':!CLAUDE.md'` leer).
 
 ## Geänderte und neue Dateien
 
@@ -278,7 +281,7 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` 
 - Punkt 74 (ungenutzte Kopien in `media/`, wenn die Änderung nach dem Übernehmen scheitert).
 - Punkt 76 (abgewiesene Einstellung erscheint im Dialog und in der Statuszeile).
 - Punkt 77 (ungültige `kern.ini` nur von Hand reparierbar; gleiche Ports für beide Versionen).
-- Ursache des einen Fehlers von `tst_fensterbearbeiten` im Release-Bau (Klon `a7ff729`): Ausgabe fehlt, vermutlich der Fehler im Test aus «Punkt 72» (nicht geprüft); 7 weitere Release-Läufe und alle späteren Läufe ohne Fehler.
+- Ursache des einen Fehlers von `tst_fensterbearbeiten` im Release-Bau (Klon `5dc96d4`): Ausgabe fehlt, vermutlich der Fehler im Test aus «Punkt 72» (nicht geprüft); 7 weitere Release-Läufe und alle späteren Läufe ohne Fehler.
 - Rückfall von `QSaveFile` auf eine vorläufige Datei mit Namen (nicht geprüft, siehe Teil A 2).
 
 ## Quellen
