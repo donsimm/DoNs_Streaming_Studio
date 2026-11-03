@@ -13,3 +13,18 @@ endif()
 if(DSS_INSTALLED_EDITION)
   install(TARGETS dss-core RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+# Overlay-Server (P10, Schalter DSS_CORE_OVERLAY_SERVER). Die Seite (web/) liegt in Arbeit im
+# Repo, im Einsatz im Installationsordner (wie Symbole und Schriften, P10a).
+if(DSS_CORE_OVERLAY_SERVER)
+  target_link_libraries(dss-core PRIVATE dss_server)
+  if(DSS_INSTALLED_EDITION)
+    set(DSS_WEB_DIR "${DSS_INSTALL_FULL_SHARE_DIR}/web")
+    install(FILES ${PROJECT_SOURCE_DIR}/web/overlay.html ${PROJECT_SOURCE_DIR}/web/overlay.js
+            DESTINATION ${DSS_INSTALL_SHARE_DIR}/web)
+  else()
+    set(DSS_WEB_DIR "${PROJECT_SOURCE_DIR}/web")
+  endif()
+  target_compile_definitions(dss-core PRIVATE DSS_CORE_OVERLAY_SERVER=1 DSS_WEB_DIR="${DSS_WEB_DIR}")
+else()
+  target_compile_definitions(dss-core PRIVATE DSS_CORE_OVERLAY_SERVER=0)
+endif()

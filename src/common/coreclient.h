@@ -85,6 +85,9 @@ public:
     // Letzte Antwort zum angefragten Overlay; leer bis dahin und ohne Verbindung.
     std::optional<BrowserSourceInfo> browserSource() const { return m_browserSource; }
 
+    // Zustand des Overlay-Servers (P10), nach hello und bei jeder Änderung; ohne Verbindung leer.
+    std::optional<ServerStatusInfo> serverStatus() const { return m_serverStatus; }
+
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
@@ -129,6 +132,8 @@ signals:
     void settingsChanged();
     // browserSource() hat sich geändert (P10).
     void browserSourceChanged();
+    // serverStatus() hat sich geändert (P10).
+    void serverStatusChanged();
 
 private:
     void tryConnect();
@@ -170,6 +175,7 @@ private:
     std::optional<SettingsInfo> m_settings;
     QUuid m_browserSourceWanted;
     std::optional<BrowserSourceInfo> m_browserSource;
+    std::optional<ServerStatusInfo> m_serverStatus;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
 };

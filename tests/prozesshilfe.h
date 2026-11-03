@@ -4,7 +4,10 @@
 // Datenordner und Verbindung sind immer eigene temporäre Ordner; die echten Daten unter
 // ~/.local/share/dons-streaming-studio und der echte Socket werden nie berührt.
 
+#include <QCoreApplication>
 #include <QDeadlineTimer>
+#include <QDir>
+#include <QFile>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QString>
@@ -24,12 +27,31 @@ inline std::unique_ptr<QTemporaryDir> runtimeDir()
         + QStringLiteral("/dss-test-XXXXXX"));
 }
 
+// kern.ini im Ordner der Einstellungen configHome (Aufbau wie CoreSettingsStore); leere
+// Adresse = der Kern trägt sie beim Start aus der Standardroute ein.
+inline bool writeCoreSettings(const QString &configHome, int port, const QString &homeAddress = QString())
+{
+    const QString dir = configHome + QStringLiteral("/dons-streaming-studio-entwicklung");
+    if (!QDir().mkpath(dir))
+        return false;
+    QFile f(dir + QStringLiteral("/kern.ini"));
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    f.write(QStringLiteral("[overlay-server]\nport=%1\nadresse-im-heimnetz=%2\n").arg(port).arg(homeAddress).toUtf8());
+    return true;
+}
+
 // Eigener Ordner der Einstellungen (XDG_CONFIG_HOME) für jeden gestarteten Kern (P10-vor): Der
 // Kern schreibt dort kern.ini, nie in ~/.config. Die Ordner bleiben bis zum Ende des Tests.
+// Seit P10 mit eigenem Port je Kern (nicht 8081): Der Overlay-Server der Testkerne stört so weder
+// die Version in Arbeit noch andere Tests (belegt wäre nur eine Meldung, kein Fehler).
 inline QString testConfigHome()
 {
     static std::vector<std::unique_ptr<QTemporaryDir>> dirs;
+    static int next = 0;
     dirs.push_back(std::make_unique<QTemporaryDir>());
+    const int port = 24000 + int(QCoreApplication::applicationPid() % 2000) * 4 + (next++ % 4);
+    writeCoreSettings(dirs.back()->path(), port);
     return dirs.back()->path();
 }
 

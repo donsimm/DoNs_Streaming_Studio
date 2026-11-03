@@ -16,6 +16,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QLocalSocket>
 #include <QSignalSpy>
@@ -186,7 +187,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 7); // seit P10
+        QCOMPARE(c->coreHello().protocolVersion, 8); // seit P10
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -533,6 +534,58 @@ private slots:
         QVERIFY(!m_coreLog.contains(oldToken) && !m_coreLog.contains(newToken)
                 && !m_coreLog.contains(m_overviewToken));
     }
+
+#if DSS_CORE_OVERLAY_SERVER
+    // P10 (Teil A 2, Punkt 77): Zwei Kerne mit demselben Port. Der zweite meldet im Fenster
+    // (server_status), wer den Port belegt, und lauscht von selbst, sobald er frei ist.
+    void serverStatusPortBusy()
+    {
+        QTemporaryDir data1;
+        QTemporaryDir data2;
+        QTemporaryDir config1;
+        QTemporaryDir config2;
+        const int port = 24000 + int(QCoreApplication::applicationPid() % 2000) * 4 + 3;
+        QVERIFY(writeCoreSettings(config1.path(), port));
+        QVERIFY(writeCoreSettings(config2.path(), port));
+        const QString socket1 = m_run->filePath(QStringLiteral("eins.sock"));
+        const QString socket2 = m_run->filePath(QStringLiteral("zwei.sock"));
+        auto core1 = testhelp::startCore(data1.path(), socket1, config1.path());
+        QString log1;
+        QVERIFY2(waitForLog(core1.get(), QStringLiteral("Overlay-Server lauscht auf 127.0.0.1:%1").arg(port), &log1),
+                 qPrintable(log1));
+        auto core2 = testhelp::startCore(data2.path(), socket2, config2.path());
+        QString log2;
+        QVERIFY2(waitForLog(core2.get(), QStringLiteral("ist belegt"), &log2), qPrintable(log2));
+
+        CoreClient::Options o;
+        o.socketPath = socket2;
+        o.program = QStringLiteral("tst_kernverbindung");
+        o.version = version();
+        o.reconnectIntervalMs = 200;
+        CoreClient c(o);
+        c.start();
+        QTRY_VERIFY_WITH_TIMEOUT(c.serverStatus().has_value(), 3000);
+        QVERIFY(c.serverStatus()->enabled);
+        const QString problems = c.serverStatus()->problems.join(QLatin1Char('\n'));
+        QVERIFY2(problems.contains(QStringLiteral("Port %1 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (%2) (Prozess %3)")
+                                       .arg(port).arg(QFileInfo(QStringLiteral(DSS_CORE_BIN)).canonicalFilePath())
+                                       .arg(core1->processId())),
+                 qPrintable(problems));
+        QVERIFY(c.serverStatus()->listening.isEmpty() || !c.serverStatus()->listening.join(QLatin1Char(' ')).contains(QStringLiteral("127.0.0.1")));
+
+        core1->terminate();
+        QVERIFY(core1->waitForFinished(5000));
+        QTRY_VERIFY_WITH_TIMEOUT(c.serverStatus()->listening.contains(QStringLiteral("127.0.0.1:%1").arg(port)), 6000);
+        QVERIFY(!c.serverStatus()->problems.join(QLatin1Char(' ')).contains(QStringLiteral("belegt")));
+        const QString detected = detectHomeAddress();
+        if (!detected.isEmpty())
+            QVERIFY(c.serverStatus()->listening.contains(QStringLiteral("%1:%2").arg(detected).arg(port)));
+        c.stop();
+        core2->terminate();
+        QVERIFY(core2->waitForFinished(5000));
+        QCOMPARE(core2->exitCode(), 0);
+    }
+#endif
 
     // Ungültige kern.ini: Kern startet mit Standardwerten, meldet den Fehler, schreibt die Datei
     // nicht und weist Änderungen ab.

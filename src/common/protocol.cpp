@@ -1143,4 +1143,64 @@ bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString
     return true;
 }
 
+QJsonObject serverStatusMessage(const ServerStatusInfo &info)
+{
+    QJsonObject o = typed(msg::kServerStatus);
+    o.insert(QStringLiteral("enabled"), info.enabled);
+    o.insert(QStringLiteral("listening"), QJsonArray::fromStringList(info.listening));
+    o.insert(QStringLiteral("problems"), QJsonArray::fromStringList(info.problems));
+    o.insert(QStringLiteral("invalid_use"),
+             info.invalidUse.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(info.invalidUse));
+    QJsonObject pages;
+    for (auto it = info.pages.constBegin(); it != info.pages.constEnd(); ++it)
+        pages.insert(idText(it.key()), it.value());
+    o.insert(QStringLiteral("pages"), pages);
+    return o;
+}
+
+bool parseServerStatus(const QJsonObject &message, ServerStatusInfo *info, QString *error)
+{
+    ServerStatusInfo i;
+    if (!requireBool(message, QStringLiteral("enabled"), &i.enabled, error))
+        return false;
+    for (const auto &[key, list] : {std::pair{QStringLiteral("listening"), &i.listening},
+                                    std::pair{QStringLiteral("problems"), &i.problems}}) {
+        const QJsonValue v = message.value(key);
+        if (!v.isArray()) {
+            *error = QStringLiteral("Feld %1 fehlt oder ist keine Liste").arg(key);
+            return false;
+        }
+        for (const QJsonValue &e : v.toArray()) {
+            if (!e.isString()) {
+                *error = QStringLiteral("Feld %1 enthält etwas anderes als Text").arg(key);
+                return false;
+            }
+            list->append(e.toString());
+        }
+    }
+    const QJsonValue invalid = message.value(QStringLiteral("invalid_use"));
+    if (invalid.isString()) {
+        i.invalidUse = invalid.toString();
+    } else if (!invalid.isNull()) {
+        *error = QStringLiteral("Feld invalid_use fehlt oder ist weder Text noch null");
+        return false;
+    }
+    const QJsonValue pages = message.value(QStringLiteral("pages"));
+    if (!pages.isObject()) {
+        *error = QStringLiteral("Feld pages fehlt oder ist kein Objekt");
+        return false;
+    }
+    const QJsonObject p = pages.toObject();
+    for (auto it = p.constBegin(); it != p.constEnd(); ++it) {
+        QUuid id;
+        int count = 0;
+        if (!requireUuid(QJsonObject{{QStringLiteral("id"), it.key()}}, QStringLiteral("id"), &id, error)
+            || !requireIntField(p, it.key(), 0, 1 << 20, &count, error))
+            return false;
+        i.pages.insert(id, count);
+    }
+    *info = i;
+    return true;
+}
+
 } // namespace dss

@@ -2,6 +2,9 @@
 
 #include "browsersource.h"
 #include "version.h"
+#if DSS_CORE_OVERLAY_SERVER
+#include "overlayserver.h"
+#endif
 
 #include <QDir>
 #include <QFile>
@@ -163,12 +166,21 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
                                       [&o](const dss::Overlay &b) { return b.id == o.id; });
         if (old == before.end() || !(*old == o)) {
             broadcast(dss::overlayMessage(dss::msg::kOverlayChanged, o, m_store->mediaSizes(o)));
+#if DSS_CORE_OVERLAY_SERVER
+            // Auch an die Seiten der Browserquelle (K-02: das ganze Overlay)
+            if (m_overlayServer)
+                m_overlayServer->overlayChanged(o.id);
+#endif
             ++changed;
         }
     }
     for (const dss::Overlay &b : before) {
         if (!m_store->overlay(b.id)) {
             broadcast(dss::overlayIdMessage(dss::msg::kOverlayRemoved, b.id));
+#if DSS_CORE_OVERLAY_SERVER
+            if (m_overlayServer)
+                m_overlayServer->overlayRemoved(b.id);
+#endif
             ++removed;
         }
     }
@@ -197,6 +209,11 @@ void CoreService::reload()
 
     const auto [changed, removed] = broadcastDifferences(before, listBefore);
     updateBrowserSources();
+#if DSS_CORE_OVERLAY_SERVER
+    // Token können sich beim Neu laden geändert haben (tokens.json von Hand).
+    if (m_overlayServer)
+        m_overlayServer->allChanged();
+#endif
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
           static_cast<long long>(m_store->overlays().size()), changed, removed);
     // Schriftdateien im Datenordner können sich geändert haben.
@@ -290,6 +307,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
               qPrintable(hello.version), static_cast<long long>(m_clients.size()));
         send(socket, listMessage());
         send(socket, dss::connectionsMessage(m_connectionStates));
+        send(socket, serverStatusMessage());
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -389,6 +407,36 @@ void CoreService::updateBrowserSources()
     }
 }
 
+void CoreService::setOverlayServer(dss::OverlayServer *server)
+{
+#if DSS_CORE_OVERLAY_SERVER
+    m_overlayServer = server;
+    connect(server, &dss::OverlayServer::statusChanged, this,
+            [this] { broadcast(serverStatusMessage()); });
+    const dss::CoreSettings s = m_settings ? m_settings->settings() : dss::defaultCoreSettings();
+    server->configure(s.port, s.homeAddress);
+    broadcast(serverStatusMessage());
+#else
+    Q_UNUSED(server);
+#endif
+}
+
+QJsonObject CoreService::serverStatusMessage() const
+{
+    dss::ServerStatusInfo info;
+#if DSS_CORE_OVERLAY_SERVER
+    if (m_overlayServer) {
+        const dss::OverlayServer::Status s = m_overlayServer->status();
+        info.enabled = true;
+        info.listening = s.listening;
+        info.problems = s.problems;
+        info.invalidUse = s.invalidUse;
+        info.pages = s.pages;
+    }
+#endif
+    return dss::serverStatusMessage(info);
+}
+
 QJsonObject CoreService::settingsMessage() const
 {
     return dss::settingsMessage({m_settings->settings(), dss::kPortMin, dss::kPortMax,
@@ -419,11 +467,15 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
     }
     const dss::CoreSettings after = m_settings->settings();
     if (!(after == before)) {
-        // Port und Adresse wirken erst mit dem Overlay-Server (P10).
         qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
               after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
         broadcast(settingsMessage());
         updateBrowserSources();
+#if DSS_CORE_OVERLAY_SERVER
+        // Neuer Port oder neue Adresse: Server neu starten (Teil A 2)
+        if (m_overlayServer)
+            m_overlayServer->configure(after.port, after.homeAddress);
+#endif
     }
     send(socket, dss::changeResultMessage({update.requestId, true, QUuid(), QString(), QString()}));
 }
@@ -665,6 +717,10 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
             const Overlay *o = m_store->overlay(r.overlayId);
             qInfo("Neuer Token für Overlay «%s» (%s): die alte Adresse gilt nicht mehr",
                   qPrintable(o->name), qPrintable(browserSourceLogPath(o->address)));
+#if DSS_CORE_OVERLAY_SERVER
+            if (m_overlayServer)
+                m_overlayServer->tokenChanged(r.overlayId);
+#endif
         }
         return done(ok, error);
     }

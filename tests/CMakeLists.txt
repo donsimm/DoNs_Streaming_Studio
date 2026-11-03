@@ -61,6 +61,8 @@ dss_add_test(tst_kernverbindung)
 target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
 add_dependencies(tst_kernverbindung dss-core)
+target_compile_definitions(tst_kernverbindung PRIVATE
+  DSS_CORE_OVERLAY_SERVER=$<BOOL:${DSS_CORE_OVERLAY_SERVER}>)
 if(DSS_BUILD_CLI) # P10-vor: dss-cli einstellungen
   target_compile_definitions(tst_kernverbindung PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
   add_dependencies(tst_kernverbindung dss-cli)
@@ -232,3 +234,15 @@ target_compile_definitions(tst_uebernehmen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:d
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}")
 add_dependencies(tst_uebernehmen dss-core)
 set_tests_properties(tst_uebernehmen PROPERTIES FIXTURES_REQUIRED dss_media)
+
+# P10, Teil A: Overlay-Server ohne Fenster (Token, alte Adressen, Ereignisse, Medien, Port belegt,
+# Adresse fehlt, nur IPv4). Nur mit dem Server (DSS_CORE_OVERLAY_SERVER) und dss_media.
+if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media)
+  dss_add_test(tst_overlayserver)
+  target_link_libraries(tst_overlayserver PRIVATE dss_server dss_media)
+  target_compile_definitions(tst_overlayserver PRIVATE DSS_WEB_DIR="${PROJECT_SOURCE_DIR}/web"
+    DSS_TEST_FONT="${DSS_TEST_FONT}" DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+    DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
+    DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
+endif()
+

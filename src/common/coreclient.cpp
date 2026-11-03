@@ -420,6 +420,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_settings = info;
         emit settingsChanged();
+    } else if (type == QLatin1String(msg::kServerStatus)) {
+        ServerStatusInfo info;
+        if (!parseServerStatus(message, &info, &error)) {
+            qWarning("Kern: server_status ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_serverStatus = info;
+        emit serverStatusChanged();
     } else if (type == QLatin1String(msg::kBrowserSource)) {
         BrowserSourceInfo info;
         if (!parseBrowserSource(message, &info, &error)) {
@@ -506,6 +514,10 @@ void CoreClient::clearData()
     if (m_browserSource) {
         m_browserSource.reset();
         emit browserSourceChanged();
+    }
+    if (m_serverStatus) {
+        m_serverStatus.reset();
+        emit serverStatusChanged();
     }
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);

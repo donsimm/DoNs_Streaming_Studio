@@ -17,6 +17,10 @@ class QLocalServer;
 class QLocalSocket;
 class QTimer;
 
+namespace dss {
+class OverlayServer;
+}
+
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
 // Verbindungen von Fenstern über einen Unix-Socket an und verteilt Overlays, Leistungswerte
 // und Zustände der Verbindungen. Seit P08 nimmt er Änderungen der Fenster an, prüft sie mit dem
@@ -46,6 +50,11 @@ public:
     void reload();
 
     int clientCount() const { return int(m_clients.size()); }
+
+    // Overlay-Server für die Browserquelle (P10, Schalter DSS_CORE_OVERLAY_SERVER): startet ihn
+    // mit Port und Adresse aus den Einstellungen und hält ihn danach auf dem Stand (Änderungen,
+    // neuer Token, neue Einstellungen). Ohne Aufruf: kein Server (server_status enabled false).
+    void setOverlayServer(dss::OverlayServer *server);
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -109,6 +118,7 @@ private:
     dss::BrowserSourceInfo browserSourceInfo(const QUuid &overlayId) const;
     // Schickt jeder fragenden Verbindung die Adresse neu, wenn sie sich geändert hat.
     void updateBrowserSources();
+    QJsonObject serverStatusMessage() const;
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
@@ -124,6 +134,7 @@ private:
     dss::OverlayStore *m_store;
     QString m_socketPath;
     dss::CoreSettingsStore *m_settings = nullptr;
+    dss::OverlayServer *m_overlayServer = nullptr;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;
     QTimer *m_statsTimer = nullptr;

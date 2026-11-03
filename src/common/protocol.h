@@ -12,6 +12,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QString>
+#include <QStringList>
 #include <QUuid>
 
 // Schnittstelle zwischen Kern und Fenster (P07, Teil D; Änderungen seit P08, Teil A): JSON, eine
@@ -33,8 +34,9 @@ namespace dss {
 //   set_overlay_output
 // 7 seit P10: Neuer Token (new_token), Adresse der Browserquelle (get_browser_source,
 //   browser_source)
+// 8 seit P10: Zustand des Overlay-Servers (server_status)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 7;
+inline constexpr int kProtocolVersion = 8;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -86,6 +88,7 @@ inline constexpr char kSetOverlayOutput[] = "set_overlay_output";
 inline constexpr char kNewToken[] = "new_token";
 inline constexpr char kGetBrowserSource[] = "get_browser_source";
 inline constexpr char kBrowserSource[] = "browser_source";
+inline constexpr char kServerStatus[] = "server_status";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -312,6 +315,21 @@ struct BrowserSourceInfo
 };
 QJsonObject browserSourceMessage(const BrowserSourceInfo &info);
 bool parseBrowserSource(const QJsonObject &message, BrowserSourceInfo *info, QString *error);
+// server_status (P10): Zustand des Overlay-Servers, nach hello und nach jeder Änderung an alle.
+// Ohne Token. enabled false: Kern ohne Overlay-Server gebaut (Schalter DSS_CORE_OVERLAY_SERVER).
+struct ServerStatusInfo
+{
+    bool enabled = false;
+    QStringList listening;     // «127.0.0.1:8081», …
+    QStringList problems;      // Port belegt, Adresse fehlt, … (auf Deutsch)
+    QString invalidUse;        // Hinweis: eine Browserquelle benutzt eine ungültige Adresse; leer = keiner
+    QHash<QUuid, int> pages;   // verbundene Seiten je Overlay
+
+    bool operator==(const ServerStatusInfo &) const = default;
+};
+QJsonObject serverStatusMessage(const ServerStatusInfo &info);
+bool parseServerStatus(const QJsonObject &message, ServerStatusInfo *info, QString *error);
+
 // get_browser_source: Kennung des Overlays; null = keine Adresse mehr schicken.
 QJsonObject getBrowserSourceMessage(const QUuid &overlayId);
 bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString *error);

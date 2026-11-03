@@ -34,6 +34,9 @@ option(DSS_CORE_WATCHDOG "Kern meldet sich beim Watchdog von systemd (P10a)" ON)
 # beantwortet währenddessen weiter Nachrichten. Aus: Übernehmen in der Hauptschleife wie P10a
 # (mit der zusätzlichen Meldung an den Watchdog nach jedem MiB).
 option(DSS_CORE_IMPORT_THREAD "Kern übernimmt Dateien in eigenen Threads (P10-vor)" ON)
+# P10 (Teil A): Overlay-Server im Kern für die Browserquelle (HTTP im Heimnetz, Seite aus web/).
+# Aus: kein Server, keine Browserquelle (wie P10-vor); Neuer Token und Ausgabe ein/aus bleiben.
+option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P10)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html
@@ -67,6 +70,9 @@ target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER))
   add_subdirectory(src/media)
+endif()
+if(DSS_CORE_OVERLAY_SERVER)
+  add_subdirectory(src/server)
 endif()
 add_subdirectory(src/core)
 if(DSS_BUILD_CLI)

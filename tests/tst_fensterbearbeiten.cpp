@@ -1236,9 +1236,11 @@ private slots:
         auto *hint = dialog->findChild<QLabel *>(QStringLiteral("settingsHint"));
         QVERIFY(port && address && problem && ok && hint);
         QVERIFY(hint->text().contains(QStringLiteral("erst mit der Browserquelle (P10)")));
-        // Werte des Kerns: Standard der Version und die erkannte Adresse
+        // Werte des Kerns: Port aus kern.ini des Tests (seit P10 eigener Port je Testkern,
+        // prozesshilfe.h) und die erkannte Adresse
         QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 3000);
-        QCOMPARE(port->value(), defaultCoreSettings().port);
+        QVERIFY(m_client->settings().has_value());
+        QCOMPARE(port->value(), m_client->settings()->settings.port);
         QCOMPARE(address->text(), detectHomeAddress());
         QCOMPARE(port->minimum(), 1024);
         QCOMPARE(port->maximum(), 32767);

@@ -11,6 +11,9 @@
 #include "logging.h"
 #include "mediaimport.h"
 #include "overlaystore.h"
+#if DSS_CORE_OVERLAY_SERVER
+#include "overlayserver.h"
+#endif
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
 #endif
@@ -20,6 +23,7 @@
 
 #include <QCommandLineParser>
 #include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QTextStream>
 #include <QTimer>
@@ -217,6 +221,19 @@ int main(int argc, char *argv[])
         qCritical("Kern startet nicht: %s", qPrintable(error));
         return kExitError;
     }
+
+#if DSS_CORE_OVERLAY_SERVER
+    // Overlay-Server für die Browserquelle (P10, Teil A)
+    dss::OverlayServer::Options serverOptions;
+    serverOptions.webDir = QStringLiteral(DSS_WEB_DIR);
+    // Ort der Version im Einsatz (scripts/installieren.sh), für die Meldung «Port belegt»
+    serverOptions.installedDir = QDir::homePath() + QStringLiteral("/.local/opt/dons-streaming-studio");
+#if DSS_MEDIA_SIZE
+    serverOptions.videoOrientation = dss::readVideoOrientation;
+#endif
+    dss::OverlayServer overlayServer(&store, serverOptions);
+    service.setOverlayServer(&overlayServer);
+#endif
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,
                      [](int signalNumber) {

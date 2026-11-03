@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 7); // seit P10
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 8); // seit P10
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -550,6 +550,33 @@ private slots:
         QVERIFY(parseGetBrowserSource(getBrowserSourceMessage(QUuid()), &parsed, &error));
         QVERIFY(parsed.isNull());
         QVERIFY(!parseGetBrowserSource(simpleMessage(msg::kGetBrowserSource), &parsed, &error));
+    }
+
+    void serverStatusMessages()
+    {
+        ServerStatusInfo info;
+        info.enabled = true;
+        info.listening = {QStringLiteral("127.0.0.1:8081"), QStringLiteral("192.168.1.9:8081")};
+        info.problems = {QStringLiteral("Port 8081 ist belegt")};
+        info.invalidUse = QStringLiteral("Eine Browserquelle benutzt eine ungültige Adresse");
+        info.pages.insert(QUuid::fromString(QStringLiteral("2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11")), 2);
+        const QJsonObject o = serverStatusMessage(info);
+        ServerStatusInfo back;
+        QString error;
+        QVERIFY2(parseServerStatus(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        QVERIFY(parseServerStatus(serverStatusMessage(ServerStatusInfo()), &back, &error));
+        QCOMPARE(back, ServerStatusInfo());
+        QCOMPARE(serverStatusMessage(ServerStatusInfo()).value(QStringLiteral("invalid_use")), QJsonValue(QJsonValue::Null));
+        QJsonObject bad = o;
+        bad.insert(QStringLiteral("problems"), QJsonArray{1});
+        QVERIFY(!parseServerStatus(bad, &back, &error));
+        bad = o;
+        bad.insert(QStringLiteral("pages"), QJsonObject{{QStringLiteral("keine-kennung"), 1}});
+        QVERIFY(!parseServerStatus(bad, &back, &error));
+        bad = o;
+        bad.remove(QStringLiteral("enabled"));
+        QVERIFY(!parseServerStatus(bad, &back, &error));
     }
 };
 
