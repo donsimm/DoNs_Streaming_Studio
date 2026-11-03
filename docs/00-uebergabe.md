@@ -56,7 +56,7 @@ Kann warten: NDI-SDK (Lizenz und Linux-Bezug nicht geprüft), T-03 bis T-05 (bra
 
 ## Arbeitsweise mit dem Nutzer
 
-- Immer nur ein Schritt pro Nachricht, auch im Handtest: ein Schritt, dann auf die Antwort warten (Wunsch des Nutzers, nochmals betont am 2026-11-03). Fragen nummerieren, mit einer Ziffer beantwortbar.
+- Pro Nachricht eine Sache: eine Frage, eine Prüfung oder ein Ablauf. Eine Nachricht darf mehrere Teilschritte enthalten, wenn sie zusammen eine Prüfung bilden; nie zwei Prüfungen oder zwei Themen gleichzeitig (präzisiert vom Nutzer am 2026-11-03). Fragen nummerieren, mit einer Ziffer beantwortbar.
 - Jeder Befehl für das Terminal beginnt mit `cd ~/DoNs_Streaming_Studio &&`, weil das Terminal oft im Benutzerordner steht. Schritte, die etwas schliessen oder beenden, stehen deutlich als eigener Schritt da.
 - Klar sagen, ob etwas ein Token oder ein Passwort ist, und ob für einen Prompt eine neue Claude-Code-Sitzung nötig ist.
 - Kein Hin- und Herkopieren zwischen Claude Code und Chat: Aufträge und Berichte liegen als Dateien im Repo.
