@@ -246,3 +246,24 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media)
     DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
 endif()
 
+# P10, Stufe 1 der Prüfung der Browserquelle: Qt WebEngine (Chromium) lädt die Seite eines eigenen
+# Kerns über die Adresse im Heimnetz, Abgriff mit Durchsichtigkeit, Vergleich mit dss_render. In
+# der X11-Sitzung; ohne X11 oder ohne Adresse im Heimnetz übersprungen (77). Nur mit dem Server, dem
+# Zeichner und Qt WebEngine (Paket qt6-webengine-dev, seit P01 installiert).
+if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RENDERER)
+  find_package(Qt6 QUIET COMPONENTS WebEngineWidgets QuickWidgets)
+  if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::QuickWidgets)
+    qt_add_executable(tst_browserquelle tst_browserquelle.cpp)
+    target_link_libraries(tst_browserquelle PRIVATE dss_render dss_media dss_warnings Qt6::Test
+      Qt6::WebEngineWidgets Qt6::QuickWidgets)
+    target_compile_definitions(tst_browserquelle PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+      DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}"
+      DSS_TEST_LARGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/gross-daten"
+      DSS_TEST_BUILTIN_FONT_DIR="${PROJECT_SOURCE_DIR}/src/common/schriften/be-vietnam-pro"
+      DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+      DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung")
+    add_dependencies(tst_browserquelle dss-core)
+    add_test(NAME tst_browserquelle COMMAND tst_browserquelle)
+    set_tests_properties(tst_browserquelle PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media)
+  endif()
+endif()

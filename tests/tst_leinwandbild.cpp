@@ -199,6 +199,35 @@ private slots:
         QCOMPARE(area.copy(30, 20, 640, 360), image);
     }
 
+    // P10, Teil B 3: Wechsel auf ein anderes Overlay und zurück. Der Zeichner des Editors beginnt
+    // die Videos danach von vorne (neue Spieler), wie die Browserquelle beim Einblenden
+    // (docs/01-festlegungen.md, «Video beim Wechsel des Overlays»).
+    void videoRestartsAfterOverlaySwitch()
+    {
+        SourceRenderer renderer;
+        renderer.setDataDir(m_data.path());
+        renderer.setOverlay(&m_overlay);
+        // Die Testvideos haben 10 Bilder und wiederholen; warten, bis jedes einmal von vorne begann.
+        const auto allLooped = [&](quint64 minLoops) {
+            const QList<SourceRenderer::VideoInfo> infos = renderer.videoInfo();
+            return infos.size() == 4
+                   && std::all_of(infos.begin(), infos.end(), [&](const auto &v) { return v.loops >= minLoops; });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(allLooped(1), 5000);
+        Overlay other = m_overlay;
+        other.id = QUuid::createUuid();
+        other.sources.clear();
+        renderer.setOverlay(&other);
+        QCOMPARE(renderer.videoInfo().size(), 0);
+        renderer.setOverlay(&m_overlay);
+        const QList<SourceRenderer::VideoInfo> infos = renderer.videoInfo();
+        QCOMPARE(infos.size(), 4);
+        for (const SourceRenderer::VideoInfo &v : infos) {
+            QCOMPARE(v.loops, quint64(0));
+            QVERIFY(v.decoded < 10);
+        }
+    }
+
     void saveAsPng()
     {
         QTemporaryDir pictures;
