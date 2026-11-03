@@ -23,6 +23,7 @@ Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `d
 | `CMakeLists.txt` | Oberste Build-Datei (C++20, Qt 6), Version des Programms, Schalter |
 | `src/common/` | Bibliothek `dss_common`: Logik und Daten für Kern und Fenster, nur Qt Core |
 | `src/core/` | Kern `dss-core` (Hintergrundprogramm, ohne Fenster) |
+| `src/render/` | Bibliothek `dss_render` (seit P10-vor): Zeichner der Quellen und Bild eines Overlays in seiner Auflösung, Qt Gui ohne Qt Widgets |
 | `src/app/` | Fenster `dss-app`; Farben und Schriftgrösse nur in `theme.cpp`, Symbole als SVG in `src/app/symbole/` (zur Laufzeit geladen, ersetzbar, einfarbig in Textfarbe gezeichnet), Schrift Open Sans in `src/app/schriften/` |
 | `src/cli/` | Werkzeug `dss-cli` ohne Fenster (Overlays anlegen und bearbeiten, Handtest) |
 | `web/` | Platz für den Zeichner der Browserquelle (noch leer) |
@@ -71,6 +72,7 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_APP_CANVAS_EDIT` | `ON` | Quellen auf der Leinwand mit Maus und Pfeiltasten bearbeiten (P09); aus: Leinwand zeigt nur an |
 | `DSS_APP_TRANSFORM` | `ON` | Befehle «Transformieren» im Menü «Bearbeiten» und per Rechtsklick (P09b); aus: kein Menü «Transformieren» |
 | `DSS_APP_SETTINGS_DIALOG` | `ON` | Dialog «Werkzeuge → Einstellungen …» für Port und Adresse des Kerns (P10-vor); aus: Menü «Werkzeuge» ausgegraut, Einstellungen nur mit `dss-cli` |
+| `DSS_APP_CANVAS_IMAGE` | `ON` | «Datei → Leinwand als Bild speichern» (Strg+Umschalt+B) als PNG in `~/Bilder/DoNs Streaming Studio/` (P10-vor, braucht `DSS_APP_RENDERER`); aus: kein Menüeintrag |
 | `DSS_VIDEO_ROTATION` | `ON` | Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner (P10a); aus: Videos wie gespeichert |
 | `DSS_CORE_IMPORT_THREAD` | `ON` | Kern übernimmt neue Dateien (SHA-256, Kopie) in eigenen Threads und antwortet dabei weiter (P10-vor); aus: in der Hauptschleife wie in P10a |
 | `DSS_CORE_WATCHDOG` | `ON` | Kern meldet sich beim Watchdog von systemd (P10a); aus: ohne Meldung, dann `scripts/dienst-einrichten.sh --watchdog 0` |

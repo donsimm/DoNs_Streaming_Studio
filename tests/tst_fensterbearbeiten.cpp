@@ -18,6 +18,9 @@
 #include "mainwindow.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
+#if DSS_APP_CANVAS_IMAGE
+#include "sourcerenderer.h"
+#endif
 #include "symbols.h"
 #include "theme.h"
 #include "version.h"
@@ -40,6 +43,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -1148,6 +1152,58 @@ private slots:
         QCOMPARE(geometryOf(*findSource(checked(m_scene), image.id)),
                  (SourceGeometry{100, 100, 400, 200, 0, false, false}));
     }
+
+#if DSS_APP_CANVAS_IMAGE
+    // P10-vor, Teil B 2: Datei → Leinwand als Bild speichern, Kürzel Strg+Umschalt+B, ohne
+    // gewähltes Overlay ausgegraut; Meldung mit dem Dateinamen in der Statuszeile.
+    void canvasImage()
+    {
+        QTemporaryDir pictures;
+        const QString dir = pictures.filePath(QStringLiteral("DoNs Streaming Studio"));
+        m_window->setCanvasImageDir(dir); // nie ~/Bilder im Test
+        auto *action = child<QAction>("canvasImageAction");
+        QVERIFY(action);
+        QCOMPARE(action->shortcut(), QKeySequence(QStringLiteral("Ctrl+Shift+B")));
+        QMenu *file = nullptr;
+        for (QMenu *m : m_window->findChildren<QMenu *>())
+            if (m->title() == QStringLiteral("&Datei"))
+                file = m;
+        QVERIFY(file && file->actions().contains(action));
+        QCOMPARE(action->text(), QStringLiteral("Leinwand als &Bild speichern"));
+
+        // Ohne Overlay ausgegraut: Ordner «Szenen» wählen
+        auto *tree = child<OverlayTree>("overlayTree");
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+            if ((*it)->text(0) == QStringLiteral("Szenen"))
+                tree->setCurrentItem(*it);
+        QTRY_VERIFY_WITH_TIMEOUT(!action->isEnabled(), 3000);
+        QTest::keyClick(m_window->canvas(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+        QTest::qWait(200);
+        QVERIFY(!QDir(dir).exists());
+
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        QTRY_VERIFY_WITH_TIMEOUT(action->isEnabled(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_window->renderer()->imagesLoaded(), 5000);
+        // Kürzel mit Fokus auf der Leinwand
+        m_window->canvas()->setFocus();
+        QTRY_VERIFY_WITH_TIMEOUT(m_window->canvas()->hasFocus(), 2000);
+        QTest::keyClick(m_window->canvas(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(QDir(dir).entryList(QDir::Files).size(), 1, 3000);
+        const QString name = QDir(dir).entryList(QDir::Files).first();
+        QVERIFY2(QRegularExpression(QStringLiteral("\\Atest-szene_\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d\\.png\\z"))
+                     .match(name).hasMatch(),
+                 qPrintable(name));
+        QVERIFY2(m_window->statusBar()->currentMessage().contains(name),
+                 qPrintable(m_window->statusBar()->currentMessage()));
+        const QImage image(QDir(dir).filePath(name));
+        QCOMPARE(image.size(), QSize(1920, 1080)); // Auflösung des Overlays, nicht der Leinwand
+        QVERIFY(image.hasAlphaChannel());
+        QCOMPARE(qAlpha(image.pixel(1919, 1079)), 0);
+        // Menüeintrag wirkt ebenso
+        action->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(QDir(dir).entryList(QDir::Files).size(), 2, 3000);
+    }
+#endif
 
 #if DSS_APP_SETTINGS_DIALOG
     // P10-vor, Teil B 1: Werkzeuge → Einstellungen … liest die Werte vom Kern, schickt Änderungen

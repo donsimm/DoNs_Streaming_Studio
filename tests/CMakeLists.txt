@@ -205,6 +205,19 @@ if(DSS_BUILD_APP AND DSS_APP_RENDERER)
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/leinwand-config")
 endif()
 
+# P10-vor, Teil B 2: Bild der Leinwand ohne Fenster (dss_render, QGuiApplication, kein Qt
+# Widgets) in der X11-Sitzung.
+if(DSS_BUILD_APP AND DSS_APP_RENDERER)
+  qt_add_executable(tst_leinwandbild tst_leinwandbild.cpp)
+  target_link_libraries(tst_leinwandbild PRIVATE dss_render dss_warnings Qt6::Test)
+  target_compile_definitions(tst_leinwandbild PRIVATE DSS_TEST_FONT="${DSS_TEST_FONT}"
+    DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+    DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
+    DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
+  add_test(NAME tst_leinwandbild COMMAND tst_leinwandbild)
+  set_tests_properties(tst_leinwandbild PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+
 # P10-vor (Punkte 67, 68): Übernehmen im eigenen Thread, Aufräumen beim Start, ohne Qt Gui;
 # Kern als eigener Prozess mit eigenem Datenordner.
 dss_add_test(tst_uebernehmen)

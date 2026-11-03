@@ -53,11 +53,16 @@ if(DSS_APP_SETTINGS_DIALOG)
 endif()
 
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
+# Seit P10-vor in dss_render (src/render, ohne Qt Widgets).
 if(DSS_APP_RENDERER)
-  target_sources(dss_app_ui PRIVATE sourcerenderer.h sourcerenderer.cpp
-                                    canvasmeasurement.h canvasmeasurement.cpp)
-  target_link_libraries(dss_app_ui PUBLIC dss_media)
+  target_sources(dss_app_ui PRIVATE canvasmeasurement.h canvasmeasurement.cpp)
+  target_link_libraries(dss_app_ui PUBLIC dss_render)
 endif()
+# «Datei → Leinwand als Bild speichern» (P10-vor, Teil B 2), braucht den Zeichner. Aus: kein
+# Menüeintrag.
+option(DSS_APP_CANVAS_IMAGE "Leinwand als Bild speichern (P10-vor)" ON)
+target_compile_definitions(dss_app_ui PUBLIC
+  DSS_APP_CANVAS_IMAGE=$<AND:$<BOOL:${DSS_APP_CANVAS_IMAGE}>,$<BOOL:${DSS_APP_RENDERER}>>)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_RENDERER=$<BOOL:${DSS_APP_RENDERER}>
                                              DSS_APP_CANVAS_EDIT=$<BOOL:${DSS_APP_CANVAS_EDIT}>)
 

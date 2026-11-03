@@ -62,6 +62,9 @@ public:
     // Bildschirmfotos, Prüfungen und die Leistungsmessung.
     SourceRenderer *renderer() const { return m_renderer; }
     CanvasWidget *canvas() const { return m_canvas; }
+    // P10-vor: Ordner für «Leinwand als Bild speichern» (Standard: dss::canvasImageDir()); Tests
+    // setzen einen eigenen, damit nichts in ~/Bilder landet.
+    void setCanvasImageDir(const QString &dir) { m_canvasImageDir = dir; }
 
     // Zustand eines Verbindungsknopfes im Kopfbereich.
     void setConnectionState(dss::Connection connection, dss::ConnectionState state);
@@ -84,6 +87,7 @@ private:
     void saveLayout();
     void showAbout();
     void showSettings(); // P10-vor: Werkzeuge → Einstellungen …
+    void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
     void onStats(const dss::SystemStats &stats);
@@ -158,6 +162,8 @@ private:
     QList<QAction *> m_transformActions;   // alle Befehle ausser Kopieren und Einfügen
     QMenuBar *m_menuBar = nullptr;
     QAction *m_settingsAction = nullptr;       // P10-vor, nur mit DSS_APP_SETTINGS_DIALOG
+    QAction *m_canvasImageAction = nullptr;    // P10-vor, nur mit DSS_APP_CANVAS_IMAGE
+    QString m_canvasImageDir;                  // Ablage der Bilder der Leinwand
     SettingsDialog *m_settingsDialog = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;

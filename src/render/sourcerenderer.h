@@ -23,7 +23,8 @@ class VideoPlayer;
 struct VideoFrame;
 }
 
-// Zeichner der Leinwand im Editor (P09, Teil B, Schalter DSS_APP_RENDERER). Zeichnet die
+// Zeichner der Leinwand im Editor (P09, Teil B, Schalter DSS_APP_RENDERER; seit P10-vor in
+// dss_render, ohne Qt Widgets, auch für das Bild der Leinwand, overlayimage.h). Zeichnet die
 // sichtbaren Quellen des gewählten Overlays in Zeichenreihenfolge mit Lage, Grösse und Drehung
 // aus sourcegeometry.h. Bilder werden in einem Thread des Pools geladen, Videos in je einem
 // eigenen Thread dekodiert (dss::VideoPlayer); im Thread der Oberfläche wird nur gezeichnet.

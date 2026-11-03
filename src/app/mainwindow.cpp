@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 
+#include "canvasimage.h"
 #include "canvaswidget.h"
 #include "configpaths.h"
 #include "coreclient.h"
@@ -9,6 +10,9 @@
 #include "symbols.h"
 #if DSS_APP_SETTINGS_DIALOG
 #include "settingsdialog.h"
+#endif
+#if DSS_APP_CANVAS_IMAGE
+#include "overlayimage.h"
 #endif
 #if DSS_APP_RENDERER
 #include "sourcerenderer.h"
@@ -64,6 +68,7 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
                        QWidget *parent)
     : QMainWindow(parent), m_theme(theme), m_keepLayout(keepLayout), m_client(client)
 {
+    m_canvasImageDir = dss::canvasImageDir();
     setWindowTitle(dss::windowTitle());
     resize(1280, 800);
     createMenus();
@@ -98,6 +103,16 @@ void MainWindow::createMenus()
     m_menuBar = new QMenuBar(this);
     QMenuBar *bar = m_menuBar;
     QMenu *file = bar->addMenu(QStringLiteral("&Datei"));
+#if DSS_APP_CANVAS_IMAGE
+    // Bild des gewählten Overlays (P10-vor, Teil B 2). Strg+Umschalt+B: weder im Fenster noch in
+    // Xfce belegt (geprüft 2026-11-03, xfconf-query -c xfce4-keyboard-shortcuts -l -v).
+    m_canvasImageAction = file->addAction(QStringLiteral("Leinwand als &Bild speichern"), this,
+                                          &MainWindow::saveCanvasImage);
+    m_canvasImageAction->setObjectName(QStringLiteral("canvasImageAction"));
+    m_canvasImageAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_B));
+    m_canvasImageAction->setEnabled(false);
+    file->addSeparator();
+#endif
     QAction *quit = file->addAction(QStringLiteral("&Beenden"), this, &QWidget::close);
     quit->setShortcut(QKeySequence::Quit);
     quit->setMenuRole(QAction::QuitRole);
@@ -312,6 +327,22 @@ void MainWindow::showSettings()
 #endif
 }
 
+void MainWindow::saveCanvasImage()
+{
+#if DSS_APP_CANVAS_IMAGE
+    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    if (!overlay)
+        return;
+    QString path;
+    QString error;
+    if (dss::saveOverlayImage(*m_renderer, *overlay, m_canvasImageDir, QDateTime::currentDateTime(),
+                              &path, &error))
+        showStatus(QStringLiteral("Leinwand gespeichert: %1").arg(path));
+    else
+        showStatus(error);
+#endif
+}
+
 void MainWindow::onCoreConnectedChanged(bool connected)
 {
     if (m_settingsAction)
@@ -497,6 +528,8 @@ void MainWindow::refreshOverlay()
 #if DSS_APP_RENDERER
     m_renderer->setOverlay(overlay ? &*overlay : nullptr);
 #endif
+    if (m_canvasImageAction)
+        m_canvasImageAction->setEnabled(overlay.has_value()); // ohne Overlay ausgegraut
     // Auflösung im Dock «Steuerung» (P09); während eine Änderung unterwegs ist, bleibt der Wert.
     if (!m_client || !m_client->isChangePending(dss::overlaySizeKey(m_selectedOverlay))) {
         const QSignalBlocker blockWidth(m_controlDock.overlayWidth);
