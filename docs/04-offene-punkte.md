@@ -109,3 +109,13 @@ Stand: 2026-11-03 (nach P08, Handtest offen).
 
 - Neu E-23: Kopfbereich fest über die ganze Fensterbreite; links oder rechts angedockte Docks beginnen darunter. Umsetzung als erster Teil von P09.
 - Punkt 48: Die blaue Fläche links neben einem gewählten Eintrag im Ordner wird entfernt (P09). An dieser Stelle kommt mit P10 der Schalter «Ausgabe ein/aus» pro Overlay (E-24).
+
+## Entschieden nach P08 (2026-11-03)
+
+- Punkt 44: eigene Übersetzung ohne «ß». Die Übersetzung von Qt (`qtbase_de.qm`) wird beim Bau kopiert, «ß» durch «ss» ersetzt und geladen. Umsetzung mit P09.
+- Punkt 45: so lassen (nur benannte Schnitte). P09 sorgt dafür, dass der Zeichner bei einer variablen Schriftdatei die gewählte Stärke (Achse `wght`) setzt.
+- Punkt 47: Auflösung eines bestehenden Overlays nachträglich änderbar, im Dock «Steuerung» (Breite und Höhe in Pixeln, Wunsch des Nutzers: nicht über Rechtsklick). Quellen behalten ihre Pixelwerte; was danach ausserhalb liegt, ist teilweise ausserhalb der Leinwand. Umsetzung mit P09.
+- Punkt 49: so lassen, die Bildlaufleiste im Dock «Eigenschaften» ist in Ordnung.
+- Punkt 50: alle drei Annahmen vom Nutzer bestätigt (neue Quelle wird gewählt; letzte Änderung beim Kern gilt; nach hartem Absturz des Kerns höchstens 1 s Änderungen verloren).
+- Punkt 46 (Datei- und Farbwahl nur im Handtest geprüft): im Handtest P08 geprüft, in Ordnung; keine weitere Massnahme.
+- Punkt 51 (Ausrichten ausgegraut): gehört zu E-10 (SOLL), keine Massnahme bis dahin.
