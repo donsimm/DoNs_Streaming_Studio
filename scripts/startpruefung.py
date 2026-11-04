@@ -14,7 +14,9 @@ Je Start:
 - Beenden: nach 1 s Laufzeit SIGTERM (dss-core auch SIGINT). dss-app schliesst bei SIGTERM sein
   Fenster, also derselbe Weg wie beim Schliessen von Hand.
 - Seit P07 nie mit echten Daten: dss-core läuft mit eigenem --datenordner und eigener
-  --verbindung (temporäre Ordner, Socket in $XDG_RUNTIME_DIR). dss-app läuft mit einer eigenen
+  --verbindung (temporäre Ordner, Socket in $XDG_RUNTIME_DIR). Seit P10b (Punkt 83) auch mit
+  eigenem Port (--standardport, 32000 bis 32767 nach der PID): Der Overlay-Server stört so weder
+  dss-core-entwicklung.service noch die Version im Einsatz (beide 8081). dss-app läuft mit einer eigenen
   --verbindung, an der kein Kern antwortet, und einer --einheit, die es nicht gibt: Das Fenster
   versucht die Einheit zu starten, das scheitert, und es startet trotzdem (Teil F).
   Fall «app-kern-sigterm»: vor jedem Start ein eigener dss-core; das Fenster verbindet sich, beim
@@ -43,6 +45,9 @@ EXIT_TIMEOUT_S = 10
 RUNNING_S = 1.0
 
 CORE = "src/core/dss-core"
+# P10b, Punkt 83: Port der Testkerne; nie 8080 oder 8081, nicht der Bereich von tests/prozesshilfe.h
+# (24000 bis 31999) und höchstens 32767 (gültige Ports: docs/08-kern-schnittstelle.md, «Einstellungen»)
+TEST_PORT = 32000 + os.getpid() % 768
 UNIT_MISSING = "dss-startpruefung-gibt-es-nicht.service"
 CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: ",
                  "Aufräumen media/: 0 vorläufige Dateien",
@@ -153,7 +158,8 @@ def stderr_rest(proc, err):
 def start_core(build, data_dir, socket_path, env):
     """Eigener Kern für den Fall app-kern-sigterm; wartet, bis er Verbindungen annimmt."""
     core = subprocess.Popen([os.path.join(build, CORE), "--datenordner", data_dir,
-                             "--verbindung", socket_path], stdout=subprocess.PIPE,
+                             "--verbindung", socket_path, "--standardport", str(TEST_PORT)],
+                            stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True, start_new_session=True, env=env)
     core_lines = []
     ready = read_until(core, "Verbindung offen: ", START_TIMEOUT_S, core_lines)
@@ -164,7 +170,8 @@ def one_run(build, case, idx, env=None, data_dir=None, socket_path=None):
     rel, sig, ready_pattern, expected = CASES[case]
     cmd = [os.path.join(build, rel)]
     if rel == CORE:
-        cmd += ["--datenordner", data_dir, "--verbindung", socket_path]
+        cmd += ["--datenordner", data_dir, "--verbindung", socket_path,
+                "--standardport", str(TEST_PORT)]
     else:
         cmd += ["--verbindung", socket_path, "--einheit", UNIT_MISSING]
     core = None

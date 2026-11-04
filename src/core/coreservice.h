@@ -162,4 +162,6 @@ private:
         QElapsedTimer timer; // seit Beginn des Übernehmens (Protokoll)
     };
     QHash<quint64, PendingImport> m_imports;
+    // P10b, Punkt 85: leere Adresse im Heimnetz alle 2 s aus der Standardroute
+    dss::HomeAddressWatcher *m_addressWatcher = nullptr;
 };

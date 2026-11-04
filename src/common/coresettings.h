@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QHostAddress>
 #include <QList>
+#include <QObject>
 #include <QString>
 #include <QStringList>
 
@@ -58,7 +59,8 @@ QString coreSettingsPath(Edition edition = buildEdition());
 
 // Prüfungen; leer = gültig, sonst die Meldung auf Deutsch.
 QString validatePort(int port);
-// Leer ist erlaubt (dann trägt der Kern beim nächsten Start die Adresse der Standardroute ein).
+// Leer ist erlaubt (dann trägt der Kern seit P10b innerhalb von 2 s die Adresse der Standardroute
+// ein, sobald es eine gibt; HomeAddressWatcher).
 // Sonst vier Zahlen 0 bis 255 mit Punkten, ohne führende Nullen; nicht 0.0.0.0, nicht
 // 127.x.x.x, nicht Multicast (224 bis 239) und nicht reserviert (ab 240, auch 255.255.255.255).
 QString validateHomeAddress(const QString &address);
@@ -124,6 +126,10 @@ public:
     // Protokollzeilen. false mit Meldung: Datei gültig, Umbenennen oder Schreiben fehlgeschlagen
     // (dann gilt der alte Stand).
     bool resetInvalid(const QDateTime &now, QString *renamedTo, QStringList *log, QString *error);
+    // P10b, Punkt 85: Ist die Datei gültig und die Adresse im Heimnetz leer, die Adresse der
+    // Standardroute eintragen und die Datei schreiben. true, wenn eine Adresse eingetragen wurde
+    // (*log bekommt die Zeile). Ohne Standardroute still false (der Kern fragt alle 2 s).
+    bool fillMissingHomeAddress(QStringList *log);
 
 private:
     bool write(const CoreSettings &settings, QString *error);
@@ -136,6 +142,28 @@ private:
     LocalAddresses m_localAddresses;
     CoreSettings m_settings;
     QString m_fileError;
+};
+
+// P10b, Punkt 85: prüft alle intervalMs, ob die Adresse im Heimnetz leer ist, und trägt dann die
+// Adresse der Standardroute ein (CoreSettingsStore::fillMissingHomeAddress), ohne Neustart.
+// filled() kommt, wenn eine Adresse eingetragen wurde; der Kern startet dann den Server neu.
+class HomeAddressWatcher : public QObject
+{
+    Q_OBJECT
+
+public:
+    static constexpr int kIntervalMs = 2000;
+
+    HomeAddressWatcher(CoreSettingsStore *settings, int intervalMs = kIntervalMs,
+                       QObject *parent = nullptr);
+    // Einmal prüfen (sonst über den Zeitgeber); true, wenn eine Adresse eingetragen wurde.
+    bool check();
+
+signals:
+    void filled(const QString &logLine);
+
+private:
+    CoreSettingsStore *m_settings;
 };
 
 } // namespace dss

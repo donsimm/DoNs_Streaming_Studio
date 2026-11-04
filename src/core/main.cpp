@@ -124,7 +124,16 @@ int main(int argc, char *argv[])
         QStringLiteral("Datei der Einstellungen des Kerns (Standard: ~/.config/%1/kern.ini).")
             .arg(dss::appDirName()),
         QStringLiteral("PFAD"));
+    // P10b, Punkt 83: Tests und Startprüfung geben jedem Kern einen eigenen Port, auch für eine
+    // neu angelegte oder zurückgesetzte kern.ini; so stört ein laufender dss-core-entwicklung.service
+    // (Port 8081) sie nicht.
+    const QCommandLineOption defaultPortOption(
+        QStringLiteral("standardport"),
+        QStringLiteral("Port, der beim Anlegen oder Zurücksetzen von kern.ini gilt (Standard: %1; "
+                       "für Tests).").arg(dss::defaultCoreSettings().port),
+        QStringLiteral("PORT"));
     parser.addOption(versionOption);
+    parser.addOption(defaultPortOption);
     parser.addOption(dataDirOption);
     parser.addOption(settingsOption);
     parser.addOption(connectionOption);
@@ -181,9 +190,20 @@ int main(int argc, char *argv[])
 
     // Einstellungen (P10-vor): kern.ini lesen, eine fehlende Adresse im Heimnetz einmal aus der
     // Standardroute eintragen.
+    dss::CoreSettings settingsDefaults = dss::defaultCoreSettings();
+    if (parser.isSet(defaultPortOption)) {
+        bool ok = false;
+        const int port = parser.value(defaultPortOption).toInt(&ok);
+        if (!ok || !dss::validatePort(port).isEmpty()) {
+            qCritical("Kern startet nicht: --standardport %s ungültig (%d bis %d)",
+                      qPrintable(parser.value(defaultPortOption)), dss::kPortMin, dss::kPortMax);
+            return kExitError;
+        }
+        settingsDefaults.port = port;
+    }
     dss::CoreSettingsStore settings(parser.isSet(settingsOption) ? parser.value(settingsOption)
                                                                  : dss::coreSettingsPath(),
-                                    dss::defaultCoreSettings());
+                                    settingsDefaults);
     {
         QStringList log;
         QStringList warnings;

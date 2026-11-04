@@ -1434,8 +1434,8 @@ private slots:
             QVERIFY(f.open(QIODevice::WriteOnly));
             f.write("[overlay-server]\nport=99999\n");
         }
-        // Port nach dem Zurücksetzen: Standard der Version in Arbeit (8081). Ist er belegt, meldet
-        // das nur der Server; der Test prüft den Dialog.
+        // Port nach dem Zurücksetzen: Standard dieses Testkerns (--standardport, Punkt 83), nicht
+        // 8081 der Version in Arbeit.
         std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
         QString log;
         QVERIFY2(testhelp::waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
@@ -1463,7 +1463,7 @@ private slots:
         QVERIFY(dialog.isVisible());
         QVERIFY(ok->isEnabled());
         QVERIFY(!reset->isEnabled());
-        QCOMPARE(port->value(), defaultCoreSettings().port);
+        QCOMPARE(port->value(), testhelp::testPort(config.path()));
         QCOMPARE(address->text(), detectHomeAddress());
         QCOMPARE(QDir(dir).entryList(QDir::Files).size(), 2); // kern.ini und die umbenannte
         dialog.reject();

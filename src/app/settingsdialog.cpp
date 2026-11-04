@@ -25,7 +25,7 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     m_port->setRange(1, 65535);
     m_address = new QLineEdit(this);
     m_address->setObjectName(QStringLiteral("settingsAddress"));
-    m_address->setPlaceholderText(QStringLiteral("leer = beim nächsten Start ermitteln"));
+    m_address->setPlaceholderText(QStringLiteral("leer = aus der Standardroute ermitteln"));
     m_file = new QLabel(this);
     m_file->setObjectName(QStringLiteral("settingsFile"));
     m_file->setTextInteractionFlags(Qt::TextSelectableByMouse);

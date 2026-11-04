@@ -84,9 +84,10 @@ const char *const kUsageTemplate =
     "einstellungen: Port und Adresse im Heimnetz des Kerns (kern.ini). Läuft der Kern, fragt dss-cli\n"
     "ihn; sonst liest es die Datei ~/.config/%1/kern.ini (nur lesen).\n"
     "einstellung-port, einstellung-adresse: ändern über den laufenden Kern (nur er schreibt die\n"
-    "Datei). PORT 1024 bis 32767; ADRESSE IPv4 wie 192.168.1.9, \"\" = leer (beim nächsten Start\n"
-    "aus der Standardroute eintragen); nur Adressen dieses PCs. Beides wirkt sofort (der\n"
-    "Overlay-Server startet neu; in OBS dann die neue Adresse der Browserquelle eintragen).\n"
+    "Datei). PORT 1024 bis 32767; ADRESSE IPv4 wie 192.168.1.9, \"\" = leer (der Kern trägt\n"
+    "innerhalb von 2 s die Adresse der Standardroute ein, sobald es eine gibt); nur Adressen\n"
+    "dieses PCs. Beides wirkt sofort (der Overlay-Server startet neu; in OBS dann die neue\n"
+    "Adresse der Browserquelle eintragen).\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
     "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse).\n";

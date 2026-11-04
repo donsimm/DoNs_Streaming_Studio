@@ -4,7 +4,9 @@
 Nie mit echten Daten und nie mit der echten Einheit: eine eigene Einheit (Standard
 dss-core-pruefung.service) mit eigenem --datenordner (Testdaten wie im Handtest, mit dss-cli
 angelegt) und eigener --verbindung (Socket in $XDG_RUNTIME_DIR). dss-app läuft mit eigenem
-XDG_CONFIG_HOME, damit fenster.ini des Nutzers unberührt bleibt.
+XDG_CONFIG_HOME, damit fenster.ini des Nutzers unberührt bleibt. Seit P10b (Punkt 83) hat der Kern
+eine eigene kern.ini (--einstellungen) mit eigenem Port (32000 bis 32767 nach der PID, wie
+scripts/startpruefung.py); vorher nutzte er die kern.ini der Version in Arbeit und damit Port 8081.
 
 Ablauf:
  1. scripts/dienst-einrichten.sh zweimal: «geschrieben», dann «unverändert»; Zustand «static»
@@ -145,6 +147,10 @@ def main():
     socket = os.path.join(run_dir, "kern.sock")
     config = os.path.join(work, "config")
     os.makedirs(config)
+    # P10b, Punkt 83: eigene kern.ini mit eigenem Port; die Adresse im Heimnetz trägt der Kern ein.
+    settings = os.path.join(work, "kern.ini")
+    with open(settings, "w", encoding="utf-8") as f:
+        f.write("[overlay-server]\nport=%d\n" % (32000 + os.getpid() % 768))
     result = {"datum": time.strftime("%Y-%m-%d %H:%M:%S %z"), "einheit": unit,
               "datenordner": data, "verbindung": socket, "kills": []}
     apps = []
@@ -161,7 +167,8 @@ def main():
             check(r.returncode == 0, "dss-cli " + " ".join(cmd[:2]))
 
         log("1. Einrichten (zweimal)")
-        setup = [SETUP, "--einheit", unit, "--datenordner", data, "--verbindung", socket]
+        setup = [SETUP, "--einheit", unit, "--datenordner", data, "--verbindung", socket,
+                 "--einstellungen", settings]
         r1, r2 = run(setup), run(setup)
         check(r1.returncode == 0 and "geschrieben:" in r1.stdout, "erstes Einrichten schreibt die Einheit")
         check(r2.returncode == 0 and "unverändert:" in r2.stdout, "zweites Einrichten ändert nichts")

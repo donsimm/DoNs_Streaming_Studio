@@ -48,6 +48,16 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
     m_importer = new dss::MediaImporter(m_store->mediaDir(), kImportThreads, this);
     connect(m_importer, &dss::MediaImporter::finished, this, &CoreService::onImportFinished);
 #endif
+    if (m_settings) {
+        // Punkt 85: leere Adresse im Heimnetz ohne Neustart eintragen, sobald es eine
+        // Standardroute gibt; der Server hört dann auch dort zu (settingsApplied).
+        m_addressWatcher = new dss::HomeAddressWatcher(m_settings,
+                                                       dss::HomeAddressWatcher::kIntervalMs, this);
+        connect(m_addressWatcher, &dss::HomeAddressWatcher::filled, this, [this](const QString &line) {
+            qInfo("%s", qPrintable(line));
+            settingsApplied();
+        });
+    }
     // In P07 gibt es noch keine Verbindungen: alle «nicht eingerichtet» (grau).
     for (dss::Connection c : dss::kAllConnections)
         m_connectionStates.insert(c, dss::ConnectionState::Off);

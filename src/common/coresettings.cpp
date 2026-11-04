@@ -9,6 +9,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
+#include <QTimer>
 
 namespace dss {
 
@@ -330,6 +331,50 @@ bool CoreSettingsStore::resetInvalid(const QDateTime &now, QString *renamedTo, Q
     log->append(QStringLiteral("Einstellungen: ungültige Datei umbenannt in %1, %2 mit Standardwerten "
                                "neu geschrieben").arg(target, m_path));
     return true;
+}
+
+bool CoreSettingsStore::fillMissingHomeAddress(QStringList *log)
+{
+    if (!m_fileError.isEmpty() || !m_settings.homeAddress.isEmpty())
+        return false;
+    QString iface;
+    QString reason;
+    const QString address = m_detector(&iface, &reason);
+    if (address.isEmpty())
+        return false;
+    CoreSettings next = m_settings;
+    next.homeAddress = address;
+    QString error;
+    if (!write(next, &error)) {
+        log->append(QStringLiteral("Einstellungen: Adresse im Heimnetz %1 nicht gespeichert: %2")
+                        .arg(address, error));
+        return false;
+    }
+    m_settings = next;
+    log->append(QStringLiteral("Einstellungen: Adresse im Heimnetz %1 eingetragen (Netzwerkkarte "
+                               "%2 der Standardroute, ohne Neustart)").arg(address, iface));
+    return true;
+}
+
+HomeAddressWatcher::HomeAddressWatcher(CoreSettingsStore *settings, int intervalMs, QObject *parent)
+    : QObject(parent)
+    , m_settings(settings)
+{
+    auto *timer = new QTimer(this);
+    timer->setInterval(intervalMs);
+    connect(timer, &QTimer::timeout, this, &HomeAddressWatcher::check);
+    timer->start();
+}
+
+bool HomeAddressWatcher::check()
+{
+    QStringList log;
+    const bool filled = m_settings->fillMissingHomeAddress(&log);
+    if (filled)
+        emit this->filled(log.join(QLatin1Char(' ')));
+    else if (!log.isEmpty())
+        qWarning("%s", qPrintable(log.join(QLatin1Char(' '))));
+    return filled;
 }
 
 bool CoreSettingsStore::write(const CoreSettings &settings, QString *error)

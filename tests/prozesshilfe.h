@@ -8,6 +8,7 @@
 #include <QDeadlineTimer>
 #include <QDir>
 #include <QFile>
+#include <QHash>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QString>
@@ -41,22 +42,44 @@ inline bool writeCoreSettings(const QString &configHome, int port, const QString
     return true;
 }
 
+// Eigener Port für jeden Testkern (P10, seit P10b Punkt 83 auch für eine neu angelegte oder
+// zurückgesetzte kern.ini): 24000 bis 31999, je Prozess vier Ports nach der PID, danach weiter
+// gezählt. Nie 8080 oder 8081: Der Overlay-Server der Testkerne stört so weder die Version in
+// Arbeit (dss-core-entwicklung.service) noch die im Einsatz.
+inline int nextTestPort()
+{
+    static int next = 0;
+    return 24000 + int(QCoreApplication::applicationPid() % 2000) * 4 + (next++ % 4);
+}
+
+// Port, der zu einem Ordner aus testConfigHome() gehört (0, wenn unbekannt).
+inline QHash<QString, int> &testPorts()
+{
+    static QHash<QString, int> ports;
+    return ports;
+}
+
+inline int testPort(const QString &configHome)
+{
+    return testPorts().value(configHome, 0);
+}
+
 // Eigener Ordner der Einstellungen (XDG_CONFIG_HOME) für jeden gestarteten Kern (P10-vor): Der
 // Kern schreibt dort kern.ini, nie in ~/.config. Die Ordner bleiben bis zum Ende des Tests.
-// Seit P10 mit eigenem Port je Kern (nicht 8081): Der Overlay-Server der Testkerne stört so weder
-// die Version in Arbeit noch andere Tests (belegt wäre nur eine Meldung, kein Fehler).
 inline QString testConfigHome()
 {
     static std::vector<std::unique_ptr<QTemporaryDir>> dirs;
-    static int next = 0;
     dirs.push_back(std::make_unique<QTemporaryDir>());
-    const int port = 24000 + int(QCoreApplication::applicationPid() % 2000) * 4 + (next++ % 4);
+    const int port = nextTestPort();
     writeCoreSettings(dirs.back()->path(), port);
+    testPorts().insert(dirs.back()->path(), port);
     return dirs.back()->path();
 }
 
 // Startet dss-core mit eigenem Datenordner, eigener Verbindung und eigenem Ordner der
-// Einstellungen; Protokoll auf stderr wird gesammelt (readAllStandardError).
+// Einstellungen; Protokoll auf stderr wird gesammelt (readAllStandardError). Der Kern bekommt
+// den Port des Ordners auch als --standardport (Punkt 83): Eine fehlende, ungültige oder
+// zurückgesetzte kern.ini bekommt so nie 8081.
 inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString &socketPath,
                                            const QString &configHome = testConfigHome())
 {
@@ -65,8 +88,11 @@ inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("XDG_CONFIG_HOME"), configHome);
     p->setProcessEnvironment(env);
+    if (testPort(configHome) == 0)
+        testPorts().insert(configHome, nextTestPort());
     p->start(QStringLiteral(DSS_CORE_BIN),
-             {QStringLiteral("--datenordner"), dataDir, QStringLiteral("--verbindung"), socketPath});
+             {QStringLiteral("--datenordner"), dataDir, QStringLiteral("--verbindung"), socketPath,
+              QStringLiteral("--standardport"), QString::number(testPort(configHome))});
     return p;
 }
 

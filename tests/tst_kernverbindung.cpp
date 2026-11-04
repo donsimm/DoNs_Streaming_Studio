@@ -379,7 +379,7 @@ private slots:
         SettingsInfo info;
         QString error;
         QVERIFY2(parseSettings(one.waitFor(QStringLiteral("settings")), &info, &error), qPrintable(error));
-        QCOMPARE(info, (SettingsInfo{{defaultCoreSettings().port, detected}, 1024, 32767, path, QString()}));
+        QCOMPARE(info, (SettingsInfo{{testhelp::testPort(m_config.path()), detected}, 1024, 32767, path, QString()}));
 
         // Ungültige Werte: abgewiesen mit Meldung, Datei unverändert, keine Nachricht an andere.
         const QByteArray before = [&] {
@@ -428,17 +428,31 @@ private slots:
             QVERIFY(f.open(QIODevice::ReadOnly));
             CoreSettings stored;
             QVERIFY(parseCoreSettings(f.readAll(), defaultCoreSettings(), &stored, &error));
-            QCOMPARE(stored, (CoreSettings{9000, QString()}));
+            // Leer, oder schon wieder eingetragen (Punkt 85, alle 2 s)
+            QCOMPARE(stored.port, 9000);
+            QVERIFY2(stored.homeAddress.isEmpty() || stored.homeAddress == detected, qPrintable(stored.homeAddress));
         }
         QVERIFY(waitForLog(m_core.get(), QStringLiteral("Einstellungen geändert: Port 9000, Adresse im Heimnetz leer"),
                            &m_coreLog));
+        // P10b, Punkt 85: Leere Adresse trägt der Kern innerhalb von 2 s aus der Standardroute ein,
+        // ohne Neustart, und schickt die neuen Werte an alle.
+        if (!detected.isEmpty()) {
+            QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings"), 4000), &broadcast, &error));
+            QCOMPARE(broadcast.settings, (CoreSettings{9000, detected}));
+            QVERIFY(waitForLog(m_core.get(), QStringLiteral("Adresse im Heimnetz %1 eingetragen (Netzwerkkarte").arg(detected),
+                               &m_coreLog));
+            QVERIFY(m_coreLog.contains(QStringLiteral("der Standardroute, ohne Neustart)")));
+        }
 
 #ifdef DSS_CLI_BIN
         // dss-cli über dieselbe Verbindung
         CliResult cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellungen")});
         QCOMPARE(cli.exitCode, 0);
         QVERIFY2(cli.out.contains(QStringLiteral("9000 (erlaubt 1024 bis 32767)")), qPrintable(cli.out));
-        QVERIFY2(cli.out.contains(QRegularExpression(QStringLiteral("Adresse im Heimnetz +leer"))), qPrintable(cli.out));
+        QVERIFY2(cli.out.contains(QRegularExpression(QStringLiteral("Adresse im Heimnetz +%1")
+                                                         .arg(detected.isEmpty() ? QStringLiteral("leer")
+                                                                                 : QRegularExpression::escape(detected)))),
+                 qPrintable(cli.out));
         QVERIFY(cli.out.contains(QStringLiteral("Kern")));
         cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
                                      QStringLiteral("1023")});
@@ -448,15 +462,17 @@ private slots:
                                      QStringLiteral("acht")});
         QCOMPARE(cli.exitCode, 1);
         cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-port"),
-                                     QString::number(defaultCoreSettings().port)});
+                                     QString::number(testhelp::testPort(m_config.path()))});
         QCOMPARE(cli.exitCode, 0);
-        QVERIFY(cli.out.startsWith(QStringLiteral("Port: %1\n").arg(defaultCoreSettings().port)));
+        QVERIFY(cli.out.startsWith(QStringLiteral("Port: %1\n").arg(testhelp::testPort(m_config.path()))));
         cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_socket, QStringLiteral("einstellung-adresse"),
                                      detected});
         QCOMPARE(cli.exitCode, 0);
         QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
-        QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
-        QCOMPARE(broadcast.settings, (CoreSettings{defaultCoreSettings().port, detected}));
+        // Mit erkannter Adresse ist sie schon eingetragen (Punkt 85): keine zweite Nachricht
+        if (detected.isEmpty())
+            QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &broadcast, &error));
+        QCOMPARE(broadcast.settings, (CoreSettings{testhelp::testPort(m_config.path()), detected}));
         // Ohne Kern: ändern geht nicht (Exit 4)
         cli = runCli(m_data.path(), {QStringLiteral("--verbindung"), m_run->filePath(QStringLiteral("keiner.sock")),
                                      QStringLiteral("einstellung-port"), QStringLiteral("9000")});
@@ -513,7 +529,8 @@ private slots:
         }
         // Neue Werte an alle, ohne Meldung; die Datei hat die Standardwerte mit der erkannten Adresse.
         QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings")), &info, &error));
-        const CoreSettings expected{defaultCoreSettings().port, detectHomeAddress()};
+        // Punkt 83: Standard dieses Testkerns (--standardport), nicht 8081
+        const CoreSettings expected{testhelp::testPort(config.path()), detectHomeAddress()};
         QCOMPARE(info.settings, expected);
         QVERIFY(info.error.isEmpty());
         {
@@ -558,7 +575,7 @@ private slots:
         QVERIFY2(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error),
                  qPrintable(error));
         const QString oldToken = storedToken();
-        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, oldToken));
+        QCOMPARE(info.url, browserSourceUrl(detected, testhelp::testPort(m_config.path()), address, oldToken));
         QVERIFY(info.problem.isEmpty());
 
         // Neuer Token: neue Adresse an one, nichts an two, Protokoll ohne Token
@@ -573,7 +590,7 @@ private slots:
         QVERIFY2(result.ok, qPrintable(result.message));
         const QString newToken = storedToken();
         QVERIFY(newToken != oldToken);
-        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, newToken));
+        QCOMPARE(info.url, browserSourceUrl(detected, testhelp::testPort(m_config.path()), address, newToken));
         QVERIFY(waitForLog(m_core.get(), QStringLiteral("Neuer Token für Overlay «Überblick Start» (/o/%1/…): "
                                                         "die alte Adresse gilt nicht mehr").arg(address),
                            &m_coreLog));
@@ -586,9 +603,9 @@ private slots:
         QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
         QCOMPARE(info.url, browserSourceUrl(detected, 9001, address, newToken));
         one.sendLine(QStringLiteral("{\"type\":\"update_settings\",\"request_id\":13,\"port\":%1}")
-                         .arg(defaultCoreSettings().port).toUtf8());
+                         .arg(testhelp::testPort(m_config.path())).toUtf8());
         QVERIFY(parseBrowserSource(one.waitFor(QStringLiteral("browser_source")), &info, &error));
-        QCOMPARE(info.url, browserSourceUrl(detected, defaultCoreSettings().port, address, newToken));
+        QCOMPARE(info.url, browserSourceUrl(detected, testhelp::testPort(m_config.path()), address, newToken));
 
         // Unbekanntes Overlay: problem; null: keine Adresse mehr
         one.sendLine(encodeMessage(getBrowserSourceMessage(QUuid::createUuid())).chopped(1));
@@ -688,7 +705,7 @@ private slots:
         SettingsInfo info;
         QString error;
         QVERIFY(parseSettings(c.waitFor(QStringLiteral("settings")), &info, &error));
-        QCOMPARE(info.settings, defaultCoreSettings());
+        QCOMPARE(info.settings, (CoreSettings{testhelp::testPort(config.path()), QString()}));
         QVERIFY2(info.error.contains(QStringLiteral("Port 99999 ungültig")), qPrintable(info.error));
         c.sendLine("{\"type\":\"update_settings\",\"request_id\":1,\"port\":9000}");
         ChangeResult r;

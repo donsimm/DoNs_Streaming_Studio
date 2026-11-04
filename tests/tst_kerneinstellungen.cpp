@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -292,6 +293,84 @@ private slots:
         again.load(&log, &warnings);
         QCOMPARE(calls, 2);
         QCOMPARE(again.settings().homeAddress, QStringLiteral("192.168.1.9"));
+    }
+
+    // P10b, Punkt 85: Leere Adresse alle 2 s (hier 50 ms) aus der Standardroute eintragen, ohne
+    // Neustart. Die Route und die Adressen der Netzwerkkarten wechseln im Test wie beim Einstecken
+    // des Kabels: zuerst keine Standardroute (tests/daten/proc/ohne-route), dann enp3s0 ohne
+    // IPv4, dann mit 192.168.1.9 (tests/daten/proc/heimnetz).
+    void watcherFillsMissingAddress()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        QByteArray route = readFile(kData + QStringLiteral("/ohne-route/net/route"));
+        QList<QHostAddress> addresses;
+        const auto addressesOf = [&addresses](const QString &iface) {
+            return iface == QStringLiteral("enp3s0") ? addresses : QList<QHostAddress>{};
+        };
+        int calls = 0;
+        const auto detector = [&](QString *iface, QString *reason) {
+            ++calls;
+            return homeAddressFromRoute(route, addressesOf, iface, reason);
+        };
+        CoreSettingsStore store(path, {8081, QString()}, detector);
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QCOMPARE(store.settings().homeAddress, QString());
+        HomeAddressWatcher watcher(&store, 50);
+        QSignalSpy filled(&watcher, &HomeAddressWatcher::filled);
+        QTest::qWait(300);
+        QCOMPARE(filled.size(), 0);
+        QVERIFY(calls >= 3);
+        QCOMPARE(readFile(path), serializeCoreSettings({8081, QString()}));
+        // Kabel eingesteckt, Karte noch ohne IPv4 (nur link-local)
+        route = readFile(kData + QStringLiteral("/heimnetz/net/route"));
+        addresses = {QHostAddress(QStringLiteral("fe80::1")), QHostAddress(QStringLiteral("169.254.7.7"))};
+        QTest::qWait(200);
+        QCOMPARE(filled.size(), 0);
+        // DHCP fertig: eingetragen und gespeichert
+        addresses.append(QHostAddress(QStringLiteral("192.168.1.9")));
+        QVERIFY(filled.wait(2000));
+        QCOMPARE(filled.size(), 1);
+        QCOMPARE(filled.first().first().toString(),
+                 QStringLiteral("Einstellungen: Adresse im Heimnetz 192.168.1.9 eingetragen (Netzwerkkarte "
+                                "enp3s0 der Standardroute, ohne Neustart)"));
+        QCOMPARE(store.settings(), (CoreSettings{8081, QStringLiteral("192.168.1.9")}));
+        QCOMPARE(readFile(path), serializeCoreSettings(store.settings()));
+        // Danach nichts mehr: Adresse ist gesetzt, auch wenn die Route wechselt
+        const int callsAfter = calls;
+        addresses = {QHostAddress(QStringLiteral("10.0.0.5"))};
+        QTest::qWait(200);
+        QCOMPARE(filled.size(), 1);
+        QCOMPARE(calls, callsAfter);
+        QCOMPARE(store.settings().homeAddress, QStringLiteral("192.168.1.9"));
+        // Wieder leer gestellt (zum Beispiel im Dialog): wieder eingetragen
+        QString error;
+        addresses = {QHostAddress(QStringLiteral("192.168.1.9"))};
+        QVERIFY2(store.change(std::nullopt, QString(), &error), qPrintable(error));
+        QVERIFY(filled.wait(2000));
+        QCOMPARE(store.settings().homeAddress, QStringLiteral("192.168.1.9"));
+    }
+
+    // Ungültige Datei: nichts eintragen, Datei bleibt unverändert.
+    void watcherLeavesInvalidFile()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        const QByteArray broken("[overlay-server]\nport=99999\n");
+        QVERIFY(writeFile(path, broken));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QStringLiteral("192.168.1.9"), {}, &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        HomeAddressWatcher watcher(&store, 20);
+        QSignalSpy filled(&watcher, &HomeAddressWatcher::filled);
+        QTest::qWait(150);
+        QCOMPARE(filled.size(), 0);
+        QCOMPARE(calls, 0);
+        QCOMPARE(readFile(path), broken);
     }
 
     void invalidFileStaysUntouched()

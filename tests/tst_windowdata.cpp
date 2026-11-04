@@ -94,6 +94,8 @@ private slots:
         u = settingsUpdateFromForm(current, 80, QStringLiteral("abc"));
         QVERIFY(u && u->port == 80 && u->homeAddress == QStringLiteral("abc")); // prüft der Kern
         QVERIFY(settingsDialogHint().contains(QStringLiteral("Nur Adressen dieses PCs")));
+        // P10b, Punkt 85: leere Adresse ohne Neustart
+        QVERIFY(settingsDialogHint().contains(QStringLiteral("innerhalb von 2 s")));
         QVERIFY(!settingsDialogProblem(false, std::nullopt).isEmpty());
         QVERIFY(settingsDialogProblem(true, std::nullopt).isEmpty());
         SettingsInfo info{current, 1024, 32767, QStringLiteral("/x/kern.ini"), QStringLiteral("kaputt")};
