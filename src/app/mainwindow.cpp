@@ -334,8 +334,14 @@ void MainWindow::connectCore()
 #endif
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
-    connect(m_sourcesDock.list, &QListWidget::currentItemChanged, this,
-            &MainWindow::onSourceItemChanged);
+    // Gewählt ist die markierte Zeile, nicht die aktuelle (P10b): Nach dem Neufüllen der Liste
+    // kann Zeile 0 aktuell sein, ohne markiert zu sein (keine Quelle gewählt). Ein Klick darauf
+    // ändert dann nur die Markierung, currentItemChanged käme nicht, und die Eigenschaften
+    // blieben leer.
+    connect(m_sourcesDock.list, &QListWidget::itemSelectionChanged, this, [this] {
+        const QList<QListWidgetItem *> marked = m_sourcesDock.list->selectedItems();
+        onSourceItemChanged(marked.isEmpty() ? nullptr : marked.first());
+    });
     // Wählen auf der Leinwand: dieselbe Auswahl wie im Dock «Quellen» (P09, Teil C).
     connect(m_canvas, &CanvasWidget::sourceClicked, this, &MainWindow::onCanvasSourceClicked);
     m_statusMessage->setText(m_client->statusText());

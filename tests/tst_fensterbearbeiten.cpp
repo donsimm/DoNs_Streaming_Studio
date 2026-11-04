@@ -752,6 +752,30 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(list->count(), 3, 3000);
     }
 
+    void sourceSelectionFollowsMark()
+    {
+        // P10b: Gewählt ist die markierte Zeile, nicht die aktuelle. In 6 von 50 Läufen war nach
+        // dem Löschen der gewählten Quelle Zeile 0 aktuell, aber nicht markiert; ein Markieren
+        // dieser Zeile (wie ein Klick) zeigte dann keine Eigenschaften.
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        auto *list = child<SourceList>("sourceList");
+        auto *name = child<QLineEdit>("propertyName");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        QVERIFY(list->count() >= 2);
+        selectSourceRow(1);
+        QCOMPARE(name->text(), sourceAtRow(1).name);
+        // Zeile 0 markieren, Zeile 1 bleibt aktuell
+        list->selectionModel()->select(list->model()->index(0, 0), QItemSelectionModel::ClearAndSelect);
+        QCOMPARE(list->currentRow(), 1);
+        QCOMPARE(name->text(), sourceAtRow(0).name);
+        // Nichts markiert: keine Quelle gewählt
+        list->clearSelection();
+        QVERIFY(name->text().isEmpty());
+        selectSourceRow(0);
+        QCOMPARE(name->text(), sourceAtRow(0).name);
+    }
+
     void overlays()
     {
         if (!DSS_APP_EDITING)
