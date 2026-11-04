@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 9); // seit P10 (reset_settings)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 10); // seit P10b (Medien)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -590,6 +590,69 @@ private slots:
         bad = o;
         bad.remove(QStringLiteral("enabled"));
         QVERIFY(!parseServerStatus(bad, &back, &error));
+    }
+
+    // P10b: media_list und import_progress hin und zurück, null für leere Angaben
+    void mediaListMessages()
+    {
+        MediaListData d;
+        d.folders = {{QUuid::createUuid(), QStringLiteral("Logos"), QUuid(), true}};
+        d.folders.append({QUuid::createUuid(), QStringLiteral("Alt"), d.folders.first().id, false});
+        MediaFileData image;
+        image.entry = {QStringLiteral("media/") + QString(64, QLatin1Char('a')) + QStringLiteral(".png"),
+                       QStringLiteral("logo «neu».png"), d.folders.at(1).id};
+        image.kind = MediaKind::Image;
+        image.bytes = 19776;
+        image.usedIn = {{QUuid::createUuid(), QStringLiteral("Überblick"), QUuid::createUuid(),
+                         QStringLiteral("logo.png")}};
+        MediaFileData video;
+        video.entry = {QStringLiteral("media/") + QString(64, QLatin1Char('b')) + QStringLiteral(".mp4"),
+                       QStringLiteral("zaehler.mp4"), QUuid()};
+        video.kind = MediaKind::Video;
+        video.bytes = qint64(3) << 32; // über 4 GiB
+        video.codec = QStringLiteral("hevc");
+        video.browserProblem = QStringLiteral("zaehler.mp4 (HEVC) wird in der Browserquelle nicht angezeigt.");
+        d.files = {image, video};
+        d.error = QStringLiteral("medien.json: kaputt");
+        const QJsonObject o = roundTrip(mediaListMessage(d));
+        QCOMPARE(messageType(o), QStringLiteral("media_list"));
+        MediaListData back;
+        QString error;
+        QVERIFY2(parseMediaList(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, d);
+        QVERIFY(back.file(video.entry.file));
+        QCOMPARE(back.file(video.entry.file)->codec, QStringLiteral("hevc"));
+        // Leere Angaben als null
+        const QJsonArray files = o.value(QStringLiteral("files")).toArray();
+        QVERIFY(files.at(0).toObject().value(QStringLiteral("codec")).isNull());
+        QVERIFY(files.at(0).toObject().value(QStringLiteral("browser_problem")).isNull());
+        QVERIFY(files.at(1).toObject().value(QStringLiteral("folder")).isNull());
+        d.error.clear();
+        QVERIFY(mediaListMessage(d).value(QStringLiteral("error")).isNull());
+        // Unbekannte Art
+        QJsonObject bad = o;
+        QJsonArray badFiles = files;
+        QJsonObject f = badFiles.at(0).toObject();
+        f.insert(QStringLiteral("kind"), QStringLiteral("audio"));
+        badFiles[0] = f;
+        bad.insert(QStringLiteral("files"), badFiles);
+        QVERIFY(!parseMediaList(bad, &back, &error));
+
+        const QList<ImportProgressData> imports = {
+            {1, QStringLiteral("gross.webm"), d.folders.first().id, 42},
+            {2, QStringLiteral("klein.png"), QUuid(), 100}};
+        const QJsonObject p = roundTrip(importProgressMessage(imports));
+        QCOMPARE(messageType(p), QStringLiteral("import_progress"));
+        QList<ImportProgressData> backImports;
+        QVERIFY2(parseImportProgress(p, &backImports, &error), qPrintable(error));
+        QCOMPARE(backImports, imports);
+        QJsonObject over = importProgressMessage({{1, QStringLiteral("x.png"), QUuid(), 100}});
+        QJsonArray list = over.value(QStringLiteral("imports")).toArray();
+        QJsonObject entry = list.at(0).toObject();
+        entry.insert(QStringLiteral("percent"), 101);
+        list[0] = entry;
+        over.insert(QStringLiteral("imports"), list);
+        QVERIFY(!parseImportProgress(over, &backImports, &error));
     }
 };
 

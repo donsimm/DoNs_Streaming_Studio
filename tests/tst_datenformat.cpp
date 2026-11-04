@@ -5,6 +5,7 @@
 #include "dataformat.h"
 #include "dataformattesting.h"
 #include "datalock.h"
+#include "medialibrary.h"
 #include "overlayjson.h"
 #include "overlaystore.h"
 
@@ -16,6 +17,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QProcess>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -31,6 +33,9 @@ const QString kFormatTwo = QStringLiteral("overlays/cbf17458-229b-4bd1-8449-f554
 const QString kFormatThree = QStringLiteral("overlays/f3ab0d90-c6d2-40d3-87a3-4251c27d5d51.json");
 // P10: Format 4 mit Ausgabe aus (E-24), schon aktuell
 const QString kFormatFour = QStringLiteral("overlays/02b9d140-0573-4e87-9958-0a74ee955363.json");
+// P10b: Die Testdaten stammen von vor P10b; medien.json fehlt, media/ hat 3 Dateien.
+const QString kMediaLine = QStringLiteral("medien.json (fehlt, 3 Datei(en) in media/ bekommen Ersatznamen)");
+const QString kMediaJson = QStringLiteral("medien.json");
 
 bool copyTree(const QString &from, const QString &to)
 {
@@ -141,7 +146,7 @@ private slots:
         QVERIFY(s.error.isEmpty());
         QCOMPARE(s.older, (QStringList{kFormatTwo + QStringLiteral(" (Format 2)"),
                                        kFormatThree + QStringLiteral(" (Format 3)"),
-                                       kFormatOne + QStringLiteral(" (Format 1)")}));
+                                       kFormatOne + QStringLiteral(" (Format 1)"), kMediaLine}));
         QVERIFY(s.newer.isEmpty());
         QVERIFY(s.unreadable.isEmpty());
         QVERIFY(s.needsConversion());
@@ -162,7 +167,8 @@ private slots:
         QStringList converted;
         QString error;
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 3);
+        QCOMPARE(converted.size(), 4);
+        QCOMPARE(converted.last(), kMediaLine);
         for (const QString &f : {kFormatOne, kFormatTwo, kFormatThree, kFormatFour}) {
             QCOMPARE(readAll(dataDir() + QLatin1Char('/') + f), before.value(f));
             QCOMPARE(formatVersion(dataDir() + QLatin1Char('/') + f), 4);
@@ -172,14 +178,41 @@ private slots:
             const QJsonObject o = QJsonDocument::fromJson(readAll(dataDir() + QLatin1Char('/') + f)).object();
             QCOMPARE(o.value(QStringLiteral("output")), QJsonValue(f != kFormatFour));
         }
-        // Alles andere unverändert: Format 4, Liste, Token, Medien
+        // Alles andere unverändert: Format 4, Liste, Token, Medien; dazu medien.json (P10b)
         const QMap<QString, QByteArray> filesAfter = snapshot(dataDir());
-        QCOMPARE(filesAfter.keys(), filesBefore.keys());
+        QStringList expectedKeys = filesBefore.keys();
+        expectedKeys.append(kMediaJson);
+        expectedKeys.sort();
+        QCOMPARE(filesAfter.keys(), expectedKeys);
         for (const QString &f : filesBefore.keys()) {
             if (f != kFormatOne && f != kFormatTwo && f != kFormatThree)
                 QVERIFY2(filesAfter.value(f) == filesBefore.value(f), qPrintable(f));
         }
         QVERIFY(!checkDataFormat(dataDir()).needsConversion());
+        // medien.json: alle drei Dateien mit Ersatznamen aus Typ und Datum der Datei (Teil A 1)
+        MediaLibrary library;
+        QVERIFY2(parseMediaLibrary(readAll(dataDir() + QStringLiteral("/medien.json")), &library, &error),
+                 qPrintable(error));
+        QCOMPARE(library.files.size(), 3);
+        QVERIFY(library.folders.isEmpty());
+        QList<MediaEntry> videos;
+        for (const MediaEntry &e : library.files) {
+            const QDate date = QFileInfo(dataDir() + QLatin1Char('/') + e.file).lastModified().date();
+            QVERIFY2(e.name.startsWith(mediaKindName(*mediaKindOf(e.file)) + QStringLiteral(" vom ")
+                                       + date.toString(Qt::ISODate)),
+                     qPrintable(e.name));
+            QVERIFY(e.folder.isNull());
+            if (mediaKindOf(e.file) == MediaKind::Video)
+                videos.append(e);
+        }
+        // Zwei Videos vom selben Tag: das spätere (oder bei gleicher Zeit nach Verweis) mit « (2)»
+        QCOMPARE(videos.size(), 2);
+        const QDate videoDate = QFileInfo(dataDir() + QLatin1Char('/') + videos.at(0).file).lastModified().date();
+        if (QFileInfo(dataDir() + QLatin1Char('/') + videos.at(1).file).lastModified().date() == videoDate) {
+            const QString base = substituteMediaName(MediaKind::Video, videoDate);
+            QCOMPARE((QSet<QString>{videos.at(0).name, videos.at(1).name}),
+                     (QSet<QString>{base, base + QStringLiteral(" (2)")}));
+        }
 
         // Das Programm lädt alles ohne Fehler (nur die absichtlich fehlende Schrift als Warnung,
         // je eine in format-drei und format-vier)
@@ -238,7 +271,7 @@ private slots:
         QStringList converted;
         QString error;
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 3);
+        QCOMPARE(converted.size(), 4);
         QCOMPARE(readAll(broken), QByteArray("{ kaputt"));
     }
 
@@ -249,13 +282,14 @@ private slots:
         QTest::addColumn<int>("failAt");
         QTest::newRow("erste Datei") << 1;
         QTest::newRow("zweite Datei") << 2;
+        QTest::newRow("medien.json") << 4; // P10b: zuletzt; die Overlays werden zurückgeschrieben
     }
 
     void failedWriteRestoresFiles()
     {
         QFETCH(int, failAt);
         const QMap<QString, QByteArray> before = contents(dataDir());
-        QCOMPARE(checkDataFormat(dataDir()).older.size(), 3);
+        QCOMPARE(checkDataFormat(dataDir()).older.size(), 4);
         // Erste umzuwandelnde Datei (older ist nach Name sortiert: Format 2 vor Format 1)
         const QString first = dataDir() + QLatin1Char('/') + kFormatTwo;
         const ino_t firstInode = inode(first);
@@ -274,15 +308,49 @@ private slots:
             QVERIFY2(after.value(it.key()) == it.value(), qPrintable(it.key()));
         // Beim Fehler an der zweiten Datei wurde die erste geschrieben und zurückgeschrieben
         // (QSaveFile benennt um: neue Inode), an der ersten gar nichts.
-        if (failAt == 2)
+        if (failAt >= 2)
             QVERIFY(inode(first) != firstInode);
         else
             QCOMPARE(inode(first), firstInode);
         // Gegenprobe: Beim zweiten Mal (ohne Testfehler) wurde die erste Datei wirklich
         // geschrieben und danach zurückgeschrieben; ohne Testmöglichkeit gelingt das Umwandeln.
         QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
-        QCOMPARE(converted.size(), 3);
+        QCOMPARE(converted.size(), 4);
         QVERIFY(contents(dataDir()) != before);
+    }
+
+    // P10b: medien.json gültig, ungültig, neuer; ohne Dateien in media/ nichts umzuwandeln
+    void mediaLibraryFormat()
+    {
+        QString error;
+        QStringList converted;
+        // Leeres media/: keine medien.json nötig
+        QDir media(dataDir() + QStringLiteral("/media"));
+        for (const QString &f : media.entryList(QDir::Files))
+            QVERIFY(media.remove(f));
+        DataFormatStatus s = checkDataFormat(dataDir());
+        QVERIFY(!s.older.contains(kMediaLine));
+        QCOMPARE(s.older.size(), 3);
+        QVERIFY2(convertDataFormat(dataDir(), &converted, &error), qPrintable(error));
+        QVERIFY(!QFile::exists(dataDir() + QStringLiteral("/medien.json")));
+        QVERIFY(!checkDataFormat(dataDir()).needsConversion());
+
+        // Ungültig: nicht lesbar gemeldet, Umwandeln lässt sie, wie sie ist
+        const QString path = dataDir() + QStringLiteral("/medien.json");
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly) && f.write("{\"format_version\": 1, \"files\": 3}") > 0);
+        f.close();
+        s = checkDataFormat(dataDir());
+        QCOMPARE(s.unreadable.size(), 1);
+        QVERIFY2(s.unreadable.first().startsWith(QStringLiteral("medien.json: ")), qPrintable(s.unreadable.first()));
+        QVERIFY(!s.needsConversion());
+        // Neuer als dieses Programm
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate)
+                && f.write("{\"format_version\": 2, \"folders\": [], \"files\": []}") > 0);
+        f.close();
+        s = checkDataFormat(dataDir());
+        QCOMPARE(s.newer, QStringList{QStringLiteral("medien.json (Format 2)")});
+        QVERIFY(!convertDataFormat(dataDir(), &converted, &error));
     }
 
     void missingDataDir()
@@ -313,7 +381,8 @@ private slots:
         }
         r = runCore(dir + QStringList{QStringLiteral("--umwandeln")});
         QCOMPARE(r.exitCode, 0);
-        QVERIFY2(r.out.contains(QStringLiteral("3 Dateien umgewandelt")), qPrintable(r.out));
+        QVERIFY2(r.out.contains(QStringLiteral("4 Dateien umgewandelt")), qPrintable(r.out));
+        QVERIFY2(r.out.contains(kMediaLine), qPrintable(r.out));
         r = runCore(dir + QStringList{QStringLiteral("--format-pruefen")});
         QCOMPARE(r.exitCode, 0);
         QVERIFY2(r.out.startsWith(QStringLiteral("Format aktuell")), qPrintable(r.out));

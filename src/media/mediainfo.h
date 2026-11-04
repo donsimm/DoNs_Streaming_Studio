@@ -34,4 +34,11 @@ int displayMatrixOrientation(const int32_t *matrix);
 // DSS_VIDEO_ROTATION oder bei Fehlern 1). Für den Overlay-Server (P10): die Seite dreht danach.
 int readVideoOrientation(const QString &path);
 
+// Format (Codec) des besten Bildstroms einer Videodatei als Name in FFmpeg, zum Beispiel "h264",
+// "vp9", "hevc", "mpeg4", "prores" (P10b, Punkt 81; videoformat.h). Öffnet nur die Datei und liest
+// die Angaben der Ströme, ohne zu dekodieren. false mit Meldung, wenn das nicht geht.
+// https://ffmpeg.org/doxygen/7.1/group__lavf__decoding.html (avformat_find_stream_info,
+// av_find_best_stream), https://ffmpeg.org/doxygen/7.1/group__lavc__core.html (avcodec_get_name)
+bool readVideoCodec(const QString &path, QString *codec, QString *error);
+
 } // namespace dss

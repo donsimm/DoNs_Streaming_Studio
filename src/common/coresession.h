@@ -28,6 +28,9 @@ public:
     std::optional<SettingsInfo> getSettings(QString *error);
     // Antwort change_result des Kerns; ohne Antwort std::nullopt mit Meldung.
     std::optional<ChangeResult> updateSettings(const SettingsUpdate &update, QString *error);
+    // P10b: Medienliste und Änderungen (request.requestId wird hier vergeben).
+    std::optional<MediaListData> getMediaList(QString *error);
+    std::optional<ChangeResult> change(ChangeRequest request, QString *error);
 
 private:
     bool send(const QJsonObject &message, QString *error);

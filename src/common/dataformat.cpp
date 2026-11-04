@@ -6,6 +6,7 @@
 #include "dataformattesting.h"
 
 #include "datalock.h"
+#include "medialibrary.h"
 #include "overlayjson.h"
 #include "overlaylist.h"
 #include "tokenstore.h"
@@ -116,6 +117,34 @@ Scan scan(const QString &dataDir)
             s.converted.append(serializeOverlay(overlay));
             s.older.append(f);
         }
+    }
+
+    // medien.json (P10b): Fehlt sie bei vorhandenen Dateien in media/, legt Umwandeln sie mit
+    // Ersatznamen an (Teil A 1); das gilt als älteres Format, damit installieren.sh vorher sichert.
+    // Ohne Dateien in media/ ist nichts zu tun, die Datei entsteht bei der ersten Übernahme.
+    const QString mediaRelative = QString::fromLatin1(kMediaLibraryFileName);
+    const QString mediaPath = dataDir + QLatin1Char('/') + mediaRelative;
+    if (QFile::exists(mediaPath)) {
+        const FileFormat f = readFormat(dataDir, mediaRelative);
+        MediaLibrary library;
+        QString error;
+        if (f.version == 0)
+            s.status.unreadable.append(f.relative + QStringLiteral(": ") + f.problem);
+        else if (f.version > kMediaLibraryFormatVersion)
+            s.status.newer.append(describe(f));
+        else if (!parseMediaLibrary(f.data, &library, &error))
+            s.status.unreadable.append(f.relative + QStringLiteral(": ") + error);
+    } else if (const QList<MediaFileInfo> files = scanMediaDir(dataDir + QStringLiteral("/media"));
+               !files.isEmpty()) {
+        MediaLibrary library;
+        reconcileMediaLibrary(&library, files);
+        FileFormat f;
+        f.relative = mediaRelative;
+        f.path = mediaPath;
+        s.status.older.append(QStringLiteral("%1 (fehlt, %2 Datei(en) in media/ bekommen Ersatznamen)")
+                                  .arg(mediaRelative).arg(files.size()));
+        s.converted.append(serializeMediaLibrary(library));
+        s.older.append(f); // zuletzt: muss nie zurückgeschrieben werden
     }
     return s;
 }

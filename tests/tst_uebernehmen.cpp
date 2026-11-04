@@ -23,6 +23,7 @@
 #include <QTest>
 #include <QThread>
 
+#include <algorithm>
 #include <csignal>
 #include <memory>
 
@@ -416,6 +417,131 @@ private slots:
         }
         QCOMPARE(bigSources, 2);
         QVERIFY(waitForLog(m_core.get(), QStringLiteral("war schon vorhanden"), &m_coreLog));
+    }
+
+    // P10b, Punkt 73: Eine Datei in Übernahme erscheint mit Fortschritt in Prozent bei allen
+    // Fenstern (höchstens alle 200 ms); Abbrechen: change_result «canceled», nichts bleibt in media/
+    // (weder Kopie noch vorläufige Datei) und nichts in der Medienliste.
+    void progressAndCancel()
+    {
+        m_run = runtimeDir();
+        m_socket = m_run->filePath(QStringLiteral("k.sock"));
+        QVERIFY2(startCore(), qPrintable(m_coreLog));
+        QVERIFY(connectClient());
+        ChangeRequest folder = request(msg::kCreateMediaFolder);
+        folder.name = QStringLiteral("Neu");
+        const ChangeResult created = change(folder);
+        QVERIFY2(created.ok, qPrintable(created.message));
+
+        QSignalSpy progress(m_client.get(), &CoreClient::importProgressChanged);
+        QSignalSpy results(m_client.get(), &CoreClient::changeFinished);
+        ChangeRequest add = request(msg::kAddMedia);
+        add.file = m_big;
+        add.folderId = created.id;
+        QElapsedTimer t;
+        t.start();
+        const qint64 addId = m_client->sendChange(add);
+        QList<int> percents;
+        QList<qint64> times;
+        qint64 importId = 0;
+        while (percents.isEmpty() || percents.last() < 25) {
+            QVERIFY2(progress.wait(3000), "kein Fortschritt");
+            const QList<ImportProgressData> imports = m_client->imports();
+            QVERIFY2(!waitResult(&results, addId, 0), "Übernehmen war schon fertig; Datei zu klein");
+            if (imports.isEmpty())
+                continue;
+            QCOMPARE(imports.size(), 1);
+            QCOMPARE(imports.first().name, QStringLiteral("gross.png"));
+            QCOMPARE(imports.first().folder, created.id);
+            importId = imports.first().importId;
+            percents.append(imports.first().percent);
+            times.append(t.elapsed());
+        }
+        qInfo("Fortschritt: %s nach %s ms",
+              qPrintable(QStringList([&] { QStringList l; for (int p : percents) l.append(QString::number(p)); return l; }()).join(QLatin1Char(' '))),
+              qPrintable(QStringList([&] { QStringList l; for (qint64 v : times) l.append(QString::number(v)); return l; }()).join(QLatin1Char(' '))));
+        QVERIFY(std::is_sorted(percents.begin(), percents.end()));
+        QVERIFY(percents.last() < 100);
+        // Zwischen zwei Meldungen mindestens 200 ms (Zeitgeber), ausser der ersten beim Start
+        for (qsizetype i = 2; i < times.size(); ++i)
+            QVERIFY2(times.at(i) - times.at(i - 1) >= 150,
+                     qPrintable(QStringLiteral("%1 ms").arg(times.at(i) - times.at(i - 1))));
+
+        ChangeRequest cancel = request(msg::kCancelImport);
+        cancel.importId = importId;
+        const ChangeResult canceled = change(cancel);
+        QVERIFY2(canceled.ok, qPrintable(canceled.message));
+        const std::optional<ChangeResult> r = waitResult(&results, addId, 10000);
+        QVERIFY(r);
+        QVERIFY(!r->ok);
+        QCOMPARE(r->code, QString::fromLatin1(err::kCanceled));
+        QCOMPARE(r->message, QStringLiteral("Übernehmen von gross.png abgebrochen."));
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->imports().isEmpty(), 2000);
+        QCOMPARE(mediaEntries(dataDir()), QStringList());
+        QVERIFY(m_client->mediaList().files.isEmpty());
+        QVERIFY(waitForLog(m_core.get(), QStringLiteral("Übernehmen von %1 abgebrochen nach").arg(m_big), &m_coreLog));
+        // Noch einmal abbrechen: gibt es nicht mehr
+        const ChangeResult again = change(cancel);
+        QVERIFY(!again.ok);
+        QVERIFY2(again.message.contains(QStringLiteral("Keine laufende Übernahme")), qPrintable(again.message));
+
+        // Danach geht Übernehmen normal: kleine Datei in den Ordner, Fortschritt am Ende leer
+        add.file = kImage;
+        const ChangeResult small = change(add);
+        QVERIFY2(small.ok, qPrintable(small.message));
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->mediaList().files.size(), qsizetype(1), 2000);
+        QCOMPARE(m_client->mediaList().files.first().entry.name, QStringLiteral("bild1.png"));
+        QCOMPARE(m_client->mediaList().files.first().entry.folder, created.id);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->imports().isEmpty(), 2000);
+        QCOMPARE(mediaEntries(dataDir()).size(), 1);
+    }
+
+    // P10b, Teil A 1: Hinzufügen ohne Quelle hält den ursprünglichen Dateinamen fest; dieselbe Datei
+    // nochmals behält Name und Ordner (mit Hinweis). Die Quelle aus der Medienliste bekommt deren Namen.
+    void addMediaKeepsName()
+    {
+        m_run = runtimeDir();
+        m_socket = m_run->filePath(QStringLiteral("k.sock"));
+        QVERIFY2(startCore(), qPrintable(m_coreLog));
+        QVERIFY(connectClient());
+        ChangeRequest add = request(msg::kAddMedia);
+        add.file = kImage;
+        QVERIFY(change(add).ok);
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->mediaList().files.size(), qsizetype(1), 2000);
+        const QString file = m_client->mediaList().files.first().entry.file;
+        ChangeRequest rename = request(msg::kRenameMedia);
+        rename.file = file;
+        rename.name = QStringLiteral("Logo");
+        QVERIFY(change(rename).ok);
+        const ChangeResult again = change(add);
+        QVERIFY(again.ok);
+        QCOMPARE(again.warning, QStringLiteral("bild1.png ist schon in der Medienliste (als «Logo»), Name und "
+                                               "Ordner bleiben."));
+        QCOMPARE(m_client->mediaList().files.size(), qsizetype(1));
+        QCOMPARE(m_client->mediaList().files.first().entry.name, QStringLiteral("Logo"));
+        // Unbekannte Endung: abgewiesen, ohne Übernehmen
+        add.file = m_files.filePath(QStringLiteral("text.gif"));
+        const ChangeResult gif = change(add);
+        QVERIFY(!gif.ok);
+        QVERIFY2(gif.message.contains(QStringLiteral("png, jpg, jpeg, webm, mp4, ttf, otf")), qPrintable(gif.message));
+        // Quelle aus der Medienliste: Name aus der Liste, keine neue Kopie
+        m_overlay = createOverlay(QStringLiteral("Liste"));
+        ChangeRequest source = request(msg::kAddImageSource, m_overlay);
+        source.file = file;
+        const ChangeResult added = change(source);
+        QVERIFY2(added.ok, qPrintable(added.message));
+        QCOMPARE(m_client->overlay(m_overlay)->sources.first().name, QStringLiteral("Logo"));
+        QCOMPARE(mediaEntries(dataDir()).size(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->mediaList().files.first().usedIn.size(), qsizetype(1), 2000);
+        // Verwendet: Löschen abgewiesen mit Code in_use
+        ChangeRequest remove = request(msg::kRemoveMedia);
+        remove.file = file;
+        const ChangeResult refused = change(remove);
+        QVERIFY(!refused.ok);
+        QCOMPARE(refused.code, QString::fromLatin1(err::kInUse));
+        QCOMPARE(refused.message, QStringLiteral("«Logo» lässt sich nicht löschen, verwendet in Overlay «Liste» "
+                                                 "(Quelle «Logo»)."));
+        QCOMPARE(mediaEntries(dataDir()).size(), 1);
     }
 
     // Overlay bzw. Quelle während des Übernehmens gelöscht: Die Änderung wird abgewiesen, die

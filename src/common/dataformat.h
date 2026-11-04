@@ -11,6 +11,8 @@
 // liste.json (kListFormatVersion) und tokens.json (kTokenFormatVersion). Umwandeln heisst: jede
 // Overlay-Datei in älterem Format streng lesen und im aktuellen Format schreiben, genau wie es
 // das Programm beim nächsten Speichern tut (docs/06-overlay-format.md, «Versionen»).
+// Seit P10b auch medien.json (kMediaLibraryFormatVersion): Fehlt sie und liegen Dateien in
+// media/, legt Umwandeln sie mit Ersatznamen an (als letzte Datei).
 
 namespace dss {
 

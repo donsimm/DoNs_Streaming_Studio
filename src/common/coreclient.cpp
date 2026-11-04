@@ -88,6 +88,12 @@ void CoreClient::requestOverlay(const QUuid &id)
         send(overlayIdMessage(msg::kGetOverlay, id));
 }
 
+void CoreClient::requestMediaList()
+{
+    if (m_connected)
+        send(simpleMessage(msg::kGetMediaList));
+}
+
 void CoreClient::requestOverlayList()
 {
     if (m_connected)
@@ -160,11 +166,13 @@ qint64 CoreClient::transmit(ChangeRequest request, const QString &coalesceKey)
     send(changeRequestMessage(request));
     // Änderungen, für die der Kern zuerst eine Datei übernimmt (P10-vor): Hinweis im Fenster.
     // Ein Verweis "media/…" (Schrift aus dem Datenordner) ist schon übernommen.
-    const bool imports = request.type == QLatin1String(msg::kAddImageSource)
-                         || request.type == QLatin1String(msg::kAddVideoSource)
-                         || request.type == QLatin1String(msg::kReplaceImageFile)
-                         || (request.type == QLatin1String(msg::kSetTextFont)
-                             && !validateMediaReference(request.file).isEmpty());
+    // Seit P10b auch add_media, und Bild und Video aus der Medienliste sind schon übernommen.
+    const bool imports = (request.type == QLatin1String(msg::kAddImageSource)
+                          || request.type == QLatin1String(msg::kAddVideoSource)
+                          || request.type == QLatin1String(msg::kReplaceImageFile)
+                          || request.type == QLatin1String(msg::kSetTextFont)
+                          || request.type == QLatin1String(msg::kAddMedia))
+                         && !validateMediaReference(request.file).isEmpty();
     if (imports) {
         m_importNames.insert(request.requestId, QFileInfo(request.file).fileName());
         emit pendingImportsChanged();
@@ -431,6 +439,22 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_settings = info;
         emit settingsChanged();
+    } else if (type == QLatin1String(msg::kMediaList)) {
+        MediaListData data;
+        if (!parseMediaList(message, &data, &error)) {
+            qWarning("Kern: media_list ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_mediaList = data;
+        emit mediaListChanged();
+    } else if (type == QLatin1String(msg::kImportProgress)) {
+        QList<ImportProgressData> imports;
+        if (!parseImportProgress(message, &imports, &error)) {
+            qWarning("Kern: import_progress ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_imports = imports;
+        emit importProgressChanged();
     } else if (type == QLatin1String(msg::kServerStatus)) {
         ServerStatusInfo info;
         if (!parseServerStatus(message, &info, &error)) {
@@ -534,6 +558,12 @@ void CoreClient::clearData()
     if (m_serverStatus) {
         m_serverStatus.reset();
         emit serverStatusChanged();
+    }
+    m_mediaList = MediaListData();
+    emit mediaListChanged();
+    if (!m_imports.isEmpty()) {
+        m_imports.clear();
+        emit importProgressChanged();
     }
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);

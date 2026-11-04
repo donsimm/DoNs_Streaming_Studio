@@ -47,16 +47,26 @@ struct MediaImportResult
     qint64 bytes = 0;      // Grösse der Datei
 };
 
+// Stand eines Übernehmens (P10b, Punkt 73), von einem anderen Thread lesbar: done von total
+// Byte. Gezählt werden beide Durchgänge (SHA-256 und Kopie), total ist also die doppelte Grösse;
+// liegt der Inhalt schon vor, springt done am Ende auf total.
+struct ImportProgress
+{
+    std::atomic<qint64> done{0};
+    std::atomic<qint64> total{0};
+};
+
 // Kopiert filePath nach mediaDir/<SHA-256>.<Endung>: zuerst SHA-256 der Datei, dann Kopie über
 // QSaveFile mit zweitem SHA-256 (hat sich die Datei geändert, wird nichts gespeichert). Läuft in
 // jedem Thread; gleichzeitige Aufrufe mit demselben Ziel (gleicher Inhalt) warten aufeinander,
 // der zweite findet dann die fertige Kopie (existed). cancel (darf nullptr sein) wird nach jedem
 // MiB geprüft; bei Abbruch bleibt weder eine Datei unter dem endgültigen Namen noch die
 // vorläufige Datei. progress (darf leer sein) wird nach jedem MiB aufgerufen, im Thread des
-// Aufrufs.
+// Aufrufs; state (darf nullptr sein) bekommt den Stand.
 MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePath, MediaUse use,
                                   const std::atomic<bool> *cancel = nullptr,
-                                  const std::function<void()> &progress = {});
+                                  const std::function<void()> &progress = {},
+                                  ImportProgress *state = nullptr);
 
 // Vorläufige Dateien von QSaveFile, die das Übernehmen nach einem Absturz oder SIGKILL in
 // media/ hinterlassen kann (Punkt 68): <64 Zeichen 0-9a-f>.<erlaubte Endung>.<6 Zeichen A-Z a-z>.
@@ -89,6 +99,13 @@ public:
     quint64 start(const QString &filePath, MediaUse use);
     // Laufende und wartende Aufträge.
     int pending() const { return int(m_pending.size()); }
+    // Bricht einen Auftrag ab (P10b, Punkt 73): Der Thread hört nach dem nächsten MiB auf, danach
+    // kommt finished() wie sonst, mit canceled (oder ohne, wenn er schon fertig war: dann muss
+    // der Aufrufer die neue Kopie selbst entfernen). false, wenn es den Auftrag nicht gibt.
+    bool cancel(quint64 job);
+    // Stand eines Auftrags: done und total in Byte (siehe ImportProgress); false, wenn es den
+    // Auftrag nicht gibt.
+    bool progress(quint64 job, qint64 *done, qint64 *total) const;
     // Bricht alle Aufträge ab und wartet, bis die Threads fertig sind (beim Beenden des Kerns).
     // Rückgabe: Anzahl abgebrochener Aufträge. Danach kommt kein finished() mehr.
     int cancelAll();
@@ -97,11 +114,16 @@ signals:
     void finished(quint64 job, const dss::MediaImportResult &result);
 
 private:
+    struct Job
+    {
+        QString file;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<ImportProgress> state;
+    };
     QString m_mediaDir;
     QThreadPool m_pool;
-    std::shared_ptr<std::atomic<bool>> m_cancel;
     quint64 m_nextJob = 1;
-    QHash<quint64, QString> m_pending; // Auftrag → Datei
+    QHash<quint64, Job> m_pending;
 };
 
 } // namespace dss

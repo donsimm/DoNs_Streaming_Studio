@@ -107,6 +107,11 @@ private slots:
         r.italic = true;
         r.changes.x = -5;
         r.changes.content = QStringLiteral("Zeile 1\nZeile 2");
+        r.parentId = QUuid::createUuid(); // P10b
+        r.importId = 17;
+        r.centerX = -40;
+        r.centerY = 1080;
+        r.insertIndex = 3;
         const QJsonObject message = roundTrip(changeRequestMessage(r));
         QCOMPARE(messageType(message), type);
         QCOMPARE(messageRequestId(message), 4711);
@@ -131,6 +136,11 @@ private slots:
         QCOMPARE(back.weight, has("weight") ? r.weight : standard.weight);
         QCOMPARE(back.italic, has("italic") ? r.italic : standard.italic);
         QCOMPARE(back.changes, has("changes") ? r.changes : standard.changes);
+        QCOMPARE(back.parentId, has("parent_id") ? r.parentId : standard.parentId);
+        QCOMPARE(back.importId, has("import_id") ? r.importId : standard.importId);
+        QCOMPARE(back.centerX, has("center_x") ? r.centerX : standard.centerX);
+        QCOMPARE(back.centerY, has("center_y") ? r.centerY : standard.centerY);
+        QCOMPARE(back.insertIndex, has("insert_index") ? r.insertIndex : standard.insertIndex);
         // Kein Zugangsdatum in einer Änderung (Teil A): kein Feld heisst token (new_token, P10,
         // hat nur overlay_id).
         for (const QString &key : message.keys())
@@ -158,8 +168,10 @@ private slots:
         QCOMPARE(keys(msg::kRemoveFolder), QStringLiteral("folder_id"));
         QCOMPARE(keys(msg::kMoveFolder), QStringLiteral("folder_id,index"));
         QCOMPARE(keys(msg::kSetFolderExpanded), QStringLiteral("expanded,folder_id"));
-        QCOMPARE(keys(msg::kAddImageSource), QStringLiteral("file,overlay_id"));
-        QCOMPARE(keys(msg::kAddVideoSource), QStringLiteral("file,overlay_id"));
+        QCOMPARE(keys(msg::kAddImageSource),
+                 QStringLiteral("center_x,center_y,file,insert_index,overlay_id"));
+        QCOMPARE(keys(msg::kAddVideoSource),
+                 QStringLiteral("center_x,center_y,file,insert_index,overlay_id"));
         QCOMPARE(keys(msg::kAddTextSource), QStringLiteral("overlay_id"));
         QCOMPARE(keys(msg::kRemoveSource), QStringLiteral("overlay_id,source_id"));
         QCOMPARE(keys(msg::kMoveSource), QStringLiteral("index,overlay_id,source_id"));
@@ -169,9 +181,58 @@ private slots:
         QCOMPARE(keys(msg::kSetOverlaySize), QStringLiteral("height,overlay_id,width"));
         QCOMPARE(keys(msg::kSetOverlayOutput), QStringLiteral("output,overlay_id"));
         QCOMPARE(keys(msg::kNewToken), QStringLiteral("overlay_id"));
-        QCOMPARE(changeTypes().size(), 21);
+        // P10b: Medien
+        QCOMPARE(keys(msg::kAddMedia), QStringLiteral("file,folder_id"));
+        QCOMPARE(keys(msg::kRenameMedia), QStringLiteral("file,name"));
+        QCOMPARE(keys(msg::kMoveMedia), QStringLiteral("file,folder_id"));
+        QCOMPARE(keys(msg::kRemoveMedia), QStringLiteral("file"));
+        QCOMPARE(keys(msg::kCreateMediaFolder), QStringLiteral("name,parent_id"));
+        QCOMPARE(keys(msg::kRenameMediaFolder), QStringLiteral("folder_id,name"));
+        QCOMPARE(keys(msg::kRemoveMediaFolder), QStringLiteral("folder_id"));
+        QCOMPARE(keys(msg::kMoveMediaFolder), QStringLiteral("folder_id,parent_id"));
+        QCOMPARE(keys(msg::kSetMediaFolderExpanded), QStringLiteral("expanded,folder_id"));
+        QCOMPARE(keys(msg::kCancelImport), QStringLiteral("import_id"));
+        QCOMPARE(changeTypes().size(), 31);
         QVERIFY(!isChangeType(QStringLiteral("get_overlay")));
         QVERIFY(!isChangeType(QStringLiteral("set_token")));
+    }
+
+    void placementOptional()
+    {
+        // P10b: center_x, center_y, insert_index dürfen fehlen oder null sein (Lage 0/0, zuoberst
+        // wie bis Version 9); center_x und center_y nur zusammen.
+        ChangeRequest r = fullRequest(QString::fromLatin1(msg::kAddImageSource));
+        QJsonObject o = changeRequestMessage(r);
+        QVERIFY(o.value(QStringLiteral("center_x")).isNull());
+        o.remove(QStringLiteral("center_y"));
+        o.remove(QStringLiteral("insert_index"));
+        ChangeRequest back;
+        QString error;
+        QVERIFY2(parseChangeRequest(o, &back, &error), qPrintable(error));
+        QVERIFY(!back.centerX && !back.centerY && !back.insertIndex);
+        o.insert(QStringLiteral("center_x"), 10);
+        QVERIFY(!parseChangeRequest(o, &back, &error));
+        QVERIFY2(error.contains(QStringLiteral("zusammen")), qPrintable(error));
+        o.insert(QStringLiteral("center_y"), 20);
+        o.insert(QStringLiteral("insert_index"), -1);
+        QVERIFY(!parseChangeRequest(o, &back, &error));
+        o.insert(QStringLiteral("insert_index"), 1);
+        QVERIFY2(parseChangeRequest(o, &back, &error), qPrintable(error));
+        QCOMPARE(back.centerX, 10);
+        QCOMPARE(back.centerY, 20);
+        QCOMPARE(back.insertIndex, 1);
+        // parent_id null = oberste Ebene, import_id ab 1
+        r = fullRequest(QString::fromLatin1(msg::kCreateMediaFolder));
+        o = changeRequestMessage(r);
+        QVERIFY(o.value(QStringLiteral("parent_id")).isNull());
+        QVERIFY2(parseChangeRequest(o, &back, &error), qPrintable(error));
+        QVERIFY(back.parentId.isNull());
+        r = fullRequest(QString::fromLatin1(msg::kCancelImport));
+        o = changeRequestMessage(r);
+        QVERIFY(!parseChangeRequest(o, &back, &error)); // import_id 0
+        o.insert(QStringLiteral("import_id"), 3);
+        QVERIFY2(parseChangeRequest(o, &back, &error), qPrintable(error));
+        QCOMPARE(back.importId, 3);
     }
 
     void nullValues()

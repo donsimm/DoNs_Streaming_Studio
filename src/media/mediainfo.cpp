@@ -58,6 +58,31 @@ bool readMediaSize(const QString &path, int *width, int *height, QString *error)
     return found;
 }
 
+bool readVideoCodec(const QString &path, QString *codec, QString *error)
+{
+    quietAvLog();
+    AVFormatContext *format = nullptr;
+    const QByteArray name = path.toUtf8();
+    if (avformat_open_input(&format, name.constData(), nullptr, nullptr) < 0) {
+        *error = QStringLiteral("Datei nicht lesbar");
+        return false;
+    }
+    bool ok = false;
+    if (avformat_find_stream_info(format, nullptr) >= 0) {
+        const int stream = av_find_best_stream(format, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+        if (stream >= 0) {
+            *codec = QString::fromLatin1(avcodec_get_name(format->streams[stream]->codecpar->codec_id));
+            ok = true;
+        } else {
+            *error = QStringLiteral("kein Bildstrom");
+        }
+    } else {
+        *error = QStringLiteral("Angaben der Ströme nicht lesbar");
+    }
+    avformat_close_input(&format);
+    return ok;
+}
+
 int readVideoOrientation(const QString &path)
 {
     AvInput input;

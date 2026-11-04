@@ -84,7 +84,7 @@ QStringList allowedMediaSuffixes(MediaUse use)
 
 MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePath, MediaUse use,
                                   const std::atomic<bool> *cancel,
-                                  const std::function<void()> &progress)
+                                  const std::function<void()> &progress, ImportProgress *state)
 {
     MediaImportResult result;
     const QFileInfo info(filePath);
@@ -101,6 +101,12 @@ MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePa
         return result;
     }
     result.bytes = source.size();
+    if (state)
+        state->total = 2 * result.bytes;
+    const auto advance = [state](qint64 bytes) {
+        if (state)
+            state->done += bytes;
+    };
     // Stückweise statt addData(QIODevice *), damit Abbruch und Fortschritt dazwischen laufen.
     QCryptographicHash hash(QCryptographicHash::Sha256);
     while (!source.atEnd()) {
@@ -112,6 +118,7 @@ MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePa
             return result;
         }
         hash.addData(chunk);
+        advance(chunk.size());
         if (progress)
             progress();
     }
@@ -130,6 +137,8 @@ MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePa
     if (QFileInfo::exists(target)) {
         result.reference = reference; // gleicher Inhalt schon vorhanden: keine zweite Kopie
         result.existed = true;
+        if (state)
+            state->done = state->total.load();
         return result;
     }
     if (!QDir().mkpath(mediaDir)) {
@@ -154,6 +163,7 @@ MediaImportResult importMediaFile(const QString &mediaDir, const QString &filePa
             break;
         check.addData(chunk);
         copy.write(chunk);
+        advance(chunk.size());
         if (progress)
             progress();
     }
@@ -204,7 +214,6 @@ LeftoverCleanup removeSaveFileLeftovers(const QString &mediaDir)
 MediaImporter::MediaImporter(const QString &mediaDir, int maxThreads, QObject *parent)
     : QObject(parent)
     , m_mediaDir(mediaDir)
-    , m_cancel(std::make_shared<std::atomic<bool>>(false))
 {
     qRegisterMetaType<dss::MediaImportResult>();
     m_pool.setMaxThreadCount(maxThreads);
@@ -218,13 +227,15 @@ MediaImporter::~MediaImporter()
 quint64 MediaImporter::start(const QString &filePath, MediaUse use)
 {
     const quint64 job = m_nextJob++;
-    m_pending.insert(job, filePath);
+    // Abbruch und Stand je Auftrag (P10b): Der Nutzer bricht eine Datei ab, die anderen laufen
+    // weiter.
+    const Job entry{filePath, std::make_shared<std::atomic<bool>>(false),
+                    std::make_shared<ImportProgress>()};
+    m_pending.insert(job, entry);
     const QString mediaDir = m_mediaDir;
-    const std::shared_ptr<std::atomic<bool>> cancel = m_cancel;
-    m_pool.start([this, job, mediaDir, filePath, use, cancel] {
-        const MediaImportResult result = importMediaFile(mediaDir, filePath, use, cancel.get());
-        if (cancel->load())
-            return;
+    m_pool.start([this, job, mediaDir, filePath, use, entry] {
+        const MediaImportResult result =
+            importMediaFile(mediaDir, filePath, use, entry.cancel.get(), {}, entry.state.get());
         // Zurück in den Thread dieses Objekts; nach cancelAll() steht der Auftrag nicht mehr in
         // m_pending und wird übergangen.
         QMetaObject::invokeMethod(this, [this, job, result] {
@@ -236,14 +247,33 @@ quint64 MediaImporter::start(const QString &filePath, MediaUse use)
     return job;
 }
 
+bool MediaImporter::cancel(quint64 job)
+{
+    const auto it = m_pending.constFind(job);
+    if (it == m_pending.constEnd())
+        return false;
+    it->cancel->store(true);
+    return true;
+}
+
+bool MediaImporter::progress(quint64 job, qint64 *done, qint64 *total) const
+{
+    const auto it = m_pending.constFind(job);
+    if (it == m_pending.constEnd())
+        return false;
+    *done = it->state->done.load();
+    *total = it->state->total.load();
+    return true;
+}
+
 int MediaImporter::cancelAll()
 {
     const int count = int(m_pending.size());
-    m_cancel->store(true);
-    m_pool.waitForDone();
+    for (const Job &j : std::as_const(m_pending))
+        j.cancel->store(true);
+    // m_pending vor dem Warten leeren: Die Rückmeldungen der Threads werden dann übergangen.
     m_pending.clear();
-    // Neue Aufträge nach dem Abbrechen (gibt es beim Beenden nicht) bekämen ein neues Zeichen.
-    m_cancel = std::make_shared<std::atomic<bool>>(false);
+    m_pool.waitForDone();
     return count;
 }
 

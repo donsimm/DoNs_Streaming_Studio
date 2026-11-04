@@ -3,6 +3,7 @@
 #include "connectionstate.h"
 #include "coresettings.h"
 #include "fontcatalog.h"
+#include "medialibrary.h"
 #include "overlay.h"
 #include "overlaylist.h"
 #include "systemstats.h"
@@ -36,8 +37,11 @@ namespace dss {
 //   browser_source)
 // 8 seit P10: Zustand des Overlay-Servers (server_status)
 // 9 seit P10: ungültige kern.ini zurücksetzen (reset_settings, Punkt 77)
+// 10 seit P10b: Medienliste (get_media_list, media_list, import_progress), Änderungen der
+//   Medien (add_media, rename_media, …, cancel_import), add_image_source und add_video_source
+//   mit Lage (center_x, center_y, insert_index), Codes canceled und in_use
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 9;
+inline constexpr int kProtocolVersion = 10;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -91,6 +95,20 @@ inline constexpr char kNewToken[] = "new_token";
 inline constexpr char kGetBrowserSource[] = "get_browser_source";
 inline constexpr char kBrowserSource[] = "browser_source";
 inline constexpr char kServerStatus[] = "server_status";
+// P10b: Dock «Medien» (E-28)
+inline constexpr char kGetMediaList[] = "get_media_list";
+inline constexpr char kMediaList[] = "media_list";
+inline constexpr char kImportProgress[] = "import_progress";
+inline constexpr char kAddMedia[] = "add_media";
+inline constexpr char kRenameMedia[] = "rename_media";
+inline constexpr char kMoveMedia[] = "move_media";
+inline constexpr char kRemoveMedia[] = "remove_media";
+inline constexpr char kCreateMediaFolder[] = "create_media_folder";
+inline constexpr char kRenameMediaFolder[] = "rename_media_folder";
+inline constexpr char kRemoveMediaFolder[] = "remove_media_folder";
+inline constexpr char kMoveMediaFolder[] = "move_media_folder";
+inline constexpr char kSetMediaFolderExpanded[] = "set_media_folder_expanded";
+inline constexpr char kCancelImport[] = "cancel_import";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -111,6 +129,8 @@ inline constexpr char kUnknownSource[] = "unknown_source";
 inline constexpr char kUnknownFolder[] = "unknown_folder";
 inline constexpr char kRejected[] = "rejected";       // Modell oder Datei lehnt ab
 inline constexpr char kSaveFailed[] = "save_failed";  // verzögertes Speichern gescheitert (error)
+inline constexpr char kCanceled[] = "canceled";       // P10b: Übernehmen abgebrochen
+inline constexpr char kInUse[] = "in_use";            // P10b: Datei wird von Quellen verwendet
 } // namespace err
 
 // Eine Zeile: kompaktes JSON (enthält nie ein Zeilenende) und «\n».
@@ -240,8 +260,11 @@ struct ChangeRequest
     QUuid overlayId;
     QUuid sourceId;
     QUuid folderId;               // bei move_overlay das Ziel, null = oberste Ebene
+    QUuid parentId;               // P10b: create_media_folder, move_media_folder; null = oberste Ebene
     QString name;
-    QString file;                 // Pfad der Datei des Nutzers oder Verweis "media/…" (Schrift)
+    // Pfad der Datei des Nutzers oder Verweis "media/…" (Schrift; seit P10b auch Bild und Video
+    // aus der Medienliste und die Änderungen der Medien)
+    QString file;
     int width = 0;
     int height = 0;
     int index = 0;
@@ -251,6 +274,13 @@ struct ChangeRequest
     std::optional<int> weight;    // set_text_font; leer = aus der Datei
     std::optional<bool> italic;   // set_text_font; leer = aus der Datei
     SourceChanges changes;        // update_source
+    qint64 importId = 0;          // P10b: cancel_import
+    // P10b: add_image_source, add_video_source. Mitte der neuen Quelle in Pixeln des Overlays
+    // (beide oder keiner; leer = Lage 0/0 wie bisher) und Stelle in der Zeichenreihenfolge wie
+    // bei move_source (leer = zuoberst).
+    std::optional<int> centerX;
+    std::optional<int> centerY;
+    std::optional<int> insertIndex;
 
     bool operator==(const ChangeRequest &) const = default;
 };
@@ -335,6 +365,46 @@ struct ServerStatusInfo
 };
 QJsonObject serverStatusMessage(const ServerStatusInfo &info);
 bool parseServerStatus(const QJsonObject &message, ServerStatusInfo *info, QString *error);
+
+// media_list (P10b, E-28): Namen und Ordner aller Mediendateien, nach hello, auf get_media_list
+// und nach jeder Änderung an alle.
+struct MediaFileData
+{
+    MediaEntry entry;
+    MediaKind kind = MediaKind::Image;
+    qint64 bytes = 0;
+    QString codec;              // Video: Name in FFmpeg ("vp9", "hevc", …); leer = unbekannt
+    QString browserProblem;     // Hinweis, wenn die Browserquelle die Datei nicht abspielt
+    QList<MediaUsage> usedIn;   // leer = ungenutzt, darf gelöscht werden
+
+    bool operator==(const MediaFileData &) const = default;
+};
+struct MediaListData
+{
+    QList<MediaFolder> folders;
+    QList<MediaFileData> files;
+    QString error;  // medien.json ungültig (Umbenennen und Ordner abgewiesen); leer = gültig
+
+    const MediaFileData *file(const QString &reference) const;
+    bool operator==(const MediaListData &) const = default;
+};
+QJsonObject mediaListMessage(const MediaListData &data);
+bool parseMediaList(const QJsonObject &message, MediaListData *data, QString *error);
+
+// import_progress (P10b, Punkt 73): alle laufenden Übernahmen, an alle, höchstens alle 200 ms,
+// solange sich etwas ändert, und einmal leer, wenn die letzte fertig ist.
+struct ImportProgressData
+{
+    qint64 importId = 0;  // für cancel_import
+    QString name;         // ursprünglicher Dateiname
+    QUuid folder;         // Ordner der Medienliste (add_media), null = oberste Ebene
+    int percent = 0;      // 0 bis 100
+
+    bool operator==(const ImportProgressData &) const = default;
+};
+QJsonObject importProgressMessage(const QList<ImportProgressData> &imports);
+bool parseImportProgress(const QJsonObject &message, QList<ImportProgressData> *imports,
+                         QString *error);
 
 // get_browser_source: Kennung des Overlays; null = keine Adresse mehr schicken.
 QJsonObject getBrowserSourceMessage(const QUuid &overlayId);

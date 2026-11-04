@@ -95,6 +95,11 @@ public:
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
+    // P10b: Medienliste (E-28); der Kern schickt sie nach hello und nach jeder Änderung von selbst.
+    const MediaListData &mediaList() const { return m_mediaList; }
+    void requestMediaList();
+    // P10b (Punkt 73): laufende Übernahmen im Kern mit Fortschritt (auch die anderer Fenster).
+    QList<ImportProgressData> imports() const { return m_imports; }
     void requestFonts();
 
     // Schickt eine Änderung an den Kern (P08, Teil A); request.requestId wird hier vergeben.
@@ -141,6 +146,9 @@ signals:
     void browserSourceChanged();
     // serverStatus() hat sich geändert (P10).
     void serverStatusChanged();
+    // P10b: mediaList() bzw. imports() hat sich geändert.
+    void mediaListChanged();
+    void importProgressChanged();
 
 private:
     void tryConnect();
@@ -184,6 +192,8 @@ private:
     QUuid m_browserSourceWanted;
     std::optional<BrowserSourceInfo> m_browserSource;
     std::optional<ServerStatusInfo> m_serverStatus;
+    MediaListData m_mediaList;
+    QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
 };

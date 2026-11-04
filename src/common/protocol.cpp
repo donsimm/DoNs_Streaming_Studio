@@ -798,6 +798,9 @@ enum ChangeField : unsigned {
     FFontStyle = 1u << 10,   // weight, italic (je Zahl/true/false oder null)
     FChanges = 1u << 11,
     FOutput = 1u << 12,      // output (true/false), P10
+    FParent = 1u << 13,      // parent_id, UUID oder null (P10b)
+    FImport = 1u << 14,      // import_id (P10b)
+    FPlacement = 1u << 15,   // center_x, center_y, insert_index, je Zahl oder null/fehlt (P10b)
 };
 
 const QList<std::pair<const char *, unsigned>> &changeFieldTable()
@@ -813,8 +816,8 @@ const QList<std::pair<const char *, unsigned>> &changeFieldTable()
         {msg::kRemoveFolder, FFolder},
         {msg::kMoveFolder, FFolder | FIndex},
         {msg::kSetFolderExpanded, FFolder | FExpanded},
-        {msg::kAddImageSource, FOverlay | FFile},
-        {msg::kAddVideoSource, FOverlay | FFile},
+        {msg::kAddImageSource, FOverlay | FFile | FPlacement},
+        {msg::kAddVideoSource, FOverlay | FFile | FPlacement},
         {msg::kAddTextSource, FOverlay},
         {msg::kRemoveSource, FOverlay | FSource},
         {msg::kMoveSource, FOverlay | FSource | FIndex},
@@ -824,6 +827,16 @@ const QList<std::pair<const char *, unsigned>> &changeFieldTable()
         {msg::kSetOverlaySize, FOverlay | FSize},
         {msg::kSetOverlayOutput, FOverlay | FOutput},
         {msg::kNewToken, FOverlay},
+        {msg::kAddMedia, FFile | FTargetFolder},
+        {msg::kRenameMedia, FFile | FName},
+        {msg::kMoveMedia, FFile | FTargetFolder},
+        {msg::kRemoveMedia, FFile},
+        {msg::kCreateMediaFolder, FName | FParent},
+        {msg::kRenameMediaFolder, FFolder | FName},
+        {msg::kRemoveMediaFolder, FFolder},
+        {msg::kMoveMediaFolder, FFolder | FParent},
+        {msg::kSetMediaFolderExpanded, FFolder | FExpanded},
+        {msg::kCancelImport, FImport},
     };
     return table;
 }
@@ -887,6 +900,19 @@ QJsonObject changeRequestMessage(const ChangeRequest &r)
     }
     if (f & FChanges)
         o.insert(QStringLiteral("changes"), sourceChangesToJson(r.changes));
+    if (f & FParent)
+        o.insert(QStringLiteral("parent_id"), r.parentId.isNull() ? QJsonValue(QJsonValue::Null)
+                                                                  : QJsonValue(idText(r.parentId)));
+    if (f & FImport)
+        o.insert(QStringLiteral("import_id"), double(r.importId));
+    if (f & FPlacement) {
+        const auto value = [](const std::optional<int> &v) {
+            return v ? QJsonValue(*v) : QJsonValue(QJsonValue::Null);
+        };
+        o.insert(QStringLiteral("center_x"), value(r.centerX));
+        o.insert(QStringLiteral("center_y"), value(r.centerY));
+        o.insert(QStringLiteral("insert_index"), value(r.insertIndex));
+    }
     return o;
 }
 
@@ -954,6 +980,34 @@ bool parseChangeRequest(const QJsonObject &message, ChangeRequest *request, QStr
             r.italic = i.toBool();
         } else if (!i.isNull()) {
             *error = QStringLiteral("Feld italic muss true, false oder null sein");
+            return false;
+        }
+    }
+    if (f & FParent) {
+        const QJsonValue v = message.value(QStringLiteral("parent_id"));
+        if (!v.isNull() && !requireUuid(message, QStringLiteral("parent_id"), &r.parentId, error))
+            return false;
+    }
+    if ((f & FImport)
+        && !requireInt(message, QStringLiteral("import_id"), 1, qint64(1) << 53, &r.importId, error))
+        return false;
+    if (f & FPlacement) {
+        // Freiwillig (P10b): fehlt oder null = wie bisher (Lage 0/0, zuoberst).
+        for (const auto &[key, target, min] :
+             {std::tuple{"center_x", &r.centerX, std::numeric_limits<int>::min()},
+              std::tuple{"center_y", &r.centerY, std::numeric_limits<int>::min()},
+              std::tuple{"insert_index", &r.insertIndex, 0}}) {
+            const QJsonValue v = message.value(QLatin1String(key));
+            if (v.isNull() || v.isUndefined())
+                continue;
+            int value = 0;
+            if (!requireIntField(message, QLatin1String(key), min, std::numeric_limits<int>::max(),
+                                 &value, error))
+                return false;
+            *target = value;
+        }
+        if (r.centerX.has_value() != r.centerY.has_value()) {
+            *error = QStringLiteral("Felder center_x und center_y gehören zusammen");
             return false;
         }
     }
@@ -1134,6 +1188,186 @@ bool parseBrowserSource(const QJsonObject &message, BrowserSourceInfo *info, QSt
         return false;
     }
     *info = i;
+    return true;
+}
+
+const MediaFileData *MediaListData::file(const QString &reference) const
+{
+    for (const MediaFileData &f : files) {
+        if (f.entry.file == reference)
+            return &f;
+    }
+    return nullptr;
+}
+
+namespace {
+
+QJsonValue idOrNull(const QUuid &id)
+{
+    return id.isNull() ? QJsonValue(QJsonValue::Null) : QJsonValue(idText(id));
+}
+
+bool uuidOrNull(const QJsonObject &o, const QString &key, QUuid *id, QString *error)
+{
+    if (o.value(key).isNull()) {
+        *id = QUuid();
+        return true;
+    }
+    return requireUuid(o, key, id, error);
+}
+
+QJsonValue textOrNull(const QString &text)
+{
+    return text.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(text);
+}
+
+bool optionalText(const QJsonObject &o, const QString &key, QString *text, QString *error)
+{
+    const QJsonValue v = o.value(key);
+    if (v.isNull()) {
+        text->clear();
+        return true;
+    }
+    return requireString(o, key, text, error);
+}
+
+} // namespace
+
+QJsonObject mediaListMessage(const MediaListData &data)
+{
+    QJsonObject o = typed(msg::kMediaList);
+    QJsonArray folders;
+    for (const MediaFolder &f : data.folders)
+        folders.append(QJsonObject{{QStringLiteral("id"), idText(f.id)},
+                                   {QStringLiteral("name"), f.name},
+                                   {QStringLiteral("parent"), idOrNull(f.parent)},
+                                   {QStringLiteral("expanded"), f.expanded}});
+    QJsonArray files;
+    for (const MediaFileData &f : data.files) {
+        QJsonArray used;
+        for (const MediaUsage &u : f.usedIn)
+            used.append(QJsonObject{{QStringLiteral("overlay_id"), idText(u.overlayId)},
+                                    {QStringLiteral("overlay_name"), u.overlayName},
+                                    {QStringLiteral("source_id"), idText(u.sourceId)},
+                                    {QStringLiteral("source_name"), u.sourceName}});
+        files.append(QJsonObject{{QStringLiteral("file"), f.entry.file},
+                                 {QStringLiteral("name"), f.entry.name},
+                                 {QStringLiteral("folder"), idOrNull(f.entry.folder)},
+                                 {QStringLiteral("kind"), mediaKindKey(f.kind)},
+                                 {QStringLiteral("bytes"), double(f.bytes)},
+                                 {QStringLiteral("codec"), textOrNull(f.codec)},
+                                 {QStringLiteral("browser_problem"), textOrNull(f.browserProblem)},
+                                 {QStringLiteral("used_in"), used}});
+    }
+    o.insert(QStringLiteral("folders"), folders);
+    o.insert(QStringLiteral("files"), files);
+    o.insert(QStringLiteral("error"), textOrNull(data.error));
+    return o;
+}
+
+bool parseMediaList(const QJsonObject &message, MediaListData *data, QString *error)
+{
+    MediaListData d;
+    const QJsonValue folders = message.value(QStringLiteral("folders"));
+    const QJsonValue files = message.value(QStringLiteral("files"));
+    if (!folders.isArray() || !files.isArray()) {
+        *error = QStringLiteral("Felder folders und files müssen Listen sein");
+        return false;
+    }
+    for (const QJsonValue &v : folders.toArray()) {
+        if (!v.isObject()) {
+            *error = QStringLiteral("Eintrag in folders ist kein Objekt");
+            return false;
+        }
+        const QJsonObject f = v.toObject();
+        MediaFolder folder;
+        if (!requireUuid(f, QStringLiteral("id"), &folder.id, error)
+            || !requireString(f, QStringLiteral("name"), &folder.name, error)
+            || !uuidOrNull(f, QStringLiteral("parent"), &folder.parent, error)
+            || !requireBool(f, QStringLiteral("expanded"), &folder.expanded, error))
+            return false;
+        d.folders.append(folder);
+    }
+    for (const QJsonValue &v : files.toArray()) {
+        if (!v.isObject()) {
+            *error = QStringLiteral("Eintrag in files ist kein Objekt");
+            return false;
+        }
+        const QJsonObject f = v.toObject();
+        MediaFileData file;
+        QString kind;
+        qint64 bytes = 0;
+        if (!requireString(f, QStringLiteral("file"), &file.entry.file, error)
+            || !requireString(f, QStringLiteral("name"), &file.entry.name, error)
+            || !uuidOrNull(f, QStringLiteral("folder"), &file.entry.folder, error)
+            || !requireString(f, QStringLiteral("kind"), &kind, error)
+            || !requireInt(f, QStringLiteral("bytes"), 0, qint64(1) << 53, &bytes, error)
+            || !optionalText(f, QStringLiteral("codec"), &file.codec, error)
+            || !optionalText(f, QStringLiteral("browser_problem"), &file.browserProblem, error))
+            return false;
+        const std::optional<MediaKind> k = mediaKindFromKey(kind);
+        if (!k) {
+            *error = QStringLiteral("Feld kind: unbekannt «%1»").arg(kind);
+            return false;
+        }
+        file.kind = *k;
+        file.bytes = bytes;
+        const QJsonValue used = f.value(QStringLiteral("used_in"));
+        if (!used.isArray()) {
+            *error = QStringLiteral("Feld used_in muss eine Liste sein");
+            return false;
+        }
+        for (const QJsonValue &u : used.toArray()) {
+            const QJsonObject uo = u.toObject();
+            MediaUsage usage;
+            if (!requireUuid(uo, QStringLiteral("overlay_id"), &usage.overlayId, error)
+                || !requireString(uo, QStringLiteral("overlay_name"), &usage.overlayName, error)
+                || !requireUuid(uo, QStringLiteral("source_id"), &usage.sourceId, error)
+                || !requireString(uo, QStringLiteral("source_name"), &usage.sourceName, error))
+                return false;
+            file.usedIn.append(usage);
+        }
+        d.files.append(file);
+    }
+    if (!optionalText(message, QStringLiteral("error"), &d.error, error))
+        return false;
+    *data = d;
+    return true;
+}
+
+QJsonObject importProgressMessage(const QList<ImportProgressData> &imports)
+{
+    QJsonObject o = typed(msg::kImportProgress);
+    QJsonArray list;
+    for (const ImportProgressData &i : imports)
+        list.append(QJsonObject{{QStringLiteral("import_id"), double(i.importId)},
+                                {QStringLiteral("name"), i.name},
+                                {QStringLiteral("folder"), idOrNull(i.folder)},
+                                {QStringLiteral("percent"), i.percent}});
+    o.insert(QStringLiteral("imports"), list);
+    return o;
+}
+
+bool parseImportProgress(const QJsonObject &message, QList<ImportProgressData> *imports,
+                         QString *error)
+{
+    const QJsonValue list = message.value(QStringLiteral("imports"));
+    if (!list.isArray()) {
+        *error = QStringLiteral("Feld imports muss eine Liste sein");
+        return false;
+    }
+    QList<ImportProgressData> result;
+    for (const QJsonValue &v : list.toArray()) {
+        const QJsonObject o = v.toObject();
+        ImportProgressData i;
+        if (!requireInt(o, QStringLiteral("import_id"), 1, qint64(1) << 53, &i.importId, error)
+            || !requireString(o, QStringLiteral("name"), &i.name, error)
+            || !uuidOrNull(o, QStringLiteral("folder"), &i.folder, error)
+            || !requireIntField(o, QStringLiteral("percent"), 0, 100, &i.percent, error))
+            return false;
+        result.append(i);
+    }
+    *imports = result;
     return true;
 }
 

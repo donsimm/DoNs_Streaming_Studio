@@ -218,6 +218,8 @@ int main(int argc, char *argv[])
 #if DSS_MEDIA_SIZE
     // Grösse neuer Bild- und Videoquellen aus der Datei (P09, Entscheid 6)
     store.setMediaSizeReader(dss::readMediaSize);
+    // Format der Videos (P10b, Punkt 81): Hinweis, wenn die Browserquelle es nicht abspielt
+    store.setVideoCodecReader(dss::readVideoCodec);
 #endif
     if (!store.load(&error)) {
         qCritical("Datenordner %s: %s", qPrintable(store.dataDir()), qPrintable(error));

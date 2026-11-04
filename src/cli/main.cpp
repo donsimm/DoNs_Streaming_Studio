@@ -32,10 +32,24 @@ constexpr int kExitLocked = 3;
 constexpr int kExitCoreNotRunning = 4;
 
 // Befehle, die nur anzeigen; alle anderen ändern den Datenordner.
-const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringLiteral("quelle-liste")};
+const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringLiteral("quelle-liste"),
+                                       QStringLiteral("medien-liste")};
 // Befehle für die Einstellungen des Kerns (P10-vor): ohne Datenordner und ohne Sperre.
 const QStringList kSettingsCommands = {QStringLiteral("einstellungen"), QStringLiteral("einstellung-port"),
                                        QStringLiteral("einstellung-adresse")};
+// Befehle für die Medienliste (P10b, Teil A 6): Nur der Kern schreibt medien.json; dss-cli
+// schickt die Änderung an den laufenden Kern. Name → Anzahl Argumente.
+const QList<std::pair<QString, int>> kMediaCommands = {
+    {QStringLiteral("medium-umbenennen"), 2},       {QStringLiteral("medium-verschieben"), 2},
+    {QStringLiteral("medium-loeschen"), 1},         {QStringLiteral("medien-ordner-anlegen"), 1},
+    {QStringLiteral("medien-ordner-umbenennen"), 2}, {QStringLiteral("medien-ordner-verschieben"), 2},
+    {QStringLiteral("medien-ordner-loeschen"), 1}};
+
+bool isMediaCommand(const QString &command)
+{
+    return std::any_of(kMediaCommands.begin(), kMediaCommands.end(),
+                       [&command](const auto &c) { return c.first == command; });
+}
 
 QTextStream &out()
 {
@@ -65,6 +79,14 @@ const char *const kUsageTemplate =
     "  quelle-text ADRESSE TEXT SCHRIFTDATEI\n"
     "  quelle-geometrie ADRESSE NR X Y BREITE HOEHE DREHUNG [--waagrecht-gespiegelt]\n"
     "                   [--senkrecht-gespiegelt]\n"
+    "  medien-liste\n"
+    "  medium-umbenennen DATEI NEUER_NAME\n"
+    "  medium-verschieben DATEI ZIELORDNER\n"
+    "  medium-loeschen DATEI\n"
+    "  medien-ordner-anlegen ORDNER\n"
+    "  medien-ordner-umbenennen ORDNER NEUER_NAME\n"
+    "  medien-ordner-verschieben ORDNER ZIELORDNER\n"
+    "  medien-ordner-loeschen ORDNER\n"
     "  einstellungen\n"
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
@@ -88,9 +110,15 @@ const char *const kUsageTemplate =
     "innerhalb von 2 s die Adresse der Standardroute ein, sobald es eine gibt); nur Adressen\n"
     "dieses PCs. Beides wirkt sofort (der Overlay-Server startet neu; in OBS dann die neue\n"
     "Adresse der Browserquelle eintragen).\n"
+    "medien-liste: alle Mediendateien mit Name, Ordner, Typ, Grösse und «verwendet in» (geht immer).\n"
+    "Die übrigen medien- und medium-Befehle ändern die Medienliste über den laufenden Kern (nur er\n"
+    "schreibt medien.json). DATEI: Nr aus medien-liste, Verweis media/… oder Name (eindeutig).\n"
+    "ORDNER, ZIELORDNER: Pfad wie in medien-liste, zum Beispiel «Logos/Alt»; \"/\" = oberste Ebene.\n"
+    "medien-ordner-anlegen legt den letzten Teil des Pfads an. Löschen eines Ordners: Inhalt kommt\n"
+    "eine Ebene höher. medium-loeschen löscht nur Dateien, die keine Quelle verwendet.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
-    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse).\n";
+    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -254,6 +282,7 @@ public:
             {"quelle-video", 2, [this](const QStringList &x) { return addMedia(x, dss::SourceKind::Video); }},
             {"quelle-text", 3, [this](const QStringList &x) { return addText(x); }},
             {"quelle-geometrie", 7, [this](const QStringList &x) { return setGeometry(x); }},
+            {"medien-liste", 0, [this](const QStringList &) { return listMedia(); }},
         };
         for (const Command &c : commands) {
             if (command == QLatin1String(c.name)) {
@@ -436,6 +465,54 @@ private:
                          s.name});
         }
         printTable(rows);
+        return kExitOk;
+    }
+
+    // P10b, Teil A 6: Medienliste aus dem Datenordner (nur gelesen, abgeglichen mit media/ wie im
+    // Kern; Ersatznamen für Dateien ohne Eintrag).
+    int listMedia()
+    {
+        const dss::MediaLibrary &library = m_store->mediaLibrary();
+        if (!m_store->mediaLibraryError().isEmpty())
+            err() << "Fehler: " << m_store->mediaLibraryError() << " (Ersatznamen)\n";
+        const QList<dss::MediaEntry> files = dss::mediaFilesInOrder(library);
+        if (files.isEmpty() && library.folders.isEmpty()) {
+            out() << "Keine Mediendateien vorhanden.\n";
+            return kExitOk;
+        }
+        const dss::MediaUsages usages = m_store->mediaUsages();
+        QList<QStringList> rows = {{QStringLiteral("Nr"), QStringLiteral("Name"),
+                                    QStringLiteral("Ordner"), QStringLiteral("Typ"),
+                                    QStringLiteral("Grösse"), QStringLiteral("Format"),
+                                    QStringLiteral("Datei"), QStringLiteral("Verwendet in")}};
+        QStringList problems;
+        for (qsizetype i = 0; i < files.size(); ++i) {
+            const dss::MediaEntry &e = files.at(i);
+            const QString folder = dss::mediaFolderPath(library, e.folder);
+            const QString codec = m_store->videoCodec(e.file);
+            const QString used = dss::usageText(usages.value(e.file));
+            rows.append({QString::number(i + 1), e.name, folder.isEmpty() ? QStringLiteral("/") : folder,
+                         dss::mediaKindName(dss::mediaKindOf(e.file).value_or(dss::MediaKind::Image)),
+                         dss::mediaSizeText(m_store->mediaBytes(e.file)),
+                         codec.isEmpty() ? QStringLiteral("–") : codec, e.file,
+                         used.isEmpty() ? QStringLiteral("ungenutzt") : used.mid(13)});
+            if (const QString p = m_store->browserProblem(e.file); !p.isEmpty())
+                problems.append(QStringLiteral("Nr %1: %2").arg(i + 1).arg(p));
+        }
+        printTable(rows);
+        // Ordner ohne Dateien erscheinen sonst nirgends.
+        QStringList empty;
+        for (const dss::MediaFolder &f : library.folders) {
+            const bool hasFiles = std::any_of(library.files.begin(), library.files.end(),
+                                              [&f](const dss::MediaEntry &e) { return e.folder == f.id; });
+            if (!hasFiles)
+                empty.append(dss::mediaFolderPath(library, f.id));
+        }
+        empty.sort(Qt::CaseInsensitive);
+        if (!empty.isEmpty())
+            out() << "Ordner ohne Dateien: " << empty.join(QStringLiteral(", ")) << '\n';
+        for (const QString &p : std::as_const(problems))
+            out() << "Hinweis: " << p << '\n';
         return kExitOk;
     }
 
@@ -639,6 +716,112 @@ int runSettings(const Arguments &args)
     return kExitOk;
 }
 
+// Änderung der Medienliste über den laufenden Kern (P10b, Teil A 6).
+int runMedia(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const int expected = std::find_if(kMediaCommands.begin(), kMediaCommands.end(),
+                                      [&command](const auto &c) { return c.first == command; })->second;
+    if (a.size() != expected) {
+        err() << "Fehler: " << QStringLiteral("%1 erwartet %2 Argument(e), erhalten %3.")
+                                   .arg(command).arg(expected).arg(a.size())
+              << "\n\n" << usageText();
+        return kExitUsage;
+    }
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Die Medienliste ändert nur der Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    const std::optional<dss::MediaListData> list = session.getMediaList(&error);
+    if (!list) {
+        err() << "Fehler: " << error << '\n';
+        return kExitError;
+    }
+    // Pfade und Namen auflösen wie in medien-liste (dieselben Funktionen)
+    dss::MediaLibrary library;
+    library.folders = list->folders;
+    for (const dss::MediaFileData &f : list->files)
+        library.files.append(f.entry);
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    dss::ChangeRequest r;
+    QString done;
+    const auto folderArg = [&](const QString &path, QUuid *id) {
+        const std::optional<QUuid> found = dss::findMediaFolder(library, path, &error);
+        if (found)
+            *id = *found;
+        return found.has_value();
+    };
+    if (command == QLatin1String("medium-umbenennen") || command == QLatin1String("medium-verschieben")
+        || command == QLatin1String("medium-loeschen")) {
+        r.file = dss::findMediaFile(library, a.at(0), &error);
+        if (r.file.isEmpty())
+            return fail(error);
+        const QString oldName = library.entry(r.file)->name;
+        if (command == QLatin1String("medium-umbenennen")) {
+            r.type = QString::fromLatin1(dss::msg::kRenameMedia);
+            r.name = a.at(1);
+            done = QStringLiteral("«%1» heisst jetzt «%2».").arg(oldName, a.at(1));
+        } else if (command == QLatin1String("medium-verschieben")) {
+            r.type = QString::fromLatin1(dss::msg::kMoveMedia);
+            if (!folderArg(a.at(1), &r.folderId))
+                return fail(error);
+            done = QStringLiteral("«%1» liegt jetzt in «%2».")
+                       .arg(oldName, r.folderId.isNull() ? QStringLiteral("/") : a.at(1));
+        } else {
+            r.type = QString::fromLatin1(dss::msg::kRemoveMedia);
+            done = QStringLiteral("«%1» (%2) gelöscht.").arg(oldName, r.file);
+        }
+    } else if (command == QLatin1String("medien-ordner-anlegen")) {
+        r.type = QString::fromLatin1(dss::msg::kCreateMediaFolder);
+        QString path = a.at(0).trimmed();
+        while (path.endsWith(QLatin1Char('/')))
+            path.chop(1);
+        const qsizetype slash = path.lastIndexOf(QLatin1Char('/'));
+        r.name = path.mid(slash + 1);
+        if (!folderArg(slash < 0 ? QString() : path.left(slash), &r.parentId))
+            return fail(error);
+        done = QStringLiteral("Ordner «%1» angelegt.").arg(path);
+    } else {
+        if (!folderArg(a.at(0), &r.folderId))
+            return fail(error);
+        if (r.folderId.isNull())
+            return fail(QStringLiteral("Die oberste Ebene ist kein Ordner."));
+        if (command == QLatin1String("medien-ordner-umbenennen")) {
+            r.type = QString::fromLatin1(dss::msg::kRenameMediaFolder);
+            r.name = a.at(1);
+            done = QStringLiteral("Ordner «%1» heisst jetzt «%2».").arg(a.at(0), a.at(1));
+        } else if (command == QLatin1String("medien-ordner-verschieben")) {
+            r.type = QString::fromLatin1(dss::msg::kMoveMediaFolder);
+            if (!folderArg(a.at(1), &r.parentId))
+                return fail(error);
+            done = QStringLiteral("Ordner «%1» liegt jetzt in «%2».")
+                       .arg(a.at(0), r.parentId.isNull() ? QStringLiteral("/") : a.at(1));
+        } else {
+            r.type = QString::fromLatin1(dss::msg::kRemoveMediaFolder);
+            done = QStringLiteral("Ordner «%1» gelöscht, sein Inhalt liegt eine Ebene höher.").arg(a.at(0));
+        }
+    }
+    const std::optional<dss::ChangeResult> result = session.change(r, &error);
+    if (!result)
+        return fail(error);
+    if (!result->ok)
+        return fail(result->message);
+    out() << done << '\n';
+    return kExitOk;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -673,9 +856,20 @@ int main(int argc, char *argv[])
         err().flush();
         return rc;
     }
+    if (isMediaCommand(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für Änderungen der Medienliste (sie gehen an "
+                     "den Kern; --verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runMedia(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
     if (!args.connection.isEmpty()) {
-        err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port und "
-                 "einstellung-adresse.\n\n" << usageText();
+        err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port, "
+                 "einstellung-adresse und die Änderungen der Medienliste.\n\n" << usageText();
         return kExitUsage;
     }
 
@@ -703,6 +897,7 @@ int main(int argc, char *argv[])
 #if DSS_MEDIA_SIZE
     // Grösse neuer Bild- und Videoquellen aus der Datei wie im Kern (P09, Entscheid 6)
     store.setMediaSizeReader(dss::readMediaSize);
+    store.setVideoCodecReader(dss::readVideoCodec); // P10b: Format in medien-liste
 #endif
     if (!store.load(&error, readOnly ? dss::OverlayStore::LoadMode::ReadOnly
                                      : dss::OverlayStore::LoadMode::ReadWrite)) {

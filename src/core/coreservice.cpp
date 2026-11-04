@@ -24,6 +24,8 @@ constexpr qsizetype kMaxSocketPathBytes = 107;
 // Übernehmen (P10-vor, Punkt 67): höchstens zwei Dateien gleichzeitig. Eine kleine Datei wartet
 // so nicht hinter einer grossen; mehr Threads teilen sich nur dieselbe Platte.
 constexpr int kImportThreads = 2;
+// Stand der Übernahmen (P10b, Punkt 73) höchstens alle 200 ms an die Fenster
+constexpr int kProgressIntervalMs = 200;
 
 } // namespace
 
@@ -48,6 +50,13 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
     m_importer = new dss::MediaImporter(m_store->mediaDir(), kImportThreads, this);
     connect(m_importer, &dss::MediaImporter::finished, this, &CoreService::onImportFinished);
 #endif
+    // Namen und Ordner der Medien schreibt nur der Kern (P10b, Teil A 1).
+    m_store->setWritesMediaLibrary(true);
+    m_progressTimer = new QTimer(this);
+    m_progressTimer->setInterval(kProgressIntervalMs);
+    connect(m_progressTimer, &QTimer::timeout, this, &CoreService::broadcastImportProgress);
+    m_lastProgress = dss::importProgressMessage({});
+    m_lastMediaList = dss::mediaListMessage(mediaListData());
     if (m_settings) {
         // Punkt 85: leere Adresse im Heimnetz ohne Neustart eintragen, sobald es eine
         // Standardroute gibt; der Server hört dann auch dort zu (settingsApplied).
@@ -146,6 +155,8 @@ int CoreService::stopImports()
     for (const PendingImport &p : std::as_const(m_imports))
         qWarning("Übernehmen abgebrochen: %s", qPrintable(p.file));
     m_imports.clear();
+    m_progressTimer->stop();
+    removeCanceledCopies();
     return count;
 }
 
@@ -219,6 +230,7 @@ void CoreService::reload()
         qWarning("Warnung: %s", qPrintable(w));
 
     const auto [changed, removed] = broadcastDifferences(before, listBefore);
+    broadcastMediaListIfChanged();
     updateBrowserSources();
 #if DSS_CORE_OVERLAY_SERVER
     // Token können sich beim Neu laden geändert haben (tokens.json von Hand).
@@ -317,6 +329,16 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         qInfo("Verbunden: %s %s (%lld Verbindungen)", qPrintable(hello.program),
               qPrintable(hello.version), static_cast<long long>(m_clients.size()));
         send(socket, listMessage());
+        // Medienliste (P10b); hat sie sich seit der letzten geändert, an alle.
+        if (const QJsonObject media = dss::mediaListMessage(mediaListData());
+            media != m_lastMediaList) {
+            m_lastMediaList = media;
+            broadcast(media);
+        } else {
+            send(socket, media);
+        }
+        if (!m_imports.isEmpty())
+            send(socket, m_lastProgress);
         send(socket, dss::connectionsMessage(m_connectionStates));
         send(socket, serverStatusMessage());
         if (m_lastStats)
@@ -349,6 +371,8 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         updateBrowserSources();
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
+    } else if (type == QLatin1String(dss::msg::kGetMediaList)) {
+        send(socket, dss::mediaListMessage(mediaListData()));
     } else if (type == QLatin1String(dss::msg::kGetOverlay)) {
         QUuid id;
         if (!dss::parseOverlayId(message, &id, &error)) {
@@ -585,6 +609,7 @@ void CoreService::handleChange(QLocalSocket *socket, const QJsonObject &message)
         m_imports.insert(job, pending);
         qInfo("Übernehme %s für %s (%lld laufend)", qPrintable(file), qPrintable(request.type),
               static_cast<long long>(m_imports.size()));
+        broadcastImportProgress();
         return;
     }
     finishChange(socket, request, nullptr);
@@ -597,9 +622,15 @@ void CoreService::finishChange(QLocalSocket *socket, const dss::ChangeRequest &r
     const QJsonObject listBefore = listMessage();
     dss::ChangeResult result = applyChange(request, imported);
     result.requestId = request.requestId;
+    // Hinweis zum Videoformat (P10b, Punkt 81) zu einem Hinweis der Änderung dazu.
+    if (result.ok && imported && !imported->warning.isEmpty())
+        result.warning = result.warning.isEmpty()
+                             ? imported->warning
+                             : result.warning + QLatin1Char(' ') + imported->warning;
     // Zuerst an alle (auch an das Fenster, das die Änderung geschickt hat), dann die Antwort:
     // Das Fenster übernimmt den Zustand nur aus diesen Nachrichten (Teil A).
     broadcastDifferences(before, listBefore);
+    broadcastMediaListIfChanged();
     updateBrowserSources();
     if (m_store->hasPendingWrites())
         m_saver->changed();
@@ -614,12 +645,24 @@ QString CoreService::fileToImport(const dss::ChangeRequest &r, dss::MediaUse *us
 {
     using namespace dss;
     const QString &type = r.type;
+    // Seit P10b auch Bild und Video aus der Medienliste: ein Verweis "media/…" ist schon übernommen.
+    const bool reference = validateMediaReference(r.file).isEmpty();
     if (type == QLatin1String(msg::kAddImageSource) || type == QLatin1String(msg::kReplaceImageFile)) {
         *use = MediaUse::Image;
-        return r.file;
+        return reference ? QString() : r.file;
     }
     if (type == QLatin1String(msg::kAddVideoSource)) {
         *use = MediaUse::Video;
+        return reference ? QString() : r.file;
+    }
+    if (type == QLatin1String(msg::kAddMedia)) {
+        // Art aus der Endung; eine unbekannte Endung weist applyChange ohne Übernehmen ab.
+        const std::optional<MediaKind> kind = mediaKindOf(r.file);
+        if (!kind)
+            return {};
+        *use = *kind == MediaKind::Image ? MediaUse::Image
+               : *kind == MediaKind::Video ? MediaUse::Video
+                                           : MediaUse::Font;
         return r.file;
     }
     if (type == QLatin1String(msg::kAddTextSource)) {
@@ -642,21 +685,145 @@ void CoreService::onImportFinished(quint64 job, const dss::MediaImportResult &re
     const PendingImport pending = *it;
     m_imports.erase(it);
     const double seconds = pending.timer.elapsed() / 1000.0;
+    const auto reply = [this, &pending](const char *code, const QString &message) {
+        const dss::ChangeResult failure{pending.request.requestId, false, QUuid(),
+                                        QString::fromLatin1(code), message};
+        qWarning("Änderung %s abgelehnt: %s", qPrintable(pending.request.type), qPrintable(message));
+        if (pending.socket && m_clients.contains(pending.socket.data()))
+            send(pending.socket.data(), dss::changeResultMessage(failure));
+    };
+    if (pending.canceled || result.canceled) {
+        // P10b, Punkt 73: vom Nutzer abgebrochen. War die Kopie schon fertig und neu, wird sie
+        // gelöscht (removeCanceledCopies); es bleibt nichts in media/.
+        if (!result.reference.isEmpty() && !result.existed)
+            m_canceledCopies.insert(result.reference);
+        qInfo("Übernehmen von %s abgebrochen nach %.1f s", qPrintable(pending.file), seconds);
+        reply(dss::err::kCanceled,
+              QStringLiteral("Übernehmen von %1 abgebrochen.").arg(QFileInfo(pending.file).fileName()));
+        removeCanceledCopies();
+        broadcastImportProgress();
+        return;
+    }
     if (result.reference.isEmpty()) {
         qWarning("Übernehmen von %s gescheitert nach %.1f s: %s", qPrintable(pending.file), seconds,
                  qPrintable(result.error));
-        const dss::ChangeResult failure{pending.request.requestId, false, QUuid(),
-                                        QString::fromLatin1(dss::err::kRejected), result.error};
-        qWarning("Änderung %s abgelehnt: %s", qPrintable(pending.request.type), qPrintable(result.error));
-        if (pending.socket && m_clients.contains(pending.socket.data()))
-            send(pending.socket.data(), dss::changeResultMessage(failure));
+        reply(dss::err::kRejected, result.error);
+        broadcastImportProgress();
         return;
     }
     qInfo("Übernommen: %s → %s (%.1f MiB, %.1f s%s)", qPrintable(pending.file),
           qPrintable(result.reference), result.bytes / 1048576.0, seconds,
           result.existed ? ", war schon vorhanden" : "");
-    const ImportedFile imported{result.reference, QFileInfo(pending.file).fileName()};
+    // Eine andere, abgebrochene Übernahme mit demselben Inhalt darf die Kopie jetzt nicht löschen.
+    m_canceledCopies.remove(result.reference);
+    // Ursprünglicher Dateiname in die Medienliste (P10b, Teil A 1); gab es die Datei schon,
+    // bleiben Name und Ordner.
+    const QString fileName = QFileInfo(pending.file).fileName();
+    const dss::MediaEntry *known = m_store->mediaLibrary().entry(result.reference);
+    const QString knownName = known ? known->name : QString();
+    const QUuid folder = pending.request.type == QLatin1String(dss::msg::kAddMedia)
+                             ? pending.request.folderId : QUuid();
+    QString recordError;
+    if (!m_store->recordMedia(result.reference, fileName, folder, &recordError))
+        qWarning("Medienliste: %s", qPrintable(recordError));
+    ImportedFile imported{result.reference, fileName, m_store->browserProblem(result.reference, fileName)};
+    if (!imported.warning.isEmpty())
+        qWarning("%s", qPrintable(imported.warning));
+    if (pending.request.type == QLatin1String(dss::msg::kAddMedia) && !knownName.isEmpty()) {
+        const QString same = QStringLiteral("%1 ist schon in der Medienliste (als «%2»), Name und "
+                                            "Ordner bleiben.").arg(fileName, knownName);
+        imported.warning = imported.warning.isEmpty() ? same : same + QLatin1Char(' ') + imported.warning;
+    }
     finishChange(pending.socket.data(), pending.request, &imported);
+    removeCanceledCopies();
+    broadcastImportProgress();
+}
+
+dss::MediaListData CoreService::mediaListData() const
+{
+    dss::MediaListData data;
+    const dss::MediaLibrary &library = m_store->mediaLibrary();
+    const dss::MediaUsages usages = m_store->mediaUsages();
+    data.folders = library.folders;
+    data.error = m_store->mediaLibraryError();
+    for (const dss::MediaEntry &e : library.files) {
+        dss::MediaFileData f;
+        f.entry = e;
+        f.kind = dss::mediaKindOf(e.file).value_or(dss::MediaKind::Image);
+        f.bytes = std::max<qint64>(m_store->mediaBytes(e.file), 0);
+        f.codec = m_store->videoCodec(e.file);
+        f.browserProblem = m_store->browserProblem(e.file);
+        f.usedIn = usages.value(e.file);
+        data.files.append(f);
+    }
+    return data;
+}
+
+void CoreService::broadcastMediaListIfChanged()
+{
+    const QJsonObject media = dss::mediaListMessage(mediaListData());
+    if (media == m_lastMediaList)
+        return;
+    m_lastMediaList = media;
+    broadcast(media);
+}
+
+void CoreService::broadcastImportProgress()
+{
+    QList<dss::ImportProgressData> list;
+    for (auto it = m_imports.cbegin(); it != m_imports.cend(); ++it) {
+        if (it->canceled)
+            continue; // abgebrochen: verschwindet sofort aus der Liste
+        qint64 done = 0;
+        qint64 total = 0;
+        if (m_importer)
+            m_importer->progress(it.key(), &done, &total);
+        const int percent = total > 0 ? int(std::clamp<qint64>(done * 100 / total, 0, 100)) : 0;
+        const QUuid folder = it->request.type == QLatin1String(dss::msg::kAddMedia)
+                                 ? it->request.folderId : QUuid();
+        list.append({qint64(it.key()), QFileInfo(it->file).fileName(), folder, percent});
+    }
+    std::sort(list.begin(), list.end(), [](const auto &a, const auto &b) { return a.importId < b.importId; });
+    const QJsonObject message = dss::importProgressMessage(list);
+    if (message != m_lastProgress) {
+        m_lastProgress = message;
+        broadcast(message);
+    }
+    if (list.isEmpty())
+        m_progressTimer->stop();
+    else if (!m_progressTimer->isActive())
+        m_progressTimer->start();
+}
+
+dss::ChangeResult CoreService::cancelImport(const dss::ChangeRequest &r)
+{
+    const auto it = m_imports.find(quint64(r.importId));
+    if (it == m_imports.end() || it->canceled || !m_importer || !m_importer->cancel(quint64(r.importId)))
+        return {0, false, QUuid(), QString::fromLatin1(dss::err::kRejected),
+                QStringLiteral("Keine laufende Übernahme mit der Nummer %1 (schon fertig?).")
+                    .arg(r.importId)};
+    it->canceled = true;
+    qInfo("Übernehmen von %s: Abbruch erbeten", qPrintable(it->file));
+    broadcastImportProgress();
+    return {0, true, QUuid(), QString(), QString()};
+}
+
+void CoreService::removeCanceledCopies()
+{
+    if (!m_imports.isEmpty() || m_canceledCopies.isEmpty())
+        return;
+    const dss::MediaUsages usages = m_store->mediaUsages();
+    for (const QString &reference : std::as_const(m_canceledCopies)) {
+        if (m_store->mediaLibrary().entry(reference) || !usages.value(reference).isEmpty())
+            continue; // inzwischen anders übernommen oder verwendet
+        QFile file(m_store->mediaFilePath(reference));
+        if (file.remove())
+            qInfo("Abgebrochene Kopie gelöscht: %s", qPrintable(reference));
+        else if (file.exists())
+            qWarning("Abgebrochene Kopie nicht gelöscht: %s (%s)", qPrintable(reference),
+                     qPrintable(file.errorString()));
+    }
+    m_canceledCopies.clear();
 }
 
 std::optional<dss::ChangeResult> CoreService::checkIds(const dss::ChangeRequest &r) const
@@ -669,6 +836,29 @@ std::optional<dss::ChangeResult> CoreService::checkIds(const dss::ChangeRequest 
     const auto is = [&type](const char *name) { return type == QLatin1String(name); };
     const QString idText = r.overlayId.toString(QUuid::WithoutBraces);
 
+    // P10b: Änderungen der Medien betreffen kein Overlay; ihre Ordner sind die der Medienliste.
+    const bool media = is(msg::kAddMedia) || is(msg::kRenameMedia) || is(msg::kMoveMedia)
+                       || is(msg::kRemoveMedia) || is(msg::kCreateMediaFolder)
+                       || is(msg::kRenameMediaFolder) || is(msg::kRemoveMediaFolder)
+                       || is(msg::kMoveMediaFolder) || is(msg::kSetMediaFolderExpanded)
+                       || is(msg::kCancelImport);
+    if (media) {
+        const MediaLibrary &library = m_store->mediaLibrary();
+        const auto missing = [&library](const QUuid &id) { return !id.isNull() && !library.folder(id); };
+        const bool folderRequired = is(msg::kRenameMediaFolder) || is(msg::kRemoveMediaFolder)
+                                    || is(msg::kMoveMediaFolder) || is(msg::kSetMediaFolderExpanded);
+        const QUuid bad = (folderRequired && !library.folder(r.folderId)) ? r.folderId
+                          : ((is(msg::kAddMedia) || is(msg::kMoveMedia)) && missing(r.folderId)) ? r.folderId
+                          : ((is(msg::kCreateMediaFolder) || is(msg::kMoveMediaFolder)) && missing(r.parentId))
+                              ? r.parentId
+                              : QUuid();
+        if (!bad.isNull())
+            return fail(err::kUnknownFolder, QStringLiteral("Kein Ordner der Medienliste mit der "
+                                                            "Kennung %1").arg(bad.toString(QUuid::WithoutBraces)));
+        if (folderRequired && r.folderId.isNull())
+            return fail(err::kUnknownFolder, QStringLiteral("Kein Ordner angegeben"));
+        return std::nullopt;
+    }
     const bool needsOverlay = !is(msg::kCreateOverlay) && !is(msg::kCreateFolder)
                                   && !is(msg::kRenameFolder) && !is(msg::kRemoveFolder)
                                   && !is(msg::kMoveFolder) && !is(msg::kSetFolderExpanded);
@@ -707,7 +897,10 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
         return *failure;
     // Schon übernommene Datei (Thread, P10-vor) statt des Pfads des Nutzers.
     const QString file = imported ? imported->reference : r.file;
-    const QString sourceName = imported ? imported->sourceName : QString();
+    // Aus der Medienliste (P10b): Name der Quelle = Name in der Liste.
+    const QString sourceName = imported ? imported->sourceName
+                               : validateMediaReference(file).isEmpty() ? m_store->mediaName(file)
+                                                                        : QString();
 
     QString error;
     if (is(msg::kCreateOverlay)) {
@@ -745,12 +938,81 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
                              : m_store->addVideoSource(r.overlayId, file, false, &error, &warning,
                                                        false, sourceName);
         ChangeResult result = done(!id.isNull(), error, id);
+        if (result.ok && (r.centerX || r.insertIndex)) {
+            // P10b, Teil B 6: Mitte an der abgelegten Stelle (ganze Pixel), Stelle in der
+            // Zeichenreihenfolge. Gilt im Speicher zusammen mit dem Hinzufügen; die Fenster
+            // bekommen ein overlay_changed mit dem Endstand.
+            const Overlay *o = m_store->overlay(r.overlayId);
+            const Source &added = o->sources.at(sourceIndex(*o, id));
+            bool placed = true;
+            if (r.centerX) {
+                SourceChanges c;
+                c.x = *r.centerX - added.width / 2;
+                c.y = *r.centerY - added.height / 2;
+                placed = m_store->updateSource(r.overlayId, id, c, &error);
+            }
+            if (placed && r.insertIndex)
+                placed = m_store->moveSource(r.overlayId, id, *r.insertIndex, &error);
+            if (!placed)
+                warning = QStringLiteral("Quelle an Lage 0/0 hinzugefügt: ") + error;
+        }
         if (result.ok && !warning.isEmpty()) {
             qWarning("%s", qPrintable(warning));
             result.warning = warning;
         }
         return result;
     }
+    if (is(msg::kAddMedia)) {
+        if (imported)
+            return done(true, QString()); // übernommen und aufgenommen in onImportFinished
+        // Ohne Thread (Schalter DSS_CORE_IMPORT_THREAD aus) oder unbekannte Endung
+        const std::optional<MediaKind> kind = mediaKindOf(r.file);
+        if (!kind) {
+            QStringList all;
+            for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font})
+                all.append(allowedMediaSuffixes(use));
+            return fail(err::kRejected, QStringLiteral("Endung «%1» nicht erlaubt, erlaubt sind: %2.")
+                                            .arg(QFileInfo(r.file).suffix(), all.join(QStringLiteral(", "))));
+        }
+        const MediaUse use = *kind == MediaKind::Image   ? MediaUse::Image
+                             : *kind == MediaKind::Video ? MediaUse::Video
+                                                         : MediaUse::Font;
+        const QString reference = m_store->importMedia(r.file, use, &error, r.folderId);
+        if (reference.isEmpty())
+            return fail(err::kRejected, error);
+        ChangeResult result = done(true, QString());
+        result.warning = m_store->browserProblem(reference, QFileInfo(r.file).fileName());
+        return result;
+    }
+    if (is(msg::kRenameMedia))
+        return done(m_store->renameMedia(r.file, r.name, &error), error);
+    if (is(msg::kMoveMedia))
+        return done(m_store->moveMediaFile(r.file, r.folderId, &error), error);
+    if (is(msg::kRemoveMedia)) {
+        // Teil A 2: nur ungenutzte Dateien
+        if (const QList<MediaUsage> used = m_store->mediaUsages().value(r.file); !used.isEmpty())
+            return fail(err::kInUse, QStringLiteral("«%1» lässt sich nicht löschen, %2.")
+                                         .arg(m_store->mediaName(r.file), usageText(used)));
+        const QString name = m_store->mediaName(r.file);
+        const bool ok = m_store->removeMedia(r.file, &error);
+        if (ok)
+            qInfo("Mediendatei gelöscht: %s (%s)", qPrintable(r.file), qPrintable(name));
+        return done(ok, error);
+    }
+    if (is(msg::kCreateMediaFolder)) {
+        const QUuid id = m_store->createMediaFolder(r.name, r.parentId, &error);
+        return done(!id.isNull(), error, id);
+    }
+    if (is(msg::kRenameMediaFolder))
+        return done(m_store->renameMediaFolder(r.folderId, r.name, &error), error);
+    if (is(msg::kRemoveMediaFolder))
+        return done(m_store->removeMediaFolder(r.folderId, &error), error);
+    if (is(msg::kMoveMediaFolder))
+        return done(m_store->moveMediaFolder(r.folderId, r.parentId, &error), error);
+    if (is(msg::kSetMediaFolderExpanded))
+        return done(m_store->setMediaFolderExpanded(r.folderId, r.expanded, &error), error);
+    if (is(msg::kCancelImport))
+        return cancelImport(r);
     if (is(msg::kSetOverlaySize))
         return done(m_store->setOverlaySize(r.overlayId, r.width, r.height, &error), error);
     if (is(msg::kNewToken)) {

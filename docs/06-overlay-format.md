@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-03 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-04 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -13,11 +13,12 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ├── media/
 │   └── <SHA-256>.<Endung>    Kopien der Dateien des Nutzers (Bild, Video, Schrift)
 ├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
+├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
 - **overlays/**: Jede Datei ist JSON in UTF-8. Gespeichert wird atomar (`QSaveFile`: temporäre Datei, danach Umbenennen).
-- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Ungenutzte Kopien werden (noch) nicht gelöscht. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
+- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
 
 ## Liste (`liste.json`)
@@ -143,6 +144,81 @@ EXIF-Ausrichtung (Entscheid 7, P09b): Ein Bild wird so gezeigt, wie seine EXIF-A
 `loop` und `hold_at_end` gibt es nur bei `video`; bei `image` sind sie unbekannte Felder. Am Ende eines Videos (Entscheid 9, P09): mit `loop` wieder von vorne, sonst mit `hold_at_end` das letzte Bild, sonst wird die Quelle leer (durchsichtig). Mit `loop` hat `hold_at_end` keine Wirkung, der Wert bleibt aber gespeichert (im Editor ist «Am Ende anhalten» dann ausgegraut). Ein Video läuft im Editor ab der Wahl des Overlays (Entscheid 10). Zum Ton speichert das Format nichts: Der Studio-PC spielt ihn über eine Audiokarte ab, die Browserquelle ist immer stumm (`docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»).
 
 Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und Videoquellen bekommen beim Hinzufügen die Grösse der Datei (Bild: Pixel des Bildes; Video: Grösse des ersten Bildes), Lage (0, 0), Drehung 0. Lässt sich die Grösse nicht lesen, bekommt die Quelle die Grösse des Overlays, und Kern bzw. dss-cli melden das als Warnung. Text wird ab der oberen Kante gesetzt, Zeilen nur an den Zeilenwechseln des Inhalts; was über den Kasten hinausgeht, wird im Editor abgeschnitten (Annahme P09, nicht entschieden).
+
+## Medienliste (`medien.json`)
+
+Seit P10b (E-28). Namen und Ordner der Dateien in `media/`, wie sie das Dock «Medien» zeigt. Ordner sind nur eine Einteilung: Die Dateien bleiben in `media/`, kein Verweis eines Overlays ändert sich. Die Datei gehört dem Kern; massgebend ist der Code in `src/common/medialibrary.h/.cpp` und `src/common/overlaystore.cpp`.
+
+| Feld | Typ | Bereich | Bedeutung |
+|---|---|---|---|
+| `format_version` | ganze Zahl | genau `1` | Version des Formats der Medienliste (unabhängig von Overlay-Datei und Liste) |
+| `folders` | Liste | 0 oder mehr | alle Ordner, in der Reihenfolge des Anlegens (das Dock sortiert selbst) |
+| `files` | Liste | 0 oder mehr | alle Dateien, in der Reihenfolge des Übernehmens |
+
+Ordner:
+
+| Feld | Typ | Bereich | Bedeutung |
+|---|---|---|---|
+| `id` | Text, UUID in Kleinbuchstaben | eindeutig | Kennung des Ordners, ändert sich nie |
+| `name` | Text | nicht leer (nicht nur Leerzeichen) | Name; gleiche Namen sind erlaubt |
+| `parent` | Text (UUID) oder `null` | ein Ordner der Datei, nicht der Ordner selbst und keiner seiner Unterordner | Elternordner, `null` = oberste Ebene. Beliebig tief |
+| `expanded` | true/false | | im Dock aufgeklappt |
+
+Datei:
+
+| Feld | Typ | Bereich | Bedeutung |
+|---|---|---|---|
+| `file` | Text | `media/<SHA-256>.<erlaubte Endung>`, eindeutig | Verweis wie in den Quellen |
+| `name` | Text | nicht leer | Name im Dock; beim Übernehmen der ursprüngliche Dateiname (zum Beispiel `logo.png`). Gleiche Namen sind erlaubt |
+| `folder` | Text (UUID) oder `null` | ein Ordner der Datei | Ordner, `null` = oberste Ebene |
+
+Regeln:
+
+- Nur der Kern schreibt die Datei, atomar (`QSaveFile`), bei jeder Änderung: Datei übernommen, umbenannt, verschoben, gelöscht; Ordner angelegt, umbenannt, verschoben, gelöscht, auf- oder zugeklappt. `dss-cli` ändert sie nur über den laufenden Kern.
+- **Gleiche Datei nochmals:** Gleicher Inhalt ergibt dieselbe Datei in `media/` (SHA-256). Hat sie schon einen Eintrag, bleiben Name und Ordner; der Kern meldet es als Hinweis («logo.png ist schon in der Medienliste (als «Logo»), Name und Ordner bleiben.»).
+- **Dateien ohne Eintrag** (zum Beispiel vor P10b übernommen oder mit `dss-cli` bei angehaltenem Kern) bekommen einen Ersatznamen aus Art und Datum: «Bild vom 2026-11-02», «Video vom …», «Schrift vom …», bei gleichen Namen « (2)», « (3)» in der Reihenfolge des Datums. Sie kommen auf die oberste Ebene. Das Datum ist die letzte Änderung der Datei in `media/` (lokale Zeit): Der Kern schreibt die Datei beim Übernehmen und ändert sie danach nie (der Name ist ihr Inhalt), also ist es das Datum der Übernahme. Eine Sicherung mit `cp -a` (wie `scripts/installieren.sh`) behält es. Der Zeitpunkt des Anlegens (birth time) wäre gleich, ist aber nicht auf jedem Dateisystem vorhanden.
+- **Einträge zu Dateien, die fehlen,** fallen weg. Wie bei `liste.json` geschieht das beim Laden nur im Speicher; die Datei wird bei der nächsten Änderung geschrieben.
+- **Ordner löschen:** Dateien und Unterordner darin kommen eine Ebene höher (in den Elternordner bzw. auf die oberste Ebene). Gewählt, weil es nie eine Datei löscht und dasselbe tut wie die Ordner der Overlay-Liste; nur leere Ordner löschbar wäre umständlicher bei verschachtelten Ordnern.
+- **Datei löschen** löscht die Datei in `media/` und ihren Eintrag. Der Kern weist es ab, solange eine Quelle die Datei nutzt (Bild- und Videoquellen über `file`, Textquellen über ihre Schriftdatei) oder eine Overlay-Datei, die sich nicht laden lässt, den Verweis enthält.
+- **Ungültige Datei:** wie bei `liste.json`. Beim Laden gemeldet (`medien.json: …`) und nicht überschrieben; die Namen sind dann Ersatznamen (nur im Speicher). Umbenennen, Verschieben und Ordner werden mit einer Meldung abgewiesen, bis die Datei repariert oder entfernt und der Kern neu geladen ist (SIGHUP). Übernehmen geht weiter.
+- **Erstes Anlegen bei bestehenden Daten** gilt als Umwandeln (P10a): Fehlt `medien.json` und liegen Dateien in `media/`, meldet `dss-core --format-pruefen` «älteres Format: medien.json (fehlt, N Datei(en) in media/ bekommen Ersatznamen)» (Exit-Code 4), und `scripts/installieren.sh` sichert den Datenordner, bevor `dss-core --umwandeln` die Datei mit den Ersatznamen schreibt. Eine `format_version` über 1 gilt als neueres Format (Exit-Code 5).
+- `dss-cli medien-liste` zeigt die Dateien nach Ordner und Name mit Nummer, Ordner, Typ, Grösse, Format (Video), Verweis und «verwendet in».
+
+Beispiel: ein Ordner «Logos» mit dem Unterordner «Alt», darin eine Datei; eine Datei auf der obersten Ebene. Das Beispiel liest ein Test (`tst_medienliste`, Fall `formatDocExample`).
+
+<!-- medien-beispiel-anfang -->
+```json
+{
+    "files": [
+        {
+            "file": "media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png",
+            "folder": "0c6f3d2a-8b1e-4f5a-9d7c-2e4b6a8c0d1f",
+            "name": "logo.png"
+        },
+        {
+            "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm",
+            "folder": null,
+            "name": "Video vom 2026-11-03"
+        }
+    ],
+    "folders": [
+        {
+            "expanded": true,
+            "id": "7a1d9e44-3c2b-4f6e-8a5d-1b9c0e7f2a36",
+            "name": "Logos",
+            "parent": null
+        },
+        {
+            "expanded": false,
+            "id": "0c6f3d2a-8b1e-4f5a-9d7c-2e4b6a8c0d1f",
+            "name": "Alt",
+            "parent": "7a1d9e44-3c2b-4f6e-8a5d-1b9c0e7f2a36"
+        }
+    ],
+    "format_version": 1
+}
+```
+<!-- medien-beispiel-ende -->
 
 ## Versionen
 

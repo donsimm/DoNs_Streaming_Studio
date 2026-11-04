@@ -132,6 +132,17 @@ inline CliResult runCli(const QString &dataDir, const QStringList &args, const Q
     return {p.exitStatus() == QProcess::NormalExit ? p.exitCode() : -1,
             QString::fromUtf8(p.readAllStandardOutput()), QString::fromUtf8(p.readAllStandardError())};
 }
+
+// Ohne --datenordner (Befehle, die an den Kern gehen, P10b: Medienliste)
+inline CliResult runCliOnly(const QStringList &args)
+{
+    QProcess p;
+    p.start(QStringLiteral(DSS_CLI_BIN), args);
+    p.closeWriteChannel();
+    p.waitForFinished(10000);
+    return {p.exitStatus() == QProcess::NormalExit ? p.exitCode() : -1,
+            QString::fromUtf8(p.readAllStandardOutput()), QString::fromUtf8(p.readAllStandardError())};
+}
 #endif
 
 } // namespace testhelp

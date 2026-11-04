@@ -3,6 +3,7 @@
 #include "address.h"
 #include "imageorientation.h"
 #include "overlayjson.h"
+#include "videoformat.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -73,6 +74,7 @@ bool OverlayStore::load(QString *error, LoadMode mode)
     m_pendingWrites.clear();
     m_loadErrors.clear();
     m_loadWarnings.clear();
+    m_unreadableOverlayFiles.clear();
     for (const QString &dir : {overlaysDir(), mediaDir()}) {
         if (!readOnly && !QDir().mkpath(dir)) {
             *error = QStringLiteral("Ordner %1 kann nicht angelegt werden.").arg(dir);
@@ -91,6 +93,8 @@ bool OverlayStore::load(QString *error, LoadMode mode)
     for (const QString &fileName : files) {
         const QString name = relativeName(fileName);
         QFile file(dir.filePath(fileName));
+        // Nicht geladene Dateien merken: Ihre Mediendateien dürfen nicht gelöscht werden.
+        m_unreadableOverlayFiles.append(file.fileName());
         if (!file.open(QIODevice::ReadOnly)) {
             m_loadErrors.append(QStringLiteral("%1: kann nicht gelesen werden (%2)")
                                     .arg(name, file.errorString()));
@@ -130,9 +134,11 @@ bool OverlayStore::load(QString *error, LoadMode mode)
             else
                 m_loadErrors.append(QStringLiteral("%1: kein Token vorhanden, %2").arg(name, tokenError));
         }
+        m_unreadableOverlayFiles.removeLast(); // gelesen (auch ohne Token: Datei ist gültig)
         insertSorted(overlay);
     }
     loadLayout(); // liest nur, schreibt auch im Modus ReadWrite nicht
+    loadMediaLibrary(); // ebenso
     return true;
 }
 
@@ -168,6 +174,217 @@ void OverlayStore::loadLayout()
     m_layoutError = QString::fromLatin1(kListFileName) + QStringLiteral(": ") + error;
     m_loadErrors.append(m_layoutError
                         + QStringLiteral(" (Liste nach Name, Datei wird nicht überschrieben)"));
+}
+
+QString OverlayStore::mediaLibraryFilePath() const
+{
+    return m_dataDir + QLatin1Char('/') + QString::fromLatin1(kMediaLibraryFileName);
+}
+
+void OverlayStore::loadMediaLibrary()
+{
+    // Wie liste.json: Fehlt die Datei, gelten Ersatznamen; Abweichungen zu media/ werden nur im
+    // Speicher ausgeglichen, geschrieben wird erst bei einer Änderung.
+    m_mediaError.clear();
+    m_media = MediaLibrary();
+    QFile file(mediaLibraryFilePath());
+    if (file.exists()) {
+        MediaLibrary library;
+        QString error;
+        if (!file.open(QIODevice::ReadOnly)) {
+            error = QStringLiteral("kann nicht gelesen werden (%1)").arg(file.errorString());
+        } else if (parseMediaLibrary(file.readAll(), &library, &error)) {
+            m_media = library;
+        }
+        if (!error.isEmpty()) {
+            // Kaputte Datei: melden, nicht überschreiben, Ersatznamen auf der obersten Ebene.
+            m_mediaError = QString::fromLatin1(kMediaLibraryFileName) + QStringLiteral(": ") + error;
+            m_loadErrors.append(m_mediaError + QStringLiteral(" (Ersatznamen, Datei wird nicht "
+                                                              "überschrieben)"));
+        }
+    }
+    reconcileMedia();
+}
+
+bool OverlayStore::reconcileMedia()
+{
+    const QList<MediaFileInfo> present = scanMediaDir(mediaDir());
+    m_mediaBytes.clear();
+    for (const MediaFileInfo &f : present)
+        m_mediaBytes.insert(f.reference, f.bytes);
+    return reconcileMediaLibrary(&m_media, present);
+}
+
+bool OverlayStore::writeMediaLibrary(const MediaLibrary &library, QString *error)
+{
+    // Atomar wie liste.json. https://doc.qt.io/qt-6.8/qsavefile.html
+    QSaveFile file(mediaLibraryFilePath());
+    if (!file.open(QIODevice::WriteOnly)) {
+        *error = QStringLiteral("%1 kann nicht geschrieben werden (%2)")
+                     .arg(file.fileName(), file.errorString());
+        return false;
+    }
+    file.write(serializeMediaLibrary(library));
+    if (!file.commit()) {
+        *error = QStringLiteral("%1 kann nicht gespeichert werden (%2)")
+                     .arg(file.fileName(), file.errorString());
+        return false;
+    }
+    return true;
+}
+
+bool OverlayStore::changeMedia(const std::function<QString(MediaLibrary *)> &change,
+                               bool structural, QString *error)
+{
+    if (structural && !m_mediaError.isEmpty()) {
+        *error = QStringLiteral("Die Medienliste lässt sich nicht ändern: %1. Die Datei wird nicht "
+                                "überschrieben; reparieren oder entfernen und den Kern neu laden.")
+                     .arg(m_mediaError);
+        return false;
+    }
+    MediaLibrary changed = m_media;
+    if (const QString e = change(&changed); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    // Ungültige medien.json bleibt, wie sie ist (Übernehmen und Löschen gelten nur im Speicher).
+    if (m_writesMedia && m_mediaError.isEmpty() && !writeMediaLibrary(changed, error))
+        return false;
+    m_media = changed;
+    return true;
+}
+
+QString OverlayStore::mediaName(const QString &reference) const
+{
+    const MediaEntry *e = m_media.entry(reference);
+    return e ? e->name : QString();
+}
+
+QString OverlayStore::videoCodec(const QString &reference) const
+{
+    if (!m_videoCodecReader || mediaKindOf(reference) != MediaKind::Video)
+        return {};
+    auto it = m_videoCodecCache.constFind(reference);
+    if (it == m_videoCodecCache.constEnd()) {
+        QString codec;
+        QString ignored;
+        if (!m_videoCodecReader(mediaFilePath(reference), &codec, &ignored))
+            codec.clear();
+        it = m_videoCodecCache.insert(reference, codec);
+    }
+    return *it;
+}
+
+QString OverlayStore::browserProblem(const QString &reference, const QString &name) const
+{
+    const std::optional<QString> unsupported = browserUnsupportedVideoCodec(videoCodec(reference));
+    if (!unsupported)
+        return {};
+    return browserVideoWarning(name.isEmpty() ? mediaName(reference) : name, *unsupported);
+}
+
+bool OverlayStore::recordMedia(const QString &reference, const QString &name, const QUuid &folder,
+                               QString *error)
+{
+    const QFileInfo info(mediaFilePath(reference));
+    if (!info.isFile()) {
+        *error = QStringLiteral("Datei %1 fehlt im Datenordner.").arg(reference);
+        return false;
+    }
+    m_mediaBytes.insert(reference, info.size());
+    const QUuid target = m_media.folder(folder) ? folder : QUuid();
+    const QString entryName = name.trimmed().isEmpty() ? QFileInfo(reference).fileName() : name;
+    // Gibt es die Datei schon (gleicher Inhalt), bleiben Name und Ordner (addMediaToLibrary).
+    return changeMedia([&](MediaLibrary *l) {
+        return addMediaToLibrary(l, reference, entryName, target);
+    }, false, error);
+}
+
+bool OverlayStore::renameMedia(const QString &reference, const QString &name, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) { return renameMediaInLibrary(l, reference, name); },
+                       true, error);
+}
+
+bool OverlayStore::moveMediaFile(const QString &reference, const QUuid &folder, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) { return moveMediaFileInLibrary(l, reference, folder); },
+                       true, error);
+}
+
+QUuid OverlayStore::createMediaFolder(const QString &name, const QUuid &parent, QString *error)
+{
+    const QUuid id = QUuid::createUuid();
+    if (!changeMedia([&](MediaLibrary *l) { return createMediaFolderInLibrary(l, id, name, parent); },
+                     true, error))
+        return {};
+    return id;
+}
+
+bool OverlayStore::renameMediaFolder(const QUuid &folderId, const QString &name, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) { return renameMediaFolderInLibrary(l, folderId, name); },
+                       true, error);
+}
+
+bool OverlayStore::removeMediaFolder(const QUuid &folderId, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) { return removeMediaFolderFromLibrary(l, folderId); },
+                       true, error);
+}
+
+bool OverlayStore::moveMediaFolder(const QUuid &folderId, const QUuid &parent, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) { return moveMediaFolderInLibrary(l, folderId, parent); },
+                       true, error);
+}
+
+bool OverlayStore::setMediaFolderExpanded(const QUuid &folderId, bool expanded, QString *error)
+{
+    return changeMedia([&](MediaLibrary *l) {
+        return setMediaFolderExpandedInLibrary(l, folderId, expanded);
+    }, true, error);
+}
+
+bool OverlayStore::removeMedia(const QString &reference, QString *error)
+{
+    const MediaEntry *entry = m_media.entry(reference);
+    if (!entry) {
+        *error = QStringLiteral("Datei %1 ist nicht in der Medienliste.").arg(reference);
+        return false;
+    }
+    const QString name = entry->name;
+    if (const QList<MediaUsage> used = mediaUsages().value(reference); !used.isEmpty()) {
+        *error = QStringLiteral("«%1» lässt sich nicht löschen, %2.").arg(name, usageText(used));
+        return false;
+    }
+    for (const QString &path : std::as_const(m_unreadableOverlayFiles)) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly) || file.readAll().contains(reference.toUtf8())) {
+            *error = QStringLiteral("«%1» lässt sich nicht löschen: Die Overlay-Datei %2 ist nicht "
+                                    "lesbar und kann die Datei verwenden.")
+                         .arg(name, QFileInfo(path).fileName());
+            return false;
+        }
+    }
+    QFile file(mediaFilePath(reference));
+    if (file.exists() && !file.remove()) {
+        *error = QStringLiteral("%1 kann nicht gelöscht werden (%2)")
+                     .arg(file.fileName(), file.errorString());
+        return false;
+    }
+    m_mediaSizeCache.remove(reference);
+    m_videoCodecCache.remove(reference);
+    m_mediaBytes.remove(reference);
+    QString writeError;
+    if (!changeMedia([&](MediaLibrary *l) { return removeMediaFromLibrary(l, reference); }, false,
+                     &writeError)) {
+        // Datei ist weg; der Eintrag fällt spätestens beim nächsten Laden weg.
+        removeMediaFromLibrary(&m_media, reference);
+        *error = QStringLiteral("Datei gelöscht, aber die Medienliste nicht gespeichert: ") + writeError;
+        return false;
+    }
+    return true;
 }
 
 bool OverlayStore::writeLayout(const OverlayLayout &layout, QString *error)
@@ -497,11 +714,18 @@ bool OverlayStore::setFolderExpanded(const QUuid &folderId, bool expanded, QStri
     }, error);
 }
 
-QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString *error)
+QString OverlayStore::importMedia(const QString &filePath, MediaUse use, QString *error,
+                                  const QUuid &folder)
 {
     const MediaImportResult r = importMediaFile(mediaDir(), filePath, use, nullptr, m_progress);
-    if (r.reference.isEmpty())
+    if (r.reference.isEmpty()) {
         *error = r.error;
+        return {};
+    }
+    // Ursprünglicher Dateiname in die Medienliste (P10b). Scheitert das Speichern der Liste, gilt
+    // die Übernahme trotzdem; die Datei bekommt dann beim nächsten Laden einen Ersatznamen.
+    QString ignored;
+    recordMedia(r.reference, QFileInfo(filePath).fileName(), folder, &ignored);
     return r.reference;
 }
 

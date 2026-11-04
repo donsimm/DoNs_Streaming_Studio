@@ -2,6 +2,7 @@
 
 #include "configpaths.h"
 #include "mediaimport.h"
+#include "medialibrary.h"
 #include "overlay.h"
 #include "overlaylist.h"
 #include "tokenstore.h"
@@ -23,6 +24,7 @@
 //   <Datenordner>/media/<SHA-256>.<Endung>  Kopien der Dateien des Nutzers
 //   <Datenordner>/tokens.json               Token pro Overlay, Dateirechte 0600
 //   <Datenordner>/liste.json                Reihenfolge und Ordner der Overlay-Liste (P08)
+//   <Datenordner>/medien.json               Namen und Ordner der Mediendateien (P10b)
 //
 // Jede Änderung wird sofort atomar gespeichert. Schlägt das Speichern fehl, bleibt das
 // Overlay im Speicher unverändert.
@@ -98,11 +100,51 @@ public:
     bool removeFolder(const QUuid &folderId, QString *error);
     bool setFolderExpanded(const QUuid &folderId, bool expanded, QString *error);
 
+    // Namen und Ordner der Mediendateien (P10b, medien.json). load() liest die Datei und gleicht
+    // sie im Speicher mit media/ ab (neue Dateien mit Ersatzname, fehlende fallen weg); geschrieben
+    // wird erst bei der nächsten Änderung. Ist medien.json ungültig, steht die Meldung in
+    // mediaLibraryError() (und in loadErrors()), alle Dateien haben Ersatznamen, Umbenennen und
+    // Ordner werden abgewiesen und die Datei wird nicht überschrieben (wie liste.json).
+    // Schreiben darf nur der Kern (Teil A 1): ohne setWritesMediaLibrary(true) ändern die
+    // Funktionen unten nur den Speicher (dss-cli übernimmt Dateien ohne Namen; der Kern nimmt sie
+    // beim nächsten Laden mit Ersatzname auf).
+    void setWritesMediaLibrary(bool writes) { m_writesMedia = writes; }
+    const MediaLibrary &mediaLibrary() const { return m_media; }
+    QString mediaLibraryError() const { return m_mediaError; }
+    QString mediaLibraryFilePath() const;
+    // Grösse jeder Datei in Byte (aus dem letzten Abgleich)
+    qint64 mediaBytes(const QString &reference) const { return m_mediaBytes.value(reference, -1); }
+    // Name im Dock; leer, wenn die Datei nicht in der Liste steht.
+    QString mediaName(const QString &reference) const;
+    // Übernommene Datei aufnehmen (beim Übernehmen): gibt es sie schon, bleiben Name und Ordner.
+    // folder null = oberste Ebene; ein Ordner, den es nicht mehr gibt, ebenso.
+    bool recordMedia(const QString &reference, const QString &name, const QUuid &folder,
+                     QString *error);
+    bool renameMedia(const QString &reference, const QString &name, QString *error);
+    bool moveMediaFile(const QString &reference, const QUuid &folder, QString *error);
+    QUuid createMediaFolder(const QString &name, const QUuid &parent, QString *error);
+    bool renameMediaFolder(const QUuid &folderId, const QString &name, QString *error);
+    // Inhalt kommt eine Ebene höher (Teil A 1, Begründung in docs/06-overlay-format.md).
+    bool removeMediaFolder(const QUuid &folderId, QString *error);
+    bool moveMediaFolder(const QUuid &folderId, const QUuid &parent, QString *error);
+    bool setMediaFolderExpanded(const QUuid &folderId, bool expanded, QString *error);
+    // Löscht die Datei in media/ und ihren Eintrag (Teil A 2). Abgewiesen, wenn eine Quelle sie
+    // nutzt; auch dann, wenn eine Overlay-Datei, die nicht geladen werden konnte, den Verweis
+    // enthält.
+    bool removeMedia(const QString &reference, QString *error);
+    // Verwendung jeder Datei in den geladenen Overlays (Teil A 2)
+    MediaUsages mediaUsages() const { return dss::mediaUsages(m_overlays); }
+    // Neuer Abgleich mit media/ (nach dem Übernehmen). true, wenn sich die Liste geändert hat.
+    bool reconcileMedia();
+
     // Kopiert eine Datei nach media/<SHA-256>.<Endung> (gleicher Inhalt → eine Kopie)
     // und gibt den Verweis "media/…" zurück, bei Fehler einen leeren Text. Läuft im Thread des
     // Aufrufs (dss-cli; der Kern übernimmt seit P10-vor mit MediaImporter in einem eigenen
     // Thread und gibt danach den Verweis weiter).
-    QString importMedia(const QString &filePath, MediaUse use, QString *error);
+    // Seit P10b kommt die Datei mit ihrem Namen in die Medienliste, in folder (null = oberste
+    // Ebene); gab es sie schon, bleiben Name und Ordner.
+    QString importMedia(const QString &filePath, MediaUse use, QString *error,
+                        const QUuid &folder = QUuid());
     // Ordner der Kopien: <Datenordner>/media
     QString mediaDir() const;
 
@@ -112,6 +154,16 @@ public:
     using MediaSizeReader =
         std::function<bool(const QString &path, int *width, int *height, QString *error)>;
     void setMediaSizeReader(MediaSizeReader reader) { m_mediaSizeReader = std::move(reader); }
+    // Liest das Format (Codec) einer Videodatei als Name in FFmpeg (P10b, Punkt 81). Gesetzt vom
+    // Kern (dss_media, readVideoCodec). Ohne: kein Hinweis auf Formate.
+    using VideoCodecReader = std::function<bool(const QString &path, QString *codec, QString *error)>;
+    void setVideoCodecReader(VideoCodecReader reader) { m_videoCodecReader = std::move(reader); }
+    // Codec eines Videos aus der Medienliste (einmal gelesen, Dateien ändern sich nie); leer, wenn
+    // unbekannt oder kein Video.
+    QString videoCodec(const QString &reference) const;
+    // Hinweis, wenn die Browserquelle die Datei nicht abspielt (videoformat.h); name ist der Name
+    // im Hinweis (Dateiname beim Übernehmen, sonst der Name in der Medienliste). Leer = kein Problem.
+    QString browserProblem(const QString &reference, const QString &name = QString()) const;
     // Wird beim Übernehmen einer Datei nach jedem MiB aufgerufen (P10a, Punkt 41): Der Kern
     // meldet sich damit beim Watchdog von systemd, weil eine grosse Datei die Hauptschleife lange
     // anhält (1 GiB etwa 16 s auf dem Studio-PC, Bericht P10a).
@@ -194,6 +246,12 @@ private:
     int indexOf(const QUuid &overlayId) const;
     QList<QUuid> idsByName() const;
     void loadLayout();
+    void loadMediaLibrary();
+    // Änderung der Medienliste: auf einer Kopie, dann speichern (nur im Kern), dann übernehmen.
+    // structural: Umbenennen und Ordner; bei ungültiger medien.json abgewiesen.
+    bool changeMedia(const std::function<QString(MediaLibrary *)> &change, bool structural,
+                     QString *error);
+    bool writeMediaLibrary(const MediaLibrary &library, QString *error);
     bool writeLayout(const OverlayLayout &layout, QString *error);
     // Änderung der Liste durch den Nutzer: auf einer Kopie, dann speichern, dann übernehmen.
     bool changeLayout(const std::function<QString(OverlayLayout *)> &change, QString *error);
@@ -207,6 +265,8 @@ private:
     std::optional<QSize> mediaSize(const QString &reference, QString *reason) const;
 
     MediaSizeReader m_mediaSizeReader;
+    VideoCodecReader m_videoCodecReader;
+    mutable QHash<QString, QString> m_videoCodecCache;
     std::function<void()> m_progress;
     struct CachedSize
     {
@@ -218,6 +278,12 @@ private:
     QList<Overlay> m_overlays;
     OverlayLayout m_layout;
     QString m_layoutError;
+    MediaLibrary m_media;
+    QString m_mediaError;
+    QHash<QString, qint64> m_mediaBytes;
+    bool m_writesMedia = false;
+    // Overlay-Dateien, die load() nicht lesen konnte (Löschen von Mediendateien prüft sie roh)
+    QStringList m_unreadableOverlayFiles;
     bool m_deferredWrites = false;
     QSet<QUuid> m_pendingWrites;
     int m_overlayWrites = 0;

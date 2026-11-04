@@ -30,6 +30,8 @@ add_library(dss_common STATIC
   transform.h transform.cpp
   dataformat.h dataformat.cpp dataformattesting.h
   mediaimport.h mediaimport.cpp
+  medialibrary.h medialibrary.cpp
+  videoformat.h videoformat.cpp
   coresettings.h coresettings.cpp
   coresession.h coresession.cpp
   browsersource.h browsersource.cpp

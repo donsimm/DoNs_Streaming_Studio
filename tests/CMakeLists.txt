@@ -39,6 +39,12 @@ add_test(NAME media_vorbereiten
 set_tests_properties(media_vorbereiten PROPERTIES FIXTURES_SETUP dss_media)
 set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
 
+# P10b: Namen und Ordner der Mediendateien (medien.json), ohne Qt Gui und ohne Kern-Prozess.
+dss_add_test(tst_medienliste)
+target_compile_definitions(tst_medienliste PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
+  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md")
+set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED dss_media)
+
 # P07: Schnittstelle, Leistungswerte, Aufbereitung für das Fenster (ohne Qt Gui).
 dss_add_test(tst_protocol)
 dss_add_test(tst_windowdata)
@@ -188,11 +194,13 @@ if(TARGET dss_media)
   target_compile_definitions(tst_medien PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
     DSS_CORE_BIN="$<TARGET_FILE:dss-core>" DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
     DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
-    DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
+    DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>
+    DSS_MEDIA_SIZE=$<BOOL:${DSS_MEDIA_SIZE}>)
   if(DSS_BUILD_CLI AND DSS_MEDIA_SIZE)
     target_compile_definitions(tst_medien PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
     add_dependencies(tst_medien dss-cli)
   endif()
+  add_dependencies(tst_medien dss-core) # P10b: Kern für Videoformate und Lage
   set_tests_properties(tst_medien PROPERTIES FIXTURES_REQUIRED dss_media)
 endif()
 

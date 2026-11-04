@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 
 #include <optional>
 
@@ -102,6 +103,7 @@ private:
     {
         QString reference;  // "media/…"
         QString sourceName; // ursprünglicher Dateiname (Name neuer Bild- und Videoquellen)
+        QString warning = {}; // P10b: Hinweis zum Videoformat (Punkt 81)
     };
     // Prüft die Kennungen (Overlay, Quelle, Ordner); bei einem Fehler das Ergebnis.
     std::optional<dss::ChangeResult> checkIds(const dss::ChangeRequest &request) const;
@@ -114,6 +116,15 @@ private:
     // Datei, die die Änderung zuerst übernehmen muss, und wofür; leer, wenn keine.
     QString fileToImport(const dss::ChangeRequest &request, dss::MediaUse *use) const;
     void onImportFinished(quint64 job, const dss::MediaImportResult &result);
+    // P10b: Medienliste (E-28) und Stand der Übernahmen (Punkt 73)
+    dss::MediaListData mediaListData() const;
+    // Schickt media_list an alle, wenn sie sich seit der letzten geändert hat.
+    void broadcastMediaListIfChanged();
+    void broadcastImportProgress();
+    dss::ChangeResult cancelImport(const dss::ChangeRequest &request);
+    // Abgebrochene Übernahmen, deren Kopie schon fertig war: löschen, sobald keine Übernahme mehr
+    // läuft (eine andere könnte denselben Inhalt gerade gefunden haben) und nichts sie nutzt.
+    void removeCanceledCopies();
     // Adresse der Browserquelle (P10): mit Token, nur an Verbindungen, die danach fragen.
     dss::BrowserSourceInfo browserSourceInfo(const QUuid &overlayId) const;
     // Schickt jeder fragenden Verbindung die Adresse neu, wenn sie sich geändert hat.
@@ -160,8 +171,13 @@ private:
         dss::ChangeRequest request;
         QString file;
         QElapsedTimer timer; // seit Beginn des Übernehmens (Protokoll)
+        bool canceled = false; // P10b: vom Nutzer abgebrochen
     };
     QHash<quint64, PendingImport> m_imports;
+    QTimer *m_progressTimer = nullptr;
+    QJsonObject m_lastProgress;
+    QJsonObject m_lastMediaList;
+    QSet<QString> m_canceledCopies;
     // P10b, Punkt 85: leere Adresse im Heimnetz alle 2 s aus der Standardroute
     dss::HomeAddressWatcher *m_addressWatcher = nullptr;
 };

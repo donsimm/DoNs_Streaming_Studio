@@ -70,6 +70,34 @@ std::optional<ChangeResult> CoreSession::updateSettings(const SettingsUpdate &up
     return result;
 }
 
+std::optional<MediaListData> CoreSession::getMediaList(QString *error)
+{
+    if (!send(simpleMessage(msg::kGetMediaList), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kMediaList), error);
+    if (!reply)
+        return std::nullopt;
+    MediaListData data;
+    if (!parseMediaList(*reply, &data, error))
+        return std::nullopt;
+    return data;
+}
+
+std::optional<ChangeResult> CoreSession::change(ChangeRequest request, QString *error)
+{
+    request.requestId = m_nextRequestId++;
+    if (!send(changeRequestMessage(request), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply =
+        waitFor(QString::fromLatin1(msg::kChangeResult), error, request.requestId);
+    if (!reply)
+        return std::nullopt;
+    ChangeResult result;
+    if (!parseChangeResult(*reply, &result, error))
+        return std::nullopt;
+    return result;
+}
+
 bool CoreSession::send(const QJsonObject &message, QString *error)
 {
     m_socket.write(encodeMessage(message));
