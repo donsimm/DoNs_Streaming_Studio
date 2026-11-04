@@ -329,18 +329,21 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` 
 
 ## Commits
 
-- `f84ba9f` P10: Overlay-Format 4 mit Ausgabe ein/aus (E-24), Schnittstelle 6
-- `a07fd5b` P10: Neuer Token und Adresse der Browserquelle, Schnittstelle 7
-- `50d5dbc` P10: Grundlagen des zweiten Zeichners: Lage der EXIF-Angabe, Zeilenmasse wie Qt
-- `98e8f04` P10: Seite der Browserquelle als zweiter Zeichner (Teil B)
-- `a0b5057` P10: Overlay-Server im Kern (Teil A), Schnittstelle 8
-- `88e2cf3` P10: Stufe 1 der Prüfung mit Qt WebEngine, Video beim Wechsel des Overlays
-- `d07789a` P10: Browserquelle im Fenster (Teil C)
-- `1516383` P10: Nacharbeiten zu den Einstellungen (Punkte 76 bis 78), Schnittstelle 9
-- `bb28a6f` P10: Token immer vergleichen, auch ohne Overlay zur Adresse
-- `68d4d8c` P10: Startprüfung erwartet «Overlay-Server lauscht auf» im Protokoll des Kerns
-- `327dfc6` P10: tst_fensterbearbeiten besteht auch mit DSS_CORE_OVERLAY_SERVER=OFF
-- (dieser Commit) P10: Bericht, Dokumente nachgeführt, Messdaten
+- `f5c5538` P10: Overlay-Format 4 mit Ausgabe ein/aus (E-24), Schnittstelle 6
+- `0b2ff81` P10: Neuer Token und Adresse der Browserquelle, Schnittstelle 7
+- `9316097` P10: Grundlagen des zweiten Zeichners: Lage der EXIF-Angabe, Zeilenmasse wie Qt
+- `48dbb21` P10: Seite der Browserquelle als zweiter Zeichner (Teil B)
+- `8f28fd1` P10: Overlay-Server im Kern (Teil A), Schnittstelle 8
+- `253a1e5` P10: Stufe 1 der Prüfung mit Qt WebEngine, Video beim Wechsel des Overlays
+- `1fa87ad` P10: Browserquelle im Fenster (Teil C)
+- `345e8af` P10: Nacharbeiten zu den Einstellungen (Punkte 76 bis 78), Schnittstelle 9
+- `9958676` P10: Token immer vergleichen, auch ohne Overlay zur Adresse
+- `1a33c89` P10: Startprüfung erwartet «Overlay-Server lauscht auf» im Protokoll des Kerns
+- `ada65f1` P10: tst_fensterbearbeiten besteht auch mit DSS_CORE_OVERLAY_SERVER=OFF
+- `033bb32` P10: Bericht, Dokumente nachgeführt, Messdaten
+- (dieser Commit) P10: Bericht, Kennungen der Commits nach dem Rebase
+
+Beim `git pull --rebase origin main` lag auf dem Server `6c047a8` («P10 gestartet», nur `docs/00-uebergabe.md` und `docs/07-bauplan.md`). Die Commits oben sind darauf neu aufgesetzt. Den Konflikt in `docs/07-bauplan.md` habe ich so gelöst: Die Zeile P10 unter «Geplant» fällt weg, weil P10 jetzt unter «Erledigt» steht. Die übrigen Teile dieses Berichts und die Messdaten nennen die Kennungen vor dem Rebase: `f84ba9f` = `f5c5538`, `a07fd5b` = `0b2ff81`, `50d5dbc` = `9316097`, `98e8f04` = `48dbb21`, `a0b5057` = `8f28fd1`, `88e2cf3` = `253a1e5`, `d07789a` = `1fa87ad`, `1516383` = `345e8af`, `bb28a6f` = `9958676`, `68d4d8c` = `1a33c89`, `327dfc6` = `ada65f1`. Der Code ist derselbe (`git diff 327dfc6 ada65f1 -- . ':!docs'` leer).
 
 ## Geänderte und neue Dateien
 
