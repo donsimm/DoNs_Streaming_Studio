@@ -1,0 +1,254 @@
+Befehl: python3 scripts/dienstpruefung.py --kills 5 --out <Notizordner>/dienstN (dss-core-entwicklung.service lief daneben)
+
+== Lauf 0, Stand 9641893, Beginn 2026-11-04 12:46:07 (vor der Korrektur im Skript)
+Testdaten (wie im Handtest) mit dss-cli in /tmp/dss-dienstpruefung-8vkmv5c7/daten
+  ok: dss-cli overlay-neu Überblick Start
+  ok: dss-cli overlay-neu Chat Ecke
+  ok: dss-cli quelle-bild ueberblick-start
+  ok: dss-cli quelle-video ueberblick-start
+  ok: dss-cli quelle-text ueberblick-start
+1. Einrichten (zweimal)
+  ok: erstes Einrichten schreibt die Einheit
+  ok: zweites Einrichten ändert nichts
+  ok: systemd-analyze --user verify dss-core-pruefung.service
+  ok: Zustand static (kein Start bei der Anmeldung)
+  ok: Einheit läuft nicht
+2. Fenster startet den Kern
+  ok: Einheit active nach Start des Fensters
+  ok: Fenster verbunden
+  Zeit bis active 0.312 s, bis verbunden 0.316 s
+3. kill -9 des Kerns (5 mal)
+  ok: Kern läuft (PID 861539)
+  ok: Kern neu gestartet (1)
+  ok: Fenster wieder verbunden (1)
+  ok: NRestarts 0 → 1
+  Neustart nach 1.099 s, Fenster wieder verbunden nach 1.981 s
+  ok: Kern läuft (PID 861605)
+  ok: Kern neu gestartet (2)
+  ok: Fenster wieder verbunden (2)
+  ok: NRestarts 1 → 2
+  Neustart nach 1.123 s, Fenster wieder verbunden nach 3.004 s
+  ok: Kern läuft (PID 861669)
+  ok: Kern neu gestartet (3)
+  ok: Fenster wieder verbunden (3)
+  ok: NRestarts 2 → 3
+  Neustart nach 1.116 s, Fenster wieder verbunden nach 1.957 s
+  ok: Kern läuft (PID 861753)
+  ok: Kern neu gestartet (4)
+  ok: Fenster wieder verbunden (4)
+  ok: NRestarts 3 → 4
+  Neustart nach 1.106 s, Fenster wieder verbunden nach 2.941 s
+  ok: Kern läuft (PID 861823)
+  ok: Kern neu gestartet (5)
+  ok: Fenster wieder verbunden (5)
+  ok: NRestarts 4 → 5
+  Neustart nach 1.133 s, Fenster wieder verbunden nach 1.911 s
+  ok: Fenster läuft noch
+4. kill -9 des Fensters: Kern läuft weiter
+  ok: Kern bemerkt Trennung
+  ok: Kern läuft nach 3 s weiter (PID 861902)
+5. Zwei Fenster, normal schliessen
+  ok: zwei Fenster verbunden
+  ok: erstes Fenster endet mit Exit-Code 0
+FEHLER: erstes Fenster: «Kern läuft weiter: 1 andere Fenster verbunden»
+6. Entfernen (zweimal)
+  ok: erstes Entfernen entfernt die Einheit
+  ok: zweites Entfernen: nichts zu tun
+  ok: systemd kennt die Einheit nicht mehr
+Neustart nach kill -9: 1.099 bis 1.133 s; Fenster wieder verbunden: 1.911 bis 3.004 s
+Ergebnis: nicht bestanden
+
+== Lauf 1, mit Korrektur in scripts/dienstpruefung.py
+Testdaten (wie im Handtest) mit dss-cli in /tmp/dss-dienstpruefung-sc07bdh2/daten
+  ok: dss-cli overlay-neu Überblick Start
+  ok: dss-cli overlay-neu Chat Ecke
+  ok: dss-cli quelle-bild ueberblick-start
+  ok: dss-cli quelle-video ueberblick-start
+  ok: dss-cli quelle-text ueberblick-start
+1. Einrichten (zweimal)
+  ok: erstes Einrichten schreibt die Einheit
+  ok: zweites Einrichten ändert nichts
+  ok: systemd-analyze --user verify dss-core-pruefung.service
+  ok: Zustand static (kein Start bei der Anmeldung)
+  ok: Einheit läuft nicht
+2. Fenster startet den Kern
+  ok: Einheit active nach Start des Fensters
+  ok: Fenster verbunden
+  Zeit bis active 0.320 s, bis verbunden 0.325 s
+3. kill -9 des Kerns (5 mal)
+  ok: Kern läuft (PID 862323)
+  ok: Kern neu gestartet (1)
+  ok: Fenster wieder verbunden (1)
+  ok: NRestarts 0 → 1
+  Neustart nach 1.132 s, Fenster wieder verbunden nach 1.806 s
+  ok: Kern läuft (PID 862387)
+  ok: Kern neu gestartet (2)
+  ok: Fenster wieder verbunden (2)
+  ok: NRestarts 1 → 2
+  Neustart nach 1.150 s, Fenster wieder verbunden nach 2.662 s
+  ok: Kern läuft (PID 862447)
+  ok: Kern neu gestartet (3)
+  ok: Fenster wieder verbunden (3)
+  ok: NRestarts 2 → 3
+  Neustart nach 1.105 s, Fenster wieder verbunden nach 1.670 s
+  ok: Kern läuft (PID 862523)
+  ok: Kern neu gestartet (4)
+  ok: Fenster wieder verbunden (4)
+  ok: NRestarts 3 → 4
+  Neustart nach 1.103 s, Fenster wieder verbunden nach 2.678 s
+  ok: Kern läuft (PID 862581)
+  ok: Kern neu gestartet (5)
+  ok: Fenster wieder verbunden (5)
+  ok: NRestarts 4 → 5
+  Neustart nach 1.111 s, Fenster wieder verbunden nach 1.623 s
+  ok: Fenster läuft noch
+4. kill -9 des Fensters: Kern läuft weiter
+  ok: Kern bemerkt Trennung
+  ok: Kern läuft nach 3 s weiter (PID 862657)
+5. Zwei Fenster, normal schliessen
+  ok: zwei Fenster verbunden
+  ok: beide Fenster gezeichnet
+  ok: erstes Fenster endet mit Exit-Code 0
+  ok: erstes Fenster: «Kern läuft weiter: 1 andere Fenster verbunden»
+  ok: Kern läuft weiter
+  ok: zweites Fenster endet mit Exit-Code 0
+  ok: zweites Fenster: «Kern beendet sich»
+  ok: Einheit inactive
+  ok: kein Neustart nach 3 s (Result success, keine neue Startzeile)
+  ok: Kern meldet «beendet, Exit-Code 0»
+6. Entfernen (zweimal)
+  ok: erstes Entfernen entfernt die Einheit
+  ok: zweites Entfernen: nichts zu tun
+  ok: systemd kennt die Einheit nicht mehr
+Neustart nach kill -9: 1.103 bis 1.150 s; Fenster wieder verbunden: 1.623 bis 2.678 s
+Ergebnis: bestanden
+
+== Lauf 2, mit Korrektur in scripts/dienstpruefung.py
+Testdaten (wie im Handtest) mit dss-cli in /tmp/dss-dienstpruefung-flnlatd7/daten
+  ok: dss-cli overlay-neu Überblick Start
+  ok: dss-cli overlay-neu Chat Ecke
+  ok: dss-cli quelle-bild ueberblick-start
+  ok: dss-cli quelle-video ueberblick-start
+  ok: dss-cli quelle-text ueberblick-start
+1. Einrichten (zweimal)
+  ok: erstes Einrichten schreibt die Einheit
+  ok: zweites Einrichten ändert nichts
+  ok: systemd-analyze --user verify dss-core-pruefung.service
+  ok: Zustand static (kein Start bei der Anmeldung)
+  ok: Einheit läuft nicht
+2. Fenster startet den Kern
+  ok: Einheit active nach Start des Fensters
+  ok: Fenster verbunden
+  Zeit bis active 0.317 s, bis verbunden 0.322 s
+3. kill -9 des Kerns (5 mal)
+  ok: Kern läuft (PID 862889)
+  ok: Kern neu gestartet (1)
+  ok: Fenster wieder verbunden (1)
+  ok: NRestarts 0 → 1
+  Neustart nach 1.113 s, Fenster wieder verbunden nach 2.002 s
+  ok: Kern läuft (PID 862954)
+  ok: Kern neu gestartet (2)
+  ok: Fenster wieder verbunden (2)
+  ok: NRestarts 1 → 2
+  Neustart nach 1.096 s, Fenster wieder verbunden nach 3.122 s
+  ok: Kern läuft (PID 863023)
+  ok: Kern neu gestartet (3)
+  ok: Fenster wieder verbunden (3)
+  ok: NRestarts 2 → 3
+  Neustart nach 1.117 s, Fenster wieder verbunden nach 2.018 s
+  ok: Kern läuft (PID 863107)
+  ok: Kern neu gestartet (4)
+  ok: Fenster wieder verbunden (4)
+  ok: NRestarts 3 → 4
+  Neustart nach 1.105 s, Fenster wieder verbunden nach 2.986 s
+  ok: Kern läuft (PID 863169)
+  ok: Kern neu gestartet (5)
+  ok: Fenster wieder verbunden (5)
+  ok: NRestarts 4 → 5
+  Neustart nach 1.120 s, Fenster wieder verbunden nach 1.965 s
+  ok: Fenster läuft noch
+4. kill -9 des Fensters: Kern läuft weiter
+  ok: Kern bemerkt Trennung
+  ok: Kern läuft nach 3 s weiter (PID 863251)
+5. Zwei Fenster, normal schliessen
+  ok: zwei Fenster verbunden
+  ok: beide Fenster gezeichnet
+  ok: erstes Fenster endet mit Exit-Code 0
+  ok: erstes Fenster: «Kern läuft weiter: 1 andere Fenster verbunden»
+  ok: Kern läuft weiter
+  ok: zweites Fenster endet mit Exit-Code 0
+  ok: zweites Fenster: «Kern beendet sich»
+  ok: Einheit inactive
+  ok: kein Neustart nach 3 s (Result success, keine neue Startzeile)
+  ok: Kern meldet «beendet, Exit-Code 0»
+6. Entfernen (zweimal)
+  ok: erstes Entfernen entfernt die Einheit
+  ok: zweites Entfernen: nichts zu tun
+  ok: systemd kennt die Einheit nicht mehr
+Neustart nach kill -9: 1.096 bis 1.120 s; Fenster wieder verbunden: 1.965 bis 3.122 s
+Ergebnis: bestanden
+
+== Lauf 3, mit Korrektur in scripts/dienstpruefung.py
+Testdaten (wie im Handtest) mit dss-cli in /tmp/dss-dienstpruefung-lgchqvq1/daten
+  ok: dss-cli overlay-neu Überblick Start
+  ok: dss-cli overlay-neu Chat Ecke
+  ok: dss-cli quelle-bild ueberblick-start
+  ok: dss-cli quelle-video ueberblick-start
+  ok: dss-cli quelle-text ueberblick-start
+1. Einrichten (zweimal)
+  ok: erstes Einrichten schreibt die Einheit
+  ok: zweites Einrichten ändert nichts
+  ok: systemd-analyze --user verify dss-core-pruefung.service
+  ok: Zustand static (kein Start bei der Anmeldung)
+  ok: Einheit läuft nicht
+2. Fenster startet den Kern
+  ok: Einheit active nach Start des Fensters
+  ok: Fenster verbunden
+  Zeit bis active 0.311 s, bis verbunden 0.316 s
+3. kill -9 des Kerns (5 mal)
+  ok: Kern läuft (PID 863490)
+  ok: Kern neu gestartet (1)
+  ok: Fenster wieder verbunden (1)
+  ok: NRestarts 0 → 1
+  Neustart nach 1.101 s, Fenster wieder verbunden nach 1.997 s
+  ok: Kern läuft (PID 863555)
+  ok: Kern neu gestartet (2)
+  ok: Fenster wieder verbunden (2)
+  ok: NRestarts 1 → 2
+  Neustart nach 1.130 s, Fenster wieder verbunden nach 2.975 s
+  ok: Kern läuft (PID 863617)
+  ok: Kern neu gestartet (3)
+  ok: Fenster wieder verbunden (3)
+  ok: NRestarts 2 → 3
+  Neustart nach 1.094 s, Fenster wieder verbunden nach 1.990 s
+  ok: Kern läuft (PID 863696)
+  ok: Kern neu gestartet (4)
+  ok: Fenster wieder verbunden (4)
+  ok: NRestarts 3 → 4
+  Neustart nach 1.132 s, Fenster wieder verbunden nach 2.974 s
+  ok: Kern läuft (PID 863758)
+  ok: Kern neu gestartet (5)
+  ok: Fenster wieder verbunden (5)
+  ok: NRestarts 4 → 5
+  Neustart nach 1.143 s, Fenster wieder verbunden nach 1.934 s
+  ok: Fenster läuft noch
+4. kill -9 des Fensters: Kern läuft weiter
+  ok: Kern bemerkt Trennung
+  ok: Kern läuft nach 3 s weiter (PID 863838)
+5. Zwei Fenster, normal schliessen
+  ok: zwei Fenster verbunden
+  ok: beide Fenster gezeichnet
+  ok: erstes Fenster endet mit Exit-Code 0
+  ok: erstes Fenster: «Kern läuft weiter: 1 andere Fenster verbunden»
+  ok: Kern läuft weiter
+  ok: zweites Fenster endet mit Exit-Code 0
+  ok: zweites Fenster: «Kern beendet sich»
+  ok: Einheit inactive
+  ok: kein Neustart nach 3 s (Result success, keine neue Startzeile)
+  ok: Kern meldet «beendet, Exit-Code 0»
+6. Entfernen (zweimal)
+  ok: erstes Entfernen entfernt die Einheit
+  ok: zweites Entfernen: nichts zu tun
+  ok: systemd kennt die Einheit nicht mehr
+Neustart nach kill -9: 1.094 bis 1.143 s; Fenster wieder verbunden: 1.934 bis 2.975 s
+Ergebnis: bestanden

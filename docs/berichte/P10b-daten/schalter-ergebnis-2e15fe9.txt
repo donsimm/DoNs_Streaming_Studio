@@ -1,0 +1,21 @@
+Klon: 2e15fe9 P10b: Dienstprüfung wartet in Schritt 5, bis beide Fenster gezeichnet sind, Beginn 2026-11-04 12:50:07
+release: Exit 0, Warnungen 0, 260 s, ctest: 100% tests passed, 0 tests failed out of 38
+debug: Exit 0, Warnungen 0, 222 s, ctest: 100% tests passed, 0 tests failed out of 38
+aus-DSS_APP_MEDIA_DOCK: Exit 2, Warnungen 0, 94 s
+aus-DSS_BUILD_APP: Exit 0, Warnungen 0, 65 s
+aus-DSS_BUILD_TESTS: Exit 0, Warnungen 0, 49 s
+aus-DSS_BUILD_CLI: Exit 0, Warnungen 0, 91 s
+aus-DSS_MEDIA_SIZE: Exit 0, Warnungen 1, 95 s
+aus-DSS_APP_RENDERER: Exit 0, Warnungen 0, 84 s
+aus-DSS_APP_CANVAS_EDIT: Exit 0, Warnungen 0, 95 s
+aus-DSS_VIDEO_ROTATION: Exit 0, Warnungen 0, 96 s
+aus-DSS_CORE_WATCHDOG: Exit 0, Warnungen 0, 95 s
+aus-DSS_APP_EDITING: Exit 0, Warnungen 0, 94 s
+aus-DSS_APP_TRANSFORM: Exit 0, Warnungen 0, 95 s
+aus-DSS_CORE_IMPORT_THREAD: Exit 0, Warnungen 0, 95 s
+aus-DSS_APP_SETTINGS_DIALOG: Exit 0, Warnungen 0, 95 s
+aus-DSS_APP_CANVAS_IMAGE: Exit 0, Warnungen 0, 95 s
+aus-DSS_CORE_OVERLAY_SERVER: Exit 0, Warnungen 0, 87 s
+aus-DSS_APP_BROWSER_SOURCE: Exit 0, Warnungen 0, 96 s
+ein-DSS_INSTALLED_EDITION: Exit 0, Warnungen 0, 94 s
+fertig 2026-11-04 13:23:25

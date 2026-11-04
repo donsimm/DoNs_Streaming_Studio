@@ -1,0 +1,32 @@
+== Daten vorher: 13 Dateien, medien.json fehlt
+== Installation (2026-11-04 10:39:54)
+Exit 0
+älteres Format: medien.json (fehlt, 10 Datei(en) in media/ bekommen Ersatznamen)
+Sicherung des Datenordners: <Notizordner>/inst/daten-sicherungen/2026-11-04_10-40-57
+umgewandelt: medien.json (fehlt, 10 Datei(en) in media/ bekommen Ersatznamen)
+1 Datei umgewandelt: <Notizordner>/inst/daten
+Umgewandelt; Sicherung der alten Dateien: <Notizordner>/inst/daten-sicherungen/2026-11-04_10-40-57
+dss-app 0.1.0 (Einsatz, Commit 4ebf22b-geändert)
+dss-core 0.1.0 (Einsatz, Commit 4ebf22b-geändert)
+== Sicherung
+2026-11-04_10-40-57
+Sicherung gleich den Daten vorher
+== Daten nachher
+Nur in daten: medien.json.
+Format aktuell: <Notizordner>/inst/daten
+format-pruefen Exit 0
+Nr  Name                        Ordner  Typ      Grösse     Format  Datei                                                                        Verwendet in
+1   Bild vom 2026-11-02         /       Bild     19.3 KiB   –       media/3bb2f4e86362dd6d44bfa852d36109788d1854c38cded41ce74f3758cecb099e.png   Overlay «Neues Overlay» (Quelle «bild1.png»)
+2   Schrift vom 2026-11-02      /       Schrift  741.9 KiB  –       media/57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e.ttf   ungenutzt
+3   Schrift vom 2026-11-03      /       Schrift  129.8 KiB  –       media/cd1ef6e9d7db28ad5cdb88a65ccbe693870e60d340b791f349d248342b4fe4c3.ttf   ungenutzt
+4   Schrift vom 2026-11-03 (2)  /       Schrift  4.6 KiB    –       media/a0e635f75821f54f7293b25e6b576d015741157d03daa7e9957686e01420b921.otf   ungenutzt
+5   Schrift vom 2026-11-03 (3)  /       Schrift  401.2 KiB  –       media/bade59d822652f76e6941aa87b40a87c13d1cc70db98ededb5011127efafd1d3.ttf   ungenutzt
+6   Schrift vom 2026-11-03 (4)  /       Schrift  404.9 KiB  –       media/1b5f2da6f4cadce4c05b9ecebe3a6fcd374eb95ae443605e799f4c3287978939.ttf   ungenutzt
+7   Schrift vom 2026-11-03 (5)  /       Schrift  399.5 KiB  –       media/352e9dc2be89f210dbd3c0fd5dfaf97135de70e0beb5f22378601861462493a7.ttf   ungenutzt
+8   Schrift vom 2026-11-03 (6)  /       Schrift  137.0 KiB  –       media/7f738fe5c43c8872807b20e2d30d42163618de8a4daf7f48a939adac32c16847.ttf   ungenutzt
+9   Schrift vom 2026-11-03 (7)  /       Schrift  133.5 KiB  –       media/bd8e27eb02720b9d91e59e4f10a90878643219f25ce6a8d9a4f06a8a88d3bb71.ttf   Overlay «Neues Overlay» (Quelle «Text: Herzlich Wilkommen»)
+10  Video vom 2026-11-03        /       Video    1.9 MiB    vp9     media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm  ungenutzt
+medien-liste Exit 0
+dss-core 0.1.0 (Einsatz, Commit 4ebf22b-geändert)
+Testeinheit entfernt
+Kopien der Daten gelöscht
