@@ -2045,7 +2045,9 @@ private slots:
         const QStringList mediaBefore = QDir(m_data.filePath(QStringLiteral("media"))).entryList(QDir::Files);
         CanvasWidget *canvas = m_window->canvas();
         const QPoint drop = canvas->toWidget(QPointF(600, 400)).toPoint();
+#if DSS_MEDIA_SIZE
         const QPointF at = canvas->overlayPoint(drop);
+#endif
         QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000);
         mediaItem(QStringLiteral("Ziel"))->setExpanded(true);
         QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Ziel"))->expanded && mediaSynced(), 3000);
