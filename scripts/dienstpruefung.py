@@ -235,6 +235,13 @@ def main():
         apps.append(App(app_bin, socket, unit, config, os.path.join(work, "app2.log")))
         apps.append(App(app_bin, socket, unit, config, os.path.join(work, "app3.log")))
         check(journal.wait_count("Verbunden: dss-app", connected + 2, 10), "zwei Fenster verbunden")
+        # «Verbunden» schreibt der Kern beim hello des Fensters; das hello des Kerns kann beim
+        # Fenster dann noch ungelesen sein. Kam SIGTERM davor, schloss das Fenster ohne Bitte
+        # zum Beenden (P10b: 55 ms nach «Verbunden», 1 von 1 Lauf). Deshalb warten, bis beide
+        # Fenster gezeichnet sind, und dann 1 s.
+        check(wait_for(lambda: all("Fenster gezeichnet" in a.text() for a in apps[1:]), 10),
+              "beide Fenster gezeichnet")
+        time.sleep(1)
         rc = apps[1].finish(signal.SIGTERM)
         check(rc == 0, "erstes Fenster endet mit Exit-Code 0")
         check("Kern läuft weiter: 1 andere Fenster verbunden" in apps[1].text(),
