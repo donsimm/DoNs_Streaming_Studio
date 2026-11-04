@@ -231,3 +231,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 - T-04: vorbereitet (siehe Tabelle «Machbarkeitstests»).
 - Punkte 76, 77 und 78: erledigt (siehe oben).
 - Verhalten eines Videos beim Wechsel des Overlays (Teil B 3): festgelegt in `docs/01-festlegungen.md`, «Zeichnen im Editor».
+
+## Wünsche aus dem Handtest P10 (2026-11-04)
+
+- Adresse der Browserquelle ohne Kopieren zwischen den PCs: Der Weg über Mousepad und `ssh` ist nur eine Notlösung. Entscheid: E-29 (MUSS), Browserquelle über obs-websocket direkt in OBS anlegen und nachführen, Baustein P10c mit T-05 nach P10b.
