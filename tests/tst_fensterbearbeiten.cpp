@@ -1244,8 +1244,14 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(field->text().contains(QStringLiteral(":%1/o/test-szene/").arg(port)), 3000);
         QVERIFY(field->text().startsWith(QStringLiteral("http://")));
         QVERIFY(field->isEnabled() && copy->isEnabled() && newToken->isEnabled());
+#if DSS_CORE_OVERLAY_SERVER
         QVERIFY(message->text().isEmpty());
         QVERIFY(status->text().isEmpty());
+#else
+        // Kern ohne Server: Hinweis im Dock und in der Statuszeile; Adresse und Token gehen trotzdem.
+        QTRY_VERIFY_WITH_TIMEOUT(message->text().contains(QStringLiteral("ohne Overlay-Server")), 3000);
+        QVERIFY(status->text().contains(QStringLiteral("ohne Overlay-Server")));
+#endif
 
         // Kopieren in die Zwischenablage (Inhalt des Nutzers danach zurück)
         QClipboard *clipboard = QGuiApplication::clipboard();
@@ -1261,7 +1267,11 @@ private slots:
         QVERIFY(onSwitch.right() < tree->visualItemRect(itemNamed(QStringLiteral("Test Szene"))).left());
         QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, onSwitch.center());
         QTRY_VERIFY_WITH_TIMEOUT(!m_check->listData().summary(m_scene)->output, 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Ausgabe: aus (Browserquelle leer), keine Browserquelle verbunden"), 3000);
+        // Ohne Server kennt der Kern keine verbundenen Seiten (keine Anzahl).
+        const QString offText = DSS_CORE_OVERLAY_SERVER
+                                    ? QStringLiteral("Ausgabe: aus (Browserquelle leer), keine Browserquelle verbunden")
+                                    : QStringLiteral("Ausgabe: aus (Browserquelle leer)");
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), offText, 3000);
         QCOMPARE(itemNamed(QStringLiteral("Test Szene"))->data(0, OverlayTree::kOutputRole).toBool(), false);
         QCOMPARE(tree->currentItem()->text(0), QStringLiteral("Test Szene"));
         // Ein anderes Overlay umschalten, ohne es zu wählen
@@ -1297,6 +1307,7 @@ private slots:
         newToken->click();
         QTRY_VERIFY_WITH_TIMEOUT(field->text() != before && field->text().contains(QStringLiteral("/o/test-szene/")), 3000);
 
+#if DSS_CORE_OVERLAY_SERVER
         // Port belegt: Meldung im Dock und in der Statuszeile, danach wieder weg
         // Port im erlaubten Bereich (kPortMin bis kPortMax), den dieser Test selbst belegt
         QTcpServer blocker;
@@ -1315,6 +1326,7 @@ private slots:
         QVERIFY(m_client->sendSettingsUpdate(update) > 0);
         QTRY_VERIFY_WITH_TIMEOUT(message->text().isEmpty() && status->text().isEmpty(), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(field->text().contains(QStringLiteral(":%1/o/test-szene/").arg(port)), 3000);
+#endif
 
         // Ohne gewähltes Overlay (Ordner gewählt) ausgegraut
         for (QTreeWidgetItemIterator it(tree); *it; ++it)
