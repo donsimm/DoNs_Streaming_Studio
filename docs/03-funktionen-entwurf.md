@@ -19,7 +19,7 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-09 | Lineale, Zoom «Einpassen», Anzeige der Zeigerposition | MUSS | Bild der Oberfläche |
 | E-10 | Einrasten, Raster, Hilfslinien, Ausrichten | SOLL | Bearbeiten geht auch ohne |
 | E-11 | Schriften als Dateien: Be Vietnam Pro als Standard, eigene Schriftdateien | MUSS | Beide Zeichner laden dieselbe Datei. Systemschriften des Studio-PCs fehlen in OBS auf dem Streaming-PC (Einschätzung, nicht gemessen) |
-| E-12 | Ausgabe als Browserquelle mit kopierbarer URL (mit Token), Aktualisierung in OBS ohne Neuladen | MUSS | Hauptweg der Ausgabe; Prüfung in OBS wartet auf T-04 |
+| E-12 | Ausgabe als Browserquelle mit kopierbarer URL (mit Token), Aktualisierung in OBS ohne Neuladen | MUSS | Hauptweg der Ausgabe; Prüfung in OBS wartet auf T-04 Umgesetzt mit P10 (abgenommen 2026-11-04). |
 | E-13 | Vorschau mit einstellbarer Bildrate und Verkleinerung | SOLL | Leinwand funktioniert auch mit fester Bildrate |
 | E-14 | Animationen pro Quelle (Schweben, Atmen, Schreibmaschine) | SOLL | Grösstes Risiko für Abweichungen zwischen den Zeichnern, erst nach dem Konzept der zwei Zeichner |
 | E-15 | Konfiguration exportieren und importieren | SOLL | Speichern (E-02) reicht für den Anfang |
@@ -36,7 +36,7 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-27 | Mehrfachauswahl wie OBS: mehrere Quellen wählen (Strg+Klick), gemeinsam verschieben, drehen und die Befehle aus E-25 auf alle anwenden | SOLL | Entscheid des Nutzers 2026-11-03 (Punkt 62) |
 | E-28 | Dock «Medien»: Mediendateien des Datenordners als Liste mit Spalten (Vorschaubild, Name, Typ, Grösse), Ordner beliebig tief, ursprünglicher Name umbenennbar, Hinzufügen mehrerer Dateien, Löschen nur ungenutzter Dateien («verwendet in …»), Ziehen auf die Leinwand und in die Liste «Quellen» | MUSS | Wunsch und Entscheide des Nutzers 2026-11-03 (nach P10a), Einzelheiten in `docs/04-offene-punkte.md`, «Wünsche nach P10a». Baustein P10b |
 | E-29 | Browserquelle direkt in OBS anlegen und nachführen über obs-websocket: Knopf im Editor (zum Beispiel «In OBS anlegen»), Adresse in OBS nach «Neuer Token» oder neuer Adresse vom Kern nachgeführt; kein Kopieren zwischen den PCs mehr | MUSS | Wunsch und Entscheid des Nutzers 2026-11-04 (Handtest P10: Weg der Adresse über Mousepad und `ssh` nur als Notlösung). Braucht T-05; Passwort von OBS nie im Klartext (CLAUDE.md, Regel 12). Baustein P10c |
-| E-24 | Schalter pro Overlay «Ausgabe ein/aus» links neben dem Eintrag in der Liste; aus = Browserquelle zeigt nichts (leer, durchsichtig), Editor bleibt bearbeitbar | MUSS | Wunsch des Nutzers 2026-11-03, Umsetzung P10 |
+| E-24 | Schalter pro Overlay «Ausgabe ein/aus» links neben dem Eintrag in der Liste; aus = Browserquelle zeigt nichts (leer, durchsichtig), Editor bleibt bearbeitbar | MUSS | Wunsch des Nutzers 2026-11-03, Umsetzung P10 Umgesetzt mit P10 (abgenommen 2026-11-04). |
 
 ### Quelle Text (E-03)
 

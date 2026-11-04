@@ -9,7 +9,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 3. Chat-Bot: Umfang und Streamer.bot-Import werden geklärt, wenn das Modul an der Reihe ist. Die Daten der alten Installation sind vorhanden.
 4. Live-Modul: Inhalt wird später geklärt.
 5. Funktionsprioritäten (MUSS, SOLL, KANN): pro Modul festlegen. Editor: entschieden (2026-11-02), Tabelle E-01 bis E-19 in `docs/03-funktionen-entwurf.md`. Umfang der Quelle Text: entschieden (2026-11-02), TX-01 bis TX-16. Zeilenumbruch (TX-11) rechnet nur der Kern (K-04).
-6. Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI), T-04 (Browserquelle in OBS), T-05 (obs-websocket). Netzwerk besteht seit 2026-11-03; T-04 kommt mit P10, T-03 und T-05 werden später eingeplant. T-04 vorbereitet mit P10 (2026-11-04): Stufe 1 mit Qt WebEngine auf dem Studio-PC bestanden; die Prüfung in OBS ist der Handtest P10.
+6. Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI), T-04 (Browserquelle in OBS), T-05 (obs-websocket). Netzwerk besteht seit 2026-11-03; T-04 kommt mit P10, T-03 und T-05 werden später eingeplant. T-04 vorbereitet mit P10 (2026-11-04): Stufe 1 mit Qt WebEngine auf dem Studio-PC bestanden; die Prüfung in OBS ist der Handtest P10. T-04 erledigt (2026-11-04, P10). T-05 kommt mit P10c.
 7. Abbild der sauberen Installation (Clonezilla): entschieden (2026-11-02), der Nutzer verzichtet darauf.
 8. Aus P01: Qt Multimedia 6.8.2 (Debian) liefert VP9-WebM mit Alpha als `NV12`, also ohne Alpha. Erledigt mit P02 (M1): Ein eigener Dekodierweg über libavcodec mit `libvpx-vp9` stellt den Alpha in A korrekt dar. Siehe `docs/messungen/P02-bericht.md`.
 9. Aus P01: Der GPU-Weg von Qt (Qt Quick) ist nicht gemessen; A und C nutzen QPainter in Software.
@@ -98,7 +98,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
 | T-01 | Oberfläche: Start mit echtem Fenstersystem, mindestens 20 Mal, Exit-Code und Beenden prüfen | Technik der Oberfläche | Prompt P01 |
 | T-02 | Overlay 1920x1080 mit Animationen und WebM mit Alpha rendern, CPU und Bildrate messen | Rendern der Vorschau | Prompt P01 |
 | T-03 | NDI mit Alpha senden (1080p30, dann 1080p60, dann zwei Ausgänge), CPU, Verluste und Verzögerung am OBS-PC messen | NDI, Technikwahl | Netzwerk besteht (2026-11-03), offen |
-| T-04 | OBS-PC lädt ein Overlay als Browserquelle vom Studio-PC über das Heimnetz, Live-Aktualisierung prüfen | Hauptweg der Ausgabe | Netzwerk besteht (2026-11-03); vorbereitet mit P10 (2026-11-04, Stufe 1 mit Qt WebEngine bestanden), Prüfung in OBS im Handtest P10 offen |
+| T-04 | OBS-PC lädt ein Overlay als Browserquelle vom Studio-PC über das Heimnetz, Live-Aktualisierung prüfen | Hauptweg der Ausgabe | erledigt (2026-11-04): Handtest P10 mit OBS 33.0.1 auf dem Streaming-PC, Browserquelle über `http://192.168.1.9:8080/…`, Änderung ohne Neuladen bestanden |
 | T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | Netzwerk besteht (2026-11-03), offen |
 
 ## Reihenfolge

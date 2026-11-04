@@ -1,6 +1,6 @@
 # P10 – Bericht Browserquelle
 
-Auftrag: `prompts/P10-browserquelle.md`. Ausgeführt am 2026-11-03/04 von Claude Code auf dem Studio-PC (Debian 13, X11, `DISPLAY=:0.0`). Stand: ausgeführt, Handtest offen.
+Auftrag: `prompts/P10-browserquelle.md`. Ausgeführt am 2026-11-03/04 von Claude Code auf dem Studio-PC (Debian 13, X11, `DISPLAY=:0.0`). Stand: abgenommen (2026-11-04), einschliesslich Handtest.
 
 Alle Messwerte stammen von diesem Gerät, mit Datum und Befehl. Was nur in OBS auf dem Streaming-PC prüfbar ist, ist «nicht geprüft» und steht im Handtest. Tokens sind in diesem Bericht durch `<token>` ersetzt.
 
@@ -335,7 +335,7 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` 
 | 2 – Änderung ohne Neuladen, Ausgabe, Video | bestanden (08:24) |
 | 3 – Neuer Token | bestanden (08:28) |
 | 4 – Echte Installation, Port 8080 | bestanden (08:50) nach einer Störung des Netzwerks: Um 08:29:35 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort des Routers, Punkt 84). Der installierte Kern startete um 08:32 ohne Netzwerk, trug keine Adresse ein und lauschte nur auf `127.0.0.1` mit Meldung im Fenster (richtiges Verhalten). Nach `nmcli connection up` (08:41) und Neustart des Kerns: `http://192.168.1.9:8080/…`, Browserquelle in OBS mit den echten Daten, Änderung ohne Neuladen. Punkt 85 (Adresse nur beim Start eingetragen) |
-| 5 – Aufräumen | offen |
+| 5 – Aufräumen | bestanden (08:52) |
 
 Wunsch aus dem Handtest: E-29 (Browserquelle über obs-websocket in OBS anlegen), Baustein P10c.
 
