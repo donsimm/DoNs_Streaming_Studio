@@ -2089,6 +2089,12 @@ private slots:
             rm.sourceId = id;
             QVERIFY(checkChange(rm).ok);
         }
+        // Erst weiter, wenn auch das Fenster das Löschen gesehen hat: Sonst zeigt es zu Beginn des
+        // nächsten Falls noch «video.webm» als gewählte Quelle (5 und 6 von 50 Läufen von
+        // usableWhileImportingLargeFile scheiterten so).
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->overlay(m_scene)
+                                     && !findSource(*m_client->overlay(m_scene), added.id)
+                                     && !findSource(*m_client->overlay(m_scene), video.id), 5000);
     }
 
     void usableWhileImportingLargeFile()
