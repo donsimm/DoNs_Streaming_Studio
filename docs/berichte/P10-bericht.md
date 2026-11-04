@@ -327,6 +327,18 @@ cd ~/DoNs_Streaming_Studio && systemctl --user stop dss-core-entwicklung.service
 
 Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` und in `~/.config/`) und `dons-streaming-studio-sicherungen`. Die Bilder aus Prüfung 1 liegen in `~/Bilder/` und `~/Bilder/DoNs Streaming Studio/` und können gelöscht werden, wenn sie nicht mehr gebraucht werden.
 
+### Ergebnis des Handtests (2026-11-04)
+
+| Prüfung | Ergebnis |
+|---|---|
+| 1 – Test-Overlay in OBS, Vergleich | bestanden (08:15, 08:21). OBS 33.0.1 auf dem Streaming-PC (Zorin OS). Lage, Grösse, Drehung, Spiegelung, EXIF und Video-Drehung gleich wie im Editor. «Bildschirmfoto (Quelle)» von OBS 33.0.1 ist **nicht durchsichtig** (freie Flächen schwarz), wie nach dem Quellcode erwartet. Adresse über Mousepad und `ssh` auf den Streaming-PC gebracht |
+| 2 – Änderung ohne Neuladen, Ausgabe, Video | bestanden (08:24) |
+| 3 – Neuer Token | bestanden (08:28) |
+| 4 – Echte Installation, Port 8080 | bestanden (08:50) nach einer Störung des Netzwerks: Um 08:29:35 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort des Routers, Punkt 84). Der installierte Kern startete um 08:32 ohne Netzwerk, trug keine Adresse ein und lauschte nur auf `127.0.0.1` mit Meldung im Fenster (richtiges Verhalten). Nach `nmcli connection up` (08:41) und Neustart des Kerns: `http://192.168.1.9:8080/…`, Browserquelle in OBS mit den echten Daten, Änderung ohne Neuladen. Punkt 85 (Adresse nur beim Start eingetragen) |
+| 5 – Aufräumen | offen |
+
+Wunsch aus dem Handtest: E-29 (Browserquelle über obs-websocket in OBS anlegen), Baustein P10c.
+
 ## Commits
 
 - `f5c5538` P10: Overlay-Format 4 mit Ausgabe ein/aus (E-24), Schnittstelle 6
