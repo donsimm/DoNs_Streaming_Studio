@@ -348,8 +348,10 @@ void MainWindow::connectCore()
     refreshGauges(dss::SystemStats());
     if (editingAllowed())
         connectEditing();
+#if DSS_APP_MEDIA_DOCK
     if (m_mediaDock.dock)
         connectMedia();
+#endif
     refreshActions();
 }
 
