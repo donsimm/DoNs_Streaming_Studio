@@ -76,6 +76,8 @@ Schalter beim Einrichten (`cmake -S . -B build -D<Schalter>=OFF`):
 | `DSS_VIDEO_ROTATION` | `ON` | Drehung aus den Metadaten von Videos (Display-Matrix) in Kern und Zeichner (P10a); aus: Videos wie gespeichert |
 | `DSS_CORE_IMPORT_THREAD` | `ON` | Kern übernimmt neue Dateien (SHA-256, Kopie) in eigenen Threads und antwortet dabei weiter (P10-vor); aus: in der Hauptschleife wie in P10a |
 | `DSS_CORE_WATCHDOG` | `ON` | Kern meldet sich beim Watchdog von systemd (P10a); aus: ohne Meldung, dann `scripts/dienst-einrichten.sh --watchdog 0` |
+| `DSS_CORE_OVERLAY_SERVER` | `ON` | Overlay-Server im Kern für die Browserquelle in OBS (P10, `docs/08-kern-schnittstelle.md`, «Overlay-Server»); aus: Kern ohne Server, das Fenster meldet «ohne Overlay-Server gebaut» |
+| `DSS_APP_BROWSER_SOURCE` | `ON` | Dock «Steuerung» mit Adresse der Browserquelle, «Kopieren», «Neuer Token», «Ausgabe: …», Kästchen «Ausgabe ein/aus» in der Overlay-Liste und Meldungen des Servers (P10); aus: die Felder im Dock «Steuerung» bleiben ausgegraut wie in P10-vor, keine Kästchen, keine Meldungen des Servers |
 | `DSS_INSTALLED_EDITION` | `OFF` | Version im Einsatz bauen (nur `scripts/installieren.sh`, P10a): echte Daten, `dss-core.service`, Laufzeit-Dateien aus dem Installationsordner |
 
 Das Fenster speichert Grösse, Lage und Anordnung der Docks beim Beenden in `~/.config/dons-streaming-studio-entwicklung/fenster.ini` (Version in Arbeit) bzw. `~/.config/dons-streaming-studio/fenster.ini` (Version im Einsatz, jeweils `$XDG_CONFIG_HOME/…`). Löschen der Datei stellt die Standardanordnung her.

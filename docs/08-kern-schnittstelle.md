@@ -1,8 +1,24 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-03 (P10-vor). Version der Schnittstelle: **5**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread).
+Stand: 2026-11-04 (P10). Version der Schnittstelle: **9**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1).
 
-Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays wird nie übertragen, weder gelesen noch geändert (kommt mit P10; CLAUDE.md Regel 12).
+Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 9 (P10)
+
+Neu ist `reset_settings` (ungültige `kern.ini` zurücksetzen, Punkt 77). Ein Kern der Version 8 würde sie mit `unknown_type` beantworten, und der Knopf «Auf Standardwerte zurücksetzen» im Dialog «Einstellungen» bliebe ohne Antwort. Seit Version 9 nimmt der Kern als Adresse im Heimnetz nur noch Adressen dieses PCs an (Punkt 78); das ändert kein Feld.
+
+### Version 8 (P10)
+
+Neu ist `server_status` (Zustand des Overlay-Servers, nach `hello` und bei jeder Änderung an alle). Das Fenster der Version 8 zeigt daraus «Port belegt», «Adresse fehlt» und «ungültige Adresse benutzt».
+
+### Version 7 (P10)
+
+Neu sind die Änderung `new_token` sowie `get_browser_source` und `browser_source` (Adresse der Browserquelle mit Token). Ein Kern der Version 6 würde sie mit `unknown_type` beantworten.
+
+### Version 6 (P10)
+
+`overlay` und `overlay_changed` tragen Overlays im Dateiformat 4 (Pflichtfeld `output`, E-24, `docs/06-overlay-format.md`), die ein Fenster der Version 5 als ungültig verwerfen würde; dazu das Feld `output` in `overlay_list` und die Änderung `set_overlay_output`.
 
 ### Version 5 (P10-vor)
 
@@ -51,6 +67,7 @@ Fenster                                 Kern
    | ---- hello (Fenster) ---------------> |   sofort nach dem Verbinden
    | <--- overlay_list ------------------- |   Antwort auf hello
    | <--- connections -------------------- |
+   | <--- server_status ------------------ |   seit Version 8 (P10)
    | <--- stats (letzte Messung) --------- |
    | <--- stats ------------------------- |   einmal pro Sekunde
    | ---- get_overlay {id} --------------> |
@@ -73,15 +90,18 @@ Fenster                                 Kern
    | <--- settings ----------------------- |   an alle Fenster, wenn geändert
    | <--- change_result {request_id 9} --- |   nur an dieses Fenster, zuletzt
    |                ...                    |
+   | ---- get_browser_source {id} -------> |   seit Version 7 (P10)
+   | <--- browser_source {url} ----------- |   nur an dieses Fenster, auch später von selbst
+   |                ...                    |
    | ---- quit_request ------------------> |   normales Schliessen des Fensters
    | <--- quit_reply {accepted} ---------- |
    | ---- trennt -------------------------X|
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 5 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 5».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 9 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 9».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
-4. Nach dem `hello` schickt der Kern `overlay_list`, `connections` und, falls schon gemessen, die letzte `stats`.
+4. Nach dem `hello` schickt der Kern `overlay_list`, `connections`, `server_status` und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
@@ -111,11 +131,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `5` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `9` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":5,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":9,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -142,11 +162,12 @@ Eintrag eines Overlays:
 | `address` | Text | Adresse der Browserquelle |
 | `width`, `height` | ganze Zahl | Auflösung (1 bis 7680 bzw. 1 bis 4320) |
 | `source_count` | ganze Zahl ab 0 | Anzahl Quellen |
+| `output` | true/false | seit Version 6 (P10, E-24): Ausgabe ein (Browserquelle zeigt das Overlay) oder aus (leer, durchsichtig) |
 
 Jedes Overlay steht genau einmal in der Liste; jede Kennung (Overlay und Ordner) kommt nur einmal vor. Sonst ist die Nachricht ungültig.
 
 ```json
-{"entries":[{"expanded":true,"id":"70fcf543-5e55-4028-ace3-1ddfed919ce5","kind":"folder","name":"Szenen","overlays":[{"address":"ueberblick-start","height":1080,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","name":"Überblick Start","source_count":0,"width":1920}]}],"list_error":null,"type":"overlay_list"}
+{"entries":[{"expanded":true,"id":"70fcf543-5e55-4028-ace3-1ddfed919ce5","kind":"folder","name":"Szenen","overlays":[{"address":"ueberblick-start","height":1080,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","name":"Überblick Start","output":true,"source_count":0,"width":1920}]}],"list_error":null,"type":"overlay_list"}
 ```
 
 ### `overlay` und `overlay_changed`
@@ -182,13 +203,45 @@ Antwort auf eine Änderung, **nur** an das Fenster, das sie geschickt hat, und i
 | `ok` | true/false | `true`: übernommen |
 | `id` | Text oder `null` | Kennung des neu angelegten Overlays, Ordners oder der neuen Quelle (`create_overlay`, `copy_overlay`, `create_folder`, `add_*_source`), sonst `null` |
 | `code` | Text oder `null` | bei `ok: false` der Fehlercode (`invalid_message`, `unknown_overlay`, `unknown_source`, `unknown_folder`, `rejected`), sonst `null` |
-| `message` | Text oder `null` | bei `ok: false` die Meldung auf Deutsch; das Fenster zeigt sie in der Statuszeile. Sonst `null` |
+| `message` | Text oder `null` | bei `ok: false` die Meldung auf Deutsch; das Fenster zeigt sie in der Statuszeile (Antworten auf `update_settings` und `reset_settings` seit P10 nur im Dialog «Einstellungen», Punkt 76). Sonst `null` |
 | `warning` | Text oder `null` | seit Version 3: bei `ok: true` ein Hinweis, den das Fenster in der Statuszeile zeigt, zum Beispiel «Grösse von «bild.png» nicht lesbar (…), die Quelle bekommt die Grösse des Overlays 1920x1080.» Sonst `null` |
 
 ```json
 {"code":null,"id":"9adf79a8-1420-4d18-94b1-d780afba49d8","message":null,"ok":true,"request_id":1,"type":"change_result","warning":null}
 {"code":"rejected","id":null,"message":"Drehung 3600 ungültig, erlaubt sind 0 bis 3599 Zehntelgrad.","ok":false,"request_id":6,"type":"change_result","warning":null}
 {"code":"invalid_message","id":null,"message":"Feld changes.breite ist unbekannt","ok":false,"request_id":7,"type":"change_result","warning":null}
+```
+
+### `browser_source` (seit Version 7, P10)
+
+Adresse der Browserquelle des Overlays, nach dem das Fenster mit `get_browser_source` gefragt hat, **nur an diese Verbindung**. Der Kern schickt sie danach von selbst neu, wenn sie sich ändert (neuer Token, neuer Name mit neuer Adresse, neuer Port, neue Adresse im Heimnetz, Overlay gelöscht), auch nach dem Wiederverbinden (der `CoreClient` fragt nach `hello` erneut). Genau eines von `url` und `problem` ist gesetzt.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `overlay_id` | Text | Kennung des Overlays |
+| `url` | Text oder `null` | `http://<Adresse im Heimnetz>:<Port>/o/<adresse>/<token>/` (Abschnitt «Overlay-Server») |
+| `problem` | Text oder `null` | warum es keine Adresse gibt: «Kein Overlay mit dieser Kennung.», «Das Overlay hat keinen Token. «Neuer Token» erzeugt einen.», «Der Kern hat keine Einstellungen.», «Keine Adresse im Heimnetz eingestellt (Dialog «Einstellungen»).» |
+
+```json
+{"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618","problem":null,"type":"browser_source","url":"http://192.168.1.9:24901/o/test-szene/<token>/"}
+```
+
+(aufgezeichnet am 2026-11-04 mit einem Kern mit eigenem Datenordner und Port 24901; Token hier ersetzt.)
+
+### `server_status` (seit Version 8, P10)
+
+Zustand des Overlay-Servers, nach dem `hello` und bei jeder Änderung an **alle** begrüssten Verbindungen.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `enabled` | true/false | `false`, wenn der Kern ohne Server gebaut ist (`DSS_CORE_OVERLAY_SERVER=OFF`) |
+| `listening` | Liste von Text | wo der Server lauscht, zum Beispiel `127.0.0.1:8081` |
+| `problems` | Liste von Text | Meldungen auf Deutsch: Port belegt (mit dem Programm, Abschnitt «Overlay-Server»), Adresse im Heimnetz fehlt oder ist gerade nicht vorhanden, Lauschen fehlgeschlagen |
+| `invalid_use` | Text oder `null` | Hinweis, dass eine Browserquelle eine ungültige Adresse benutzt (30 s lang nach der letzten solchen Anfrage), ohne Token: «Eine Browserquelle (192.168.1.116) benutzt eine ungültige Adresse (/o/szene/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.» |
+| `pages` | Objekt | verbundene Seiten je Overlay: Schlüssel Kennung, Wert Anzahl (nur Overlays mit mindestens einer) |
+
+```json
+{"enabled":true,"invalid_use":null,"listening":["127.0.0.1:24901","192.168.1.9:24901"],"pages":{},"problems":[],"type":"server_status"}
 ```
 
 ### `font_list`
@@ -281,22 +334,25 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `5`) | `overlay_list`, `connections`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `9`) | `overlay_list`, `connections`, `server_status`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
 | `quit_request` | – | `quit_reply` |
 | `get_settings` | – (seit Version 5) | `settings` |
 | `update_settings` | siehe Abschnitt «Einstellungen» (seit Version 5) | `settings` an alle (wenn geändert), dann `change_result` |
+| `reset_settings` | `request_id` (seit Version 9, Abschnitt «Einstellungen») | `settings` an alle, dann `change_result` |
+| `get_browser_source` | `overlay_id` (Text oder `null` = keine Adresse mehr schicken; seit Version 7) | `browser_source` an diese Verbindung, danach bei jeder Änderung von selbst |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":5,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":9,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
 {"type":"quit_request"}
 {"type":"get_settings"}
+{"type":"get_browser_source","overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618"}
 ```
 
 ## Änderungen (P08)
@@ -328,6 +384,8 @@ Kennungen: `overlay_id`, `source_id`, `folder_id` sind Text (UUID). `file` ist e
 | `update_source` | `overlay_id`, `source_id`, `changes` (Objekt, unten) | ändert die angegebenen Eigenschaften, alle zusammen oder keine | – |
 | `set_text_font` | `overlay_id`, `source_id`, `file`, `weight` (100 bis 900 oder `null`), `italic` (true/false oder `null`) | Schriftdatei, Gewicht und kursiv zusammen; `null` = aus der Datei lesen (`fc-query`, für «Datei wählen …») | – |
 | `replace_image_file` | `overlay_id`, `source_id`, `file` | neues Bild für eine Bildquelle; Lage und Grösse bleiben | – |
+| `set_overlay_output` | `overlay_id`, `output` (true/false) | seit Version 6 (P10, E-24): Ausgabe ein/aus, gespeichert in der Overlay-Datei (`output`); aus = Browserquelle leer und durchsichtig, bleibt verbunden; der Editor bleibt bearbeitbar | – |
+| `new_token` | `overlay_id` | seit Version 7 (P10, Teil A 8): neuer Token; die alte Adresse gilt sofort nicht mehr (offene Seiten bekommen `gone` und laden die leere Seite), die neue kommt mit `browser_source`. Protokoll ohne Token: «Neuer Token für Overlay «Name» (adresse): die alte Adresse gilt nicht mehr» | – |
 
 Objekt `changes` (nur angegebene Felder ändern sich, mindestens eines; unbekannte Felder sind ein Fehler):
 
@@ -356,10 +414,12 @@ Grenzen und Meldungen kommen aus dem Modell (`docs/06-overlay-format.md`). Eine 
 {"type":"update_source","request_id":5,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","changes":{"x":40,"y":900,"text":{"content":"Willkommen","font_size":72}}}
 {"type":"set_overlay_size","request_id":9,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","width":1280,"height":720}
 {"type":"update_source","request_id":10,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"b814d820-5d53-42a8-9683-ef3419cf4d7e","changes":{"video":{"hold_at_end":true}}}
+{"type":"set_overlay_output","request_id":1,"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618","output":false}
+{"type":"new_token","request_id":3,"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618"}
 {"type":"set_text_font","request_id":8,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","weight":700,"italic":false}
 ```
 
-(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`. Die Zeilen mit `request_id` 9 und 10 sind in P09 von Hand ergänzt, Form wie `tst_aenderungen` sie prüft.)
+(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`. Die Zeilen mit `request_id` 9 und 10 sind in P09 von Hand ergänzt, Form wie `tst_aenderungen` sie prüft. `set_overlay_output` und `new_token` aufgezeichnet am 2026-11-04, Antwort jeweils `change_result` `ok: true`.)
 
 Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `request_id`, antwortet der Kern mit `change_result` `ok: false`, `code: invalid_message`; sonst mit `error` `invalid_message`.
 
@@ -394,7 +454,7 @@ Hält der Nutzer eine Pfeiltaste in einem Zahlenfeld gedrückt, entstehen viele 
 
 ## Einstellungen (P10-vor)
 
-Einstellungen des Kerns stehen in `kern.ini` im Ordner der Einstellungen der Version: `~/.config/dons-streaming-studio/kern.ini` (Version im Einsatz), `~/.config/dons-streaming-studio-entwicklung/kern.ini` (Version in Arbeit); anderer Pfad: `dss-core --einstellungen PFAD`. Nur der Kern schreibt die Datei, atomar (`QSaveFile`). Code: `src/common/coresettings.h/.cpp`. Beide Werte wirken erst mit dem Overlay-Server (P10).
+Einstellungen des Kerns stehen in `kern.ini` im Ordner der Einstellungen der Version: `~/.config/dons-streaming-studio/kern.ini` (Version im Einsatz), `~/.config/dons-streaming-studio-entwicklung/kern.ini` (Version in Arbeit); anderer Pfad: `dss-core --einstellungen PFAD`. Nur der Kern schreibt die Datei, atomar (`QSaveFile`). Code: `src/common/coresettings.h/.cpp`. Seit P10 wirken beide Werte sofort: Der Overlay-Server startet mit den neuen Werten neu, und die Adresse der Browserquelle ändert sich (`browser_source`).
 
 ```ini
 [overlay-server]
@@ -405,9 +465,9 @@ adresse-im-heimnetz=192.168.1.9
 | Wert | Festlegung |
 |---|---|
 | `port` | Port des Overlay-Servers. Standard 8080 im Einsatz, 8081 in Arbeit (beide Versionen können gleichzeitig laufen). Gültig **1024 bis 32767**: Ports unter 1024 darf unter Linux nur ein Prozess mit besonderen Rechten öffnen (`/proc/sys/net/ipv4/ip_unprivileged_port_start` = 1024); ab 32768 vergibt Linux Ports für ausgehende Verbindungen (`/proc/sys/net/ipv4/ip_local_port_range` = 32768 60999), ein Port dort kann beim Start des Servers zufällig belegt sein. Werte gemessen auf dem Studio-PC am 2026-11-03 mit `cat`. Quelle: ip(7), https://man7.org/linux/man-pages/man7/ip.7.html |
-| `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Fehlt sie beim Start, trägt der Kern einmal die Adresse der Netzwerkkarte der Standardroute ein und schreibt die Datei; danach ermittelt er sie nie neu. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch beim nächsten Start |
+| `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Fehlt sie beim Start, trägt der Kern einmal die Adresse der Netzwerkkarte der Standardroute ein und schreibt die Datei; danach ermittelt er sie nie neu. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch beim nächsten Start. Seit P10 (Punkt 78) nimmt `update_settings` nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, IPv4 ohne 127.x.x.x), sonst «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»; die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt (Kabel) |
 
-Ist die Datei ungültig (unbekannte Angabe oder Abschnitt, doppelte Angabe, ungültiger Wert), gelten die Standardwerte, der Kern schreibt eine Warnung ins Protokoll, überschreibt die Datei nicht und weist `update_settings` ab, bis sie von Hand repariert oder gelöscht ist.
+Ist die Datei ungültig (unbekannte Angabe oder Abschnitt, doppelte Angabe, ungültiger Wert), gelten die Standardwerte, der Kern schreibt eine Warnung ins Protokoll, überschreibt die Datei nicht und weist `update_settings` ab, bis sie von Hand repariert oder mit `reset_settings` zurückgesetzt ist (unten).
 
 ### `settings` (Kern → Fenster)
 
@@ -434,7 +494,52 @@ Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ga
 {"type":"update_settings","request_id":10,"home_address":"192.168.1.9"}
 ```
 
+### `reset_settings` (Fenster → Kern, seit Version 9)
+
+Punkt 77 (Entscheid 2026-11-03): Knopf «Auf Standardwerte zurücksetzen» im Dialog «Einstellungen», nur bei ungültiger Datei frei. Feld: `request_id`. Der Kern benennt die ungültige Datei in `kern.ini.ungueltig-<JJJJ-MM-TT_hh-mm-ss>` um (Ortszeit, 24 Stunden), schreibt eine neue mit den Standardwerten, trägt die Adresse im Heimnetz wieder aus der Standardroute ein, schickt `settings` an alle und dann `change_result` `ok: true` mit `warning` «Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt kern.ini.ungueltig-2026-11-04_00-53-07.». Abgewiesen (`rejected`): Datei gültig («… ist gültig; nichts zurückgesetzt.»), Name schon vergeben, Umbenennen oder Schreiben fehlgeschlagen (dann bleibt alles wie vorher).
+
+```json
+{"type":"reset_settings","request_id":4}
+```
+
 `dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4).
+
+## Overlay-Server (P10)
+
+Der Kern liefert jedem Overlay eine Webseite für die Browserquelle in OBS (E-12, zweiter Zeichner K-01 bis K-08). Code: `src/server/` (`dss_server`, Schalter `DSS_CORE_OVERLAY_SERVER`, Standard ON), Seite: `web/overlay.html`, `web/overlay.js`. Begründung der Technik im Bericht `docs/berichte/P10-bericht.md`.
+
+| Punkt | Festlegung |
+|---|---|
+| Technik | eigener kleiner HTTP/1.1-Server auf `QTcpServer` (Qt Network ist schon da; Qt HttpServer und Qt WebSockets sind nicht installiert, Regel 5). Änderungen als Server-Sent Events (`text/event-stream`): Der Kern schickt nur zur Seite, `EventSource` verbindet sich von selbst neu (https://html.spec.whatwg.org/multipage/server-sent-events.html). HTTP/1.1 nach RFC 9110 und RFC 9112 (https://www.rfc-editor.org/rfc/rfc9110, https://www.rfc-editor.org/rfc/rfc9112) |
+| Adressen | nur IPv4: ein `QTcpServer` je Adresse, auf `127.0.0.1` und der «Adresse im Heimnetz» aus `kern.ini`, nie `QHostAddress::Any` (das nimmt auch IPv6 an). Port aus `kern.ini`. Gemessen am 2026-11-04 mit `ss -ltnH "sport = :24901"`: `192.168.1.9:24901` und `127.0.0.1:24901`; `ss -ltn6H` leer |
+| Neue Einstellungen | Port oder Adresse geändert: Server schliesst alle Verbindungen und lauscht neu |
+| Port belegt | Meldung in `server_status.problems` und im Protokoll (Warnung), zum Beispiel «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess 1234). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Das Programm findet der Kern über `/proc/net/tcp` und `/proc/net/tcp6` (Zeilen im Zustand `0A` = LISTEN mit dem Port, Inode) und die Links `/proc/<pid>/fd/*` → `socket:[<inode>]`; heisst das Programm (`/proc/<pid>/exe`) `dss-core` und liegt unter `~/.local/opt/dons-streaming-studio/`, heisst es «im Einsatz», ein anderer `dss-core` «in Arbeit (Pfad)», sonst «von «Dateiname»»; ohne Zugriff (Prozess eines anderen Benutzers) «von einem Programm, das sich nicht feststellen lässt». Neuer Versuch alle 2 s. Quellen: https://docs.kernel.org/networking/proc_net_tcp.html, proc_pid_fd(5) https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html, proc_pid_exe(5) https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html |
+| Adresse fehlt | Ist die Adresse im Heimnetz leer oder gerade auf keiner Karte (Kabel), lauscht der Server nur auf `127.0.0.1`, meldet das in `server_status.problems` und prüft alle 2 s, ob sie da ist; dann lauscht er von selbst auch dort (Protokoll «Overlay-Server: Adresse im Heimnetz … ist da») |
+
+### Pfade
+
+Alles liegt unter `/o/<adresse>/<token>/` (`<adresse>` aus der Overlay-Datei, `<token>` 43 Zeichen Base64url, `docs/06-overlay-format.md`). Code: `src/common/browsersource.h`.
+
+| Pfad | Methode | Antwort |
+|---|---|---|
+| `/o/<adresse>/<token>` | GET | 302 nach `…/` (sonst gingen die relativen Verweise der Seite ins Leere) |
+| `/o/<adresse>/<token>/` | GET, HEAD | `overlay.html` |
+| `…/overlay.js` | GET, HEAD | Zeichner der Seite |
+| `…/events` | GET | Server-Sent Events: zuerst `retry: 1000`, dann `event: overlay` mit `data: {"overlay": <Overlay im Dateiformat ohne Token>, "media": {"media/…": {"orientation": 1 bis 8}}, "fonts": {"media/….ttf": {"units_per_em", "ascent", "descent", "leading"}}}` bei jeder Änderung (immer das ganze Overlay, K-02), ein neues `overlay` nur, wenn sich die Daten geändert haben; alle 15 s eine Kommentarzeile `:` (tote Verbindungen erkennen) |
+| `…/media/<sha256>.<endung>` | GET, HEAD | nur Dateien, die das Overlay benutzt; `Range` (206, 416), `Cache-Control: max-age=31536000, immutable` (Dateien heissen nach ihrem Inhalt). Bei JPEG/PNG steht die EXIF-Ausrichtung in den gelieferten Bytes auf 1 (PNG mit neuer CRC des Blocks `eXIf`), bei MP4/MOV die Matrix in `mvhd` und `tkhd` auf der Einheitsmatrix: Die Seite dreht selbst nach `media[…].orientation`, unabhängig davon, ob die Chromium-Version es selbst täte. Die Datei im Datenordner bleibt unverändert |
+| `…/report` | POST | Meldung der Seite (zum Beispiel «Video nicht abspielbar: «name» (media/…) (Fehler 4 …)»), höchstens 20 pro Minute, 300 Zeichen, Steuerzeichen ersetzt; Protokoll «Browserquelle /o/<adresse>/… meldet: …»; Antwort 204 |
+| `/` | GET | leere, durchsichtige Seite |
+| alles andere | – | 404 ohne Inhalt; andere Methoden 405 |
+
+`Cache-Control`: Medien wie oben, `overlay.html` und `overlay.js` `no-cache` (OBS fragt jedes Mal nach, ob sie neu sind), alles andere `no-store`. Verbindungen bleiben offen (Keep-Alive); grosse Dateien gehen in Stücken zu 256 KiB, ein neues Stück erst, wenn weniger als 512 KiB auf das Senden warten.
+
+### Alte und unbekannte Adressen
+
+Der Token wird mit gleichbleibender Laufzeit verglichen (`constantTimeEquals` in `src/server/httpmessage.cpp`, Vergleich aller Bytes mit `volatile`, wie `sodium_memcmp`, https://libsodium.gitbook.io/doc/helpers#constant-time-test-for-equality); auch ohne passendes Overlay wird gegen einen Platzhalter von 43 Zeichen verglichen. Falsche oder alte Adresse (Umbenennen mit neuer Adresse, neuer Token, Overlay gelöscht, falscher Token): Die Seite bekommt eine **leere, durchsichtige Seite** (keine Fehlerseite, sonst wäre in OBS ein Kasten mit Text im Stream), die sich alle 10 s neu lädt (`<meta http-equiv="refresh" content="10">`, damit OBS nach dem Eintragen der richtigen Adresse ohne Zutun lädt); `…/events` bekommt `event: gone` (die Seite lädt neu und ist dann leer), andere Pfade 404. Protokoll (Warnung) «Browserquelle: unbekannte Adresse /o/<adresse>/… von <IPv4>», ohne Token, höchstens einmal pro Minute je Gegenstelle und Adresse; im Fenster erscheint `invalid_use` 30 s lang.
+
+### Seite (zweiter Zeichner)
+
+`web/overlay.js` zeichnet aus dem Overlay dasselbe wie der Editor (K-07): Kästen als `div` mit `rotate(θ) scale(±1, ±1)` um die Mitte, darin Bild bzw. Video gestreckt mit der Ausrichtung aus `media` (zuerst spiegeln, dann drehen, bei 5 bis 8 Breite und Höhe getauscht), Text als SVG mit derselben Schriftdatei (`FontFace`), Grundlinien aus `fonts` wie Qt 6.8 (`fontMetricPixels`, `src/render/sourcegeometry.h`), abgeschnitten am Kasten, waagrecht ausgerichtet. Videos stumm, beginnen immer von vorne (Einblenden, Laden, Ausgabe ein, andere Datei), Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Ausgabe aus: nichts gezeichnet, Verbindung bleibt. Bricht die Verbindung ab, bleibt das letzte Bild stehen, und `EventSource` verbindet sich nach 1 s wieder. Für Prüfungen steht der Zustand in `window.dssState` (`applied`, `output`, `connected`, `reports`). Abweichungen zum Editor in Zahlen: Bericht P10.
 
 ## Fehlerfälle
 
@@ -448,7 +553,7 @@ Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ga
 | `unknown_overlay` | `get_overlay` oder eine Änderung mit einer Kennung, die es nicht gibt | – |
 | `unknown_source` | Änderung mit einer Quelle, die es im Overlay nicht gibt (nur in `change_result`) | – |
 | `unknown_folder` | Änderung mit einem Ordner, den es nicht gibt (nur in `change_result`) | – |
-| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen oder ungültige Einstellung (`update_settings`), zum Beispiel ungültiger Wert, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
+| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen oder ungültige Einstellung (`update_settings`, `reset_settings`), zum Beispiel ungültiger Wert, Adresse nicht von diesem PC, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
 | `save_failed` | verzögertes Speichern gescheitert (als `error` an alle, `request` `null`) | Änderung bleibt im Speicher, neuer Versuch |
 | `message_too_long` | Zeile länger als 16 MiB | Kern trennt die Verbindung |
 

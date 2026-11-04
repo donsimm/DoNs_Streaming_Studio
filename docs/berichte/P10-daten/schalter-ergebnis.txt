@@ -1,0 +1,23 @@
+Beginn 2026-11-04 01:32:23
+Klon: 68d4d8c P10: Startprüfung erwartet «Overlay-Server lauscht auf» im Protokoll des Kerns
+release: Exit 0, Warnungen 0, 155 s, ctest: 100% tests passed, 0 tests failed out of 37
+debug: Exit 0, Warnungen 0, 125 s, ctest: 100% tests passed, 0 tests failed out of 37
+aus-DSS_BUILD_APP: Exit 0, Warnungen 0, 58 s
+aus-DSS_BUILD_TESTS: Exit 0, Warnungen 0, 46 s
+aus-DSS_BUILD_CLI: Exit 0, Warnungen 0, 85 s
+aus-DSS_MEDIA_SIZE: Exit 0, Warnungen 0, 87 s
+aus-DSS_APP_RENDERER: Exit 0, Warnungen 0, 77 s
+aus-DSS_APP_CANVAS_EDIT: Exit 0, Warnungen 0, 84 s
+aus-DSS_VIDEO_ROTATION: Exit 0, Warnungen 0, 86 s
+aus-DSS_CORE_WATCHDOG: Exit 0, Warnungen 0, 87 s
+aus-DSS_APP_EDITING: Exit 0, Warnungen 0, 85 s
+aus-DSS_APP_TRANSFORM: Exit 0, Warnungen 0, 86 s
+aus-DSS_CORE_IMPORT_THREAD: Exit 0, Warnungen 0, 88 s
+aus-DSS_APP_SETTINGS_DIALOG: Exit 0, Warnungen 0, 86 s
+aus-DSS_APP_CANVAS_IMAGE: Exit 0, Warnungen 0, 87 s
+    34/35 Test #26: tst_fensterbearbeiten ............***Failed   22.65 sec
+aus-DSS_CORE_OVERLAY_SERVER: Exit 0, Warnungen 0, 118 s, ctest: 97% tests passed, 1 tests failed out of 35
+aus-DSS_APP_BROWSER_SOURCE: Exit 0, Warnungen 0, 125 s, ctest: 100% tests passed, 0 tests failed out of 37
+ein-DSS_INSTALLED_EDITION: Exit 0, Warnungen 0, 87 s
+fertig
+Ende 2026-11-04 01:59:56

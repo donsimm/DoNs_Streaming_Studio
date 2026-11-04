@@ -44,6 +44,7 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 
 - Zugriff auf den Overlay-Server: im Heimnetz erreichbar, mit Token pro Overlay, ohne Port am Router. (entschieden)
 - Der Studio-PC hängt per Kabel am Netz und bekommt am Router eine feste Adresse. (entschieden) Umgesetzt (2026-11-03, Angabe des Nutzers): Kabel `enp3s0`, Adresse `192.168.1.9`, am Router reserviert.
+- Overlay-Server (umgesetzt mit P10, 2026-11-04, Entscheide des Nutzers vom 2026-11-03): nur HTTP, nur IPv4 auf der «Adresse im Heimnetz» und `127.0.0.1`, Port aus `kern.ini`; Adresse der Browserquelle `http://<Adresse im Heimnetz>:<Port>/o/<adresse>/<token>/`; alte oder unbekannte Adresse ergibt eine leere, durchsichtige Seite. Einzelheiten: `docs/08-kern-schnittstelle.md`, «Overlay-Server».
 - Zielwerte für die Last: 1080p30, bis zu 2 NDI-Ausgänge, bis zu 10 Quellen pro Overlay. (entschieden)
 - Spenden und Tip Jar aus dem alten Entwurf sind nicht Teil des Neustarts. (entschieden)
 - Funktionsprioritäten (MUSS, SOLL, KANN) werden pro Modul festgelegt, wenn das Modul an der Reihe ist. Der Editor beginnt zuerst. (entschieden) Editor: entschieden (2026-11-02), siehe `docs/03-funktionen-entwurf.md`, E-01 bis E-19.
@@ -55,7 +56,7 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 - Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen: siehe Abschnitt «Konzept der zwei Zeichner».
 - Video mit Alpha in der eigenen Leinwand: eigener Dekodierweg über libavcodec mit `libvpx-vp9` (gemessen in P02, M1). Qt Multimedia 6.8.2 liefert den Alpha nicht.
 - Sprache des Kerns (Hintergrundprogramm): entschieden (2026-11-02, vom Nutzer bestätigt): C++, dieselbe Sprache und Werkzeugkette wie das Fenster. Begründung: gemeinsamer Code für Leinwand-Modell, Dekodierung und Zeichnen. Ungeprüft: Was Qt 6.8.2 unter Debian 13 für Webserver und Twitch-Anbindung mitbringt; das klärt der Prompt für den Kern.
-- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket).
+- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket). Seit 2026-11-03 besteht das Netzwerk; T-04 ist mit P10 vorbereitet (Stufe 1 mit Qt WebEngine auf dem Studio-PC), die Prüfung in OBS ist der Handtest P10.
 
 ## Konzept der zwei Zeichner
 
@@ -173,7 +174,7 @@ Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09:
 - Ziehen mit der Maus wie OBS: an einer Ecke bleibt das Seitenverhältnis, mit Umschalttaste frei; an einer Kante nur Breite oder Höhe. Seit P09b ist es an der Ecke das Verhältnis der Originalgrösse der Datei (wie OBS), bei Text das des Kastens beim Beginn. Zieht man über die Gegenseite hinaus, wird die Quelle in dieser Richtung gespiegelt (wie OBS).
 - Drehen mit der Maus über einen Griff oberhalb der gewählten Quelle wie in OBS; mit Umschalttaste rastet der Winkel in 1°-Schritten ein (geändert vom Nutzer im Handtest P09, 2026-11-03; vorher 15°). Ohne Umschalttaste Zehntelgrad.
 - Ende eines Videos: ohne Einstellung wird die Quelle leer (durchsichtig). Neues Kästchen «Am Ende anhalten» in den Eigenschaften des Videos: das letzte Bild bleibt stehen. Mit «Wiederholen» beginnt das Video von vorne; «Am Ende anhalten» ist dann ausgegraut. Neues Feld im Modell und in der Overlay-Datei. Gilt gleich für Editor und Browserquelle.
-- Im Editor läuft ein Video ab dem Wählen des Overlays. Wann ein Video in der Browserquelle startet, wird mit P10 entschieden.
+- Im Editor läuft ein Video ab dem Wählen des Overlays. Wann ein Video in der Browserquelle startet, ist seit P10 festgelegt (unten, «Video beim Wechsel des Overlays»).
 
 Entschieden (2026-11-03, vom Nutzer bestätigt), umgesetzt mit P09b:
 
@@ -185,6 +186,13 @@ Entschieden (2026-11-03, vom Nutzer bestätigt, Punkt 65), umgesetzt mit P10a:
 
 - **Drehung von Videos:** Videos werden so gezeigt, wie die Drehung in ihren Metadaten (Display-Matrix `AV_PKT_DATA_DISPLAYMATRIX`, https://ffmpeg.org/doxygen/7.1/group__lavc__packet__side__data.html; ffprobe zeigt sie als «Display Matrix» mit `rotation`) es verlangt; die Originalgrösse ist die angezeigte Grösse (bei 90° und 270° Breite und Höhe vertauscht). Eine gespiegelte Matrix wird wie die EXIF-Ausrichtungen 2, 4, 5 und 7 umgesetzt. Reihenfolge wie bei Bildern: Drehung aus den Metadaten → Strecken in den Kasten → Spiegeln → Drehung der Quelle. Schalter beim Bau: `DSS_VIDEO_ROTATION`.
 - **Zweiter Zeichner (P10):** Die Browserquelle muss die Drehung aus den Metadaten genauso beachten. P10 prüft das mit OBS (Browserquelle) und den Testvideos `tests/daten/video-drehung/drehung-{0,90,180,270}.mp4`: alle vier sehen gleich aus. Ob die Chromium-Version der Browserquelle in OBS die Drehung von Videos beachtet, ist nicht geprüft.
+
+Festgelegt mit P10 (2026-11-04, Teil B 3 des Auftrags; Vorgaben aus Teil B 2):
+
+- **Video beim Wechsel des Overlays:** Ein Video beginnt immer von vorne, wenn seine Quelle wieder gezeigt wird. Im Editor gilt das schon: Beim Wechsel auf ein anderes Overlay werden die Spieler beendet, beim Zurückwechseln neu angelegt, und das Video beginnt bei 0 (geprüft mit `tst_leinwandbild`, Slot `videoRestartsAfterOverlaySwitch`, 2026-11-04). In der Browserquelle beginnt ein Video beim Einblenden der Quelle, beim Laden oder Neuladen der Seite, beim Einschalten der Ausgabe und bei einer anderen Datei von vorne. Begründung: Beide Zeichner verhalten sich gleich, und es gibt keine Stelle, an der der Editor eine Laufzeit merken müsste. Der Wechsel des Overlays im Editor wirkt nicht auf die Browserquelle: Sie spielt unabhängig vom Editor und zeigt ihr Overlay weiter, auch wenn im Editor ein anderes gewählt ist.
+- **Video in der Browserquelle:** stumm; Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Die Drehung aus den Metadaten und die EXIF-Ausrichtung setzt die Seite selbst um, nach Angaben des Kerns. Der Kern liefert die Dateien dafür mit Ausrichtung 1 bzw. Einheitsmatrix aus, damit das Ergebnis nicht von der Chromium-Version abhängt (`docs/08-kern-schnittstelle.md`, «Overlay-Server»).
+- **Ausgabe ein/aus (E-24):** Der Zustand steht in der Overlay-Datei (Feld `output`, Format 4, `docs/06-overlay-format.md`), damit er einen Neustart übersteht und Editor und Browserquelle denselben Stand haben. Aus heisst: Die Browserquelle ist leer und durchsichtig, bleibt aber verbunden; der Editor bleibt bearbeitbar.
+- **Nicht abspielbare Videos:** Kann Chromium ein Video nicht abspielen (auf dem Studio-PC mit Qt WebEngine 6.8.2: HEVC, MPEG-4 Part 2, ProRes; Bericht P10), bleibt die Quelle leer, und die Seite meldet es dem Kern (Protokoll). Was mit solchen Dateien geschehen soll (Hinweis beim Hinzufügen, Umwandeln), ist offen (`docs/04-offene-punkte.md`).
 
 ## Einsatz (Version im Stream)
 
