@@ -1,7 +1,13 @@
 #include "dockviews.h"
 
+#include "medialibrary.h"
+
+#include <QDrag>
 #include <QDropEvent>
+#include <QHeaderView>
+#include <QKeyEvent>
 #include <QMetaMethod>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QStyle>
@@ -176,19 +182,210 @@ void SourceList::mousePressEvent(QMouseEvent *event)
     QListWidget::mousePressEvent(event);
 }
 
+void SourceList::setAcceptsMedia(bool accept)
+{
+    // Mit InternalMove nimmt QAbstractItemView nur Ziehen aus der eigenen Liste an; DragDrop nimmt
+    // auch fremde an, aber nur in den Formaten aus mimeTypes() (eigene Zeilen und kMediaMimeType).
+    // Eigene Zeilen verschiebt dropEvent weiter nicht selbst (refuseLocalMove).
+    // https://doc.qt.io/qt-6.8/qabstractitemview.html#DragDropMode-enum
+    m_acceptsMedia = accept;
+    setDragDropMode(accept ? QAbstractItemView::DragDrop : QAbstractItemView::InternalMove);
+}
+
+QStringList SourceList::mimeTypes() const
+{
+    QStringList types = QListWidget::mimeTypes();
+    if (m_acceptsMedia)
+        types.append(QString::fromLatin1(kMediaMimeType));
+    return types;
+}
+
+int SourceList::insertRowAt(const QPoint &position) const
+{
+    const QListWidgetItem *target = itemAt(position);
+    if (!target)
+        return count();
+    const int targetRow = row(target);
+    return dropIndicatorPosition() == QAbstractItemView::BelowItem ? targetRow + 1 : targetRow;
+}
+
 void SourceList::dropEvent(QDropEvent *event)
 {
+    if (m_acceptsMedia && event->source() != this) {
+        const QString reference = droppedMediaSource(event->mimeData());
+        if (reference.isEmpty()) {
+            event->ignore();
+            return;
+        }
+        emit mediaDropped(reference, insertRowAt(event->position().toPoint()));
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        return;
+    }
     const QList<QListWidgetItem *> dragged = selectedItems();
     if (dragged.size() != 1 || event->source() != this) {
         event->ignore();
         return;
     }
-    const QListWidgetItem *target = itemAt(event->position().toPoint());
-    int insertRow = count();
-    if (target) {
-        const int targetRow = row(target);
-        insertRow = dropIndicatorPosition() == QAbstractItemView::BelowItem ? targetRow + 1 : targetRow;
-    }
-    emit itemDropped(dragged.first()->data(kIdRole).toUuid(), insertRow);
+    emit itemDropped(dragged.first()->data(kIdRole).toUuid(), insertRowAt(event->position().toPoint()));
     refuseLocalMove(event);
+}
+
+QString droppedMediaSource(const QMimeData *mime)
+{
+    if (!mime || !mime->hasFormat(QString::fromLatin1(kMediaMimeType)))
+        return {};
+    const QString reference = QString::fromUtf8(mime->data(QString::fromLatin1(kMediaMimeType)));
+    const std::optional<dss::MediaKind> kind = dss::mediaKindOf(reference);
+    // Schriften: keine Quelle aus einer Datei allein (Textquelle braucht Text), nicht Teil von P10b
+    return kind && *kind != dss::MediaKind::Font ? reference : QString();
+}
+
+namespace {
+
+// Eintrag des Docks «Medien» mit Schlüssel zum Sortieren. Qt stellt bei absteigender Folge a vor
+// b, wenn b < a (QTreeModel::sortItems mit QTreeModelGreaterThan). operator< fragt deshalb in
+// beiden Richtungen «steht this vor other bzw. other vor this»; so bleiben Ordner immer zuerst.
+// https://doc.qt.io/qt-6.8/qtreewidgetitem.html#operator-lt
+// https://github.com/qt/qtbase/blob/v6.8.2/src/widgets/itemviews/qtreewidget.cpp (sortItems)
+class MediaItem : public QTreeWidgetItem
+{
+public:
+    explicit MediaItem(const dss::MediaSortKey &key) : m_key(key) {}
+
+    bool operator<(const QTreeWidgetItem &other) const override
+    {
+        const auto *o = dynamic_cast<const MediaItem *>(&other);
+        const QTreeWidget *tree = treeWidget();
+        if (!o || !tree)
+            return QTreeWidgetItem::operator<(other);
+        const int section = tree->sortColumn();
+        const dss::MediaColumn column = section == MediaTree::KindColumn ? dss::MediaColumn::Kind
+                                        : section == MediaTree::SizeColumn ? dss::MediaColumn::Size
+                                                                           : dss::MediaColumn::Name;
+        if (tree->header()->sortIndicatorOrder() == Qt::AscendingOrder)
+            return dss::mediaRowBefore(m_key, o->m_key, column, true);
+        return dss::mediaRowBefore(o->m_key, m_key, column, false);
+    }
+
+private:
+    dss::MediaSortKey m_key;
+};
+
+} // namespace
+
+MediaTree::MediaTree(QWidget *parent) : QTreeWidget(parent)
+{
+    setColumnCount(3);
+    setHeaderLabels({QStringLiteral("Name"), QStringLiteral("Typ"), QStringLiteral("Grösse")});
+    header()->setStretchLastSection(false);
+    header()->setSectionResizeMode(NameColumn, QHeaderView::Stretch);
+    header()->setSectionResizeMode(KindColumn, QHeaderView::ResizeToContents);
+    header()->setSectionResizeMode(SizeColumn, QHeaderView::ResizeToContents);
+    header()->setSortIndicatorShown(true);
+    headerItem()->setToolTip(NameColumn, QStringLiteral("Kursiv: ungenutzt, keine Quelle nutzt die Datei"));
+    headerItem()->setToolTip(KindColumn, QStringLiteral("Warnzeichen: Die Browserquelle zeigt das Video nicht an"));
+    setSortingEnabled(true);
+    sortByColumn(NameColumn, Qt::AscendingOrder);
+    setSelectionMode(QAbstractItemView::SingleSelection);
+    setDragDropMode(QAbstractItemView::InternalMove);
+    setDefaultDropAction(Qt::MoveAction);
+    setDropIndicatorShown(true);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    setIndentation(14);
+    setUniformRowHeights(true);
+    setRootIsDecorated(true);
+    setEditTriggers(QAbstractItemView::NoEditTriggers);
+    // Doppelklick benennt um (Teil B 3); auf- und zuklappen mit dem Pfeil oder den Pfeiltasten
+    setExpandsOnDoubleClick(false);
+}
+
+QTreeWidgetItem *MediaTree::createItem(const dss::MediaSortKey &key)
+{
+    return new MediaItem(key);
+}
+
+QStringList MediaTree::mimeTypes() const
+{
+    return {QString::fromLatin1(kMediaMimeType), QString::fromLatin1(kMediaFolderMimeType)};
+}
+
+QMimeData *MediaTree::mimeData(const QList<QTreeWidgetItem *> &items) const
+{
+    if (items.size() != 1)
+        return nullptr;
+    const QTreeWidgetItem *item = items.first();
+    auto *mime = new QMimeData;
+    const QString file = item->data(NameColumn, kFileRole).toString();
+    if (!file.isEmpty())
+        mime->setData(QString::fromLatin1(kMediaMimeType), file.toUtf8());
+    else
+        mime->setData(QString::fromLatin1(kMediaFolderMimeType), QByteArray());
+    return mime;
+}
+
+void MediaTree::startDrag(Qt::DropActions supportedActions)
+{
+    // Eigenes QDrag statt QAbstractItemView::startDrag: Es entfernt bei MoveAction nie einen
+    // Eintrag, und ausserhalb (Leinwand, Liste «Quellen») gilt CopyAction (eine neue Quelle
+    // entsteht, die Datei bleibt). Innerhalb des Docks gilt MoveAction (Verschieben).
+    Q_UNUSED(supportedActions)
+    QTreeWidgetItem *item = currentItem();
+    if (!item || !(item->flags() & Qt::ItemIsDragEnabled))
+        return;
+    QMimeData *mime = mimeData({item});
+    if (!mime)
+        return;
+    auto *drag = new QDrag(this);
+    drag->setMimeData(mime);
+    const QIcon icon = item->icon(NameColumn);
+    if (!icon.isNull())
+        drag->setPixmap(icon.pixmap(iconSize()));
+    drag->exec(Qt::CopyAction | Qt::MoveAction, Qt::MoveAction);
+}
+
+void MediaTree::dropEvent(QDropEvent *event)
+{
+    const QList<QTreeWidgetItem *> dragged = selectedItems();
+    if (dragged.size() != 1 || event->source() != this) {
+        event->ignore();
+        return;
+    }
+    const QTreeWidgetItem *item = dragged.first();
+    const QTreeWidgetItem *target = itemAt(event->position().toPoint());
+    // Laufende Übernahmen sind kein Ziel (weder Datei noch Ordner): wie am Ende der Liste
+    if (target && target->data(NameColumn, kFileRole).toString().isEmpty()
+        && target->data(NameColumn, kFolderRole).toUuid().isNull())
+        target = nullptr;
+    dss::DropPosition position = dss::DropPosition::EndOfList;
+    if (target) {
+        switch (dropIndicatorPosition()) {
+        case AboveItem:
+            position = dss::DropPosition::Above;
+            break;
+        case BelowItem:
+            position = dss::DropPosition::Below;
+            break;
+        case OnItem:
+            position = dss::DropPosition::OnItem;
+            break;
+        case OnViewport:
+            break;
+        }
+    }
+    const QUuid targetFolder = target ? target->data(NameColumn, kFolderRole).toUuid() : QUuid();
+    emit itemDropped(item->data(NameColumn, kFolderRole).toUuid(), item->data(NameColumn, kFileRole).toString(),
+                     !targetFolder.isNull(), targetFolder,
+                     target ? target->data(NameColumn, kFileRole).toString() : QString(), position);
+    refuseLocalMove(event);
+}
+
+void MediaTree::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_F2 && event->modifiers() == Qt::NoModifier && currentItem()) {
+        emit renameRequested(currentItem());
+        event->accept();
+        return;
+    }
+    QTreeWidget::keyPressEvent(event);
 }

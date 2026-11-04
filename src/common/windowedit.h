@@ -54,6 +54,58 @@ std::optional<int> sourceStepIndex(const Overlay &overlay, const QUuid &sourceId
 // «Bilder (*.png *.jpg *.jpeg)».
 QString mediaFileFilter(MediaUse use);
 
+// P10b, Teil B 6: neue Quelle aus der Medienliste an der Einfügestelle insertRow der Liste
+// «Quellen» (0 = über der obersten Zeile, Anzahl Quellen = unter der untersten) → insert_index
+// für add_image_source/add_video_source (Stelle in der Zeichenreihenfolge, 0 = ganz hinten).
+int newSourceIndex(const Overlay &overlay, int insertRow);
+
+// --- Medien (P10b, E-28) ---
+
+// Filter für «Hinzufügen» im Dock «Medien»: alle erlaubten Endungen, dann je Art.
+QString mediaLibraryFileFilter();
+
+// Zeile im Dock «Medien» zum Sortieren nach einer Spalte (Teil B 1). Ordner stehen immer vor
+// Dateien, in beiden Richtungen, wie im Dateimanager.
+enum class MediaColumn { Name, Kind, Size };
+struct MediaSortKey
+{
+    bool folder = false;
+    QString name;
+    QString kind;      // «Bild», «Video», «Schrift», bei Ordnern «Ordner»
+    qint64 bytes = 0;  // bei Ordnern 0
+    QString tieBreak;  // Verweis bzw. Kennung des Ordners: gleiche Namen in fester Folge
+};
+// true, wenn a in der Richtung ascending vor b steht. Namen ohne Gross- und Kleinschreibung.
+bool mediaRowBefore(const MediaSortKey &a, const MediaSortKey &b, MediaColumn column, bool ascending);
+
+// Ziel eines gezogenen Eintrags im Dock «Medien» (Teil B 3). Gezogen: Ordner draggedFolder oder
+// Datei draggedFile. Ziel: Ordner targetFolder (targetIsFolder) oder Datei targetFile. Auf einem
+// Ordner losgelassen: hinein; über oder unter einem Eintrag bzw. auf einer Datei: in denselben
+// Ordner wie dieser; am Ende der Liste: oberste Ebene. Leer, wenn sich nichts ändert oder das
+// Ziel nicht gilt (Ordner in sich selbst oder einen Unterordner); sonst Zielordner (null = oben).
+std::optional<QUuid> mediaDropFolder(const MediaListData &media, const QUuid &draggedFolder,
+                                     const QString &draggedFile, bool targetIsFolder,
+                                     const QUuid &targetFolder, const QString &targetFile,
+                                     DropPosition position);
+
+// Was das Dock zur Auswahl zeigt (Teil B 5): ob «Löschen» geht, sein Hinweis und die Zeile
+// unter der Liste. Gewählt ist höchstens eines: eine Datei (file), ein Ordner (folder) oder eine
+// laufende Übernahme (importId; «Löschen» bricht sie ab).
+struct MediaSelectionInfo
+{
+    bool removable = false;
+    QString removeToolTip;
+    QString line; // «verwendet in …», «ungenutzt», Hinweis zum Videoformat
+};
+MediaSelectionInfo mediaSelectionInfo(const MediaListData &media,
+                                      const QList<ImportProgressData> &imports,
+                                      const QString &file, const QUuid &folder, qint64 importId);
+// Hinweis beim Darüberfahren über eine Datei: Name, Art, Grösse, Format, «verwendet in» bzw.
+// «ungenutzt», Hinweis zum Videoformat.
+QString mediaFileToolTip(const MediaFileData &file);
+// Text der Spalte «Grösse» einer laufenden Übernahme: «übernehme … 37 %»
+QString importProgressText(const ImportProgressData &import);
+
 // --- Eigenschaften (Teil E) ---
 
 // Drehung aus dem Zahlenfeld (Grad, eine Nachkommastelle) in Zehntelgrad 0 bis 3599.

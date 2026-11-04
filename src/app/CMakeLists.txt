@@ -58,6 +58,15 @@ endif()
 option(DSS_APP_BROWSER_SOURCE "Browserquelle im Fenster (P10)" ON)
 target_compile_definitions(dss_app_ui PUBLIC DSS_APP_BROWSER_SOURCE=$<BOOL:${DSS_APP_BROWSER_SOURCE}>)
 
+# Dock «Medien» (P10b, E-28): Dateien im Datenordner mit Name, Ordner, Vorschau; Hinzufügen,
+# Umbenennen, Ordner, Löschen, Ziehen auf die Leinwand und in die Liste «Quellen». Aus: kein Dock,
+# Anordnung wie bis P10a; dss-cli kann die Medienliste weiter ändern.
+option(DSS_APP_MEDIA_DOCK "Dock Medien im Fenster (P10b)" ON)
+target_compile_definitions(dss_app_ui PUBLIC DSS_APP_MEDIA_DOCK=$<BOOL:${DSS_APP_MEDIA_DOCK}>)
+if(DSS_APP_MEDIA_DOCK)
+  target_sources(dss_app_ui PRIVATE mainwindowmedia.cpp)
+endif()
+
 # Zeichner der Leinwand (P09, Teil B, Schalter DSS_APP_RENDERER in der obersten CMakeLists.txt).
 # Seit P10-vor in dss_render (src/render, ohne Qt Widgets).
 if(DSS_APP_RENDERER)

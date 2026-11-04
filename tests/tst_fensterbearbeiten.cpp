@@ -5,13 +5,18 @@
 // Verbindung) und was das Fenster danach zeigt.
 // Nicht hier: Dateidialoge (Bild, Video, Schriftdatei, Bild ersetzen) und der Farbdialog sind
 // Dialoge der GTK-Plattform und lassen sich nicht fernsteuern; die Änderungen dahinter prüft
-// tst_bearbeiten. Ziehen mit der Maus (QDrag) ebenso; die Rechnung prüfen tst_overlayliste und
-// tst_windowedit.
+// tst_bearbeiten. Ziehen in den Docks «Overlays» und «Quellen» ebenso; die Rechnung prüfen
+// tst_overlayliste und tst_windowedit.
+// P10b: Dock «Medien» in beiden Lagen, Umbenennen, Ordner, Hinzufügen (mit dem Dateidialog von Qt
+// statt GTK, Qt::AA_DontUseNativeDialogs), Fortschritt und Abbrechen, Löschen. Ziehen aus dem Dock
+// mit QDrag wie mit der Maus (dragWithMouse): zwischen Ordnern, auf die Leinwand, in die Liste
+// «Quellen». Dazu muss das Fenster an der Stelle zuoberst auf dem Bildschirm liegen.
 // Daten wie im Handtest: Bild und Video aus prototypes/media, Be Vietnam Pro.
 
 #include "browsersource.h"
 #include "canvaswidget.h"
 #include "coreclient.h"
+#include "configpaths.h"
 #include "coresettings.h"
 #include "dockviews.h"
 #include "fontcatalog.h"
@@ -46,6 +51,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QElapsedTimer>
 #include <QSignalSpy>
@@ -57,7 +63,10 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QStyleOptionViewItem>
+#include <QHeaderView>
+#include <QSettings>
 #include <QTcpServer>
+#include <QWindow>
 #include <QTimer>
 #include <QToolButton>
 
@@ -133,6 +142,36 @@ void drag(QWidget *w, QPointF a, QPointF b, Qt::KeyboardModifiers modifiers = {}
     sendMouse(w, QEvent::MouseButtonRelease, b, Qt::LeftButton, Qt::NoButton, modifiers);
 }
 
+// P10b: Ziehen mit der Maus wie der Nutzer, mit echtem QDrag. Drücken und Bewegen auf dem
+// Fenster lassen die Ansicht das Ziehen beginnen; QDrag::exec läuft in einer eigenen Schleife und
+// kehrt erst nach dem Loslassen zurück. Darin bewegt ein Zeitgeber die Maus zum Ziel und lässt
+// los. Die Ereignisse gehen über QTest mit QWindow (QWindowSystemInterface) wie vom Fenstersystem;
+// das Ziel sucht Qt am Bildschirm (xcb), das Fenster muss dort also zuoberst liegen.
+// https://doc.qt.io/qt-6.8/qdrag.html#exec, https://doc.qt.io/qt-6.8/qtest.html#mouseMove-1
+bool dragWithMouse(QWidget *from, QPoint fromPos, QWidget *to, QPoint toPos)
+{
+    QWindow *window = from->window()->windowHandle();
+    const QPoint a = from->mapTo(from->window(), fromPos);
+    const QPoint b = to->mapTo(to->window(), toPos);
+    bool released = false;
+    QTimer::singleShot(200, window, [&] {
+        for (int i = 1; i <= 6; ++i) {
+            QTest::mouseMove(window, a + (b - a) * i / 6);
+            QTest::qWait(30);
+        }
+        QTest::qWait(80);
+        QTest::mouseRelease(window, Qt::LeftButton, {}, b);
+        released = true;
+    });
+    QTest::mousePress(window, Qt::LeftButton, {}, a);
+    QTest::mouseMove(window, a + QPoint(QApplication::startDragDistance() + 4, 0));
+    QTest::mouseMove(window, a + QPoint(QApplication::startDragDistance() + 8, 2));
+    const QDeadlineTimer deadline(5000);
+    while (!released && !deadline.hasExpired())
+        QTest::qWait(20);
+    return released;
+}
+
 void clickButton(QWidget *dialog, const QString &text)
 {
     for (QPushButton *b : dialog->findChildren<QPushButton *>()) {
@@ -198,6 +237,81 @@ private:
     {
         auto *list = child<SourceList>("sourceList");
         list->setCurrentRow(row);
+    }
+
+    // P10b: Änderung über die zweite Verbindung und ihr Ergebnis
+    ChangeResult checkChange(const ChangeRequest &r)
+    {
+        QSignalSpy spy(m_check.get(), &CoreClient::changeFinished);
+        const qint64 id = m_check->sendChange(r);
+        QDeadlineTimer deadline(30000);
+        while (!deadline.hasExpired()) {
+            for (const QList<QVariant> &args : std::as_const(spy)) {
+                if (args.at(0).value<ChangeResult>().requestId == id)
+                    return args.at(0).value<ChangeResult>();
+            }
+            spy.wait(50);
+        }
+        return {};
+    }
+
+    // Eintrag im Dock «Medien» mit diesem Namen (Spalte Name), nullptr wenn keiner
+    QTreeWidgetItem *mediaItem(const QString &name)
+    {
+        for (QTreeWidgetItemIterator it(child<MediaTree>("mediaTree")); *it; ++it) {
+            if ((*it)->text(MediaTree::NameColumn) == name)
+                return *it;
+        }
+        return nullptr;
+    }
+
+    const MediaFileData *checkedMedia(const QString &name)
+    {
+        for (const MediaFileData &f : m_check->mediaList().files) {
+            if (f.entry.name == name)
+                return &f;
+        }
+        return nullptr;
+    }
+
+    // Fenster und zweite Verbindung haben dieselbe Medienliste (das Fenster hat neu gefüllt)
+    bool mediaSynced()
+    {
+        return m_client->mediaList() == m_check->mediaList() && m_client->imports() == m_check->imports();
+    }
+
+    const MediaFolder *checkedFolder(const QString &name)
+    {
+        for (const MediaFolder &f : m_check->mediaList().folders) {
+            if (f.name == name)
+                return &f;
+        }
+        return nullptr;
+    }
+
+    // Grosse Datei für Übernahmen, die einige Sekunden dauern (P10-vor, Punkt 67), einmal im
+    // Bau-Ordner erzeugt (zufälliger Inhalt, Endung .png; der Kern prüft beim Übernehmen nur die
+    // Endung).
+    QString largeFile()
+    {
+        const qint64 mib = qEnvironmentVariableIsSet("DSS_TEST_GROSS_MIB")
+                               ? qEnvironmentVariableIntValue("DSS_TEST_GROSS_MIB") : 1024;
+        if (mib <= 0 || !QDir().mkpath(QStringLiteral(DSS_TEST_LARGE_DIR)))
+            return {};
+        const QString big = QStringLiteral(DSS_TEST_LARGE_DIR "/gross-%1mib.png").arg(mib);
+        if (QFileInfo(big).size() != mib << 20) {
+            QFile f(big);
+            if (!f.open(QIODevice::WriteOnly))
+                return {};
+            QRandomGenerator random(67);
+            QByteArray chunk(1 << 20, Qt::Uninitialized);
+            for (qint64 i = 0; i < mib; ++i) {
+                random.fillRange(reinterpret_cast<quint32 *>(chunk.data()), chunk.size() / 4);
+                if (f.write(chunk) != chunk.size())
+                    return {};
+            }
+        }
+        return big;
     }
 
 private slots:
@@ -1478,25 +1592,488 @@ private slots:
     // Grösse 1 GiB (Auftrag); DSS_TEST_GROSS_MIB setzt eine andere (Wiederholungsläufe). Die Datei
     // (Zufallszahlen mit festem Startwert) liegt im Bauordner auf der Platte und wird
     // wiederverwendet; die Kopie des Kerns landet im Datenordner des Tests.
+    // --- Dock «Medien» (P10b, E-28) ---
+
+    // Teil B 2 ohne gespeicherte Anordnung: eigenes Dock zwischen «Quellen» und «Eigenschaften»;
+    // Teil B 1: Spalten, Vorschau, Ordner zuerst, Sortieren per Spaltenkopf.
+    void mediaDockDefaultLayout()
+    {
+        if (!DSS_APP_MEDIA_DOCK)
+            QSKIP("Schalter DSS_APP_MEDIA_DOCK ist aus");
+        auto *media = child<QDockWidget>("mediaDock");
+        auto *sources = child<QDockWidget>("sourcesDock");
+        auto *properties = child<QDockWidget>("propertiesDock");
+        QVERIFY(media && sources && properties);
+        QCOMPARE(m_window->dockWidgetArea(media), Qt::BottomDockWidgetArea);
+        QVERIFY(m_window->tabifiedDockWidgets(media).isEmpty());
+        QVERIFY(media->isVisible() && !media->isFloating());
+        QVERIFY2(sources->geometry().right() < media->geometry().left()
+                     && media->geometry().right() < properties->geometry().left(),
+                 "Medien nicht zwischen Quellen und Eigenschaften");
+        QCOMPARE(media->windowTitle(), QStringLiteral("Medien"));
+        // im Menü «Docks» ein- und ausblendbar
+        QMenu *docks = nullptr;
+        for (QMenu *m : m_window->findChildren<QMenu *>()) {
+            if (m->title() == QStringLiteral("D&ocks"))
+                docks = m;
+        }
+        QVERIFY(docks);
+        QAction *toggle = nullptr;
+        for (QAction *a : docks->actions()) {
+            if (a->text() == QStringLiteral("Medien"))
+                toggle = a;
+        }
+        QVERIFY(toggle);
+        toggle->trigger();
+        QVERIFY(!media->isVisible());
+        toggle->trigger();
+        QVERIFY(media->isVisible());
+
+        auto *tree = child<MediaTree>("mediaTree");
+        QCOMPARE(tree->columnCount(), 3);
+        QCOMPARE(tree->headerItem()->text(0), QStringLiteral("Name"));
+        QCOMPARE(tree->headerItem()->text(1), QStringLiteral("Typ"));
+        QCOMPARE(tree->headerItem()->text(2), QStringLiteral("Grösse"));
+        // Dateien aus initTestCase (ohne medien.json: Ersatznamen) und neue mit Namen
+        ChangeRequest folder;
+        folder.type = QString::fromLatin1(msg::kCreateMediaFolder);
+        folder.name = QStringLiteral("Logos");
+        QVERIFY(checkChange(folder).ok);
+        ChangeRequest add;
+        add.type = QString::fromLatin1(msg::kAddMedia);
+        add.file = kMediaDir + QStringLiteral("/video.webm");
+        QVERIFY(checkChange(add).ok);
+        add.file = kMediaDir + QStringLiteral("/bild2.png");
+        QVERIFY(checkChange(add).ok);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("bild2.png")) && mediaItem(QStringLiteral("video.webm"))
+                                     && mediaItem(QStringLiteral("Logos")), 3000);
+        QTreeWidgetItem *video = mediaItem(QStringLiteral("video.webm"));
+        QCOMPARE(video->text(MediaTree::KindColumn), QStringLiteral("Video"));
+        QCOMPARE(video->text(MediaTree::SizeColumn), QStringLiteral("1.6 MiB"));
+        QVERIFY(video->font(0).italic()); // ungenutzt
+        QVERIFY(video->toolTip(0).contains(QStringLiteral("Ungenutzt")));
+        QTreeWidgetItem *logos = mediaItem(QStringLiteral("Logos"));
+        QCOMPARE(logos->text(MediaTree::KindColumn), QStringLiteral("Ordner"));
+        // genutzte Datei (Bild der Szene): nicht kursiv, «Verwendet in» im Hinweis
+        const QString usedImage = sourceAtRow(2).file;
+        QTreeWidgetItem *used = nullptr;
+        for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+            if ((*it)->data(0, MediaTree::kFileRole).toString() == usedImage)
+                used = *it;
+        }
+        QVERIFY(used);
+        QVERIFY(!used->font(0).italic());
+        // auch in «Chat Ecke», wenn transformCommands vorher lief
+        QVERIFY2(used->toolTip(0).contains(QStringLiteral("\nVerwendet in Overlay «"))
+                     && used->toolTip(0).contains(QStringLiteral("Overlay «Test Szene» (Quelle «bild1.png»")),
+                 qPrintable(used->toolTip(0)));
+#if DSS_APP_RENDERER
+        // Vorschau: Bild und erstes Bild des Videos, nicht leer
+        const auto opaquePixels = [](const QIcon &icon) {
+            const QImage image = icon.pixmap(QSize(40, 24)).toImage();
+            int n = 0;
+            for (int y = 0; y < image.height(); ++y)
+                for (int x = 0; x < image.width(); ++x)
+                    n += qAlpha(image.pixel(x, y)) > 0 ? 1 : 0;
+            return n;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(opaquePixels(mediaItem(QStringLiteral("video.webm"))->icon(0)) > 300, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(opaquePixels(mediaItem(QStringLiteral("bild2.png"))->icon(0)) > 100, 5000);
+#endif
+        // Ordner zuerst; Name aufsteigend, dann per Klick auf «Grösse» nach Grösse
+        QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("Logos"));
+        const auto order = [&] {
+            QStringList names;
+            for (int i = 0; i < tree->topLevelItemCount(); ++i)
+                names << tree->topLevelItem(i)->text(0);
+            return names;
+        };
+        QHeaderView *header = tree->header();
+        const auto clickHeader = [&](int section) {
+            QTest::mouseClick(header->viewport(), Qt::LeftButton, {},
+                              QPoint(header->sectionViewportPosition(section) + 10, header->height() / 2));
+        };
+        clickHeader(MediaTree::SizeColumn);
+        QCOMPARE(header->sortIndicatorSection(), int(MediaTree::SizeColumn));
+        QStringList bySize = order();
+        QCOMPARE(bySize.first(), QStringLiteral("Logos"));
+        QVERIFY2(bySize.indexOf(QStringLiteral("bild2.png")) < bySize.indexOf(QStringLiteral("video.webm")),
+                 qPrintable(bySize.join(QLatin1Char(','))));
+        const Qt::SortOrder firstOrder = header->sortIndicatorOrder();
+        clickHeader(MediaTree::SizeColumn);
+        QVERIFY(header->sortIndicatorOrder() != firstOrder);
+        const QStringList reversed = order();
+        QCOMPARE(reversed.first(), QStringLiteral("Logos")); // Ordner bleiben zuerst
+        QVERIFY(reversed.indexOf(QStringLiteral("bild2.png")) != bySize.indexOf(QStringLiteral("bild2.png")));
+        tree->sortByColumn(MediaTree::NameColumn, Qt::AscendingOrder);
+    }
+
+    // Teil B 2 mit gespeicherter Anordnung (fenster.ini): «Medien» als Reiter neben «Quellen»;
+    // sind «Overlays» und «Quellen» Reiter, als dritter. Ein zweiter Start lässt es dort.
+    void mediaDockSavedLayout_data()
+    {
+        QTest::addColumn<QString>("source");
+        QTest::newRow("Reiter Overlays und Quellen") << QString();
+        // Kopie der echten fenster.ini des Nutzers, wie im Handtest (nur lesen)
+        QTest::newRow("echte fenster.ini (Kopie)")
+            << QDir::homePath() + QStringLiteral("/.config/dons-streaming-studio/fenster.ini");
+    }
+
+    void mediaDockSavedLayout()
+    {
+        if (!DSS_APP_MEDIA_DOCK)
+            QSKIP("Schalter DSS_APP_MEDIA_DOCK ist aus");
+        QFETCH(QString, source);
+        QTemporaryDir config;
+        const QByteArray oldConfig = qgetenv("XDG_CONFIG_HOME");
+        qputenv("XDG_CONFIG_HOME", config.path().toUtf8());
+        const auto restore = qScopeGuard([&] { qputenv("XDG_CONFIG_HOME", oldConfig); });
+        const QString ini = configDir() + QStringLiteral("/fenster.ini");
+        QVERIFY(QDir().mkpath(configDir()));
+        const Theme theme = darkTheme();
+        if (source.isEmpty()) {
+            // Anordnung wie vor P10b: Overlays und Quellen als Reiter, ohne Dock «Medien»
+            MainWindow old(theme, false, nullptr);
+            old.resize(1280, 800);
+            old.tabifyDockWidget(old.findChild<QDockWidget *>(QStringLiteral("overlaysDock")),
+                                 old.findChild<QDockWidget *>(QStringLiteral("sourcesDock")));
+            old.removeDockWidget(old.findChild<QDockWidget *>(QStringLiteral("mediaDock")));
+            QSettings settings(ini, QSettings::IniFormat);
+            settings.setValue(QStringLiteral("fenster/geometrie"), old.saveGeometry());
+            settings.setValue(QStringLiteral("fenster/anordnung"), old.saveState(1));
+        } else {
+            if (!QFile::exists(source))
+                QSKIP("keine fenster.ini des Nutzers");
+            QVERIFY(QFile::copy(source, ini));
+            QSettings settings(ini, QSettings::IniFormat);
+            QVERIFY(!settings.contains(QStringLiteral("fenster/medien"))); // gespeichert vor P10b
+        }
+        bool overlaysTabbed = false;
+        {
+            MainWindow w(theme, true, nullptr);
+            w.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            auto *media = w.findChild<QDockWidget *>(QStringLiteral("mediaDock"));
+            auto *sources = w.findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+            auto *overlays = w.findChild<QDockWidget *>(QStringLiteral("overlaysDock"));
+            QVERIFY(w.tabifiedDockWidgets(sources).contains(media));
+            overlaysTabbed = w.tabifiedDockWidgets(sources).contains(overlays);
+            if (source.isEmpty())
+                QVERIFY(overlaysTabbed);
+            if (overlaysTabbed) {
+                const QList<QDockWidget *> tabs = w.tabifiedDockWidgets(media);
+                QVERIFY(tabs.contains(overlays) && tabs.contains(sources));
+                QCOMPARE(tabs.size(), 2); // drei Reiter
+            }
+            // Bild für den Bericht (nur mit DSS_TEST_BILDER, ein Ordner)
+            if (const QString dir = qEnvironmentVariable("DSS_TEST_BILDER"); !dir.isEmpty()) {
+                media->raise();
+                QTest::qWait(200);
+                w.grab().save(dir + QStringLiteral("/medien-reiter-%1.png").arg(QTest::currentDataTag()));
+            }
+            w.close(); // speichert die Anordnung
+        }
+        QSettings settings(ini, QSettings::IniFormat);
+        QCOMPARE(settings.value(QStringLiteral("fenster/medien")).toBool(), true);
+        {
+            MainWindow w(theme, true, nullptr);
+            w.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            auto *media = w.findChild<QDockWidget *>(QStringLiteral("mediaDock"));
+            auto *sources = w.findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
+            QVERIFY(w.tabifiedDockWidgets(sources).contains(media));
+            QCOMPARE(w.tabifiedDockWidgets(media).size(), overlaysTabbed ? 2 : 1);
+            // lösbar wie die anderen Docks
+            QVERIFY(media->features() & QDockWidget::DockWidgetFloatable);
+            QVERIFY(media->features() & QDockWidget::DockWidgetMovable);
+            w.close();
+        }
+    }
+
+    // Teil B 3 und 5: Umbenennen (F2, Doppelklick), Ordner anlegen, umbenennen, löschen; Löschen
+    // ausgegraut bei genutzter Datei, mit «verwendet in» in der Zeile unter der Liste.
+    void mediaRenameFoldersRemove()
+    {
+        if (!DSS_APP_MEDIA_DOCK || !DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_MEDIA_DOCK oder DSS_APP_EDITING ist aus");
+        auto *tree = child<MediaTree>("mediaTree");
+        auto *remove = child<QToolButton>("mediaRemove");
+        auto *info = child<QLabel>("mediaInfo");
+        ChangeRequest add;
+        add.type = QString::fromLatin1(msg::kAddMedia);
+        add.file = kMediaDir + QStringLiteral("/bild3.png");
+        QVERIFY(checkChange(add).ok);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("bild3.png")), 3000);
+
+        // F2 → Dialog → neuer Name beim Kern
+        tree->setCurrentItem(mediaItem(QStringLiteral("bild3.png")));
+        tree->setFocus();
+        answerDialog([](QWidget *d) {
+            d->findChild<QLineEdit *>()->setText(QStringLiteral("Hintergrund"));
+            clickButton(d, QStringLiteral("OK"));
+        });
+        QTest::keyClick(tree, Qt::Key_F2);
+        QTRY_VERIFY_WITH_TIMEOUT(checkedMedia(QStringLiteral("Hintergrund")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Hintergrund")), 3000);
+        QVERIFY(tree->currentItem() && tree->currentItem()->text(0) == QStringLiteral("Hintergrund"));
+
+        // Ordner anlegen im Knopf; der neue Ordner landet im gewählten Ordner bzw. dem der Datei
+        tree->setCurrentItem(nullptr);
+        answerDialog([](QWidget *d) {
+            d->findChild<QLineEdit *>()->setText(QStringLiteral("Szenen-Medien"));
+            clickButton(d, QStringLiteral("OK"));
+        });
+        child<QToolButton>("mediaAddFolder")->click();
+        QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Szenen-Medien")), 3000);
+        QCOMPARE(checkedFolder(QStringLiteral("Szenen-Medien"))->parent, QUuid());
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Szenen-Medien")), 3000);
+        tree->setCurrentItem(mediaItem(QStringLiteral("Szenen-Medien")));
+        answerDialog([](QWidget *d) {
+            d->findChild<QLineEdit *>()->setText(QStringLiteral("Unterordner"));
+            clickButton(d, QStringLiteral("OK"));
+        });
+        child<QToolButton>("mediaAddFolder")->click();
+        QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Unterordner")), 3000);
+        const QUuid outer = checkedFolder(QStringLiteral("Szenen-Medien"))->id;
+        QCOMPARE(checkedFolder(QStringLiteral("Unterordner"))->parent, outer);
+        // Doppelklick auf einen Ordner → umbenennen
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Unterordner")), 3000);
+        tree->scrollToItem(mediaItem(QStringLiteral("Unterordner")));
+        answerDialog([](QWidget *d) {
+            d->findChild<QLineEdit *>()->setText(QStringLiteral("Alt"));
+            clickButton(d, QStringLiteral("OK"));
+        });
+        doubleClick(tree, tree->visualItemRect(mediaItem(QStringLiteral("Unterordner"))).center());
+        QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Alt")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Alt")) && mediaItem(QStringLiteral("Alt"))->parent()
+                                     && mediaItem(QStringLiteral("Alt"))->parent()->text(0) == QStringLiteral("Szenen-Medien"),
+                                 3000);
+        // Zuklappen wird gespeichert
+        mediaItem(QStringLiteral("Szenen-Medien"))->setExpanded(false);
+        QTRY_VERIFY_WITH_TIMEOUT(!checkedFolder(QStringLiteral("Szenen-Medien"))->expanded, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000);
+        mediaItem(QStringLiteral("Szenen-Medien"))->setExpanded(true);
+        QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Szenen-Medien"))->expanded, 3000);
+
+        // Löschen: genutzte Datei ausgegraut, mit «verwendet in»
+        const QString usedImage = sourceAtRow(2).file;
+        for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+            if ((*it)->data(0, MediaTree::kFileRole).toString() == usedImage)
+                tree->setCurrentItem(*it);
+        }
+        QVERIFY(!remove->isEnabled());
+        QVERIFY2(info->text().startsWith(QStringLiteral("Verwendet in Overlay «"))
+                     && info->text().contains(QStringLiteral("Overlay «Test Szene» (Quelle «bild1.png»")),
+                 qPrintable(info->text()));
+        QVERIFY2(remove->toolTip().contains(QStringLiteral("lässt sich nicht löschen, verwendet in Overlay «")),
+                 qPrintable(remove->toolTip()));
+        // ungenutzte Datei: löschen nach Rückfrage, Datei weg
+        tree->setCurrentItem(mediaItem(QStringLiteral("Hintergrund")));
+        QCOMPARE(info->text(), QStringLiteral("Ungenutzt"));
+        QVERIFY(remove->isEnabled());
+        const QString file = checkedMedia(QStringLiteral("Hintergrund"))->entry.file;
+        QVERIFY(QFile::exists(m_data.filePath(file)));
+        answerDialog([](QWidget *d) { clickButton(d, QStringLiteral("Löschen")); });
+        remove->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!checkedMedia(QStringLiteral("Hintergrund")), 3000);
+        QVERIFY(!QFile::exists(m_data.filePath(file)));
+        QTRY_VERIFY_WITH_TIMEOUT(!mediaItem(QStringLiteral("Hintergrund")), 3000);
+        // Ordner löschen: Inhalt kommt eine Ebene höher
+        tree->setCurrentItem(mediaItem(QStringLiteral("Szenen-Medien")));
+        QVERIFY(remove->isEnabled());
+        answerDialog([](QWidget *d) {
+            QVERIFY(d->findChild<QLabel *>(QStringLiteral("qt_msgbox_label"))
+                    && d->findChild<QLabel *>(QStringLiteral("qt_msgbox_label"))->text().contains(QStringLiteral("auf die oberste Ebene")));
+            clickButton(d, QStringLiteral("Löschen"));
+        });
+        remove->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!checkedFolder(QStringLiteral("Szenen-Medien")), 3000);
+        QCOMPARE(checkedFolder(QStringLiteral("Alt"))->parent, QUuid());
+    }
+
+    // Teil B 4 und Teil A 3: mehrere Dateien mit «Hinzufügen» in den gewählten Ordner, ohne Quelle;
+    // eine grosse Datei mit Fortschritt in der Liste, abgebrochen mit «Löschen».
+    void mediaAddProgressCancel()
+    {
+        if (!DSS_APP_MEDIA_DOCK || !DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_MEDIA_DOCK oder DSS_APP_EDITING ist aus");
+        auto *tree = child<MediaTree>("mediaTree");
+        auto *remove = child<QToolButton>("mediaRemove");
+        ChangeRequest folder;
+        folder.type = QString::fromLatin1(msg::kCreateMediaFolder);
+        folder.name = QStringLiteral("Neu hinzugefügt");
+        QVERIFY(checkChange(folder).ok);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Neu hinzugefügt")), 3000);
+        const QUuid folderId = checkedFolder(QStringLiteral("Neu hinzugefügt"))->id;
+        tree->setCurrentItem(mediaItem(QStringLiteral("Neu hinzugefügt")));
+        const qsizetype sourcesBefore = checked(m_scene).sources.size();
+
+        // Dateidialog von Qt (der von GTK lässt sich nicht fernsteuern); zwei Dateien auf einmal
+        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+        const auto restore = qScopeGuard([] { QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false); });
+        answerDialog([](QWidget *d) {
+            auto *dialog = qobject_cast<QFileDialog *>(d);
+            QVERIFY(dialog);
+            QCOMPARE(dialog->fileMode(), QFileDialog::ExistingFiles);
+            dialog->setDirectory(kMediaDir);
+            dialog->findChild<QLineEdit *>(QStringLiteral("fileNameEdit"))
+                ->setText(QStringLiteral("\"bild4.png\" \"bild5.png\""));
+            QMetaObject::invokeMethod(dialog, "accept"); // geschützt; wie der Knopf «Öffnen»
+        });
+        child<QToolButton>("mediaAdd")->click();
+        QTRY_VERIFY_WITH_TIMEOUT(checkedMedia(QStringLiteral("bild4.png")) && checkedMedia(QStringLiteral("bild5.png")), 5000);
+        QCOMPARE(checkedMedia(QStringLiteral("bild4.png"))->entry.folder, folderId);
+        QCOMPARE(checkedMedia(QStringLiteral("bild5.png"))->entry.folder, folderId);
+        QCOMPARE(checked(m_scene).sources.size(), sourcesBefore); // keine Quelle
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("bild4.png")) && mediaItem(QStringLiteral("bild4.png"))->parent()
+                                     == mediaItem(QStringLiteral("Neu hinzugefügt")), 3000);
+
+        // Grosse Datei: Zeile mit «übernehme … N %», «Löschen» bricht ab, nichts bleibt in media/
+        const QString big = largeFile();
+        QVERIFY(!big.isEmpty());
+        const QStringList mediaBefore = QDir(m_data.filePath(QStringLiteral("media"))).entryList(QDir::Files);
+        ChangeRequest add;
+        add.type = QString::fromLatin1(msg::kAddMedia);
+        add.file = big;
+        add.folderId = folderId;
+        QSignalSpy finished(m_client.get(), &CoreClient::changeFinished);
+        QVERIFY(m_client->sendChange(add) > 0);
+        const QString name = QFileInfo(big).fileName();
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(name), 3000);
+        QTreeWidgetItem *row = mediaItem(name);
+        QVERIFY(row->data(0, MediaTree::kImportRole).toLongLong() > 0);
+        QCOMPARE(row->parent(), mediaItem(QStringLiteral("Neu hinzugefügt")));
+        QVERIFY2(row->text(MediaTree::SizeColumn).startsWith(QStringLiteral("übernehme … ")), qPrintable(row->text(2)));
+        // Fortschritt steigt (der Kern schickt ihn alle 200 ms)
+        const auto percent = [&] {
+            QTreeWidgetItem *r = mediaItem(name);
+            return r ? r->text(MediaTree::SizeColumn).section(QLatin1Char(' '), 2, 2).toInt() : -1;
+        };
+        const int first = percent();
+        QTRY_VERIFY_WITH_TIMEOUT(percent() > first || !mediaItem(name), 10000);
+        QVERIFY2(mediaItem(name), "Übernahme schon fertig, bevor der Fortschritt stieg");
+        tree->setCurrentItem(mediaItem(name));
+        QVERIFY(remove->isEnabled());
+        QVERIFY2(remove->toolTip().startsWith(QStringLiteral("Übernehmen von «")), qPrintable(remove->toolTip()));
+        remove->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!mediaItem(name), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(finished.cbegin(), finished.cend(), [](const QList<QVariant> &a) {
+                                     const ChangeResult r = a.at(0).value<ChangeResult>();
+                                     return !r.ok && r.code == QLatin1String(err::kCanceled);
+                                 }), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(QDir(m_data.filePath(QStringLiteral("media"))).entryList(QDir::Files), mediaBefore, 10000);
+        QVERIFY(m_check->mediaList().files.size() == mediaBefore.size());
+    }
+
+    // Teil B 3 und 6 mit QDrag wie mit der Maus: Datei in einen Ordner, Ordner in einen Ordner,
+    // Bild auf die Leinwand (Mitte an der Maus, Originalgrösse), Video in die Liste «Quellen» (an
+    // der Stelle, Mitte der Leinwand). Nichts wird kopiert.
+    void mediaDragAndDrop()
+    {
+        if (!DSS_APP_MEDIA_DOCK || !DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_MEDIA_DOCK oder DSS_APP_EDITING ist aus");
+        m_window->raise();
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        auto *tree = child<MediaTree>("mediaTree");
+        // Höhere Docks: Ziehen von Zeile zu Zeile ohne Rollen (die früheren Fälle legen Ordner an)
+        auto *dock = child<QDockWidget>("mediaDock");
+        const int dockHeight = dock->height();
+        m_window->resizeDocks({dock}, {460}, Qt::Vertical);
+        const auto restoreHeight = qScopeGuard([&] { m_window->resizeDocks({dock}, {dockHeight}, Qt::Vertical); });
+        ChangeRequest r;
+        r.type = QString::fromLatin1(msg::kCreateMediaFolder);
+        r.name = QStringLiteral("Ziel");
+        QVERIFY(checkChange(r).ok);
+        r.name = QStringLiteral("Wandert");
+        QVERIFY(checkChange(r).ok);
+        r.type = QString::fromLatin1(msg::kAddMedia);
+        r.name.clear();
+        r.file = kMediaDir + QStringLiteral("/bild2.png");
+        QVERIFY(checkChange(r).ok);
+        r.file = kMediaDir + QStringLiteral("/video.webm");
+        QVERIFY(checkChange(r).ok); // nach mediaDockDefaultLayout schon da: Name bleibt
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("Ziel")) && mediaItem(QStringLiteral("Wandert"))
+                                     && mediaItem(QStringLiteral("bild2.png")) && mediaItem(QStringLiteral("video.webm")),
+                                 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000);
+        tree->collapseAll();
+        QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000); // Zuklappen geht an den Kern
+        const auto center = [&](const QString &name) {
+            QTreeWidgetItem *item = mediaItem(name);
+            tree->scrollToItem(item);
+            return tree->visualItemRect(item).center();
+        };
+        // Datei auf einen Ordner
+        QVERIFY(dragWithMouse(tree->viewport(), center(QStringLiteral("bild2.png")), tree->viewport(),
+                              center(QStringLiteral("Ziel"))));
+        const QUuid target = checkedFolder(QStringLiteral("Ziel"))->id;
+        QTRY_COMPARE_WITH_TIMEOUT(checkedMedia(QStringLiteral("bild2.png"))->entry.folder, target, 3000);
+        // Ordner auf einen Ordner
+        QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000);
+        QVERIFY(dragWithMouse(tree->viewport(), center(QStringLiteral("Wandert")), tree->viewport(),
+                              center(QStringLiteral("Ziel"))));
+        QTRY_COMPARE_WITH_TIMEOUT(checkedFolder(QStringLiteral("Wandert"))->parent, target, 3000);
+
+        // Bild auf die Leinwand: Mitte an der Maus, 256x256 wie die Datei
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        const qsizetype before = checked(m_scene).sources.size();
+        const QStringList mediaBefore = QDir(m_data.filePath(QStringLiteral("media"))).entryList(QDir::Files);
+        CanvasWidget *canvas = m_window->canvas();
+        const QPoint drop = canvas->toWidget(QPointF(600, 400)).toPoint();
+        const QPointF at = canvas->overlayPoint(drop);
+        QTRY_VERIFY_WITH_TIMEOUT(mediaSynced(), 3000);
+        mediaItem(QStringLiteral("Ziel"))->setExpanded(true);
+        QTRY_VERIFY_WITH_TIMEOUT(checkedFolder(QStringLiteral("Ziel"))->expanded && mediaSynced(), 3000);
+        QVERIFY(dragWithMouse(tree->viewport(), center(QStringLiteral("bild2.png")), canvas, drop));
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).sources.size(), before + 1, 5000);
+        Source added = checked(m_scene).sources.last(); // zuoberst
+        QCOMPARE(added.name, QStringLiteral("bild2.png"));
+        QCOMPARE(added.file, checkedMedia(QStringLiteral("bild2.png"))->entry.file);
+#if DSS_MEDIA_SIZE
+        QCOMPARE(QSize(added.width, added.height), QSize(256, 256));
+        QCOMPARE(QPoint(added.x, added.y), QPoint(qRound(at.x()) - 128, qRound(at.y()) - 128));
+#endif
+        // neue Quelle ist gewählt
+        QTRY_COMPARE_WITH_TIMEOUT(child<SourceList>("sourceList")->currentRow(), 0, 3000);
+
+        // Video in die Liste «Quellen» zwischen Zeile 0 und 1: Mitte der Leinwand, Zeile 1
+        auto *list = child<SourceList>("sourceList");
+        QTRY_COMPARE_WITH_TIMEOUT(list->count(), int(before + 1), 3000);
+        const QRect row1 = list->visualItemRect(list->item(1));
+        const QPoint between(row1.center().x(), row1.top() + 2); // oberer Rand von Zeile 1
+        QVERIFY(dragWithMouse(tree->viewport(), center(QStringLiteral("video.webm")), list->viewport(), between));
+        QTRY_COMPARE_WITH_TIMEOUT(checked(m_scene).sources.size(), before + 2, 5000);
+        const Overlay o = checked(m_scene);
+        const Source video = o.sources.at(o.sources.size() - 2); // Zeile 1
+        QCOMPARE(video.name, QStringLiteral("video.webm"));
+        QCOMPARE(video.kind, SourceKind::Video);
+#if DSS_MEDIA_SIZE
+        QCOMPARE(QRect(video.x, video.y, video.width, video.height), QRect(480, 270, 960, 540));
+#endif
+        // nichts kopiert
+        QCOMPARE(QDir(m_data.filePath(QStringLiteral("media"))).entryList(QDir::Files), mediaBefore);
+        // jetzt verwendet: nicht mehr kursiv, Löschen ausgegraut
+        QTRY_VERIFY_WITH_TIMEOUT(mediaItem(QStringLiteral("video.webm")) && !mediaItem(QStringLiteral("video.webm"))->font(0).italic(), 3000);
+        tree->setCurrentItem(mediaItem(QStringLiteral("video.webm")));
+        QVERIFY(!child<QToolButton>("mediaRemove")->isEnabled());
+        // Aufräumen für spätere Fälle: beide Quellen wieder weg
+        for (const QUuid &id : {added.id, video.id}) {
+            ChangeRequest rm;
+            rm.type = QString::fromLatin1(msg::kRemoveSource);
+            rm.overlayId = m_scene;
+            rm.sourceId = id;
+            QVERIFY(checkChange(rm).ok);
+        }
+    }
+
     void usableWhileImportingLargeFile()
     {
         if (!DSS_APP_EDITING)
             QSKIP("Schalter DSS_APP_EDITING ist aus");
-        const qint64 mib = qEnvironmentVariableIsSet("DSS_TEST_GROSS_MIB")
-                               ? qEnvironmentVariableIntValue("DSS_TEST_GROSS_MIB") : 1024;
-        QVERIFY(mib > 0);
-        QVERIFY(QDir().mkpath(QStringLiteral(DSS_TEST_LARGE_DIR)));
-        const QString big = QStringLiteral(DSS_TEST_LARGE_DIR "/gross-%1mib.png").arg(mib);
-        if (QFileInfo(big).size() != mib << 20) {
-            QFile f(big);
-            QVERIFY(f.open(QIODevice::WriteOnly));
-            QRandomGenerator random(67);
-            QByteArray chunk(1 << 20, Qt::Uninitialized);
-            for (qint64 i = 0; i < mib; ++i) {
-                random.fillRange(reinterpret_cast<quint32 *>(chunk.data()), chunk.size() / 4);
-                QCOMPARE(f.write(chunk), chunk.size());
-            }
-        }
+        const QString big = largeFile();
+        QVERIFY(!big.isEmpty());
+        const qint64 mib = QFileInfo(big).size() >> 20;
         selectOverlayNamed(QStringLiteral("Test Szene"));
         const qsizetype sourcesBefore = checked(m_scene).sources.size();
         selectSourceRow(0);

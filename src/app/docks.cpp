@@ -186,6 +186,37 @@ SourcesDock createSourcesDock(QWidget *parent)
     return result;
 }
 
+MediaDock createMediaDock(QWidget *parent)
+{
+    MediaDock result;
+    result.add = symbolButton(QStringLiteral("hinzufuegen.svg"), QStringLiteral("+"),
+                              QStringLiteral("Dateien hinzufügen …"), nullptr);
+    result.addFolder = symbolButton(QStringLiteral("ordner-neu.svg"), QStringLiteral("O"),
+                                    QStringLiteral("Ordner anlegen …"), nullptr);
+    result.remove = symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
+                                 QStringLiteral("Datei oder Ordner löschen"), nullptr);
+    result.tree = new MediaTree;
+    result.tree->setAccessibleName(QStringLiteral("Medien"));
+    // Zeile zur Auswahl: immer da (keine Änderung der Anordnung beim Wechsel der Auswahl), eine
+    // Zeile, abgeschnitten; der ganze Text steht im Hinweis beim Darüberfahren.
+    auto *list = new QWidget;
+    auto *column = new QVBoxLayout(list);
+    column->setContentsMargins(0, 0, 0, 0);
+    column->setSpacing(2);
+    column->addWidget(result.tree, 1);
+    result.info = new QLabel(list);
+    result.info->setObjectName(QStringLiteral("mediaInfo"));
+    result.info->setContentsMargins(6, 0, 6, 0);
+    result.info->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    result.info->setTextFormat(Qt::PlainText);
+    column->addWidget(result.info);
+    nameWidgets({{result.tree, "mediaTree"}, {result.add, "mediaAdd"},
+                 {result.addFolder, "mediaAddFolder"}, {result.remove, "mediaRemove"}});
+    QWidget *content = listWithButtons({result.add, result.addFolder, result.remove}, list, nullptr);
+    result.dock = dock(QStringLiteral("Medien"), QStringLiteral("mediaDock"), content, parent);
+    return result;
+}
+
 PropertiesDock createPropertiesDock(QWidget *parent)
 {
     PropertiesDock r;

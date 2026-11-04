@@ -309,6 +309,14 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #dockButtons QToolButton::menu-indicator { image: none; width: 0px; }
 
 #hintLabel { color: @textMuted@; }
+/* P10b: Dock «Medien» mit Spalten wie im Dateimanager: Zeilen ohne Rundung je Zelle (sonst
+   jede Spalte ein eigenes Kästchen), Spaltenkopf wie die Dock-Titel, Zeile zur Auswahl gedämpft. */
+#mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
+#mediaTree::item:selected:hover { border-radius: 0px; border: none; padding: 2px 2px; }
+QHeaderView { background: transparent; border: none; }
+QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
+                       border-right: 1px solid @border@; padding: 3px 6px; }
+#mediaInfo { color: @textMuted@; }
 /* P09b, E-26: Bereiche im Dock «Eigenschaften», kleine Titel und feine Linie wie der Rahmen
    des Kopfbereichs (#headerBar). */
 #propertySectionTitle { font-size: @fontSizeSmall@pt; font-weight: bold; color: @textMuted@; }

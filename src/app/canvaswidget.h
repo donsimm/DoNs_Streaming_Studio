@@ -42,6 +42,8 @@ public:
     // P09 Teil C: gewählte Quelle (Rahmen und Griffe) und ob gezogen werden darf.
     void setSelectedSource(const QUuid &id);
     void setEditable(bool editable);
+    // P10b (Teil B 6): Bilder und Videos aus dem Dock «Medien» annehmen (mediaDropped).
+    void setAcceptsMedia(bool accept);
     // Punkt des Overlays in Pixeln dieses Widgets und zurück (auch für Prüfungen).
     QPointF toWidget(QPointF overlayPoint) const;
     QPointF overlayPoint(QPointF widgetPoint) const;
@@ -56,6 +58,9 @@ signals:
     // P09b (E-25): Rechtsklick wählt die Quelle unter dem Zeiger (wie Klick) und will ihr Menü;
     // id null = keine Quelle unter dem Zeiger.
     void sourceMenuRequested(const QUuid &id, const QPoint &globalPosition);
+    // P10b: Datei reference aus dem Dock «Medien» losgelassen; center = Punkt der Maus in ganzen
+    // Pixeln des Overlays (CLAUDE.md Regel 11), dort kommt die Mitte der neuen Quelle hin.
+    void mediaDropped(const QString &reference, const QPoint &center);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -66,6 +71,9 @@ protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
 private:
     // Fläche ohne Lineale und eingepasste Leinwand für die aktuelle Grösse des Widgets.
@@ -83,6 +91,7 @@ private:
     dss::MediaSizes m_mediaSizes;
     QUuid m_selected;
     bool m_editable = false;
+    bool m_acceptsMedia = false;
     // Ziehen (Teil C): Griff, Quelle und Zeiger beim Beginn, letzte gemeldete Lage.
     struct Drag
     {

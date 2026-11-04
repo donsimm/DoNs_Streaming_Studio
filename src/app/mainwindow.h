@@ -28,6 +28,7 @@ class QTreeWidgetItem;
 
 namespace dss {
 class CoreClient;
+class MediaPreviewLoader;
 enum class DropPosition;
 struct ChangeRequest;
 struct ChangeResult;
@@ -157,6 +158,24 @@ private:
     void chooseColor();
     void replaceImage();
     QString askMediaFile(const QString &title, const QString &filter);
+    // Dock «Medien» (P10b, E-28, mainwindowmedia.cpp, Schalter DSS_APP_MEDIA_DOCK)
+    void setupMediaDock();
+    void connectMedia();
+    void refreshMedia();
+    void refreshMediaImports();
+    void refreshMediaSelection();
+    void onMediaPreview(const QString &reference);
+    void onMediaItemChanged(QTreeWidgetItem *current);
+    QUuid mediaTargetFolder() const;
+    void addMediaFiles();
+    void createMediaFolder();
+    void renameMediaItem(QTreeWidgetItem *item);
+    void removeMediaItem();
+    void showMediaMenu(const QPoint &position);
+    void onMediaDropped(const QUuid &draggedFolder, const QString &draggedFile, bool targetIsFolder,
+                        const QUuid &targetFolder, const QString &targetFile, dss::DropPosition position);
+    void onMediaFolderExpanded(QTreeWidgetItem *item, bool expanded);
+    void addSourceFromMedia(const QString &reference, const QPoint &center, std::optional<int> insertIndex);
 
     Theme m_theme;
     bool m_keepLayout = false;
@@ -179,6 +198,8 @@ private:
     SourcesDock m_sourcesDock;
     PropertiesDock m_propertiesDock;
     ControlDock m_controlDock;
+    MediaDock m_mediaDock;                              // P10b; dock nullptr ohne DSS_APP_MEDIA_DOCK
+    dss::MediaPreviewLoader *m_mediaPreviews = nullptr; // P10b, nur mit DSS_APP_RENDERER
     QLabel *m_statusMessage = nullptr;
     QLabel *m_importStatus = nullptr; // P10-vor: «Übernehme …», solange der Kern Dateien kopiert
     QLabel *m_coreStatus = nullptr;
@@ -207,6 +228,12 @@ private:
     enum class SelectNew { Overlay, Source };
     QHash<qint64, SelectNew> m_selectOnResult;
     QString m_lastListError;
+    // Auswahl im Dock «Medien» (P10b): höchstens eines davon
+    QString m_selectedMediaFile;
+    QUuid m_selectedMediaFolder;
+    qint64 m_selectedImport = 0;
+    QList<qint64> m_shownImports; // Übernahmen im Baum (nur Prozent nachführen, wenn gleich)
+    QString m_lastMediaError;
     QString m_lastMediaDir;
     bool m_filling = false; // Listen werden gerade neu gefüllt, Auswahl-Signale übergehen
     dss::ValueHistory m_cpuHistory;

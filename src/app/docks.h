@@ -18,6 +18,7 @@ class QStackedWidget;
 class QToolButton;
 class QWidget;
 class SourceList;
+class MediaTree;
 
 // Die vier Docks unten, wie auf docs/bilder/oberflaeche.png. Jedes Dock hat einen festen
 // objectName, damit QMainWindow::saveState() die Anordnung speichern kann. Seit P07 zeigen
@@ -90,7 +91,21 @@ struct PropertiesDock
     static constexpr int kTextPage = 3;
 };
 
+// Dock «Medien» (P10b, E-28, Schalter DSS_APP_MEDIA_DOCK): alle Dateien im Datenordner mit Name,
+// Typ, Grösse, in Ordnern. Unter der Liste eine Zeile zur Auswahl («verwendet in …»), darunter die
+// Knöpfe Hinzufügen, Ordner anlegen, Löschen (bei einer laufenden Übernahme: Abbrechen).
+struct MediaDock
+{
+    QDockWidget *dock = nullptr;
+    MediaTree *tree = nullptr;
+    QLabel *info = nullptr;
+    QToolButton *add = nullptr;
+    QToolButton *addFolder = nullptr;
+    QToolButton *remove = nullptr;
+};
+
 OverlaysDock createOverlaysDock(QWidget *parent);
+MediaDock createMediaDock(QWidget *parent);
 SourcesDock createSourcesDock(QWidget *parent);
 PropertiesDock createPropertiesDock(QWidget *parent);
 // Dock «Steuerung». Seit P09 lässt sich die Auflösung des gewählten Overlays ändern

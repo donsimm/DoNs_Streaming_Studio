@@ -15,6 +15,7 @@
 #include "overlayimage.h"
 #endif
 #if DSS_APP_RENDERER
+#include "mediapreview.h"
 #include "sourcerenderer.h"
 #endif
 #include "version.h"
@@ -204,12 +205,20 @@ void MainWindow::createDocks()
     m_sourcesDock = createSourcesDock(this);
     m_propertiesDock = createPropertiesDock(this);
     m_controlDock = createControlDock(this);
-    const QList<QDockWidget *> docks = {m_overlaysDock.dock, m_sourcesDock.dock,
-                                        m_propertiesDock.dock, m_controlDock.dock};
+    QList<QDockWidget *> docks = {m_overlaysDock.dock, m_sourcesDock.dock,
+                                  m_propertiesDock.dock, m_controlDock.dock};
+    QList<int> widths = {230, 230, 370, 440};
+#if DSS_APP_MEDIA_DOCK
+    // P10b (Teil B 2): ohne gespeicherte Anordnung eigenes Dock zwischen «Quellen» und
+    // «Eigenschaften»; mit gespeicherter Anordnung Reiter neben «Quellen» (restoreLayout).
+    setupMediaDock();
+    docks.insert(2, m_mediaDock.dock);
+    widths = {200, 200, 300, 330, 400};
+#endif
     addDockWidget(Qt::BottomDockWidgetArea, docks.first());
     for (qsizetype i = 1; i < docks.size(); ++i)
         splitDockWidget(docks.at(i - 1), docks.at(i), Qt::Horizontal);
-    resizeDocks(docks, {230, 230, 370, 440}, Qt::Horizontal);
+    resizeDocks(docks, widths, Qt::Horizontal);
     resizeDocks({docks.first()}, {215}, Qt::Vertical);
     for (QDockWidget *d : docks)
         m_docksMenu->addAction(d->toggleViewAction());
@@ -252,8 +261,19 @@ void MainWindow::restoreLayout()
     const QByteArray state = settings.value(QStringLiteral("fenster/anordnung")).toByteArray();
     if (!geometry.isEmpty() && !restoreGeometry(geometry))
         qWarning("Fenstergrösse aus %s nicht lesbar, Standard gilt", qPrintable(layoutFile()));
-    if (!state.isEmpty() && !restoreState(state, kLayoutVersion))
+    if (state.isEmpty())
+        return;
+    if (!restoreState(state, kLayoutVersion)) {
         qWarning("Anordnung der Docks aus %s nicht lesbar, Standard gilt", qPrintable(layoutFile()));
+        return;
+    }
+    // P10b (Teil B 2): Eine Anordnung ohne das Dock «Medien» (gespeichert vor P10b oder ohne
+    // DSS_APP_MEDIA_DOCK) lässt es, wo es beim Aufbau war (QMainWindow::restoreState); hier kommt
+    // es als Reiter zu «Quellen», bei Reitern «Overlays»/«Quellen» also als dritter Reiter.
+    // https://doc.qt.io/qt-6.8/qmainwindow.html#restoreState
+    // https://doc.qt.io/qt-6.8/qmainwindow.html#tabifyDockWidget
+    if (m_mediaDock.dock && !settings.value(QStringLiteral("fenster/medien"), false).toBool())
+        tabifyDockWidget(m_sourcesDock.dock, m_mediaDock.dock);
 }
 
 void MainWindow::saveLayout()
@@ -262,6 +282,8 @@ void MainWindow::saveLayout()
     QSettings settings(layoutFile(), QSettings::IniFormat);
     settings.setValue(QStringLiteral("fenster/geometrie"), saveGeometry());
     settings.setValue(QStringLiteral("fenster/anordnung"), saveState(kLayoutVersion));
+    // P10b: Enthält die Anordnung das Dock «Medien»? (restoreLayout)
+    settings.setValue(QStringLiteral("fenster/medien"), m_mediaDock.dock != nullptr);
     settings.sync();
     if (settings.status() != QSettings::NoError)
         qWarning("Fensteranordnung konnte nicht gespeichert werden: %s", qPrintable(layoutFile()));
@@ -320,6 +342,8 @@ void MainWindow::connectCore()
     refreshGauges(dss::SystemStats());
     if (editingAllowed())
         connectEditing();
+    if (m_mediaDock.dock)
+        connectMedia();
     refreshActions();
 }
 
@@ -391,6 +415,8 @@ void MainWindow::onCoreConnectedChanged(bool connected)
     // Dateien der Quellen liegen im Datenordner des Kerns (hello.data_dir, P09).
     if (connected)
         m_renderer->setDataDir(m_client->coreHello().dataDir);
+    if (connected && m_mediaPreviews)
+        m_mediaPreviews->setDataDir(m_client->coreHello().dataDir); // P10b: Vorschau im Dock «Medien»
     refreshOverlay();
 #endif
     refreshActions();

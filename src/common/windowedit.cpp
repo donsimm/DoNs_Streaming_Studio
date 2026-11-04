@@ -1,6 +1,7 @@
 #include "windowedit.h"
 
 #include "address.h"
+#include "medialibrary.h"
 
 #include <QRegularExpression>
 #include <QSet>
@@ -97,6 +98,167 @@ QString mediaFileFilter(MediaUse use)
         break;
     }
     return QStringLiteral("%1 (%2)").arg(title, patterns.join(QLatin1Char(' ')));
+}
+
+int newSourceIndex(const Overlay &overlay, int insertRow)
+{
+    const int count = int(overlay.sources.size());
+    return count - std::clamp(insertRow, 0, count);
+}
+
+QString mediaLibraryFileFilter()
+{
+    QStringList all;
+    for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font}) {
+        for (const QString &suffix : allowedMediaSuffixes(use))
+            all.append(QStringLiteral("*.") + suffix);
+    }
+    return QStringLiteral("Mediendateien (%1);;%2;;%3;;%4")
+        .arg(all.join(QLatin1Char(' ')), mediaFileFilter(MediaUse::Image),
+             mediaFileFilter(MediaUse::Video), mediaFileFilter(MediaUse::Font));
+}
+
+bool mediaRowBefore(const MediaSortKey &a, const MediaSortKey &b, MediaColumn column, bool ascending)
+{
+    if (a.folder != b.folder)
+        return a.folder;
+    const auto names = [&] { return QString::compare(a.name, b.name, Qt::CaseInsensitive); };
+    int c = 0;
+    switch (column) {
+    case MediaColumn::Name:
+        c = names();
+        break;
+    case MediaColumn::Kind:
+        c = QString::compare(a.kind, b.kind, Qt::CaseInsensitive);
+        if (c == 0)
+            c = names();
+        break;
+    case MediaColumn::Size:
+        c = a.bytes < b.bytes ? -1 : a.bytes > b.bytes ? 1 : 0;
+        if (c == 0)
+            c = names();
+        break;
+    }
+    if (c != 0)
+        return ascending ? c < 0 : c > 0;
+    // Gleiche Werte: immer in derselben Folge, unabhängig von der Richtung
+    return a.tieBreak < b.tieBreak;
+}
+
+std::optional<QUuid> mediaDropFolder(const MediaListData &media, const QUuid &draggedFolder,
+                                     const QString &draggedFile, bool targetIsFolder,
+                                     const QUuid &targetFolder, const QString &targetFile,
+                                     DropPosition position)
+{
+    MediaLibrary library;
+    library.folders = media.folders;
+    const auto folderOfFile = [&](const QString &file) -> std::optional<QUuid> {
+        const MediaFileData *f = media.file(file);
+        if (!f)
+            return std::nullopt;
+        return f->entry.folder;
+    };
+    QUuid destination;
+    if (position != DropPosition::EndOfList) {
+        if (targetIsFolder) {
+            const MediaFolder *f = library.folder(targetFolder);
+            if (!f)
+                return std::nullopt;
+            destination = position == DropPosition::OnItem ? f->id : f->parent;
+        } else {
+            const std::optional<QUuid> folder = folderOfFile(targetFile);
+            if (!folder)
+                return std::nullopt;
+            destination = *folder;
+        }
+    }
+    if (!draggedFolder.isNull()) {
+        const MediaFolder *f = library.folder(draggedFolder);
+        if (!f || f->parent == destination || destination == f->id
+            || library.descendants(f->id).contains(destination))
+            return std::nullopt;
+        return destination;
+    }
+    const std::optional<QUuid> current = folderOfFile(draggedFile);
+    if (!current || *current == destination)
+        return std::nullopt;
+    return destination;
+}
+
+namespace {
+
+QString capitalized(QString text)
+{
+    if (!text.isEmpty())
+        text[0] = text.at(0).toUpper();
+    return text;
+}
+
+} // namespace
+
+MediaSelectionInfo mediaSelectionInfo(const MediaListData &media,
+                                      const QList<ImportProgressData> &imports,
+                                      const QString &file, const QUuid &folder, qint64 importId)
+{
+    MediaSelectionInfo info;
+    info.removeToolTip = QStringLiteral("Datei oder Ordner löschen");
+    if (importId > 0) {
+        for (const ImportProgressData &i : imports) {
+            if (i.importId != importId)
+                continue;
+            info.removable = true;
+            info.removeToolTip = QStringLiteral("Übernehmen von «%1» abbrechen").arg(i.name);
+            info.line = QStringLiteral("«%1» wird übernommen (%2 %).").arg(i.name).arg(i.percent);
+        }
+        return info;
+    }
+    MediaLibrary library;
+    library.folders = media.folders;
+    if (const MediaFolder *f = library.folder(folder)) {
+        const QList<QUuid> inside = library.descendants(f->id) + QList<QUuid>{f->id};
+        int files = 0;
+        for (const MediaFileData &d : media.files)
+            files += inside.contains(d.entry.folder) ? 1 : 0;
+        info.removable = media.error.isEmpty();
+        info.removeToolTip = QStringLiteral("Ordner «%1» löschen; der Inhalt kommt eine Ebene höher")
+                                 .arg(f->name);
+        info.line = QStringLiteral("Ordner «%1»: %2 Datei(en)").arg(mediaFolderPath(library, f->id)).arg(files);
+        return info;
+    }
+    const MediaFileData *d = media.file(file);
+    if (!d)
+        return info;
+    if (d->usedIn.isEmpty()) {
+        info.removable = true;
+        info.removeToolTip = QStringLiteral("«%1» löschen").arg(d->entry.name);
+        info.line = QStringLiteral("Ungenutzt");
+    } else {
+        // Wie die Meldung des Kerns bei remove_media (Code in_use)
+        info.removeToolTip = QStringLiteral("«%1» lässt sich nicht löschen, %2.")
+                                 .arg(d->entry.name, usageText(d->usedIn));
+        info.line = capitalized(usageText(d->usedIn));
+    }
+    if (!d->browserProblem.isEmpty())
+        info.line += QStringLiteral(" · ") + d->browserProblem;
+    return info;
+}
+
+QString mediaFileToolTip(const MediaFileData &file)
+{
+    QStringList lines{file.entry.name};
+    QString kind = mediaKindName(file.kind) + QStringLiteral(" · ") + mediaSizeText(file.bytes);
+    if (!file.codec.isEmpty())
+        kind += QStringLiteral(" · Format ") + file.codec;
+    lines << kind << file.entry.file;
+    lines << (file.usedIn.isEmpty() ? QStringLiteral("Ungenutzt") : capitalized(usageText(file.usedIn)));
+    if (!file.browserProblem.isEmpty())
+        lines << file.browserProblem;
+    return lines.join(QLatin1Char('\n'));
+}
+
+QString importProgressText(const ImportProgressData &import)
+{
+    return QStringLiteral("übernehme … %1 %").arg(import.percent);
 }
 
 int rotationTenths(double degrees)

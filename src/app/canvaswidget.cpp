@@ -6,7 +6,10 @@
 #include "sourcerenderer.h"
 #endif
 
+#include "dockviews.h"
+
 #include <QContextMenuEvent>
+#include <QDropEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -348,6 +351,41 @@ void CanvasWidget::leaveEvent(QEvent *)
 {
     m_pointerOver = false;
     update();
+}
+
+void CanvasWidget::setAcceptsMedia(bool accept)
+{
+    m_acceptsMedia = accept;
+    setAcceptDrops(accept);
+}
+
+void CanvasWidget::dragEnterEvent(QDragEnterEvent *event)
+{
+    dragMoveEvent(event); // QDragEnterEvent ist ein QDragMoveEvent
+}
+
+void CanvasWidget::dragMoveEvent(QDragMoveEvent *event)
+{
+    // Nur mit gewähltem Overlay; Schriften und anderes nicht (droppedMediaSource)
+    if (m_acceptsMedia && m_overlay && !droppedMediaSource(event->mimeData()).isEmpty()) {
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        return;
+    }
+    event->ignore();
+}
+
+void CanvasWidget::dropEvent(QDropEvent *event)
+{
+    const QString reference = droppedMediaSource(event->mimeData());
+    if (!m_acceptsMedia || !m_overlay || reference.isEmpty()) {
+        event->ignore();
+        return;
+    }
+    const QPointF p = overlayPoint(event->position());
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
+    emit mediaDropped(reference, QPoint(qRound(p.x()), qRound(p.y())));
 }
 
 void CanvasWidget::paintEvent(QPaintEvent *)
