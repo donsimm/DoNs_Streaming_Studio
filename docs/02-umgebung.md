@@ -59,7 +59,7 @@ Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf
 | Angabe | Studio-PC |
 |---|---|
 | Netzwerkkarte | `enp3s0` (Kabel), `UP` |
-| Adresse IPv4 | `192.168.1.9/24`, vom Router per DHCP, am Router fest reserviert (Angabe des Nutzers) |
+| Adresse IPv4 | `192.168.1.9/24`, seit 2026-11-04 08:55 **fest auf dem Studio-PC eingetragen** (NetworkManager, Verbindung «Wired connection 1»: `ipv4.method manual`, Router `192.168.1.1`, Namensauflösung `192.168.1.1`; geprüft mit `ip route` → `proto static`, Ping zum Router 2 von 2, `getent hosts github.com`). Am Router weiter reserviert. Vorher per DHCP (Punkt 84). Rückgängig: `sudo nmcli connection modify "Wired connection 1" ipv4.method auto ipv4.addresses "" ipv4.gateway "" ipv4.dns ""` |
 | Router (Standardroute) | `192.168.1.1` über `enp3s0` |
 | IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten). Ob der Router eingehende IPv6-Verbindungen sperrt: nicht geprüft |
 | USB-Tethering | nicht mehr vorhanden |
