@@ -279,8 +279,8 @@ void OverlayServer::handle(QTcpSocket *socket, Connection &c, const HttpRequest 
     const Overlay *overlay = plausibleAddress(address) ? m_store->overlayByAddress(address) : nullptr;
     // Immer vergleichen, auch ohne Overlay (gleiche Laufzeit), mit gleichbleibender Laufzeit.
     const QString expected = overlay ? m_store->token(overlay->id) : QString(43, QLatin1Char('-'));
-    const bool valid = overlay && !expected.isEmpty()
-                       && constantTimeEquals(token.toUtf8(), expected.toUtf8());
+    const bool tokenMatches = constantTimeEquals(token.toUtf8(), expected.toUtf8());
+    const bool valid = overlay && !expected.isEmpty() && tokenMatches;
     if (!valid) {
         handleInvalid(socket, c, request, address, rest);
         return;
