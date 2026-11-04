@@ -58,7 +58,7 @@ P10a, P10-vor und P10 sind abgenommen, einschliesslich Handtest. Die Browserquel
 **Als Nächstes, in dieser Reihenfolge:**
 
 1. Offene Punkte aus P10: 79 bis 85 alle entschieden (2026-11-04): 79 und 80 in P11, 81, 83 und 85 in P10b, 82 Regel 8 präzisiert, 84 erledigt (feste Adresse auf dem Studio-PC).
-2. P10b (Dock «Medien», E-28) planen und den Prompt schreiben; Entscheide in `docs/04-offene-punkte.md`, «Wünsche nach P10a», und Punkte 73, 74.
+2. P10b (Dock «Medien», E-28): Prompt `prompts/P10b-medien.md` geschrieben (2026-11-04), Bestätigung des Nutzers offen. Startbefehl: `cd ~/DoNs_Streaming_Studio && git pull && claude "Lies prompts/P10b-medien.md und führe den Auftrag aus."`
 3. Danach P10c (Anbindung an OBS: T-05, E-29), P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
 
 **Erfahrungen aus dem bisherigen Chat:**

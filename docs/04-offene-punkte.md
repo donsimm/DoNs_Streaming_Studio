@@ -207,7 +207,7 @@ Stand: 2026-11-03 (nach P09, Handtest offen).
   - Ziehen ins Overlay (Wunsch und Entscheid 2026-11-03): Dateien aus dem Dock mit der Maus auf die Leinwand ziehen (neue Quelle an der Stelle der Maus, Originalgrösse) oder in die Liste des Docks «Quellen» (neue Quelle an der abgelegten Stelle der Reihenfolge, in der Mitte der Leinwand). Die Datei ist schon in `media/`, es wird nichts kopiert. Ziehen aus dem Dateimanager: nicht gewünscht.
   - Ansicht (Entscheid 2026-11-03): Liste mit Spalten wie im Dateimanager: kleines Vorschaubild, Name, Typ, Grösse; Ordner auf- und zuklappbar; Sortieren per Klick auf den Spaltenkopf.
   - Hinzufügen (Entscheid 2026-11-03): Knopf «Hinzufügen» unten im Dock, Dateiauswahl für mehrere Dateien; die Dateien kommen in den gewählten Ordner, ohne dass eine Quelle entsteht. Übernehmen im eigenen Thread des Kerns (Punkt 67).
-  - Lage (Entscheid 2026-11-03): beim ersten Start eigenes Dock «Medien» in der unteren Reihe zwischen «Quellen» und «Eigenschaften»; lösbar, verschiebbar, über das Menü «Docks» ein- und ausblendbar wie die anderen Docks.
+  - Lage (Entscheid 2026-11-03): beim ersten Start eigenes Dock «Medien» in der unteren Reihe zwischen «Quellen» und «Eigenschaften»; lösbar, verschiebbar, über das Menü «Docks» ein- und ausblendbar wie die anderen Docks. Ergänzt 2026-11-04: Gibt es schon eine gespeicherte Anordnung (`fenster.ini`), erscheint «Medien» als dritter Reiter neben «Overlays» und «Quellen»; die Lage zwischen «Quellen» und «Eigenschaften» gilt nur ohne gespeicherte Anordnung.
 
 ## Entschieden für P10 (2026-11-03)
 
