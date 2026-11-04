@@ -47,7 +47,9 @@ UNIT_MISSING = "dss-startpruefung-gibt-es-nicht.service"
 CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: ",
                  "Aufräumen media/: 0 vorläufige Dateien",
                  # P10-vor: kern.ini im eigenen XDG_CONFIG_HOME (anlegen, Adresse, Werte)
-                 "Einstellungen: "]
+                 "Einstellungen: ",
+                 # P10: Overlay-Server auf 127.0.0.1 und der Adresse im Heimnetz (Standardport)
+                 "Overlay-Server lauscht auf "]
 
 # Programm, Signal zum Beenden, Muster der Startzeile, erwartete Protokollzeilen
 CASES = {
