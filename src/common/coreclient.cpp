@@ -463,6 +463,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_serverStatus = info;
         emit serverStatusChanged();
+    } else if (type == QLatin1String(msg::kObsStatus)) {
+        ObsStatusInfo info;
+        if (!parseObsStatus(message, &info, &error)) {
+            qWarning("Kern: obs_status ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_obsStatus = info;
+        emit obsStatusChanged();
     } else if (type == QLatin1String(msg::kBrowserSource)) {
         BrowserSourceInfo info;
         if (!parseBrowserSource(message, &info, &error)) {
@@ -558,6 +566,10 @@ void CoreClient::clearData()
     if (m_serverStatus) {
         m_serverStatus.reset();
         emit serverStatusChanged();
+    }
+    if (m_obsStatus) {
+        m_obsStatus.reset();
+        emit obsStatusChanged();
     }
     m_mediaList = MediaListData();
     emit mediaListChanged();

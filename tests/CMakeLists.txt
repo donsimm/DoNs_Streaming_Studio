@@ -64,6 +64,7 @@ if(DSS_BUILD_CLI)
 endif()
 add_dependencies(tst_sperre dss-core)
 dss_add_test(tst_kernverbindung)
+target_link_libraries(tst_kernverbindung PRIVATE dss_obs) # P10c: Testserver von OBS
 target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
 add_dependencies(tst_kernverbindung dss-core)

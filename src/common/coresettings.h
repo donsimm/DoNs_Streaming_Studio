@@ -25,6 +25,12 @@
 //   [overlay-server]
 //   port=8081
 //   adresse-im-heimnetz=192.168.1.9
+//   [obs]
+//   aktiv=nein
+//   adresse=192.168.1.116
+//   port=4455
+//
+// Das Passwort von OBS steht nie hier, sondern verschlüsselt in obs-passwort.cred (P10c, Regel 12).
 //
 // Quellen:
 //   QSaveFile: https://doc.qt.io/qt-6.8/qsavefile.html
@@ -43,13 +49,33 @@ namespace dss {
 // ausgehender Verbindungen vergibt; ein Port dort kann beim Start des Servers zufällig belegt sein.
 inline constexpr int kPortMin = 1024;
 inline constexpr int kPortMax = 32767;
+// P10c: Port von obs-websocket auf dem Streaming-PC; dort gelten die Grenzen dieses PCs nicht.
+inline constexpr int kObsPortMin = 1;
+inline constexpr int kObsPortMax = 65535;
+inline constexpr int kObsDefaultPort = 4455;
 
 struct CoreSettings
 {
     int port = 0;
     QString homeAddress; // IPv4 mit Punkten, leer = nicht gesetzt
+    // P10c, Abschnitt [obs]: standardmässig aus. Fehlt der Abschnitt, gelten diese Werte.
+    bool obsEnabled = false;
+    QString obsHost = {};
+    int obsPort = kObsDefaultPort;
 
     bool operator==(const CoreSettings &) const = default;
+};
+
+// Änderung einzelner Werte; nur angegebene ändern sich.
+struct CoreSettingsChange
+{
+    std::optional<int> port;
+    std::optional<QString> homeAddress;
+    std::optional<bool> obsEnabled;
+    std::optional<QString> obsHost;
+    std::optional<int> obsPort;
+
+    bool isEmpty() const { return !port && !homeAddress && !obsEnabled && !obsHost && !obsPort; }
 };
 
 // Standard: Port 8080 im Einsatz, 8081 in Arbeit (Entscheid 2026-11-03), Adresse leer.
@@ -64,9 +90,16 @@ QString validatePort(int port);
 // Sonst vier Zahlen 0 bis 255 mit Punkten, ohne führende Nullen; nicht 0.0.0.0, nicht
 // 127.x.x.x, nicht Multicast (224 bis 239) und nicht reserviert (ab 240, auch 255.255.255.255).
 QString validateHomeAddress(const QString &address);
+// P10c: eigene Prüfung für OBS, weil validateHomeAddress 127.x ausschliesst und dort nur Adressen
+// dieses PCs gelten. Leer ist erlaubt (nur solange die Verbindung aus ist), sonst ein Rechnername
+// oder eine IPv4-Adresse: Buchstaben, Ziffern, Punkt, Bindestrich.
+QString validateObsHost(const QString &host);
+QString validateObsPort(int port);
+// Passen die Werte zusammen? Eingeschaltet braucht es eine Adresse.
+QString validateObsCombination(bool enabled, const QString &host);
 
 // Text der Datei lesen bzw. schreiben. Fehlende Angaben gelten mit dem Standardwert; eine
-// unbekannte Angabe, ein Abschnitt ausser [overlay-server], eine doppelte Angabe oder ein
+// unbekannte Angabe, ein Abschnitt ausser [overlay-server] und [obs], eine doppelte Angabe oder ein
 // ungültiger Wert machen die Datei ungültig (false mit Meldung).
 bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, CoreSettings *settings,
                        QString *error);
@@ -119,6 +152,10 @@ public:
     // Adresse gehört nicht zu diesem PC (Punkt 78), Datei ungültig oder nicht schreibbar; dann
     // gilt der alte Stand.
     bool change(std::optional<int> port, std::optional<QString> homeAddress, QString *error);
+    bool change(const CoreSettingsChange &change, QString *error);
+    // P10c: Prüft wie change(), ändert nichts. Leer = gültig. Das Passwort wird zuerst verschlüsselt,
+    // die Einstellungen danach geändert; eine Abweisung muss also vorher feststehen.
+    QString checkChange(const CoreSettingsChange &change) const;
 
     // Punkt 77: nur bei ungültiger Datei. Benennt sie in invalidSettingsPath(path, now) um,
     // schreibt eine neue mit den Standardwerten und trägt die Adresse im Heimnetz wieder aus der
@@ -132,6 +169,8 @@ public:
     bool fillMissingHomeAddress(QStringList *log);
 
 private:
+    // Neuer Stand aus der Änderung; std::nullopt mit Meldung, wenn sie abgewiesen wird.
+    std::optional<CoreSettings> applied(const CoreSettingsChange &change, QString *error) const;
     bool write(const CoreSettings &settings, QString *error);
     // Adresse aus der Standardroute in *settings eintragen (Protokollzeile bzw. Warnung).
     bool fillHomeAddress(CoreSettings *settings, QStringList *log, QStringList *warnings);

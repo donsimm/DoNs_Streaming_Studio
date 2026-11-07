@@ -1,6 +1,6 @@
 # dss-core: Kern (Hintergrundprogramm), ohne Fenster
 qt_add_executable(dss-core main.cpp coreservice.h coreservice.cpp)
-target_link_libraries(dss-core PRIVATE dss_common dss_warnings Qt6::Network)
+target_link_libraries(dss-core PRIVATE dss_common dss_obs dss_warnings Qt6::Network)
 # Watchdog von systemd (P10a, Punkt 41, Schalter DSS_CORE_WATCHDOG)
 target_compile_definitions(dss-core PRIVATE DSS_CORE_WATCHDOG=$<BOOL:${DSS_CORE_WATCHDOG}>
   DSS_CORE_IMPORT_THREAD=$<BOOL:${DSS_CORE_IMPORT_THREAD}>)

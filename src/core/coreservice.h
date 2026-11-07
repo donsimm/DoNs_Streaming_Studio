@@ -21,6 +21,10 @@ class QTimer;
 namespace dss {
 class OverlayServer;
 }
+namespace dss::obs {
+class ObsConnection;
+class ObsSecretStore;
+}
 
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
 // Verbindungen von Fenstern über einen Unix-Socket an und verteilt Overlays, Leistungswerte
@@ -56,6 +60,11 @@ public:
     // mit Port und Adresse aus den Einstellungen und hält ihn danach auf dem Stand (Änderungen,
     // neuer Token, neue Einstellungen). Ohne Aufruf: kein Server (server_status enabled false).
     void setOverlayServer(dss::OverlayServer *server);
+
+    // Verbindung zu OBS (P10c, T-05). Alle connect zu ObsConnection stehen hier (Plan P10c, 1.5a);
+    // Logik zu OBS gehört nach src/obs/. Verbindet sich mit den Werten aus den Einstellungen und hält
+    // sie danach auf dem Stand. Ohne Aufruf: OBS bleibt «off».
+    void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets);
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -133,7 +142,13 @@ private:
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
+    // P10c: zweiter Teil von handleSettingsUpdate, wenn das Passwort geschrieben ist.
+    void finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged);
     void handleSettingsReset(QLocalSocket *socket, const QJsonObject &message);
+    // P10c: Werte aus den Einstellungen an die Verbindung zu OBS.
+    void applyObsSettings(bool passwordChanged = false);
+    QJsonObject obsStatusMessage() const;
+    void onObsChanged();
     // Einstellungen geändert: settings an alle, Adressen der Browserquellen, Server neu.
     void settingsApplied();
     void onSaveRequested();
@@ -149,6 +164,8 @@ private:
     QString m_socketPath;
     dss::CoreSettingsStore *m_settings = nullptr;
     dss::OverlayServer *m_overlayServer = nullptr;
+    dss::obs::ObsConnection *m_obs = nullptr;
+    dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;
     QTimer *m_statsTimer = nullptr;

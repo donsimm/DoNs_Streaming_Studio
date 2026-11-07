@@ -9,6 +9,7 @@
 #include "browsersource.h"
 #include "coreclient.h"
 #include "coresettings.h"
+#include "obstestserver.h"
 #include "overlayjson.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
@@ -188,7 +189,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 10); // seit P10b (Medien)
+        QCOMPARE(c->coreHello().protocolVersion, 11); // seit P10b (Medien)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -393,7 +394,15 @@ private slots:
              QStringLiteral("Adresse «192.168.1» ungültig")},
             {"{\"type\":\"update_settings\",\"request_id\":4,\"port\":9000,\"home_address\":\"127.0.0.1\"}",
              QStringLiteral("keine Adresse im Heimnetz")},
-            {"{\"type\":\"update_settings\",\"request_id\":5}", QStringLiteral("ohne port und home_address")},
+            {"{\"type\":\"update_settings\",\"request_id\":5}", QStringLiteral("update_settings ohne Wert")},
+            // P10c: Verbindung zu OBS
+            {"{\"type\":\"update_settings\",\"request_id\":9,\"obs_enabled\":true,\"obs_host\":\"\"}",
+             QStringLiteral("braucht die Adresse von OBS")},
+            {"{\"type\":\"update_settings\",\"request_id\":10,\"obs_host\":\"a b\"}", QStringLiteral("Adresse von OBS")},
+            {"{\"type\":\"update_settings\",\"request_id\":11,\"obs_port\":70000}", QStringLiteral("Port von OBS 70000")},
+            // Ungültiges neben einem Passwort: abgewiesen, bevor das Passwort geschrieben wird
+            {"{\"type\":\"update_settings\",\"request_id\":12,\"obs_port\":0,\"obs_password\":\"nur-ein-testwert\"}",
+             QStringLiteral("Port von OBS 0")},
             // P10, Punkt 78: 192.0.2.1 (Beispielnetz nach RFC 5737) gehört nie zu diesem PC
             {"{\"type\":\"update_settings\",\"request_id\":7,\"port\":9000,\"home_address\":\"192.0.2.1\"}",
              QStringLiteral("192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: ")},
@@ -479,6 +488,136 @@ private slots:
         QCOMPARE(cli.exitCode, 4);
         QVERIFY2(cli.err.contains(QStringLiteral("ändert nur der Kern")), qPrintable(cli.err));
 #endif
+    }
+
+    // P10c, T-05: Der Kern verbindet sich mit dem Testserver auf 127.0.0.1 (nie mit dem echten OBS).
+    // Zustand und Szene kommen bei allen Fenstern an, auch bei später verbundenen. Passwort und
+    // Token bleiben aus der Ausgabe des Kerns (Regel 12). Eigener Kern, eigener Ordner.
+    void obsConnection()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("o.sock"));
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+
+        const auto clientOf = [&socket]() {
+            CoreClient::Options o;
+            o.socketPath = socket;
+            o.program = QStringLiteral("tst_kernverbindung");
+            o.version = version();
+            o.reconnectIntervalMs = 200;
+            auto c = std::make_unique<CoreClient>(o);
+            c->start();
+            return c;
+        };
+        const auto stateOf = [](const CoreClient &c) { return c.connectionStates().value(Connection::Obs); };
+        std::unique_ptr<CoreClient> one = clientOf();
+        std::unique_ptr<CoreClient> two = clientOf();
+        QTRY_VERIFY(one->obsStatus().has_value());
+        QTRY_VERIFY(two->obsStatus().has_value());
+        // Standardmässig aus: grau und nichts verbunden
+        QCOMPARE(stateOf(*one), ConnectionState::Off);
+        QVERIFY(one->obsStatus()->currentScene.name.isEmpty());
+        one->requestSettings();
+        QTRY_VERIFY(one->settings().has_value());
+        QCOMPARE(one->settings()->settings.obsEnabled, false);
+        QCOMPARE(one->settings()->obsPasswordSet, false);
+
+        testhelp::ObsTestServer server;
+        const QString password = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        server.password = password;
+        QVERIFY(server.start());
+
+        QSignalSpy answered(one.get(), &CoreClient::settingsUpdateFinished);
+        SettingsUpdate update;
+        update.obsEnabled = true;
+        update.obsHost = QStringLiteral("127.0.0.1");
+        update.obsPort = server.port();
+        update.obsPassword = password;
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE_WITH_TIMEOUT(answered.size(), 1, 10000);
+        QVERIFY2(answered.first().first().value<ChangeResult>().ok,
+                 qPrintable(answered.first().first().value<ChangeResult>().message));
+        QTRY_VERIFY(one->settings() && one->settings()->obsPasswordSet);
+        QTRY_VERIFY(two->settings() && two->settings()->settings.obsEnabled);
+        QCOMPARE(two->settings()->settings.obsHost, QStringLiteral("127.0.0.1"));
+
+        // Verschlüsselt neben kern.ini, nicht im Klartext
+        const QString dir = config.filePath(QFileInfo(coreSettingsPath()).dir().dirName());
+        QFile cred(dir + QStringLiteral("/obs-passwort.cred"));
+        QVERIFY(cred.open(QIODevice::ReadOnly));
+        QVERIFY(!cred.readAll().contains(password.toUtf8()));
+        QFile ini(dir + QStringLiteral("/kern.ini"));
+        QVERIFY(ini.open(QIODevice::ReadOnly));
+        const QByteArray iniText = ini.readAll();
+        QVERIFY2(!iniText.contains(password.toUtf8()), iniText.constData());
+        QVERIFY2(iniText.contains("aktiv=ja"), iniText.constData());
+
+        QTRY_COMPARE_WITH_TIMEOUT(stateOf(*one), ConnectionState::Connected, 10000);
+        QTRY_COMPARE(stateOf(*two), ConnectionState::Connected);
+        QTRY_COMPARE(one->obsStatus()->currentScene.name, QStringLiteral("Live"));
+        QTRY_COMPARE(two->obsStatus()->currentScene.name, QStringLiteral("Live"));
+        QCOMPARE(one->obsStatus()->message, QString());
+
+        // Wechsel der aktuellen Szene erreicht alle Fenster
+        server.switchScene(server.scenes.at(1));
+        QTRY_COMPARE(one->obsStatus()->currentScene.name, QStringLiteral("Pause"));
+        QTRY_COMPARE(two->obsStatus()->currentScene.name, QStringLiteral("Pause"));
+
+        // Später verbunden: Stand kommt direkt nach hello
+        std::unique_ptr<CoreClient> late = clientOf();
+        QTRY_VERIFY(late->obsStatus().has_value());
+        QTRY_COMPARE(stateOf(*late), ConnectionState::Connected);
+        QCOMPARE(late->obsStatus()->currentScene.name, QStringLiteral("Pause"));
+
+        // Falsches Passwort: rot mit Meldung, kein neuer Versuch ohne Zutun (Close-Code 4009)
+        const int attempts = server.connectionCount();
+        server.password = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        server.closeClients(4000);
+        QTRY_COMPARE_WITH_TIMEOUT(stateOf(*one), ConnectionState::Error, 10000);
+        QTRY_VERIFY(one->obsStatus()->message.contains(QStringLiteral("Passwort abgelehnt")));
+        QTest::qWait(2500);
+        const int afterRejection = server.connectionCount();
+        QVERIFY(afterRejection > attempts);
+        QTest::qWait(2500);
+        QCOMPARE(server.connectionCount(), afterRejection);
+
+        // «OK» mit gleichen Werten versucht es wieder (Plan 1.7): hier neues Passwort
+        answered.clear();
+        update = SettingsUpdate();
+        update.obsPassword = server.password;
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE_WITH_TIMEOUT(answered.size(), 1, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(stateOf(*one), ConnectionState::Connected, 10000);
+
+        // Abschalten: grau, keine Einzelheiten mehr
+        answered.clear();
+        update = SettingsUpdate();
+        update.obsEnabled = false;
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(answered.size(), 1);
+        QTRY_COMPARE(stateOf(*two), ConnectionState::Off);
+        QTRY_VERIFY(two->obsStatus()->currentScene.name.isEmpty());
+
+        // Passwort löschen: Datei weg, obs_password_set an alle
+        answered.clear();
+        update = SettingsUpdate();
+        update.obsPassword = QString();
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(answered.size(), 1);
+        QTRY_VERIFY(two->settings() && !two->settings()->obsPasswordSet);
+        QVERIFY(!QFile::exists(cred.fileName()));
+
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        log += QString::fromUtf8(core->readAllStandardOutput());
+        log += QString::fromUtf8(core->readAllStandardError());
+        QVERIFY2(!log.contains(password), qPrintable(log));
+        QVERIFY2(!log.contains(server.password), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("OBS: Passwort verschlüsselt gespeichert")), qPrintable(log));
     }
 
     // P10, Punkt 77: ungültige kern.ini über reset_settings zurücksetzen (eigener Kern mit eigener

@@ -1080,6 +1080,11 @@ QJsonObject settingsMessage(const SettingsInfo &info)
     o.insert(QStringLiteral("file"), info.file);
     o.insert(QStringLiteral("settings_error"),
              info.error.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(info.error));
+    // P10c
+    o.insert(QStringLiteral("obs_enabled"), info.settings.obsEnabled);
+    o.insert(QStringLiteral("obs_host"), info.settings.obsHost);
+    o.insert(QStringLiteral("obs_port"), info.settings.obsPort);
+    o.insert(QStringLiteral("obs_password_set"), info.obsPasswordSet);
     return o;
 }
 
@@ -1091,7 +1096,11 @@ bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *erro
         || !requireString(message, QStringLiteral("home_address"), &i.settings.homeAddress, error)
         || !requireIntField(message, QStringLiteral("port_min"), 0, maxPort, &i.portMin, error)
         || !requireIntField(message, QStringLiteral("port_max"), 0, maxPort, &i.portMax, error)
-        || !requireString(message, QStringLiteral("file"), &i.file, error))
+        || !requireString(message, QStringLiteral("file"), &i.file, error)
+        || !requireBool(message, QStringLiteral("obs_enabled"), &i.settings.obsEnabled, error)
+        || !requireString(message, QStringLiteral("obs_host"), &i.settings.obsHost, error)
+        || !requireIntField(message, QStringLiteral("obs_port"), 0, maxPort, &i.settings.obsPort, error)
+        || !requireBool(message, QStringLiteral("obs_password_set"), &i.obsPasswordSet, error))
         return false;
     const QJsonValue e = message.value(QStringLiteral("settings_error"));
     if (e.isString()) {
@@ -1116,6 +1125,14 @@ QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
         o.insert(QStringLiteral("port"), *update.port);
     if (update.homeAddress)
         o.insert(QStringLiteral("home_address"), *update.homeAddress);
+    if (update.obsEnabled)
+        o.insert(QStringLiteral("obs_enabled"), *update.obsEnabled);
+    if (update.obsHost)
+        o.insert(QStringLiteral("obs_host"), *update.obsHost);
+    if (update.obsPort)
+        o.insert(QStringLiteral("obs_port"), *update.obsPort);
+    if (update.obsPassword)
+        o.insert(QStringLiteral("obs_password"), *update.obsPassword);
     return o;
 }
 
@@ -1150,11 +1167,99 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
             return false;
         u.homeAddress = address;
     }
-    if (!u.port && !u.homeAddress) {
-        *error = QStringLiteral("update_settings ohne port und home_address");
+    if (message.contains(QStringLiteral("obs_enabled"))) {
+        bool enabled = false;
+        if (!requireBool(message, QStringLiteral("obs_enabled"), &enabled, error))
+            return false;
+        u.obsEnabled = enabled;
+    }
+    if (message.contains(QStringLiteral("obs_host"))) {
+        QString host;
+        if (!requireString(message, QStringLiteral("obs_host"), &host, error))
+            return false;
+        u.obsHost = host;
+    }
+    if (message.contains(QStringLiteral("obs_port"))) {
+        int port = 0;
+        if (!requireIntField(message, QStringLiteral("obs_port"), std::numeric_limits<int>::min(),
+                             std::numeric_limits<int>::max(), &port, error))
+            return false;
+        u.obsPort = port;
+    }
+    if (message.contains(QStringLiteral("obs_password"))) {
+        QString password;
+        if (!requireString(message, QStringLiteral("obs_password"), &password, error))
+            return false;
+        u.obsPassword = password;
+    }
+    if (!u.port && !u.homeAddress && !u.obsEnabled && !u.obsHost && !u.obsPort && !u.obsPassword) {
+        *error = QStringLiteral("update_settings ohne Wert");
         return false;
     }
     *update = u;
+    return true;
+}
+
+QJsonObject obsStatusMessage(const ObsStatusInfo &info)
+{
+    const auto sceneObject = [](const ObsSceneInfo &s) {
+        return QJsonObject{{QStringLiteral("uuid"), s.uuid}, {QStringLiteral("name"), s.name}};
+    };
+    const auto optional = [](const QString &text) {
+        return text.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(text);
+    };
+    QJsonObject o = typed(msg::kObsStatus);
+    o.insert(QStringLiteral("message"), optional(info.message));
+    o.insert(QStringLiteral("obs_version"), optional(info.obsVersion));
+    o.insert(QStringLiteral("websocket_version"), optional(info.websocketVersion));
+    o.insert(QStringLiteral("current_scene"), info.currentScene.name.isEmpty()
+                                                  ? QJsonValue(QJsonValue::Null)
+                                                  : QJsonValue(sceneObject(info.currentScene)));
+    QJsonArray scenes;
+    for (const ObsSceneInfo &s : info.scenes)
+        scenes.append(sceneObject(s));
+    o.insert(QStringLiteral("scenes"), scenes);
+    return o;
+}
+
+bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *error)
+{
+    ObsStatusInfo i;
+    for (const auto &[key, value] : {std::pair{QStringLiteral("message"), &i.message},
+                                     std::pair{QStringLiteral("obs_version"), &i.obsVersion},
+                                     std::pair{QStringLiteral("websocket_version"), &i.websocketVersion}}) {
+        const QJsonValue v = message.value(key);
+        if (v.isString()) {
+            *value = v.toString();
+        } else if (!v.isNull()) {
+            *error = QStringLiteral("Feld %1 fehlt oder ist weder Text noch null").arg(key);
+            return false;
+        }
+    }
+    const auto parseScene = [error](const QJsonObject &o, ObsSceneInfo *scene) {
+        return requireString(o, QStringLiteral("uuid"), &scene->uuid, error)
+               && requireString(o, QStringLiteral("name"), &scene->name, error);
+    };
+    const QJsonValue current = message.value(QStringLiteral("current_scene"));
+    if (current.isObject()) {
+        if (!parseScene(current.toObject(), &i.currentScene))
+            return false;
+    } else if (!current.isNull()) {
+        *error = QStringLiteral("Feld current_scene fehlt oder ist weder Objekt noch null");
+        return false;
+    }
+    if (!message.value(QStringLiteral("scenes")).isArray()) {
+        *error = QStringLiteral("Feld scenes fehlt oder ist keine Liste");
+        return false;
+    }
+    const QJsonArray scenes = message.value(QStringLiteral("scenes")).toArray();
+    for (const QJsonValue &v : scenes) {
+        ObsSceneInfo scene;
+        if (!parseScene(v.toObject(), &scene))
+            return false;
+        i.scenes.append(scene);
+    }
+    *info = i;
     return true;
 }
 

@@ -10,6 +10,8 @@
 #include "datalock.h"
 #include "logging.h"
 #include "mediaimport.h"
+#include "obsconnection.h"
+#include "obssecretstore.h"
 #include "overlaystore.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
@@ -25,6 +27,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QTextStream>
 #include <QTimer>
 
@@ -256,6 +259,15 @@ int main(int argc, char *argv[])
     dss::OverlayServer overlayServer(&store, serverOptions);
     service.setOverlayServer(&overlayServer);
 #endif
+
+    // Verbindung zu OBS (P10c): standardmässig aus (kern.ini, Abschnitt [obs]). Das Passwort liegt
+    // verschlüsselt neben kern.ini, je Version getrennt.
+    dss::obs::ObsSecretStore obsSecrets(QFileInfo(settings.path()).absolutePath()
+                                        + QStringLiteral("/obs-passwort.cred"));
+    dss::obs::ObsConnection obsConnection([&obsSecrets](const dss::obs::ObsConnection::PasswordDone &done) {
+        obsSecrets.read(done);
+    });
+    service.setObsConnection(&obsConnection, &obsSecrets);
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,
                      [](int signalNumber) {

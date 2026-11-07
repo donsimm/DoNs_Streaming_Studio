@@ -18,6 +18,13 @@ namespace {
 constexpr char kSection[] = "overlay-server";
 constexpr char kPortKey[] = "port";
 constexpr char kAddressKey[] = "adresse-im-heimnetz";
+// P10c: Verbindung zu OBS
+constexpr char kObsSection[] = "obs";
+constexpr char kObsEnabledKey[] = "aktiv";
+constexpr char kObsHostKey[] = "adresse";
+constexpr char kObsPortKey[] = "port";
+constexpr char kYes[] = "ja";
+constexpr char kNo[] = "nein";
 
 } // namespace
 
@@ -63,6 +70,30 @@ QString validateHomeAddress(const QString &address)
     return {};
 }
 
+QString validateObsHost(const QString &host)
+{
+    static const QRegularExpression form(QStringLiteral("\\A[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?\\z"));
+    if (!host.isEmpty() && !form.match(host).hasMatch())
+        return QStringLiteral("Adresse von OBS «%1» ungültig, erwartet ist eine Adresse wie 192.168.1.116.")
+            .arg(host);
+    return {};
+}
+
+QString validateObsPort(int port)
+{
+    if (port < kObsPortMin || port > kObsPortMax)
+        return QStringLiteral("Port von OBS %1 ungültig, erlaubt sind %2 bis %3.")
+            .arg(port).arg(kObsPortMin).arg(kObsPortMax);
+    return {};
+}
+
+QString validateObsCombination(bool enabled, const QString &host)
+{
+    if (enabled && host.isEmpty())
+        return QStringLiteral("«Mit OBS verbinden» braucht die Adresse von OBS.");
+    return {};
+}
+
 bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, CoreSettings *settings,
                        QString *error)
 {
@@ -80,7 +111,7 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
             continue;
         if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']'))) {
             section = line.mid(1, line.size() - 2).trimmed();
-            if (section != QLatin1String(kSection))
+            if (section != QLatin1String(kSection) && section != QLatin1String(kObsSection))
                 return fail(QStringLiteral("unbekannter Abschnitt [%1]").arg(section));
             continue;
         }
@@ -91,10 +122,30 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         const QString value = line.mid(eq + 1).trimmed();
         if (section.isEmpty())
             return fail(QStringLiteral("«%1» steht vor [%2]").arg(key, QLatin1String(kSection)));
-        if (seen.contains(key))
+        if (seen.contains(section + QLatin1Char('/') + key))
             return fail(QStringLiteral("«%1» doppelt").arg(key));
-        seen.insert(key);
-        if (key == QLatin1String(kPortKey)) {
+        seen.insert(section + QLatin1Char('/') + key);
+        if (section == QLatin1String(kObsSection)) {
+            if (key == QLatin1String(kObsEnabledKey)) {
+                if (value != QLatin1String(kYes) && value != QLatin1String(kNo))
+                    return fail(QStringLiteral("«%1» muss ja oder nein sein, nicht «%2»").arg(key, value));
+                s.obsEnabled = value == QLatin1String(kYes);
+            } else if (key == QLatin1String(kObsHostKey)) {
+                if (const QString e = validateObsHost(value); !e.isEmpty())
+                    return fail(e);
+                s.obsHost = value;
+            } else if (key == QLatin1String(kObsPortKey)) {
+                bool number = false;
+                const int port = value.toInt(&number);
+                if (!number)
+                    return fail(QStringLiteral("Port von OBS «%1» ist keine ganze Zahl").arg(value));
+                if (const QString e = validateObsPort(port); !e.isEmpty())
+                    return fail(e);
+                s.obsPort = port;
+            } else {
+                return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
+            }
+        } else if (key == QLatin1String(kPortKey)) {
             bool number = false;
             const int port = value.toInt(&number);
             if (!number)
@@ -110,6 +161,10 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
             return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
         }
     }
+    if (const QString e = validateObsCombination(s.obsEnabled, s.obsHost); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
     *settings = s;
     return true;
 }
@@ -122,10 +177,16 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# port: Port des Overlay-Servers (" + QByteArray::number(kPortMin) + " bis "
             + QByteArray::number(kPortMax) + ").\n"
             "# adresse-im-heimnetz: IPv4-Adresse des Studio-PCs im Heimnetz; leer = beim nächsten\n"
-            "# Start aus der Standardroute eintragen.\n";
+            "# Start aus der Standardroute eintragen.\n"
+            "# [obs]: aktiv ja oder nein, Adresse und Port von obs-websocket auf dem Streaming-PC. Das\n"
+            "# Passwort steht nicht hier, sondern verschlüsselt in obs-passwort.cred.\n";
     text += '[' + QByteArray(kSection) + "]\n";
     text += QByteArray(kPortKey) + '=' + QByteArray::number(settings.port) + '\n';
     text += QByteArray(kAddressKey) + '=' + settings.homeAddress.toUtf8() + '\n';
+    text += '[' + QByteArray(kObsSection) + "]\n";
+    text += QByteArray(kObsEnabledKey) + '=' + (settings.obsEnabled ? kYes : kNo) + '\n';
+    text += QByteArray(kObsHostKey) + '=' + settings.obsHost.toUtf8() + '\n';
+    text += QByteArray(kObsPortKey) + '=' + QByteArray::number(settings.obsPort) + '\n';
     return text;
 }
 
@@ -259,43 +320,71 @@ void CoreSettingsStore::load(QStringList *log, QStringList *warnings)
 bool CoreSettingsStore::change(std::optional<int> port, std::optional<QString> homeAddress,
                                QString *error)
 {
-    if (!m_fileError.isEmpty()) {
-        *error = QStringLiteral("Einstellungen nicht änderbar: %1. «Auf Standardwerte zurücksetzen» "
-                                "oder die Datei von Hand reparieren.").arg(m_fileError);
-        return false;
-    }
-    if (!port && !homeAddress) {
-        *error = QStringLiteral("Keine Einstellung angegeben.");
-        return false;
-    }
+    return change(CoreSettingsChange{port, homeAddress, {}, {}, {}}, error);
+}
+
+std::optional<CoreSettings> CoreSettingsStore::applied(const CoreSettingsChange &change, QString *error) const
+{
+    const auto fail = [error](const QString &message) {
+        *error = message;
+        return std::optional<CoreSettings>();
+    };
+    if (!m_fileError.isEmpty())
+        return fail(QStringLiteral("Einstellungen nicht änderbar: %1. «Auf Standardwerte zurücksetzen» "
+                                   "oder die Datei von Hand reparieren.").arg(m_fileError));
+    if (change.isEmpty())
+        return fail(QStringLiteral("Keine Einstellung angegeben."));
     CoreSettings next = m_settings;
-    if (port) {
-        if (const QString e = validatePort(*port); !e.isEmpty()) {
-            *error = e;
-            return false;
-        }
-        next.port = *port;
+    if (change.port) {
+        if (const QString e = validatePort(*change.port); !e.isEmpty())
+            return fail(e);
+        next.port = *change.port;
     }
-    if (homeAddress) {
-        if (const QString e = validateHomeAddress(*homeAddress); !e.isEmpty()) {
-            *error = e;
-            return false;
-        }
+    if (change.homeAddress) {
+        if (const QString e = validateHomeAddress(*change.homeAddress); !e.isEmpty())
+            return fail(e);
         // Punkt 78: nur eine Adresse, die eine Netzwerkkarte dieses PCs gerade hat (die
         // bisherige darf bleiben, auch wenn das Kabel gerade fehlt).
-        if (*homeAddress != m_settings.homeAddress) {
-            if (const QString e = checkLocalAddress(*homeAddress, m_localAddresses()); !e.isEmpty()) {
-                *error = e;
-                return false;
-            }
+        if (*change.homeAddress != m_settings.homeAddress) {
+            if (const QString e = checkLocalAddress(*change.homeAddress, m_localAddresses()); !e.isEmpty())
+                return fail(e);
         }
-        next.homeAddress = *homeAddress;
+        next.homeAddress = *change.homeAddress;
     }
-    if (next == m_settings)
-        return true;
-    if (!write(next, error))
+    if (change.obsHost) {
+        if (const QString e = validateObsHost(*change.obsHost); !e.isEmpty())
+            return fail(e);
+        next.obsHost = *change.obsHost;
+    }
+    if (change.obsPort) {
+        if (const QString e = validateObsPort(*change.obsPort); !e.isEmpty())
+            return fail(e);
+        next.obsPort = *change.obsPort;
+    }
+    if (change.obsEnabled)
+        next.obsEnabled = *change.obsEnabled;
+    if (const QString e = validateObsCombination(next.obsEnabled, next.obsHost); !e.isEmpty())
+        return fail(e);
+    return next;
+}
+
+QString CoreSettingsStore::checkChange(const CoreSettingsChange &change) const
+{
+    QString error;
+    applied(change, &error);
+    return error;
+}
+
+bool CoreSettingsStore::change(const CoreSettingsChange &change, QString *error)
+{
+    const std::optional<CoreSettings> next = applied(change, error);
+    if (!next)
         return false;
-    m_settings = next;
+    if (*next == m_settings)
+        return true;
+    if (!write(*next, error))
+        return false;
+    m_settings = *next;
     return true;
 }
 

@@ -40,8 +40,10 @@ namespace dss {
 // 10 seit P10b: Medienliste (get_media_list, media_list, import_progress), Änderungen der
 //   Medien (add_media, rename_media, …, cancel_import), add_image_source und add_video_source
 //   mit Lage (center_x, center_y, insert_index), Codes canceled und in_use
+// 11 seit P10c: Verbindung zu OBS (obs_status, obs_sources, obs_create_source, obs_add_to_scene,
+//   settings und update_settings mit obs_*, Codes obs_*)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 10;
+inline constexpr int kProtocolVersion = 11;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -109,6 +111,8 @@ inline constexpr char kRemoveMediaFolder[] = "remove_media_folder";
 inline constexpr char kMoveMediaFolder[] = "move_media_folder";
 inline constexpr char kSetMediaFolderExpanded[] = "set_media_folder_expanded";
 inline constexpr char kCancelImport[] = "cancel_import";
+// P10c: Verbindung zu OBS
+inline constexpr char kObsStatus[] = "obs_status";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -314,6 +318,8 @@ struct SettingsInfo
     int portMax = kPortMax;
     QString file;  // Pfad von kern.ini
     QString error; // Datei ungültig (Änderungen werden abgewiesen); leer, wenn gültig
+    // P10c: Das Fenster erfährt nur, ob ein Passwort gespeichert ist, nie das Passwort (Regel 12).
+    bool obsPasswordSet = false;
 
     bool operator==(const SettingsInfo &) const = default;
 };
@@ -327,6 +333,12 @@ struct SettingsUpdate
     qint64 requestId = 0;
     std::optional<int> port;
     std::optional<QString> homeAddress;
+    // P10c: Verbindung zu OBS. obsPassword: fehlt = behalten, leer = löschen, sonst neu. Der Kern
+    // schickt es nie zurück und schreibt es nie ins Protokoll (Regel 12).
+    std::optional<bool> obsEnabled;
+    std::optional<QString> obsHost;
+    std::optional<int> obsPort;
+    std::optional<QString> obsPassword;
 
     bool operator==(const SettingsUpdate &) const = default;
 };
@@ -365,6 +377,28 @@ struct ServerStatusInfo
 };
 QJsonObject serverStatusMessage(const ServerStatusInfo &info);
 bool parseServerStatus(const QJsonObject &message, ServerStatusInfo *info, QString *error);
+
+// obs_status (P10c, T-05): Einzelheiten der Verbindung zu OBS, nach hello und nach jeder Änderung an
+// alle. Der Zustand selbst (Farbe des Knopfes) steht in connections. Ohne Adresse und ohne Passwort.
+struct ObsSceneInfo
+{
+    QString uuid;
+    QString name;
+
+    bool operator==(const ObsSceneInfo &) const = default;
+};
+struct ObsStatusInfo
+{
+    QString message;            // Beschreibung des Zustands auf Deutsch; leer, wenn verbunden
+    QString obsVersion;         // leer, solange unbekannt
+    QString websocketVersion;
+    ObsSceneInfo currentScene;  // leer, solange nicht verbunden
+    QList<ObsSceneInfo> scenes; // Reihenfolge wie in OBS
+
+    bool operator==(const ObsStatusInfo &) const = default;
+};
+QJsonObject obsStatusMessage(const ObsStatusInfo &info);
+bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *error);
 
 // media_list (P10b, E-28): Namen und Ordner aller Mediendateien, nach hello, auf get_media_list
 // und nach jeder Änderung an alle.

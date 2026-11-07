@@ -92,6 +92,10 @@ public:
     // Zustand des Overlay-Servers (P10), nach hello und bei jeder Änderung; ohne Verbindung leer.
     std::optional<ServerStatusInfo> serverStatus() const { return m_serverStatus; }
 
+    // Einzelheiten der Verbindung zu OBS (P10c), nach hello und bei jeder Änderung; ohne Verbindung
+    // leer. Die Farbe des Knopfes steht in connectionStates().
+    std::optional<ObsStatusInfo> obsStatus() const { return m_obsStatus; }
+
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
@@ -146,6 +150,8 @@ signals:
     void browserSourceChanged();
     // serverStatus() hat sich geändert (P10).
     void serverStatusChanged();
+    // obsStatus() hat sich geändert (P10c).
+    void obsStatusChanged();
     // P10b: mediaList() bzw. imports() hat sich geändert.
     void mediaListChanged();
     void importProgressChanged();
@@ -192,6 +198,7 @@ private:
     QUuid m_browserSourceWanted;
     std::optional<BrowserSourceInfo> m_browserSource;
     std::optional<ServerStatusInfo> m_serverStatus;
+    std::optional<ObsStatusInfo> m_obsStatus;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;

@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 10); // seit P10b (Medien)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 11); // seit P10c (OBS)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -463,6 +463,73 @@ private slots:
         }
     }
 
+    // P10c: Einstellungen und Zustand von OBS
+    void obsMessages()
+    {
+        SettingsInfo info{{8081, QString()}, 1024, 32767, QStringLiteral("/tmp/kern.ini"), QString()};
+        info.settings.obsEnabled = true;
+        info.settings.obsHost = QStringLiteral("192.168.1.116");
+        info.settings.obsPort = 4456;
+        info.obsPasswordSet = true;
+        SettingsInfo backInfo;
+        QString error;
+        const QJsonObject settings = settingsMessage(info);
+        QVERIFY2(parseSettings(settings, &backInfo, &error), qPrintable(error));
+        QCOMPARE(backInfo, info);
+        for (const char *key : {"obs_enabled", "obs_host", "obs_port", "obs_password_set"}) {
+            QJsonObject bad = settings;
+            bad.remove(QLatin1String(key));
+            QVERIFY2(!parseSettings(bad, &backInfo, &error), key);
+        }
+
+        SettingsUpdate update;
+        update.requestId = 3;
+        update.obsEnabled = false;
+        update.obsHost = QStringLiteral("obs.local");
+        update.obsPort = 4455;
+        update.obsPassword = QString(); // leer = löschen, fehlt = behalten
+        SettingsUpdate parsed;
+        const QJsonObject sent = settingsUpdateMessage(update);
+        QVERIFY2(parseSettingsUpdate(sent, &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, update);
+        QVERIFY(sent.contains(QStringLiteral("obs_password")));
+        update = SettingsUpdate();
+        update.requestId = 4;
+        update.obsPort = 4455;
+        QVERIFY(!settingsUpdateMessage(update).contains(QStringLiteral("obs_password")));
+        QVERIFY(!parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                 {QStringLiteral("obs_enabled"), QStringLiteral("ja")}},
+                                     &parsed, &error));
+        QVERIFY(!parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                 {QStringLiteral("obs_password"), 5}},
+                                     &parsed, &error));
+
+        ObsStatusInfo status;
+        ObsStatusInfo backStatus;
+        QCOMPARE(QString::fromUtf8(encodeMessage(obsStatusMessage(status))),
+                 QStringLiteral("{\"current_scene\":null,\"message\":null,\"obs_version\":null,\"scenes\":[],"
+                                "\"type\":\"obs_status\",\"websocket_version\":null}\n"));
+        status.message = QStringLiteral("OBS nicht erreichbar");
+        QVERIFY2(parseObsStatus(obsStatusMessage(status), &backStatus, &error), qPrintable(error));
+        QCOMPARE(backStatus, status);
+        status = ObsStatusInfo();
+        status.obsVersion = QStringLiteral("33.0.1");
+        status.websocketVersion = QStringLiteral("5.7.6");
+        status.currentScene = {QStringLiteral("a"), QStringLiteral("Live")};
+        status.scenes = {{QStringLiteral("a"), QStringLiteral("Live")}, {QStringLiteral("b"), QStringLiteral("Pause")}};
+        QVERIFY2(parseObsStatus(obsStatusMessage(status), &backStatus, &error), qPrintable(error));
+        QCOMPARE(backStatus, status);
+        QJsonObject bad = obsStatusMessage(status);
+        bad.remove(QStringLiteral("scenes"));
+        QVERIFY(!parseObsStatus(bad, &backStatus, &error));
+        bad = obsStatusMessage(status);
+        bad.insert(QStringLiteral("current_scene"), 3);
+        QVERIFY(!parseObsStatus(bad, &backStatus, &error));
+        bad = obsStatusMessage(status);
+        bad.insert(QStringLiteral("message"), 3);
+        QVERIFY(!parseObsStatus(bad, &backStatus, &error));
+    }
+
     // P10-vor: Einstellungen des Kerns
     void settingsMessages()
     {
@@ -470,7 +537,9 @@ private slots:
                                 QStringLiteral("/tmp/kern.ini"), QString()};
         const QJsonObject o = settingsMessage(info);
         QCOMPARE(QString::fromUtf8(encodeMessage(o)),
-                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.9\",\"port\":8081,"
+                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.9\","
+                                "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
+                                "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
                                 "\"type\":\"settings\"}\n"));
         SettingsInfo back;

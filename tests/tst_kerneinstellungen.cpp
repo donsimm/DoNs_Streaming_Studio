@@ -157,6 +157,98 @@ private slots:
         QCOMPARE(s, defaults);
     }
 
+    // P10c: Abschnitt [obs]. Ohne Abschnitt bleibt OBS aus (Dateien von vor P10c).
+    void parseObs()
+    {
+        const CoreSettings defaults{8081, QString()};
+        CoreSettings s;
+        QString error;
+        QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
+        QCOMPARE(s.obsEnabled, false);
+        QCOMPARE(s.obsHost, QString());
+        QCOMPARE(s.obsPort, 4455);
+        // «port» gibt es in beiden Abschnitten; doppelt gilt je Abschnitt.
+        QVERIFY2(parseCoreSettings("[overlay-server]\nport=8090\n[obs]\naktiv=ja\nadresse=192.168.1.116\nport=4456\n",
+                                   defaults, &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.port, 8090);
+        QCOMPARE(s.obsEnabled, true);
+        QCOMPARE(s.obsHost, QStringLiteral("192.168.1.116"));
+        QCOMPARE(s.obsPort, 4456);
+        // Hin und zurück, auch mit Rechnername und 127.x (Tests, OBS auf demselben PC)
+        for (const QString &host : {QStringLiteral("127.0.0.1"), QStringLiteral("streaming-pc.local")}) {
+            CoreSettings written{8090, QString()};
+            written.obsEnabled = true;
+            written.obsHost = host;
+            written.obsPort = 65535;
+            QVERIFY2(parseCoreSettings(serializeCoreSettings(written), defaults, &s, &error), qPrintable(error));
+            QCOMPARE(s, written);
+        }
+        // Passwort steht nie in der Datei: keine solche Angabe
+        QVERIFY(!serializeCoreSettings({8090, QString()}).contains("passwort="));
+        QVERIFY(!parseCoreSettings("[obs]\npasswort=x\n", defaults, &s, &error));
+    }
+
+    void parseObsInvalid_data()
+    {
+        QTest::addColumn<QByteArray>("text");
+        QTest::addColumn<QString>("message");
+        QTest::newRow("aktiv") << QByteArray("[obs]\naktiv=vielleicht\n") << QStringLiteral("ja oder nein");
+        QTest::newRow("aktiv ohne Adresse") << QByteArray("[obs]\naktiv=ja\n") << QStringLiteral("braucht die Adresse");
+        QTest::newRow("Adresse") << QByteArray("[obs]\nadresse=a b\n") << QStringLiteral("Adresse von OBS «a b»");
+        QTest::newRow("Adresse mit Schema") << QByteArray("[obs]\nadresse=ws://x\n") << QStringLiteral("ungültig");
+        QTest::newRow("Port 0") << QByteArray("[obs]\nport=0\n") << QStringLiteral("Port von OBS 0");
+        QTest::newRow("Port zu gross") << QByteArray("[obs]\nport=65536\n") << QStringLiteral("Port von OBS 65536");
+        QTest::newRow("Port Text") << QByteArray("[obs]\nport=acht\n") << QStringLiteral("keine ganze Zahl");
+        QTest::newRow("doppelt") << QByteArray("[obs]\nport=1\nport=2\n") << QStringLiteral("«port» doppelt");
+        QTest::newRow("unbekannt") << QByteArray("[obs]\nhost=x\n") << QStringLiteral("unbekannte Angabe «host»");
+    }
+
+    void parseObsInvalid()
+    {
+        QFETCH(QByteArray, text);
+        QFETCH(QString, message);
+        CoreSettings s;
+        QString error;
+        QVERIFY(!parseCoreSettings(text, {8081, QString()}, &s, &error));
+        QVERIFY2(error.contains(message), qPrintable(error));
+    }
+
+    void changeObs()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QString(), QStringLiteral("keine Route"), &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QString error;
+        // Einschalten braucht eine Adresse; checkChange ändert nichts
+        CoreSettingsChange change;
+        change.obsEnabled = true;
+        QVERIFY(store.checkChange(change).contains(QStringLiteral("braucht die Adresse")));
+        QVERIFY(!store.change(change, &error));
+        QCOMPARE(store.settings().obsEnabled, false);
+        change.obsHost = QStringLiteral("192.168.1.116");
+        QVERIFY(store.checkChange(change).isEmpty());
+        QCOMPARE(store.settings().obsEnabled, false);
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().obsHost, QStringLiteral("192.168.1.116"));
+        QVERIFY(readFile(path).contains("aktiv=ja\nadresse=192.168.1.116\nport=4455\n"));
+        // Adresse leeren geht nur, wenn die Verbindung gleichzeitig aus ist
+        CoreSettingsChange clear;
+        clear.obsHost = QString();
+        QVERIFY(!store.change(clear, &error));
+        clear.obsEnabled = false;
+        QVERIFY2(store.change(clear, &error), qPrintable(error));
+        QVERIFY(store.checkChange(CoreSettingsChange{}).contains(QStringLiteral("Keine Einstellung")));
+        CoreSettingsChange port;
+        port.obsPort = 70000;
+        QVERIFY(!store.change(port, &error));
+        QVERIFY2(error.contains(QStringLiteral("Port von OBS 70000")), qPrintable(error));
+    }
+
     void parseInvalid_data()
     {
         QTest::addColumn<QByteArray>("text");

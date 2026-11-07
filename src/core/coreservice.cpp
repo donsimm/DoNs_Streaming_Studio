@@ -1,6 +1,8 @@
 #include "coreservice.h"
 
 #include "browsersource.h"
+#include "obsconnection.h"
+#include "obssecretstore.h"
 #include "version.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
@@ -67,7 +69,7 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
             settingsApplied();
         });
     }
-    // In P07 gibt es noch keine Verbindungen: alle «nicht eingerichtet» (grau).
+    // Ohne Verbindung (Twitch, YouTube, NDI; OBS bis setObsConnection): «nicht eingerichtet» (grau).
     for (dss::Connection c : dss::kAllConnections)
         m_connectionStates.insert(c, dss::ConnectionState::Off);
     connect(m_server, &QLocalServer::newConnection, this, &CoreService::onNewConnection);
@@ -341,6 +343,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
             send(socket, m_lastProgress);
         send(socket, dss::connectionsMessage(m_connectionStates));
         send(socket, serverStatusMessage());
+        send(socket, obsStatusMessage());
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -474,10 +477,62 @@ QJsonObject CoreService::serverStatusMessage() const
     return dss::serverStatusMessage(info);
 }
 
+void CoreService::setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets)
+{
+    using dss::obs::ObsConnection;
+    m_obs = connection;
+    m_obsSecrets = secrets;
+    connect(connection, &ObsConnection::stateChanged, this, &CoreService::onObsChanged);
+    connect(connection, &ObsConnection::currentSceneChanged, this, &CoreService::onObsChanged);
+    applyObsSettings();
+}
+
+void CoreService::applyObsSettings(bool passwordChanged)
+{
+    if (!m_obs || !m_settings)
+        return;
+    const dss::CoreSettings s = m_settings->settings();
+    m_obs->configure({s.obsEnabled, s.obsHost, s.obsPort}, passwordChanged);
+}
+
+void CoreService::onObsChanged()
+{
+    using State = dss::obs::ObsConnection::State;
+    const State state = m_obs->state();
+    const dss::ConnectionState shown = state == State::Connected    ? dss::ConnectionState::Connected
+                                       : state == State::Connecting ? dss::ConnectionState::Connecting
+                                       : state == State::Error      ? dss::ConnectionState::Error
+                                                                    : dss::ConnectionState::Off;
+    if (m_connectionStates.value(dss::Connection::Obs) != shown) {
+        m_connectionStates.insert(dss::Connection::Obs, shown);
+        broadcast(dss::connectionsMessage(m_connectionStates));
+    }
+    broadcast(obsStatusMessage());
+}
+
+QJsonObject CoreService::obsStatusMessage() const
+{
+    dss::ObsStatusInfo info;
+    if (!m_obs) {
+        info.message = QStringLiteral("Nicht eingerichtet oder abgeschaltet");
+        return dss::obsStatusMessage(info);
+    }
+    info.message = m_obs->message();
+    if (m_obs->state() == dss::obs::ObsConnection::State::Connected) {
+        info.obsVersion = m_obs->obsVersion();
+        info.websocketVersion = m_obs->websocketVersion();
+        const dss::obs::Scene scene = m_obs->currentScene();
+        info.currentScene = {scene.uuid, scene.name};
+    }
+    return dss::obsStatusMessage(info);
+}
+
 QJsonObject CoreService::settingsMessage() const
 {
-    return dss::settingsMessage({m_settings->settings(), dss::kPortMin, dss::kPortMax,
-                                 m_settings->path(), m_settings->fileError()});
+    dss::SettingsInfo info{m_settings->settings(), dss::kPortMin, dss::kPortMax, m_settings->path(),
+                           m_settings->fileError()};
+    info.obsPasswordSet = m_obsSecrets && m_obsSecrets->isSet();
+    return dss::settingsMessage(info);
 }
 
 void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message)
@@ -495,16 +550,79 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
         }
         return;
     }
-    const dss::CoreSettings before = m_settings->settings();
-    if (!m_settings->change(update.port, update.homeAddress, &error)) {
-        qWarning("Einstellungen abgelehnt: %s", qPrintable(error));
+    const auto reject = [this, socket, &update](const QString &text) {
+        qWarning("Einstellungen abgelehnt: %s", qPrintable(text));
         send(socket, dss::changeResultMessage({update.requestId, false, QUuid(),
-                                               QString::fromLatin1(dss::err::kRejected), error}));
+                                               QString::fromLatin1(dss::err::kRejected), text}));
+    };
+    // P10c: Das Passwort wird zuerst geschrieben; eine Abweisung muss also vorher feststehen.
+    const dss::CoreSettingsChange change{update.port, update.homeAddress, update.obsEnabled, update.obsHost,
+                                         update.obsPort};
+    if (!change.isEmpty()) {
+        if (const QString e = m_settings->checkChange(change); !e.isEmpty()) {
+            reject(e);
+            return;
+        }
+    } else if (!m_settings->fileError().isEmpty()) {
+        reject(QStringLiteral("Einstellungen nicht änderbar: %1").arg(m_settings->fileError()));
+        return;
+    }
+    if (!update.obsPassword) {
+        finishSettingsUpdate(socket, update, false);
+        return;
+    }
+    if (!m_obsSecrets) {
+        reject(QStringLiteral("Der Kern kann das Passwort nicht ablegen."));
+        return;
+    }
+    if (update.obsPassword->isEmpty()) {
+        if (!m_obsSecrets->remove(&error)) {
+            reject(error);
+            return;
+        }
+        qInfo("OBS: Passwort gelöscht");
+        finishSettingsUpdate(socket, update, true);
+        return;
+    }
+    // systemd-creds läuft als eigener Prozess: Die Antwort kommt später (Abschnitt «Einstellungen»).
+    QPointer<QLocalSocket> target(socket);
+    m_obsSecrets->write(*update.obsPassword, [this, target, update](const QString &failure) {
+        QLocalSocket *connected = target && m_clients.contains(target.data()) ? target.data() : nullptr;
+        if (!failure.isEmpty()) {
+            qWarning("Einstellungen abgelehnt: %s", qPrintable(failure));
+            if (connected)
+                send(connected, dss::changeResultMessage({update.requestId, false, QUuid(),
+                                                          QString::fromLatin1(dss::err::kRejected), failure}));
+            return;
+        }
+        qInfo("OBS: Passwort verschlüsselt gespeichert");
+        finishSettingsUpdate(connected, update, true);
+    });
+}
+
+void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update,
+                                       bool passwordChanged)
+{
+    const auto reply = [this, socket](const dss::ChangeResult &result) {
+        if (socket)
+            send(socket, dss::changeResultMessage(result));
+    };
+    const dss::CoreSettingsChange change{update.port, update.homeAddress, update.obsEnabled, update.obsHost,
+                                         update.obsPort};
+    const dss::CoreSettings before = m_settings->settings();
+    QString error;
+    if (!change.isEmpty() && !m_settings->change(change, &error)) {
+        qWarning("Einstellungen abgelehnt: %s", qPrintable(error));
+        reply({update.requestId, false, QUuid(), QString::fromLatin1(dss::err::kRejected), error});
         return;
     }
     if (!(m_settings->settings() == before))
         settingsApplied();
-    send(socket, dss::changeResultMessage({update.requestId, true, QUuid(), QString(), QString()}));
+    else if (passwordChanged)
+        broadcast(settingsMessage()); // obs_password_set
+    // Auch bei gleichen Werten: «OK» im Dialog versucht es nach 4009, 4010, 4011 wieder (Plan 1.7).
+    applyObsSettings(passwordChanged);
+    reply({update.requestId, true, QUuid(), QString(), QString()});
 }
 
 // P10, Punkt 77: ungültige kern.ini umbenennen und mit Standardwerten neu schreiben.
@@ -527,6 +645,7 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
     for (const QString &line : std::as_const(log))
         qInfo("%s", qPrintable(line));
     settingsApplied();
+    applyObsSettings();
     send(socket, dss::changeResultMessage(
                      {requestId, true, QUuid(), QString(), QString(),
                       QStringLiteral("Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt %1.")
@@ -536,8 +655,9 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
 void CoreService::settingsApplied()
 {
     const dss::CoreSettings after = m_settings->settings();
-    qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s", after.port,
-          after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress));
+    qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s, OBS %s", after.port,
+          after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress),
+          after.obsEnabled ? qPrintable(QStringLiteral("%1:%2").arg(after.obsHost).arg(after.obsPort)) : "aus");
     broadcast(settingsMessage());
     updateBrowserSources();
 #if DSS_CORE_OVERLAY_SERVER
