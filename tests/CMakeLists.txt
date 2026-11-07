@@ -259,6 +259,10 @@ endif()
 qt_add_executable(tst_obsprotokoll tst_obsprotokoll.cpp)
 target_link_libraries(tst_obsprotokoll PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsprotokoll COMMAND tst_obsprotokoll)
+# P10c: Verbindung zu OBS gegen den Testserver (obstestserver.h) auf 127.0.0.1, ohne Kern.
+qt_add_executable(tst_obsverbindung tst_obsverbindung.cpp obstestserver.h)
+target_link_libraries(tst_obsverbindung PRIVATE dss_obs dss_warnings Qt6::Test)
+add_test(NAME tst_obsverbindung COMMAND tst_obsverbindung)
 
 # P10, Stufe 1 der Prüfung der Browserquelle: Qt WebEngine (Chromium) lädt die Seite eines eigenen
 # Kerns über die Adresse im Heimnetz, Abgriff mit Durchsichtigkeit, Vergleich mit dss_render. In
