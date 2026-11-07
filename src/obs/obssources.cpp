@@ -317,6 +317,12 @@ void ObsSources::reconcile()
         if (m_known.contains(it->inputUuid))
             used.insert(it->inputUuid);
     }
+    const auto followDesired = [this](const QString &inputUuid, const Desired &d) {
+        const KnownInput &k = m_known[inputUuid];
+        // Ohne Adresse (keine im Heimnetz eingestellt) bleibt die Quelle, wie sie ist.
+        if (!d.url.isEmpty() && (k.url != d.url || k.width != d.width || k.height != d.height))
+            updateInput(inputUuid, d);
+    };
     for (const Desired &d : std::as_const(m_desired)) {
         auto mapping = m_mappings.find(d.overlayId);
         const bool present = mapping != m_mappings.end() && m_known.contains(mapping->inputUuid);
@@ -327,6 +333,7 @@ void ObsSources::reconcile()
                 mapping->inputName = name;
                 changed = true;
             }
+            followDesired(mapping->inputUuid, d);
             continue;
         }
         if (d.url.isEmpty())
@@ -340,12 +347,43 @@ void ObsSources::reconcile()
                 changed = true;
                 qInfo("OBS: Quelle «%s» übernommen für Overlay %s", qPrintable(known->name),
                       qPrintable(d.overlayId.toString(QUuid::WithoutBraces)));
+                const QString uuid = known.key();
+                followDesired(uuid, d); // die Grösse kann abweichen
                 break;
             }
         }
     }
     if (changed)
         save();
+}
+
+void ObsSources::updateInput(const QString &inputUuid, const Desired &desired)
+{
+    // overlay=true: Andere Einstellungen der Quelle bleiben (CSS, Lage kommt ohnehin aus der Szene).
+    const QJsonObject fields{
+        {QStringLiteral("inputUuid"), inputUuid},
+        {QStringLiteral("inputSettings"), QJsonObject{{QStringLiteral("url"), desired.url},
+                                                      {QStringLiteral("width"), desired.width},
+                                                      {QStringLiteral("height"), desired.height}}},
+        {QStringLiteral("overlay"), true},
+    };
+    KnownInput &known = m_known[inputUuid];
+    known.url = desired.url;
+    known.width = desired.width;
+    known.height = desired.height;
+    qInfo("OBS: Quelle «%s» nachgeführt", qPrintable(known.name));
+    const QPointer<ObsSources> self(this);
+    m_connection->request(QStringLiteral("SetInputSettings"), fields,
+                          [self, inputUuid, name = known.name](const Response &r, RequestFailure failure) {
+        if (!self || (failure == RequestFailure::None && r.ok))
+            return;
+        qWarning("OBS: Quelle «%s» nicht nachgeführt", qPrintable(name));
+        // Stand unbekannt: Der nächste Vergleich schickt die Werte neu. Nach einem Abbruch holt der
+        // Abgleich beim Verbinden ohnehin alles frisch.
+        const auto known = self->m_known.find(inputUuid);
+        if (known != self->m_known.end())
+            known->url.clear();
+    });
 }
 
 void ObsSources::createSource(const QUuid &overlayId, const QString &sceneUuid, const QString &name, const Done &done)

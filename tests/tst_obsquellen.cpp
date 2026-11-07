@@ -389,6 +389,99 @@ private slots:
         QCOMPARE(entryOf(*m_sources, kOverlayA).inputName, QStringLiteral("Von Hand"));
     }
 
+    // Neue Adresse und neue Grösse (neuer Token, Port, Adresse im Heimnetz, Auflösung, F11): OBS folgt,
+    // nur bei einem Unterschied, und andere Einstellungen der Quelle bleiben (overlay=true).
+    void followsDesired()
+    {
+        connectAll({{kOverlayA, kUrlA, 1920, 1080}});
+        waitSynced();
+        Answer created;
+        m_sources->createSource(kOverlayA, QStringLiteral("scene-live"), QStringLiteral("Neu"), created.done());
+        QTRY_VERIFY(created.arrived);
+        const QString uuid = m_server->inputs.first().uuid;
+        m_server->input(uuid)->settings.insert(QStringLiteral("css"), QStringLiteral("von Hand"));
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 0);
+
+        // Gleiche Werte: nichts
+        m_sources->setDesired({{kOverlayA, kUrlA, 1920, 1080}});
+        QTest::qWait(60);
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 0);
+
+        // Neue Adresse
+        m_sources->setDesired({{kOverlayA, kUrlB, 1920, 1080}});
+        QTRY_COMPARE(m_server->input(uuid)->settings.value(QStringLiteral("url")).toString(), kUrlB);
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 1);
+        const QJsonObject sent = m_server->requestsOf(QStringLiteral("SetInputSettings")).first().data;
+        QCOMPARE(sent.value(QStringLiteral("inputUuid")).toString(), uuid);
+        QCOMPARE(sent.value(QStringLiteral("overlay")).toBool(false), true);
+        QCOMPARE(m_server->input(uuid)->settings.value(QStringLiteral("css")).toString(), QStringLiteral("von Hand"));
+
+        // Neue Grösse
+        m_sources->setDesired({{kOverlayA, kUrlB, 1280, 720}});
+        QTRY_COMPARE(m_server->input(uuid)->settings.value(QStringLiteral("width")).toInt(), 1280);
+        QCOMPARE(m_server->input(uuid)->settings.value(QStringLiteral("height")).toInt(), 720);
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 2);
+
+        // Keine Adresse möglich: Quelle bleibt, wie sie ist
+        m_sources->setDesired({{kOverlayA, QString(), 1280, 720}});
+        QTest::qWait(60);
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 2);
+        QCOMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
+
+        // Nicht in die Datei
+        QVERIFY(!fileText().contains("geheimerToken"));
+    }
+
+    // Änderung, während OBS aus ist: beim nächsten Verbinden nachgeführt (Plan 1.1).
+    void followsAfterReconnect()
+    {
+        connectAll({{kOverlayA, kUrlA, 1920, 1080}});
+        waitSynced();
+        Answer created;
+        m_sources->createSource(kOverlayA, QStringLiteral("scene-live"), QStringLiteral("Neu"), created.done());
+        QTRY_VERIFY(created.arrived);
+        const QString uuid = m_server->inputs.first().uuid;
+
+        m_server->stop();
+        QTRY_COMPARE(m_connection->state(), State::Error);
+        m_sources->setDesired({{kOverlayA, kUrlB, 1280, 720}});
+        // Zuletzt bekannter Stand, kein Versuch ins Leere
+        QCOMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
+        QCOMPARE(m_server->requestCount(QStringLiteral("SetInputSettings")), 0);
+
+        QVERIFY(m_server->start());
+        QTRY_COMPARE(m_connection->state(), State::Connected);
+        QTRY_COMPARE(m_server->input(uuid)->settings.value(QStringLiteral("url")).toString(), kUrlB);
+        QCOMPARE(m_server->input(uuid)->settings.value(QStringLiteral("width")).toInt(), 1280);
+
+        // Abbruch während der Anfrage: wird nach dem Wiederverbinden neu gesendet
+        m_server->closingRequests.insert(QStringLiteral("SetInputSettings"));
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("nicht nachgeführt")));
+        m_sources->setDesired({{kOverlayA, kUrlA, 1280, 720}});
+        QTRY_COMPARE(m_connection->state(), State::Error);
+        m_server->stop();
+        m_server->closingRequests.clear();
+        // Der Testserver führt die Anfrage vor dem Abbruch aus; hier ohne Wirkung vortäuschen.
+        m_server->input(uuid)->settings.insert(QStringLiteral("url"), kUrlB);
+        QVERIFY(m_server->start());
+        QTRY_COMPARE(m_connection->state(), State::Connected);
+        QTRY_COMPARE(m_server->input(uuid)->settings.value(QStringLiteral("url")).toString(), kUrlA);
+    }
+
+    // F10 nachträglich: Übernommene Quelle mit abweichender Grösse folgt ebenfalls.
+    void adoptedSourceFollowsSize()
+    {
+        const QString uuid = m_server->addInput(QStringLiteral("Von Hand"), settingsOf(kUrlA, 800, 600));
+        connectAll({{kOverlayA, kUrlA, 1920, 1080}});
+        QTRY_COMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
+        QTRY_COMPARE(m_server->input(uuid)->settings.value(QStringLiteral("width")).toInt(), 1920);
+        // GetInputSettings liefert keine Standardwerte: fehlende Grösse gilt als Unterschied
+        const QString bare = m_server->addInput(QStringLiteral("Ohne Grösse"), {{QStringLiteral("url"), kUrlB}});
+        m_sources->setDesired({{kOverlayA, kUrlA, 1920, 1080}, {kOverlayB, kUrlB, 800, 600}});
+        m_server->sendEvent(QStringLiteral("InputCreated"), {{QStringLiteral("inputKind"), QStringLiteral("browser_source")}});
+        QTRY_COMPARE(m_server->input(bare)->settings.value(QStringLiteral("width")).toInt(), 800);
+    }
+
     // F8: Overlay gelöscht: Zuordnung weg, Quelle bleibt in OBS.
     void overlayRemoved()
     {

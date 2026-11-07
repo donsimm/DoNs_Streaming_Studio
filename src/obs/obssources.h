@@ -119,8 +119,9 @@ private:
     void refreshScenes();
     void startSync();
     void finishSync(const QHash<QString, KnownInput> &known);
-    // Zuordnung mit dem Bekannten vergleichen, Quellen übernehmen (F10).
+    // Zuordnung mit dem Bekannten vergleichen, Quellen übernehmen (F10), Adresse und Grösse nachführen.
     void reconcile();
+    void updateInput(const QString &inputUuid, const Desired &desired);
     void publish();
     SourceState stateOf(const QUuid &overlayId) const;
     const Desired *desiredOf(const QUuid &overlayId) const;

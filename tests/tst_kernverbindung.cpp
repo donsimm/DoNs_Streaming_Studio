@@ -24,6 +24,7 @@
 #include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QUrl>
 
 #include <csignal>
 #include <memory>
@@ -716,6 +717,56 @@ private slots:
         QVERIFY2(text.contains(inputUuid.toUtf8()), text.constData());
         QVERIFY2(!text.contains(token.toUtf8()), text.constData());
 
+        // Nachführen (Plan 1.8, Schritt 7): neuer Token, Port, Auflösung. Ohne Kopieren folgt OBS,
+        // das Token steht nie in der Ausgabe.
+        const auto urlInObs = [&server, &inputUuid] {
+            return server.input(inputUuid)->settings.value(QStringLiteral("url")).toString();
+        };
+        QSignalSpy changes(one.get(), &CoreClient::changeFinished);
+        ChangeRequest newToken;
+        newToken.type = QString::fromLatin1(msg::kNewToken);
+        newToken.overlayId = overlay;
+        QVERIFY(one->sendChange(newToken) > 0);
+        QTRY_COMPARE(changes.size(), 1);
+        QVERIFY(changes.takeFirst().first().value<ChangeResult>().ok);
+        QTRY_VERIFY(!urlInObs().contains(token));
+        // Adresse: /o/<Adresse>/<Token>/
+        const auto tokenInObs = [&urlInObs] { return QUrl(urlInObs()).path().section(QLatin1Char('/'), -2, -2); };
+        const QString tokenAfterChange = tokenInObs();
+        QVERIFY2(!tokenAfterChange.isEmpty(), qPrintable(urlInObs()));
+
+        update = SettingsUpdate();
+        update.port = testhelp::testPort(config.path()) + 1;
+        settingsAnswered.clear();
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(settingsAnswered.size(), 1);
+        QTRY_VERIFY2(urlInObs().contains(QStringLiteral(":%1/").arg(*update.port)), qPrintable(urlInObs()));
+
+        ChangeRequest size;
+        size.type = QString::fromLatin1(msg::kSetOverlaySize);
+        size.overlayId = overlay;
+        size.width = 640;
+        size.height = 480;
+        QVERIFY(one->sendChange(size) > 0);
+        QTRY_COMPARE(server.input(inputUuid)->settings.value(QStringLiteral("width")).toInt(), 640);
+        QCOMPARE(server.input(inputUuid)->settings.value(QStringLiteral("height")).toInt(), 480);
+        changes.clear();
+
+        // Nachträglich: Während OBS weg ist, ändert sich der Token; beim Verbinden nachgeführt.
+        server.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(two->connectionStates().value(Connection::Obs), ConnectionState::Error, 10000);
+        QCOMPARE(two->obsSource(overlay).state, ObsSourceState::Present); // letzter bekannter Stand
+        const QString urlWhileOff = urlInObs();
+        QVERIFY(one->sendChange(newToken) > 0);
+        QTRY_COMPARE(changes.size(), 1);
+        changes.clear();
+        QTest::qWait(100);
+        QCOMPARE(urlInObs(), urlWhileOff);
+        QVERIFY(server.start());
+        QTRY_COMPARE_WITH_TIMEOUT(two->connectionStates().value(Connection::Obs), ConnectionState::Connected, 10000);
+        QTRY_VERIFY(urlInObs() != urlWhileOff);
+        const QString lastToken = tokenInObs();
+
         // In weitere Szene
         QVERIFY(one->sendObsAddToScene(overlay, QStringLiteral("scene-pause")) > 0);
         QTRY_COMPARE(answered.size(), 1);
@@ -723,6 +774,7 @@ private slots:
         QCOMPARE(server.sceneItems.value(QStringLiteral("scene-pause")), QStringList{inputUuid});
 
         // Von Hand gelöscht: fehlt (F7)
+        const QString lastUrl = urlInObs();
         server.removeInputWithEvent(inputUuid);
         QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::Missing);
         QVERIFY(one->sendObsAddToScene(overlay, QStringLiteral("scene-pause")) > 0);
@@ -730,7 +782,8 @@ private slots:
         QCOMPARE(answered.takeFirst().first().value<ChangeResult>().code, QString::fromLatin1(err::kObsSourceMissing));
 
         // Overlay löschen: Hinweis (F8), Quelle bleibt in OBS. Dafür ist sie wieder da.
-        server.addInput(QStringLiteral("Neu"), created.settings);
+        const QString restored = server.addInput(QStringLiteral("Neu"), created.settings);
+        server.input(restored)->settings.insert(QStringLiteral("url"), lastUrl);
         server.sendEvent(QStringLiteral("InputCreated"), {{QStringLiteral("inputKind"), QStringLiteral("browser_source")}});
         QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::Present);
         const int inputs = int(server.inputs.size());
@@ -750,8 +803,10 @@ private slots:
         QVERIFY(core->waitForFinished(5000));
         log += QString::fromUtf8(core->readAllStandardOutput());
         log += QString::fromUtf8(core->readAllStandardError());
-        QVERIFY2(!log.contains(token), qPrintable(log));
+        for (const QString &secret : {token, tokenAfterChange, lastToken})
+            QVERIFY2(!log.contains(secret), qPrintable(log));
         QVERIFY2(log.contains(QStringLiteral("OBS: Quelle «Neu» angelegt")), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("OBS: Quelle «Neu» nachgeführt")), qPrintable(log));
     }
 
     // P10, Punkt 77: ungültige kern.ini über reset_settings zurücksetzen (eigener Kern mit eigener
