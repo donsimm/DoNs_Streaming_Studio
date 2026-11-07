@@ -1,6 +1,18 @@
 # CLAUDE.md – Regeln für Claude Code im Projekt DoNs Streaming Studio
 
-Lies diese Datei zu Beginn jeder Sitzung, danach die Dokumente unter `docs/`. Der Auftrag der Sitzung kommt vom Projektleiter-Agenten oder von Lotse; nur grosse Bausteine haben eine eigene Prompt-Datei.
+**Lesepflicht zu Beginn jeder Sitzung:** diese Datei, `docs/HANDOFF.md` und nur die Dokumente zum Thema der Aufgabe. Der Auftrag kommt vom Projektleiter-Agenten oder von Lotse; nur grosse Bausteine haben eine eigene Prompt-Datei.
+
+| Thema | Dokument |
+|---|---|
+| Entscheide, zwei Zeichner (K-01 bis K-08), Orte je Version | `docs/01-festlegungen.md` |
+| Umgebung, Messwerte, Netzwerk | `docs/02-umgebung.md` |
+| Funktionen und Prioritäten | `docs/03-funktionen-entwurf.md` |
+| Offene Punkte | `docs/04-offene-punkte.md` |
+| Quellen | `docs/05-quellen.md` |
+| Format der Dateien | `docs/06-overlay-format.md` |
+| Reihenfolge der Bausteine | `docs/07-bauplan.md` |
+| Schnittstelle Fenster–Kern, Overlay-Server | `docs/08-kern-schnittstelle.md` |
+| Frühere Entscheide, Berichte, Messungen, Prompts (nur nachschlagen) | `docs/archiv/` |
 
 ## Rollen (entschieden vom Nutzer, 2026-11-07)
 
@@ -10,32 +22,55 @@ Lies diese Datei zu Beginn jeder Sitzung, danach die Dokumente unter `docs/`. De
 
 ## Projekt
 
-Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf. Sie mischt, nimmt nicht auf und streamt nicht selbst. Sie erzeugt pro Overlay eine Leinwand und gibt sie aus: hauptsächlich als Browserquelle, später per NDI (höchstens 2 Ausgänge). Module: Editor (Hauptfokus) und Chat-Bot zuerst, später Live-Modul, Zuschauer-Minispiele, Musikplayer. Details: `docs/01-festlegungen.md`.
+Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie mischt, nimmt nicht auf und streamt nicht selbst. Sie erzeugt pro Overlay eine Leinwand und gibt sie aus: hauptsächlich als Browserquelle, später per NDI (höchstens 2 Ausgänge). Module: Editor (Hauptfokus) und Chat-Bot zuerst, später Live-Modul, Zuschauer-Minispiele, Musikplayer.
 
 ## Umgebung (Zielsystem = Entwicklungssystem)
 
-- Claude Code läuft direkt auf dem Studio-PC: Debian 13 (trixie), Xfce unter X11, Kernel 6.12, Intel i7-4771 (4 Kerne / 8 Threads, AVX2), 32 GB DDR3, NVIDIA GTX 1660 SUPER mit Treiber 550.163.01, Bildschirm 1920x1080 bei 60 Hz. Gemessene Ist-Werte: `docs/02-umgebung.md`.
-- OBS läuft auf einem anderen Rechner (Streaming-PC, zurzeit Zorin OS, Wechsel zu Nobara geplant). Seit 2026-11-03 besteht das Netzwerk: Studio-PC `192.168.1.9` (Kabel `enp3s0`, Adresse fest auf dem PC eingetragen), Streaming-PC `192.168.1.116` (Kabel), beide am Router fest reserviert (`docs/02-umgebung.md`, «Netzwerk»). Claude Code hat keinen Zugang zum Streaming-PC: Prüfungen dort (Browserquelle in OBS, NDI, obs-websocket) macht der Nutzer im Handtest; Ergebnisse werden nicht erfunden.
+- Claude Code läuft direkt auf dem Studio-PC: Debian 13, Xfce unter X11, 8 Threads, 32 GB, GTX 1660 SUPER, Bildschirm 1920x1080 (`docs/02-umgebung.md`).
+- OBS läuft auf dem Streaming-PC. Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`. Claude Code hat dort keinen Zugang: Prüfungen dort (Browserquelle in OBS, NDI, obs-websocket) macht der Nutzer im Handtest; Ergebnisse werden nicht erfunden.
 - Technik und Betriebssystem sind noch nicht endgültig entschieden. Das Betriebssystem ist vorläufig Debian 13 mit X11.
+
+## Prüfstufen (entschieden vom Nutzer, 2026-11-07)
+
+| Stufe | Wann | Prüfung |
+|---|---|---|
+| Klein | kleine Änderung | Bau (`cmake --build build -j8`) und `ctest --test-dir build`. Handtest nur, wenn sichtbar oder bedienbar |
+| Baustein | Baustein aus dem Bauplan | dazu frischer Klon (Bau und `ctest`), `scripts/startpruefung.py` und `scripts/dienstpruefung.py`. 50 Wiederholungen (`scripts/wiederholen.sh`) nur für betroffene Tests, bei Änderungen an Takt, Threads oder Video oder nach einem Fehlschlag |
+| Vor der Installation | bevor der Nutzer installiert | dazu Release-Bau und `scripts/installieren-pruefen.sh` (Testoptionen, Kopie der echten Daten), Prüfsummen von Installation und echten Daten vorher und nachher. Alle Schalter einzeln (`scripts/schalter-lauf.sh`) nur auf Wunsch |
+
+Bei allen Prüfungen: Neben Wiederholungsläufen, Start- und Dienstprüfung keine Last (nicht bauen, Zeitgrenzen der Tests scheitern sonst). Fenstertests nie gleichzeitig. Vor Fensterprüfungen sicherstellen, dass die X11-Sitzung aktiv und nicht gesperrt ist. `dss-app` ausserhalb von `ctest` und `startpruefung.py` nur mit eigenem `XDG_CONFIG_HOME` starten, sonst wird die `fenster.ini` des Nutzers überschrieben.
 
 ## Regeln
 
-1. Baue nur, was im aktuellen Auftrag steht. Alles andere kommt in `docs/04-offene-punkte.md`.
-2. Nichts raten. Fehlt eine Angabe oder scheint sie falsch, schreibe es als `[OFFEN]` in den Abschlussbericht.
+Die Nummern bleiben, der Code verweist auf sie.
+
+1. Baue nur, was im aktuellen Auftrag steht. Alles andere kommt in `docs/04-offene-punkte.md`. Erledigte Punkte wandern nach `docs/archiv/04-erledigte-punkte.md`, Nummern bleiben.
+2. Nichts raten. Fehlt eine Angabe oder scheint sie falsch, schreibe es als `[OFFEN]` in den Bericht.
 3. Ungeprüftes wird als «nicht geprüft» gekennzeichnet. Messwerte stammen nur von diesem Gerät und stehen mit Datum und Befehl im Bericht.
 4. Externe Aussagen (Programmverhalten, Protokolle, Paketversionen) gegen die aktuelle Dokumentation prüfen und die Quelle (URL) im Bericht oder Code-Kommentar nennen. Immer alle Quellen nennen.
 5. Pakete: Versionen festhalten. Neue Pakete nur mit Begründung im Bericht installieren (`sudo apt install` fragt den Nutzer). Keine Pakete im System ändern, die der Auftrag nicht verlangt.
 6. Tests laufen mit echtem Fenstersystem (X11-Sitzung), nicht nur offscreen. Wo ein Start geprüft wird: mindestens 20 Starts, Exit-Code und sauberes Beenden prüfen.
 7. Tests nutzen echte Daten (Kopie davon) und, wo es einen Handtest gibt, dieselben Daten wie dieser.
 8. Ein Commit pro Funktion. Ändern mehrere kleine Punkte dieselbe Stelle und dieselbe Version der Schnittstelle, dürfen sie in einen Commit, mit Begründung im Bericht (entschieden vom Nutzer, 2026-11-04). Neue Schalter nur bei riskanten Teilen; die 17 bestehenden bleiben, Bauten mit abgeschalteten Schaltern laufen nicht mehr bei jedem Baustein (entschieden vom Nutzer, 2026-11-07).
-9. Logik und Daten laufen ohne die Oberflächen-Bibliothek und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern. Qt-Module werden genutzt, wo sie nötig sind; «ohne Oberflächen-Bibliothek» heisst ohne Qt Widgets und ohne Fenster. Zeichnen (`QPainter`, `QImage`, Schriften) darf Qt Gui nutzen; Tests des Zeichners laufen ohne Fenster (entschieden vom Nutzer, P10-vor, 2026-11-03).
-10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
+9. Logik und Daten laufen ohne die Oberflächen-Bibliothek (ohne Qt Widgets und ohne Fenster) und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern. Zeichnen (`QPainter`, `QImage`, Schriften) darf Qt Gui nutzen; Tests des Zeichners laufen ohne Fenster (entschieden vom Nutzer, 2026-11-03).
+10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
 11. Lage und Grösse von Quellen sind ganze Pixel der Overlay-Auflösung, keine Prozentwerte.
 12. Zugangsdaten (Twitch-Token, OBS-Passwort) nie im Klartext in Konfiguration, Protokoll oder Tests.
 13. Oberflächentexte und Dokumentation auf Deutsch in Schweizer Rechtschreibung (kein «ß», «Grösse», «ss»). Bezeichner im Code auf Englisch, Kommentare auf Deutsch.
 14. Module sind fest eingebaut. Jedes Modul nutzt dieselbe Schnittstelle zum Ereignisfluss. Es gibt kein Plugin-System, auch nicht für Dritte.
-15. Der Abschlussbericht nennt: geänderte Dateien, ausgeführte Befehle und Tests mit Ergebnis, nicht erledigte Punkte, getroffene Annahmen, Quellen.
+15. Der Bericht folgt der Kurzvorlage unten.
 16. Technisch bleiben. Keine Aussagen über die eigene Leistung oder Intelligenz.
 17. Commits enden mit den Zeilen aus der Sitzungsvorgabe (Co-Authored-By). Agenten committen nur lokal. Gepusht wird nur nach Freigabe des Nutzers, und zwar durch Lotse (entschieden vom Nutzer, 2026-11-07). `--force` nur mit ausdrücklichem Auftrag des Nutzers.
-18. Claude Code installiert nie in `~/.local/opt/dons-streaming-studio/` (kein `scripts/installieren.sh` gegen diesen Ort) und verändert die echten Daten `~/.local/share/dons-streaming-studio` nicht. Es arbeitet mit der Version aus dem Repo (`build/`) und deren Entwicklungsordner (`~/.local/share/dons-streaming-studio-entwicklung`, Einheit `dss-core-entwicklung.service`); Prüfungen der Installation nur mit den Testoptionen von `scripts/installieren.sh` und eigenen Testdaten (entschieden vom Nutzer, P10a, 2026-11-03).
-19. Claude Code antwortet dem Nutzer im Terminal auf Deutsch in Schweizer Rechtschreibung (Zwischenstände, Rückfragen, Zusammenfassungen), wie in Regel 13 für Oberfläche und Dokumente (Wunsch des Nutzers, 2026-11-03).
+18. Claude Code installiert nie in `~/.local/opt/dons-streaming-studio/` (kein `scripts/installieren.sh` gegen diesen Ort) und verändert die echten Daten `~/.local/share/dons-streaming-studio` nicht. Es arbeitet mit der Version aus dem Repo (`build/`) und deren Entwicklungsordner (`~/.local/share/dons-streaming-studio-entwicklung`, Einheit `dss-core-entwicklung.service`); Prüfungen der Installation nur mit den Testoptionen von `scripts/installieren.sh` und eigenen Testdaten (entschieden vom Nutzer, 2026-11-03).
+19. Claude Code antwortet dem Nutzer im Terminal auf Deutsch in Schweizer Rechtschreibung (Wunsch des Nutzers, 2026-11-03).
+
+## Kurzvorlage für den Bericht
+
+Kleine Änderung: als Rückmeldung an Lotse. Baustein: zusätzlich als Datei unter `docs/archiv/berichte/`, knapp; Rohdaten nur bei Auffälligkeiten ins Repo. Der Bericht nennt keine Kennung des eigenen Commits (ändert sich beim Rebase).
+
+- **Geändert:** Dateien, nach Funktion
+- **Geprüft:** Stufe, Befehle mit Datum und Ergebnis; Ungeprüftes als «nicht geprüft»
+- **Handtest:** was der Nutzer prüfen soll und warum, jede Prüfung ein eigener Abschnitt; sonst «kein Handtest nötig»
+- **Nicht erledigt, `[OFFEN]`**
+- **Annahmen, Interna-Entscheide:** gesammelt mit Begründung
+- **Quellen**
