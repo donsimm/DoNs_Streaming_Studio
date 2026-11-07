@@ -8,13 +8,14 @@ Stand: 2026-11-07. Einstiegspunkt jeder Sitzung, nach `CLAUDE.md`. Diese Datei h
 - **P10b abgenommen (2026-11-07):**
   - Der Nutzer meldete zu den Handtest-Prüfungen 1 bis 4 aus dem Bericht P10b «ok, passt alles». Das schliesst die Installation und den Blick auf OBS ein.
   - Von Lotse am selben Tag geprüft: installiert ist Commit `add656b` (Installiert 2026-11-07 13:16:36), `medien.json` ist angelegt, 10 Dateien in `media/`, Sicherung `2026-11-07_13-16-36`.
-- **Noch offen aus P10b:** Prüfung 5 (Aufräumen der Entwicklungsdaten), macht der Nutzer. Punkte 86 und 90: Der Nutzer hat keine Einwände gemeldet, aber nicht einzeln Stellung genommen; sie gelten nicht als ausdrücklich bestätigt (`docs/04-offene-punkte.md`).
+- **Noch offen aus P10b:** Prüfung 5 (Aufräumen der Entwicklungsdaten), macht der Nutzer. Punkt 90: Der Nutzer hat keine Einwände gemeldet, aber nicht einzeln Stellung genommen; er gilt nicht als ausdrücklich bestätigt (`docs/04-offene-punkte.md`).
 - **Echte Daten:** Laut Nutzer (2026-11-03) ist im Datenordner noch nichts Wichtiges. Der Nutzer meldet, ab wann die Software offiziell im Einsatz ist. Regel 18 gilt schon jetzt.
 
 ## Nächster Schritt
 
-1. Probelauf des schlanken Ablaufs mit einer echten kleinen Änderung, Stufe «Klein» (Schritt 9 des Umbaus, zusammen mit dem Nutzer).
-2. Danach P10c (Anbindung an OBS: T-05, E-29), P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
+Probelauf des schlanken Ablaufs (Stufe «Klein», Punkt 91) am 2026-11-07 bestanden: 38 von 38 Tests. Offen ist, wie viel der Ablauf bei einem ganzen Baustein spart; P10c ist die erste Messung.
+
+1. P10c (Anbindung an OBS: T-05, E-29), P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
 
 ## Arbeitsweise mit dem Nutzer
 
