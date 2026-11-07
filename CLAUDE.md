@@ -1,6 +1,6 @@
 # CLAUDE.md – Regeln für Claude Code im Projekt DoNs Streaming Studio
 
-**Lesepflicht zu Beginn jeder Sitzung:** diese Datei, `docs/HANDOFF.md` und nur die Dokumente zum Thema der Aufgabe. Der Auftrag kommt vom Projektleiter-Agenten oder von Lotse; nur grosse Bausteine haben eine eigene Prompt-Datei.
+**Lesepflicht zu Beginn jeder Sitzung:** diese Datei, `.claude/HANDOFF.md` und nur die Dokumente zum Thema der Aufgabe. Der Auftrag kommt vom Projektleiter-Agenten oder von Lotse; nur grosse Bausteine haben eine eigene Prompt-Datei.
 
 | Thema | Dokument |
 |---|---|
