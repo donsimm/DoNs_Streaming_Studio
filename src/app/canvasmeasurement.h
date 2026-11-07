@@ -12,7 +12,7 @@ class MainWindow;
 // Leistungsmessung der Leinwand (P09, wie T-02 aus P01/P02): schreibt Zeitstempel jedes Zeichnens
 // der Leinwand und jedes neu gezeigten Videobildes, nach Ablauf der Dauer als JSON in die Datei
 // (Felder wie prototypes/messung/t02.py sie liest: frames, video_frames, alpha_frames, info),
-// und schliesst dann das Fenster. Auswertung: docs/berichte/P09-daten/leistung.py.
+// und schliesst dann das Fenster. Auswertung: scripts/leistung.py.
 class CanvasMeasurement : public QObject
 {
     Q_OBJECT

@@ -28,7 +28,7 @@ Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `d
 | `src/cli/` | Werkzeug `dss-cli` ohne Fenster (Overlays anlegen und bearbeiten, Handtest) |
 | `web/` | Zeichner der Browserquelle (`overlay.html`, `overlay.js`) |
 | `tests/` | Tests mit Qt Test, ausgeführt über `ctest` |
-| `scripts/` | Einrichtungsskript, Paketliste, Startprüfung, Einrichten des Benutzerdienstes, Dienstprüfung |
+| `scripts/` | Einrichtungsskript, Paketliste, Startprüfung, Einrichten des Benutzerdienstes, Dienstprüfung, Installation, Prüfung der Installation (`installieren-pruefen.sh`), Wiederholungsläufe (`wiederholen.sh`), Bau aller Schalter (`schalter-lauf.sh`), Leistungsmessung (`leistung.py`) |
 | `prototypes/` | Messprototypen aus P01 und P02, nicht Teil des Builds; `prototypes/messung/media_erzeugen.sh` und `prototypes/media/` liefern die Testdateien der Tests |
 
 ## Bauen und starten
