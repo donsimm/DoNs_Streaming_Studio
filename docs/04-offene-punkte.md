@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 92 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 96 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -26,10 +26,14 @@ Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in
 5. Funktionsprioritäten (MUSS, SOLL, KANN) der übrigen Module: pro Modul festlegen, wenn es an der Reihe ist. Editor und Quelle Text sind entschieden (`docs/03-funktionen-entwurf.md`).
 13. Aus P02: Für NDI offen sind Farbmatrix und Bereich bei UYVY, Vormultiplikation bei UYVA und ob die Umwandlung besser das NDI-SDK übernimmt (laut NDI-Dokumentation empfohlen). Alpha im Abgriff bei transparenter Seite nicht geprüft.
 32. Aus P05: Werte der ausgegrauten Bedienelemente in «Steuerung» (30 Bilder/s, Raster 20 px, Einrasten an) sind vom Bild übernommen und nicht entschieden (E-10, E-13).
+92. Ereignisfluss (Regel 14): nicht gebaut, P10c nutzt Qt-Signale von `ObsConnection`, verbunden in `CoreService::setObsConnection`. Gebaut wird er mit der Twitch-Verbindung, im Plan dort festzulegen: Felder eines Ereignisses, Abonnieren, ob Ereignisse über den Socket zum Fenster gehen. Kommt E-18 früher, ist er dort der erste Nutzer und wird dort gebaut.
+93. Aus P10c: Die Meldung im Dialog «Einstellungen» (`settingsProblem`) rechnet ihre feste Höhe mit `lineSpacing() * 3`. Im Fenster «Quelle in OBS anlegen» reichte diese Rechnung im Test nicht (45 statt 48 Pixel für drei Zeilen, `tst_fensterbearbeiten`, 2026-11-07), dort misst sie nun drei gesetzte Zeilen. Der Test setzt nur das Stylesheet, nicht die Schrift der Anwendung (`src/app/main.cpp`); ob die Rechnung auch mit der echten Schrift zu knapp ist, und ob beim Dialog «Einstellungen» eine dreizeilige Meldung abgeschnitten wird, ist nicht geprüft. Nicht im Auftrag.
+94. Aus P10c: Ein Klick auf den OBS-Knopf ohne Verbindung zum Kern bleibt ohne Rückmeldung, denn der Menüeintrag «Einstellungen …» ist dann gesperrt. Der Knopf sieht trotzdem aktiv aus. Sichtbar, also zu entscheiden: so lassen, Knopf sperren oder Meldung in der Statuszeile. Empfehlung: so lassen, der Knopf «Kern» zeigt das Problem schon.
+95. Aus P10c: Im Fenster «Quelle in OBS anlegen» bleibt eine ältere Abweisung des Kerns stehen, wenn OBS danach wegfällt; «Anlegen» ist dann gesperrt, ohne dass das Fenster den Grund nennt (OBS-Knopf und Zeile im Dock zeigen ihn). Grund: Die Meldung «Verbindung zu OBS abgebrochen …» kommt zusammen mit dem Zustand und muss stehen bleiben.
 
 ## Nicht geprüft
 
-6. Machbarkeitstests T-03 und T-05 siehe unten. T-05 kommt mit P10c, T-03 wird später eingeplant.
+6. Machbarkeitstests T-03 und T-05 siehe unten. T-05 ist mit P10c gebaut, die Prüfung mit dem echten OBS steht im Handtest aus; T-03 wird später eingeplant.
 9. Aus P01: Der GPU-Weg von Qt (Qt Quick) ist nicht gemessen; A und C nutzen QPainter in Software.
 12. Aus P02 (M2): Qt WebEngine rendert minimiert nicht (Abgriff schwarz), verdeckt und ausserhalb des Bildschirms schon. Mit zwei Overlays im selben Prozess nur 26 bis 29 neue Bilder pro Sekunde; Abgriff in getrennten Threads oder Prozessen nicht gemessen.
 14. Aus P03: Die Startprüfung beendet `dss-app` per SIGTERM (das Programm schliesst dann sein Fenster). Das Schliessen über den Schliessknopf des Fenstermanagers prüft nur der Handtest (bestanden am 2026-11-02); für eine automatische Prüfung fehlt ein Werkzeug wie `xdotool` (nicht installiert).
@@ -44,4 +48,4 @@ Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in
 | Nr. | Test | Entscheidet über | Stand |
 |---|---|---|---|
 | T-03 | NDI mit Alpha senden (1080p30, dann 1080p60, dann zwei Ausgänge), CPU, Verluste und Verzögerung am OBS-PC messen | NDI, Technikwahl | Netzwerk besteht (2026-11-03), offen |
-| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | Netzwerk besteht (2026-11-03), offen, kommt mit P10c |
+| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | gebaut mit P10c, gegen Testserver geprüft (2026-11-07); mit dem echten OBS offen bis zum Handtest P10c |

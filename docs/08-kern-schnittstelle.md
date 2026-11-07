@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-04 (P10b). Version der Schnittstelle: **10**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1).
+Stand: 2026-11-07 (P10c). Version der Schnittstelle: **11**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 11 (P10c)
+
+Neu ist die Anbindung an OBS (T-05, E-29): `obs_status` (Einzelheiten der Verbindung, nach `hello` und bei jeder Änderung an alle), `obs_sources` (Quellen in OBS je Overlay, ebenso), `obs_create_source` und `obs_add_to_scene`. `settings` trägt zusätzlich `obs_enabled`, `obs_host`, `obs_port` und `obs_password_set`, `update_settings` zusätzlich dieselben Werte und `obs_password` (Abschnitt «Einstellungen»). `connections.obs` zeigt seit P10c den echten Zustand. Neue Codes: `obs_not_connected`, `obs_name_taken`, `obs_source_missing`, `obs_timeout`. Ein Kern der Version 10 würde die neuen Anfragen mit `unknown_type` beantworten, und seinem `settings` fehlten die neuen Pflichtfelder. Darum stieg die Version.
 
 ### Version 10 (P10b)
 
@@ -74,6 +78,8 @@ Fenster                                 Kern
    | <--- import_progress ---------------- |   nur wenn gerade etwas übernommen wird
    | <--- connections -------------------- |
    | <--- server_status ------------------ |   seit Version 8 (P10)
+   | <--- obs_status --------------------- |   seit Version 11 (P10c)
+   | <--- obs_sources -------------------- |   seit Version 11 (P10c)
    | <--- stats (letzte Messung) --------- |
    | <--- stats ------------------------- |   einmal pro Sekunde
    | ---- get_overlay {id} --------------> |
@@ -105,15 +111,19 @@ Fenster                                 Kern
    | ---- get_browser_source {id} -------> |   seit Version 7 (P10)
    | <--- browser_source {url} ----------- |   nur an dieses Fenster, auch später von selbst
    |                ...                    |
+   | ---- obs_create_source {request_id 12}> |   seit Version 11 (P10c)
+   | <--- obs_sources -------------------- |   an alle
+   | <--- change_result {request_id 12} -- |   nur an dieses Fenster, Antwort kann dauern
+   |                ...                    |
    | ---- quit_request ------------------> |   normales Schliessen des Fensters
    | <--- quit_reply {accepted} ---------- |
    | ---- trennt -------------------------X|
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 10 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 10».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 11 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 11».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
-4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status` und, falls schon gemessen, die letzte `stats`.
+4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
@@ -143,11 +153,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `10` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `11` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":10,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":11,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -356,7 +366,7 @@ Quellen: https://man7.org/linux/man-pages/man5/proc_stat.5.html, https://man7.or
 
 ### `connections`
 
-Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es noch keine Verbindungen gibt. Werte wie die Eigenschaft `state` der Knöpfe: `off` (grau), `error` (rot), `connecting` (orange), `connected` (grün), siehe `docs/01-festlegungen.md`, «Verbindungsanzeige im Kopfbereich».
+Zustand der vier Verbindungen im Kopfbereich. Seit P10c zeigt `obs` den echten Zustand (`error` auch während der Wiederholungen, `connecting` nur beim ersten Versuch nach dem Start oder einer Änderung der Einstellungen, Entscheid F9); die anderen drei bleiben `off`, weil es sie noch nicht gibt. Werte wie die Eigenschaft `state` der Knöpfe: `off` (grau), `error` (rot), `connecting` (orange), `connected` (grün), siehe `docs/01-festlegungen.md`, «Verbindungsanzeige im Kopfbereich».
 
 | Feld | Typ | Inhalt |
 |---|---|---|
@@ -364,6 +374,37 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 ```json
 {"ndi":"off","obs":"off","twitch":"off","type":"connections","youtube":"off"}
+```
+
+### `obs_status` (seit Version 11, P10c)
+
+Einzelheiten der Verbindung zu OBS. Die Farbe des Knopfes steht weiter in `connections`. Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `message` | Text oder `null` | Meldung zum Zustand, zum Beispiel «OBS hat das Passwort abgelehnt. Im Dialog «Einstellungen» neu eingeben.» |
+| `obs_version`, `websocket_version` | Text oder `null` | Versionen, sobald verbunden |
+| `current_scene` | Objekt (`uuid`, `name`) oder `null` | aktuelle Szene (`CurrentProgramSceneChanged`), nur verbunden |
+| `scenes` | Liste von Objekten (`uuid`, `name`) | alle Szenen, nur verbunden, sonst leer |
+
+```json
+{"current_scene":{"name":"Live","uuid":"scene-live"},"message":null,"obs_version":"33.0.1","scenes":[{"name":"Live","uuid":"scene-live"},{"name":"Pause","uuid":"scene-pause"}],"type":"obs_status","websocket_version":"5.7.6"}
+```
+
+Das Passwort steht in keiner Nachricht an das Fenster, nur `obs_password_set` in `settings`.
+
+### `obs_sources` (seit Version 11, P10c)
+
+Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle. Die Liste enthält nur Overlays mit Zuordnung; ein Overlay ohne Eintrag hat keine Quelle in OBS. Die Adresse mit Token steht nicht darin.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `sources[].overlay_id` | Text | Kennung des Overlays |
+| `sources[].state` | Text | `present` (Quelle da, oder zuletzt da und OBS gerade nicht verbunden), `missing` (in OBS nicht mehr gefunden, Zuordnung bleibt, Entscheid F7), `none` |
+| `sources[].input_name` | Text | Name der Quelle in OBS, zuletzt bekannt |
+
+```json
+{"sources":[{"input_name":"Handtest P10c","overlay_id":"db7f47a9-dee3-4de5-b056-40b5b3507607","state":"present"}],"type":"obs_sources"}
 ```
 
 ### `quit_reply`
@@ -393,7 +434,7 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `10`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `11`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -403,10 +444,12 @@ Zustand der vier Verbindungen im Kopfbereich. In P07 immer `off` (grau), weil es
 | `update_settings` | siehe Abschnitt «Einstellungen» (seit Version 5) | `settings` an alle (wenn geändert), dann `change_result` |
 | `reset_settings` | `request_id` (seit Version 9, Abschnitt «Einstellungen») | `settings` an alle, dann `change_result` |
 | `get_browser_source` | `overlay_id` (Text oder `null` = keine Adresse mehr schicken; seit Version 7) | `browser_source` an diese Verbindung, danach bei jeder Änderung von selbst |
+| `obs_create_source` | `request_id`, `overlay_id`, `scene_uuid`, `name` (seit Version 11) | legt eine Browserquelle in OBS an und fügt sie in die Szene ein: `obs_sources` an alle, dann `change_result`. Die Antwort kommt später, OBS antwortet über das Netz |
+| `obs_add_to_scene` | `request_id`, `overlay_id`, `scene_uuid` (seit Version 11) | fügt die vorhandene Quelle in eine weitere Szene ein, dann `change_result` |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":10,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":11,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -552,12 +595,22 @@ Einstellungen des Kerns stehen in `kern.ini` im Ordner der Einstellungen der Ver
 [overlay-server]
 port=8081
 adresse-im-heimnetz=192.168.1.9
+
+[obs]
+aktiv=nein
+adresse=
+port=4455
 ```
 
 | Wert | Festlegung |
 |---|---|
 | `port` | Port des Overlay-Servers. Standard 8080 im Einsatz, 8081 in Arbeit (beide Versionen können gleichzeitig laufen). Gültig **1024 bis 32767**: Ports unter 1024 darf unter Linux nur ein Prozess mit besonderen Rechten öffnen (`/proc/sys/net/ipv4/ip_unprivileged_port_start` = 1024); ab 32768 vergibt Linux Ports für ausgehende Verbindungen (`/proc/sys/net/ipv4/ip_local_port_range` = 32768 60999), ein Port dort kann beim Start des Servers zufällig belegt sein. Werte gemessen auf dem Studio-PC am 2026-11-03 mit `cat`. Quelle: ip(7), https://man7.org/linux/man-pages/man7/ip.7.html |
 | `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Ist sie leer (beim Start oder später, zum Beispiel ohne Kabel beim Start), prüft der Kern seit P10b (Punkt 85) alle 2 s die Standardroute und trägt, sobald es eine gibt, die Adresse ihrer Netzwerkkarte ein, schreibt die Datei, schickt `settings` an alle und startet den Overlay-Server mit der Adresse neu (`HomeAddressWatcher` in `src/common/coresettings.h`); ein Neustart ist nicht nötig. Eine eingetragene Adresse ermittelt er nie neu. Bei ungültiger Datei trägt er nichts ein. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch nach 2 s. Seit P10 (Punkt 78) nimmt `update_settings` nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, IPv4 ohne 127.x.x.x), sonst «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»; die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt (Kabel) |
+| `[obs] aktiv` | `ja` oder `nein`, Standard `nein`. «Mit OBS verbinden» im Dialog; braucht eine Adresse (P10c) |
+| `[obs] adresse` | Adresse von obs-websocket auf dem Streaming-PC: Buchstaben, Ziffern, `.` und `-`, leer erlaubt. Nicht auf Adressen dieses PCs beschränkt, die Tests nutzen `127.0.0.1` |
+| `[obs] port` | Port von obs-websocket, 1 bis 65535, Standard 4455 |
+
+Das Passwort von OBS steht nicht in `kern.ini` (Regel 12), sondern verschlüsselt in `obs-passwort.cred` neben ihr, Rechte 0600, je Version getrennt (`src/obs/obssecretstore.h`, `systemd-creds --user`, Entscheid F1). Der Kern ruft `systemd-creds` über `QProcess` mit stdin und stdout auf, das Passwort steht nie in der Befehlszeile. Quelle: https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html. Grenze: Andere Programme desselben Benutzers könnten es ebenfalls entschlüsseln, und der Host-Schlüssel liegt auf derselben Platte.
 
 Ist die Datei ungültig (unbekannte Angabe oder Abschnitt, doppelte Angabe, ungültiger Wert), gelten die Standardwerte, der Kern schreibt eine Warnung ins Protokoll, überschreibt die Datei nicht und weist `update_settings` ab, bis sie von Hand repariert oder mit `reset_settings` zurückgesetzt ist (unten).
 
@@ -572,14 +625,16 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `port_min`, `port_max` | ganze Zahlen | gültiger Bereich (1024, 32767); das Fenster stellt sein Zahlenfeld danach ein |
 | `file` | Text | Pfad von `kern.ini` |
 | `settings_error` | Text oder `null` | Meldung, wenn die Datei ungültig ist |
+| `obs_enabled`, `obs_host`, `obs_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[obs]`, seit Version 11 |
+| `obs_password_set` | wahr/falsch | Ein Passwort ist gespeichert. Der Wert selbst geht nie an ein Fenster (Regel 12), seit Version 11 |
 
 ```json
-{"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"192.168.1.9","port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
+{"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"192.168.1.9","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
 
-Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl) und `home_address` (Text, leer erlaubt). Nur angegebene Werte ändern sich. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
+Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen). Nur angegebene Werte ändern sich. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
 
 ```json
 {"type":"update_settings","request_id":9,"port":8090}
@@ -594,7 +649,16 @@ Punkt 77 (Entscheid 2026-11-03): Knopf «Auf Standardwerte zurücksetzen» im Di
 {"type":"reset_settings","request_id":4}
 ```
 
-`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4).
+`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4). Das Passwort von OBS lässt sich über `dss-cli` nicht setzen.
+
+## Anbindung an OBS (P10c, T-05, E-29)
+
+Code: `src/obs/` (`dss_obs`, ohne Qt Gui, bindet `protocol.h` nicht ein). Protokoll obs-websocket 5.x, RPC 1, Unterprotokoll `obswebsocket.json`, über Qt WebSockets. Quelle: https://raw.githubusercontent.com/obsproject/obs-websocket/master/docs/generated/protocol.md. Geprüft in `ctest` gegen einen Testserver auf `127.0.0.1` (`tests/obstestserver.h`), gegen das echte OBS nur im Handtest.
+
+- **Verbinden:** `ObsConnection` verbindet sich, wenn `[obs] aktiv=ja`. Nach einem Fehlschlag neuer Versuch nach 2 s, Grenze je Versuch 5 s, Ping alle 5 s, ohne Antwort nach 10 s gilt die Verbindung als tot. Schliesst OBS mit 4009 (Anmeldung), 4010 oder 4011 (Version), versucht es der Kern nicht mehr, bis die Einstellungen sich ändern oder «OK» gedrückt wird; Knopf rot, Meldung in `obs_status`. OBS beschäftigt (Status 207): dieselbe Anfrage höchstens fünfmal nach je 1 s.
+- **Ereignisfluss (Regel 14):** nicht gebaut, Punkt 92. `ObsConnection` gibt nach aussen nur `stateChanged` und `currentSceneChanged` mit eigenen Werten; verbunden an einer Stelle, `CoreService::setObsConnection`.
+- **Quellen:** `ObsSources` hält die Zuordnung in `obs-quellen.json` (`docs/06-overlay-format.md`). Beim Verbinden und bei Änderungen in OBS gleicht der Kern ab (`GetInputList` mit `browser_source`, `GetInputSettings` je Quelle): Name nachführen, Quelle mit genau der richtigen Adresse übernehmen (Entscheid F10), Adresse und Grösse bei Unterschied mit `SetInputSettings` nachführen, auch nachträglich nach einem Neustart von OBS (F11). Fehlt eine Quelle, bleibt die Zuordnung auf `missing`; nichts wird von selbst angelegt (F7). Während eines Wechsels der Szenensammlung zählt `InputRemoved` nicht. Die Lage in der Szene fasst das Studio nie an. Es löscht nichts in OBS; beim Löschen eines Overlays kommt eine Warnung (F8).
+- **Token:** Die Adresse mit Token steht in der Szenensammlung von OBS im Klartext, wie beim Eintragen von Hand. Sie steht nicht in `obs-quellen.json`, nicht in `obs_sources` und nicht im Protokoll.
 
 ## Overlay-Server (P10)
 
@@ -647,7 +711,11 @@ Der Token wird mit gleichbleibender Laufzeit verglichen (`constantTimeEquals` in
 | `unknown_folder` | Änderung mit einem Ordner, den es nicht gibt, in `liste.json` bzw. seit Version 10 in `medien.json` (nur in `change_result`) | – |
 | `in_use` | seit Version 10: `remove_media` mit einer Datei, die eine Quelle nutzt; Meldung mit «verwendet in» (nur in `change_result`) | nichts gelöscht |
 | `canceled` | seit Version 10: Übernahme mit `cancel_import` abgebrochen (nur in `change_result` der abgebrochenen Änderung) | nichts geändert, nichts in `media/` |
-| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen oder ungültige Einstellung (`update_settings`, `reset_settings`), zum Beispiel ungültiger Wert, Adresse nicht von diesem PC, Datei nicht lesbar, `liste.json` kaputt (nur in `change_result`) | nichts geändert |
+| `rejected` | Änderung vom Modell oder beim Kopieren der Datei abgewiesen oder ungültige Einstellung (`update_settings`, `reset_settings`), zum Beispiel ungültiger Wert, Adresse nicht von diesem PC, Datei nicht lesbar, `liste.json` kaputt; seit Version 11 auch `obs_create_source` und `obs_add_to_scene`, die OBS oder der Kern abweist, zum Beispiel Szene nicht mehr da, Name leer, keine Adresse (nur in `change_result`) | nichts geändert |
+| `obs_not_connected` | seit Version 11: `obs_create_source` oder `obs_add_to_scene` ohne Verbindung zu OBS oder Verbindung während der Anfrage verloren; im zweiten Fall sagt die Meldung, dass es sich nach dem Wiederverbinden zeigt (nur in `change_result`) | – |
+| `obs_name_taken` | seit Version 11: Name in OBS schon vergeben (nur in `change_result`) | nichts angelegt |
+| `obs_source_missing` | seit Version 11: `obs_add_to_scene`, die Quelle oder die Szene gibt es in OBS nicht mehr (nur in `change_result`) | – |
+| `obs_timeout` | seit Version 11: OBS hat nicht rechtzeitig geantwortet (nur in `change_result`) | – |
 | `save_failed` | verzögertes Speichern gescheitert (als `error` an alle, `request` `null`) | Änderung bleibt im Speicher, neuer Versuch |
 | `message_too_long` | Zeile länger als 16 MiB | Kern trennt die Verbindung |
 

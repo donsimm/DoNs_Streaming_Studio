@@ -30,6 +30,10 @@ https://github.com/donsimm/donstv_Studio (CLAUDE.md, docs/01 bis 05)
 - OBS 33 (CEF, Plugin-Umbau): https://www.linuxcompatible.org/story/obs-studio-330rc1-released-major-plugin-rework-and-cef-upgrade-lead-the-way/
 - Flatpak-Unterstützung: https://www.gamingonlinux.com/2022/02/obs-studio-272-is-out-bringing-flatpak-support-and-much-more/page=1/
 - obs-websocket: https://github.com/obsproject/obs-websocket und https://github.com/obsproject/obs-websocket/blob/release/5.0.0/docs/generated/protocol.md
+- obs-websocket, Stand `master`, gelesen für P10c am 2026-11-07: https://raw.githubusercontent.com/obsproject/obs-websocket/master/docs/generated/protocol.md, https://raw.githubusercontent.com/obsproject/obs-websocket/master/src/utils/Obs_ArrayHelper.cpp, https://raw.githubusercontent.com/obsproject/obs-websocket/master/src/requesthandler/RequestHandler_Inputs.cpp, https://raw.githubusercontent.com/obsproject/obs-websocket/master/src/requesthandler/RequestHandler_SceneItems.cpp, https://raw.githubusercontent.com/obsproject/obs-websocket/master/src/requesthandler/rpc/Request.cpp
+- Fernsteuerung und Browserquelle: https://obsproject.com/kb/remote-control-guide, https://raw.githubusercontent.com/obsproject/obs-browser/master/obs-browser-source.cpp
+- Qt WebSockets und Speichern (P10c): https://doc.qt.io/qt-6.8/qwebsocket.html, https://doc.qt.io/qt-6.8/qwebsockethandshakeoptions.html, https://doc.qt.io/qt-6.8/qwebsocketserver.html, https://doc.qt.io/qt-6.8/qsavefile.html
+- Passwort von OBS (P10c): https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html
 
 ## NDI
 

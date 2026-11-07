@@ -14,12 +14,14 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 │   └── <SHA-256>.<Endung>    Kopien der Dateien des Nutzers (Bild, Video, Schrift)
 ├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
 ├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
+├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
 - **overlays/**: Jede Datei ist JSON in UTF-8. Gespeichert wird atomar (`QSaveFile`: temporäre Datei, danach Umbenennen).
 - **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
+- **obs-quellen.json** (seit P10c, E-29): Zuordnung Overlay zu Browserquelle in OBS, gespeichert atomar (`QSaveFile`), nur vom Kern. Inhalt: `{"format":1,"quellen":[{"overlay":"<Kennung>","input_uuid":"<Kennung in OBS>","input_name":"<Name in OBS>"}]}`. Die Zuordnung läuft über `input_uuid`, bleibt also beim Umbenennen in OBS gültig. Fehlt die Quelle in OBS, bleibt der Eintrag: Bei einer anderen Szenensammlung fehlt sie nur scheinbar. Ohne Token und ohne Adresse. Ungültige Datei: wird in `obs-quellen.json.ungueltig-<JJJJMMTT-hhmmss>` umbenannt, der Kern beginnt ohne Zuordnung (bestehende Quellen übernimmt der Abgleich, wenn die Adresse genau stimmt).
 
 ## Liste (`liste.json`)
 

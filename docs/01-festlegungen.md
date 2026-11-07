@@ -39,6 +39,19 @@ Stand: 2026-11-07. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 
 - Kein OBS-Plugin. Die Software läuft eigenständig auf dem Studio-PC. OBS holt die Overlays als Browserquelle (später per NDI) und wird per obs-websocket gesteuert. (entschieden: Plugins nicht für den Kern; Vorschlag: obs-websocket für die Steuerung)
 - Ein Plugin wäre nur für eine kleine Hilfsfunktion auf der OBS-Seite denkbar, die weder Browserquelle, NDI noch obs-websocket leisten. Aktuell nicht nötig.
+- Anbindung an OBS (P10c, Entscheide des Nutzers vom 2026-11-07, F1 bis F12): Der Code hängt nur vom Protokoll ab, nicht vom Betriebssystem oder der Installationsart von OBS und nicht vom Namen der Szenensammlung.
+  - F1 Passwort: verschlüsselt durch das System ohne Nachfrage (`systemd-creds --user`, Datei `obs-passwort.cred`), nie im Klartext (Regel 12).
+  - F2 «In OBS anlegen»: kleines Fenster mit Name und Szene, aktuelle Szene vorgewählt.
+  - F3 Einstellung: Bereich «OBS» im Dialog «Einstellungen», Klick auf den OBS-Knopf öffnet ihn.
+  - F4 Knopf: eigene Zeile «OBS» im Dock «Steuerung» mit Zustandstext.
+  - F5 Neue Quelle ist sofort sichtbar, wie beim Hinzufügen in OBS.
+  - F6 Hat das Overlay schon eine Quelle: Der Knopf wird zu «In weitere Szene einfügen …» und nutzt dieselbe Quelle.
+  - F7 Von Hand gelöscht: Hinweis «Quelle in OBS fehlt», Knopf wieder aktiv, nichts passiert von selbst.
+  - F8 Overlay im Studio gelöscht: Die Quelle bleibt in OBS und ist leer, das Studio zeigt einen Hinweis und löscht nichts in OBS.
+  - F9 OBS-Knopf bei geschlossenem OBS: rot; orange nur beim ersten Versuch nach Start oder Änderung der Einstellungen.
+  - F10 Von Hand angelegte Quellen mit genau der richtigen Adresse werden automatisch übernommen.
+  - F11 Die Grösse der Quelle in OBS folgt der Auflösung des Overlays; die Lage in der Szene bleibt unberührt.
+  - F12 Aktuelle Szene: nur im Tooltip des OBS-Knopfes.
 
 ## Betrieb im Netz
 
@@ -56,7 +69,7 @@ Stand: 2026-11-07. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 - Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen: siehe Abschnitt «Konzept der zwei Zeichner».
 - Video mit Alpha in der eigenen Leinwand: eigener Dekodierweg über libavcodec mit `libvpx-vp9` (gemessen in P02, M1). Qt Multimedia 6.8.2 liefert den Alpha nicht.
 - Sprache des Kerns (Hintergrundprogramm): entschieden (2026-11-02, vom Nutzer bestätigt): C++, dieselbe Sprache und Werkzeugkette wie das Fenster. Begründung: gemeinsamer Code für Leinwand-Modell, Dekodierung und Zeichnen. Ungeprüft: Was Qt 6.8.2 unter Debian 13 für Webserver und Twitch-Anbindung mitbringt; das klärt der Prompt für den Kern.
-- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket). Seit 2026-11-03 besteht das Netzwerk; T-04 ist erledigt (Handtest P10 mit OBS, 2026-11-04), T-05 kommt mit P10c, T-03 ist offen.
+- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket). Seit 2026-11-03 besteht das Netzwerk; T-04 ist erledigt (Handtest P10 mit OBS, 2026-11-04), T-05 ist mit P10c gebaut (Prüfung mit dem echten OBS im Handtest P10c), T-03 ist offen.
 
 ## Konzept der zwei Zeichner
 

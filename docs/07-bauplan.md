@@ -28,11 +28,11 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P10c | Anbindung an OBS | T-05 (obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart) und E-29 (Browserquelle direkt in OBS anlegen und nachführen). Passwort von OBS nie im Klartext (Regel 12). Entscheid des Nutzers 2026-11-04 | P10b | E-29 |
+| P10c | Anbindung an OBS | Gebaut (2026-11-07), Handtest und Abnahme stehen aus; Bericht `docs/archiv/berichte/P10c-bericht.md`. T-05 (obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart) und E-29 (Browserquelle direkt in OBS anlegen und nachführen). Passwort von OBS nie im Klartext (Regel 12). Schnittstelle Version 11. Entscheid des Nutzers 2026-11-04 | P10b | E-29 |
 | P11 | Bildvergleich der zwei Zeichner | K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen. Editor rechnet Farben von Videos wie Chromium (Punkt 79). WebM mit Drehangabe prüfen, bei Abweichung neutralisieren (Punkt 80) | P10 | (Voraussetzung für K-07) |
 | P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar | P09 | E-20, E-21 |
 
-Danach (Reihenfolge noch offen): SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); Chat-Bot-Modul; NDI (E-19, T-03).
+Danach (Reihenfolge noch offen): SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); Chat-Bot-Modul; Twitch-Verbindung mit Ereignisfluss (Regel 14, Punkt 92); NDI (E-19, T-03).
 
 ## Offene Fragen zur Reihenfolge
 
