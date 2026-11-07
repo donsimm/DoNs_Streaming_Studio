@@ -31,7 +31,7 @@ QString configDir(Edition edition = buildEdition());
 
 // Eigene Symbole des Nutzers: ~/.config/dons-streaming-studio/symbole für beide Versionen
 // (nur lesen, P10a). Liegt ausserhalb des Repos, weil das Repo öffentlich ist
-// (docs/04-offene-punkte.md, «Entschieden nach P06»).
+// (docs/archiv/04-erledigte-punkte.md, «Entschieden nach P06»).
 QString userSymbolDir();
 
 // Pfad der ersten vorhandenen Datei fileName in dirs (in dieser Reihenfolge), leer, wenn

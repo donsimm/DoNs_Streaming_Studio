@@ -93,7 +93,7 @@ Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, AS
 
 ## Bildschirmschoner und Sperre
 
-Abgeschaltet am 2026-11-02 (Entscheid des Nutzers, Punkt 26 in `docs/04-offene-punkte.md`), damit Prüfungen mit Fenstern nicht von der Sperre unterbrochen werden. Nur für den Benutzer, keine Systemdateien geändert:
+Abgeschaltet am 2026-11-02 (Entscheid des Nutzers, Punkt 26 in `docs/archiv/04-erledigte-punkte.md`), damit Prüfungen mit Fenstern nicht von der Sperre unterbrochen werden. Nur für den Benutzer, keine Systemdateien geändert:
 
 - `~/.config/autostart/light-locker.desktop` mit `Hidden=true`: light-locker startet nicht mehr (Autostart-Spezifikation, https://specifications.freedesktop.org/autostart-spec/latest/).
 - `~/.config/autostart/bildschirmschoner-aus.desktop` mit `Exec=xset s off`: Bildschirmschoner von X11 bei jeder Anmeldung aus.
