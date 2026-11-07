@@ -150,12 +150,14 @@ QString settingsDialogHint()
                           "Netzwerkkarte mit der Standardroute ein, sobald es eine gibt.");
 }
 
-QString obsPasswordPlaceholder(bool passwordSet, bool deleting)
+QString obsPasswordPlaceholder(const std::optional<SettingsInfo> &info, bool deleting)
 {
+    if (!info)
+        return {};
     if (deleting)
         return QStringLiteral("wird mit «OK» gelöscht");
-    return passwordSet ? QStringLiteral("gespeichert; leer lassen = behalten")
-                       : QStringLiteral("kein Passwort gespeichert");
+    return info->obsPasswordSet ? QStringLiteral("gespeichert; leer lassen = behalten")
+                                : QStringLiteral("kein Passwort gespeichert");
 }
 
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status)
@@ -198,15 +200,26 @@ ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const 
         row.problem = obsState == ConnectionState::Error;
     } else if (connected) {
         row.text = QStringLiteral("Noch keine Quelle in OBS");
-    } else if (obsState == ConnectionState::Connecting) {
-        row.text = QStringLiteral("Verbindung zu OBS wird aufgebaut");
-    } else if (obsState == ConnectionState::Error) {
-        row.text = QStringLiteral("OBS nicht verbunden");
-        row.problem = true;
     } else {
-        row.text = QStringLiteral("OBS nicht eingerichtet oder abgeschaltet");
+        // Dieselben Worte für die Zustände wie die Verbindungsknöpfe
+        row.text = connectionStateText(Connection::Obs, obsState);
+        row.problem = obsState == ConnectionState::Error;
     }
     return row;
+}
+
+ObsSourceDialogState obsSourceDialogState(bool coreConnected, ConnectionState obsState, int sceneCount,
+                                          const QString &name, bool pending)
+{
+    ObsSourceDialogState state;
+    const bool connected = coreConnected && obsState == ConnectionState::Connected;
+    if (!coreConnected)
+        state.problem = QStringLiteral("Keine Verbindung zum Kern, OBS nicht verfügbar.");
+    else if (!connected)
+        state.problem = QStringLiteral("OBS ist nicht verbunden.");
+    state.canEdit = connected && !pending;
+    state.canSubmit = state.canEdit && sceneCount > 0 && !name.trimmed().isEmpty();
+    return state;
 }
 
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info)

@@ -1,6 +1,7 @@
 #include "obssourcedialog.h"
 
 #include "coreclient.h"
+#include "windowdata.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -21,12 +22,12 @@ ObsSourceDialog::ObsSourceDialog(dss::CoreClient *client, QWidget *parent)
     m_scene->setObjectName(QStringLiteral("obsSourceScene"));
     form->addRow(QStringLiteral("Name"), m_name);
     form->addRow(QStringLiteral("Szene"), m_scene);
-    // Meldung des Kerns: Platz für drei Zeilen von Anfang an (Regel 9), wie im Dialog «Einstellungen»
+    // Meldung des Kerns: Platz für drei gesetzte Zeilen von Anfang an (Regel 9)
     m_problem = new QLabel(this);
     m_problem->setObjectName(QStringLiteral("obsSourceProblem"));
     m_problem->setWordWrap(true);
     m_problem->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    m_problem->setFixedHeight(fontMetrics().lineSpacing() * 3);
+    m_problem->setFixedHeight(fontMetrics().size(0, QStringLiteral("a\nb\nc")).height());
     form->addRow(m_problem);
     auto *buttons = new QDialogButtonBox(this);
     m_ok = buttons->addButton(QStringLiteral("Anlegen"), QDialogButtonBox::AcceptRole);
@@ -61,18 +62,14 @@ void ObsSourceDialog::showFor(const QUuid &overlayId, const QString &name, bool 
     m_name->setReadOnly(addToScene);
     m_problem->clear();
     m_stateProblem.clear();
-    // Vorgewählt ist die aktuelle Szene (F2).
     m_scene->clear();
+    m_selectedScene.clear();
     refreshScenes();
-    const std::optional<dss::ObsStatusInfo> status = m_client->obsStatus();
-    if (status) {
-        const int current = m_scene->findData(status->currentScene.uuid);
-        if (current >= 0)
-            m_scene->setCurrentIndex(current);
-    }
     updateState();
     open();
-    if (!addToScene) {
+    if (addToScene) {
+        m_scene->setFocus();
+    } else {
         m_name->setFocus();
         m_name->selectAll();
     }
@@ -81,13 +78,18 @@ void ObsSourceDialog::showFor(const QUuid &overlayId, const QString &name, bool 
 void ObsSourceDialog::refreshScenes()
 {
     const std::optional<dss::ObsStatusInfo> status = m_client->obsStatus();
-    const QString selected = m_scene->currentData().toString();
+    // Ohne OBS ist die Liste leer; die Wahl bleibt für das Wiederverbinden gemerkt.
+    if (m_scene->count() > 0)
+        m_selectedScene = m_scene->currentData().toString();
     m_scene->clear();
     if (status) {
         for (const dss::ObsSceneInfo &scene : status->scenes)
             m_scene->addItem(scene.name, scene.uuid);
     }
-    const int index = m_scene->findData(selected);
+    int index = m_scene->findData(m_selectedScene);
+    // Vorgewählt ist die aktuelle Szene (F2).
+    if (index < 0 && status)
+        index = m_scene->findData(status->currentScene.uuid);
     if (index >= 0)
         m_scene->setCurrentIndex(index);
 }
@@ -118,17 +120,16 @@ void ObsSourceDialog::onResult(const dss::ChangeResult &result)
 
 void ObsSourceDialog::updateState()
 {
-    const bool connected = m_client->connectionStates().value(dss::Connection::Obs) == dss::ConnectionState::Connected;
-    const QString problem = connected ? QString() : QStringLiteral("OBS ist nicht verbunden.");
-    const bool idle = m_pendingRequest == 0;
-    m_name->setEnabled(idle);
-    m_scene->setEnabled(idle && connected);
-    m_ok->setEnabled(idle && connected && m_scene->count() > 0 && !m_name->text().trimmed().isEmpty());
-    // Wie im Dialog «Einstellungen»: Meldung des Zustands setzen bzw. wieder entfernen; eine Meldung
-    // des Kerns zu einer Anfrage bleibt stehen.
-    if (!problem.isEmpty() && m_problem->text().isEmpty())
-        m_problem->setText(problem);
-    else if (problem.isEmpty() && !m_stateProblem.isEmpty() && m_problem->text() == m_stateProblem)
-        m_problem->clear();
-    m_stateProblem = problem;
+    const dss::ObsSourceDialogState state = dss::obsSourceDialogState(
+        m_client->isConnected(), m_client->connectionStates().value(dss::Connection::Obs), m_scene->count(),
+        m_name->text(), m_pendingRequest != 0);
+    m_name->setEnabled(state.canEdit);
+    m_scene->setEnabled(state.canEdit);
+    m_ok->setEnabled(state.canSubmit);
+    // Meldung des Zustands setzen, ersetzen oder entfernen. Anders als im Dialog «Einstellungen» ersetzt
+    // sie eine Meldung des Kerns nicht: «Verbindung zu OBS abgebrochen …» kommt zusammen mit dem
+    // Zustand und sagt, was aus der Anfrage wurde.
+    if (m_problem->text().isEmpty() || m_problem->text() == m_stateProblem)
+        m_problem->setText(state.problem);
+    m_stateProblem = state.problem;
 }

@@ -656,9 +656,10 @@ void MainWindow::refreshObsSource()
     QLabel *state = m_controlDock.obsSourceState;
     state->setText(row.text);
     state->setToolTip(row.text);
-    if (state->property("problem").toBool() != row.problem) {
-        state->setProperty("problem", row.problem);
-        // Das Stylesheet wertet [problem="…"] nur beim Polieren aus.
+    const QString stateKey = row.problem ? QStringLiteral("problem") : QStringLiteral("normal");
+    if (state->property("state").toString() != stateKey) {
+        state->setProperty("state", stateKey);
+        // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
         state->style()->unpolish(state);
         state->style()->polish(state);
     }
@@ -678,7 +679,8 @@ void MainWindow::showObsSourceDialog()
     }
     const dss::ObsSourceInfo source = m_client->obsSource(m_selectedOverlay);
     const dss::OverlaySummary *summary = m_client->listData().summary(m_selectedOverlay);
-    const bool addToScene = source.state == dss::ObsSourceState::Present;
+    const bool addToScene = dss::obsSourceRow(
+        true, m_client->connectionStates().value(dss::Connection::Obs, dss::ConnectionState::Off), source).addsToScene;
     m_obsSourceDialog->showFor(m_selectedOverlay,
                                addToScene ? source.inputName : (summary ? summary->name : QString()), addToScene);
 }
@@ -878,6 +880,7 @@ void MainWindow::refreshActions()
     m_controlDock.copyAddress->setEnabled(canCopy);
     m_controlDock.newToken->setEnabled(edit && overlay);
     m_controlDock.outputState->setEnabled(connected && overlay);
+    m_controlDock.obsSourceState->setEnabled(connected && overlay);
 #endif
     if (!(edit && source))
         d.italic->setEnabled(false);

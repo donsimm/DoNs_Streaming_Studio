@@ -148,9 +148,14 @@ private slots:
         f.obsEnabled = false;
         QVERIFY(!settingsUpdateFromForm(current, f, true));
 
-        QVERIFY(obsPasswordPlaceholder(true, false).contains(QStringLiteral("behalten")));
-        QVERIFY(obsPasswordPlaceholder(false, false).contains(QStringLiteral("kein Passwort")));
-        QVERIFY(obsPasswordPlaceholder(true, true).contains(QStringLiteral("gelöscht")));
+        SettingsInfo info;
+        info.obsPasswordSet = true;
+        QVERIFY(obsPasswordPlaceholder(info, false).contains(QStringLiteral("behalten")));
+        QVERIFY(obsPasswordPlaceholder(info, true).contains(QStringLiteral("gelöscht")));
+        info.obsPasswordSet = false;
+        QVERIFY(obsPasswordPlaceholder(info, false).contains(QStringLiteral("kein Passwort")));
+        // Ohne Einstellungen vom Kern ist es nicht bekannt
+        QVERIFY(obsPasswordPlaceholder(std::nullopt, false).isEmpty());
     }
 
     void obsToolTipTexts()
@@ -171,6 +176,26 @@ private slots:
         QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden (OBS 33.0.1)"));
         status.currentScene = {QStringLiteral("a"), QStringLiteral("Live")};
         QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden (OBS 33.0.1, Szene «Live»)"));
+    }
+
+    // P10c, E-29: Fenster «Quelle in OBS anlegen»
+    void obsSourceDialogStates()
+    {
+        const QString name = QStringLiteral("Quelle");
+        ObsSourceDialogState state = obsSourceDialogState(true, ConnectionState::Connected, 2, name, false);
+        QVERIFY(state.problem.isEmpty() && state.canEdit && state.canSubmit);
+        // Leerer Name, keine Szene, laufende Anfrage: nicht bestätigen
+        QVERIFY(!obsSourceDialogState(true, ConnectionState::Connected, 2, QStringLiteral("  "), false).canSubmit);
+        QVERIFY(!obsSourceDialogState(true, ConnectionState::Connected, 0, name, false).canSubmit);
+        state = obsSourceDialogState(true, ConnectionState::Connected, 2, name, true);
+        QVERIFY(state.problem.isEmpty() && !state.canEdit && !state.canSubmit);
+        // Ohne OBS, ohne Kern: je eine eigene Meldung, alles gesperrt
+        state = obsSourceDialogState(true, ConnectionState::Error, 0, name, false);
+        QCOMPARE(state.problem, QStringLiteral("OBS ist nicht verbunden."));
+        QVERIFY(!state.canEdit && !state.canSubmit);
+        state = obsSourceDialogState(false, ConnectionState::Off, 0, name, false);
+        QVERIFY(state.problem.contains(QStringLiteral("Kern")));
+        QVERIFY(!state.canEdit && !state.canSubmit);
     }
 
     // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
@@ -211,12 +236,13 @@ private slots:
         QVERIFY(!row.canAct && row.problem);
         QCOMPARE(row.buttonText, add);
         row = obsSourceRow(true, ConnectionState::Error, none);
-        QCOMPARE(row.text, QStringLiteral("OBS nicht verbunden"));
+        QCOMPARE(row.text, connectionStateText(Connection::Obs, ConnectionState::Error));
         QVERIFY(!row.canAct && row.problem);
         row = obsSourceRow(true, ConnectionState::Connecting, none);
+        QCOMPARE(row.text, connectionStateText(Connection::Obs, ConnectionState::Connecting));
         QVERIFY(!row.canAct && !row.problem);
         row = obsSourceRow(true, ConnectionState::Off, none);
-        QCOMPARE(row.text, QStringLiteral("OBS nicht eingerichtet oder abgeschaltet"));
+        QCOMPARE(row.text, QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"));
         QVERIFY(!row.canAct && !row.problem);
         // Tooltip nennt den Grund für den gesperrten Knopf
         QVERIFY(row.buttonToolTip.contains(QStringLiteral("verbundenem OBS")));

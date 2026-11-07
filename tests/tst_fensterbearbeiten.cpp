@@ -1566,7 +1566,7 @@ private slots:
         auto *newToken = m_window->findChild<QPushButton *>(QStringLiteral("browserSourceNewToken"));
         QVERIFY(state && button && newToken);
         selectOverlayNamed(QStringLiteral("Test Szene"));
-        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("OBS nicht eingerichtet oder abgeschaltet"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"), 3000);
         QVERIFY(!button->isEnabled());
         QCOMPARE(button->text(), QStringLiteral("In OBS anlegen …"));
 
@@ -1613,6 +1613,13 @@ private slots:
         QVERIFY(dialog->isVisible());
         QCOMPARE(problem->height(), problemHeight);
         QVERIFY(ok->isEnabled());
+        // Auch die längste Meldung passt in die feste Höhe (Regel 9)
+        const QString shownMessage = problem->text();
+        problem->setText(QStringLiteral("Verbindung zu OBS abgebrochen. Ob die Quelle angelegt wurde, zeigt sich nach dem Wiederverbinden."));
+        QVERIFY2(problem->heightForWidth(problem->width()) <= problem->height(),
+                 qPrintable(QStringLiteral("Breite %1, nötig %2, Platz %3")
+                                .arg(problem->width()).arg(problem->heightForWidth(problem->width())).arg(problem->height())));
+        problem->setText(shownMessage);
         // Meldung nur im Fenster, nicht in der Statuszeile
         QVERIFY(!m_window->statusBar()->currentMessage().contains(QStringLiteral("Besetzt")));
 
@@ -1664,7 +1671,7 @@ private slots:
         // Von Hand gelöscht: rot, Knopf wieder «In OBS anlegen …» (F7)
         server.removeInputWithEvent(uuid);
         QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Quelle in OBS fehlt"), 3000);
-        QCOMPARE(state->property("problem").toBool(), true);
+        QCOMPARE(state->property("state").toString(), QStringLiteral("problem"));
         QCOMPARE(button->text(), QStringLiteral("In OBS anlegen …"));
         QVERIFY(button->isEnabled());
 
@@ -1672,13 +1679,22 @@ private slots:
         QTest::mouseClick(button, Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible(), 3000);
         QVERIFY(ok->isEnabled());
+        scene->setCurrentIndex(scene->findText(QStringLiteral("Live"))); // aktuell ist «Pause»
         server.stop();
         QTRY_VERIFY_WITH_TIMEOUT(!ok->isEnabled(), 10000);
         QCOMPARE(problem->text(), QStringLiteral("OBS ist nicht verbunden."));
+        QVERIFY(!name->isEnabled());
+        // OBS wieder da: Die gewählte Szene gilt weiter, die Meldung ist weg
+        QVERIFY(server.start());
+        QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 30000);
+        QCOMPARE(scene->currentText(), QStringLiteral("Live"));
+        QVERIFY(problem->text().isEmpty());
+        server.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!ok->isEnabled(), 10000);
         clickButton(dialog, QStringLiteral("Abbrechen"));
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(!button->isEnabled(), 3000);
-        QCOMPARE(state->property("problem").toBool(), true);
+        QCOMPARE(state->property("state").toString(), QStringLiteral("problem"));
 
         // Ohne Quelle: Rückfrage wie bisher. Aufräumen: OBS aus für die folgenden Tests
         update = SettingsUpdate();

@@ -433,7 +433,7 @@ ControlDock createControlDock(QWidget *parent)
     // Längeres steht im Tooltip.
     auto *obsState = new QLabel(QStringLiteral("–"), content);
     obsState->setWordWrap(true);
-    obsState->setFixedHeight(obsState->fontMetrics().lineSpacing() * 2);
+    obsState->setFixedHeight(obsState->fontMetrics().size(0, QStringLiteral("a\nb")).height());
     obsState->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     auto *obsButton = new QPushButton(QStringLiteral("In OBS anlegen …"), content);
     obsButton->setEnabled(false);
@@ -458,7 +458,7 @@ ControlDock createControlDock(QWidget *parent)
     gridSize->setSuffix(QStringLiteral(" px"));
     keepValueVisible(gridSize);
     auto *clearGuides = new QPushButton(QStringLiteral("Hilfslinien löschen"), content);
-    for (QWidget *w : std::initializer_list<QWidget *>{address, copy, newToken, output, outputState,
+    for (QWidget *w : std::initializer_list<QWidget *>{address, copy, newToken, output, outputState, obsState,
                                                        preview, previewSmall, snap, gridCheck,
                                                        gridSize, clearGuides})
         w->setEnabled(false);

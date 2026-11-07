@@ -91,8 +91,9 @@ std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current
 QString settingsDialogHint();
 // Meldung im Dialog: Datei ungültig (settings_error) bzw. ohne Verbindung; sonst leer.
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info);
-// P10c: Platzhalter im Passwortfeld. Der Wert selbst kommt nie vom Kern (Regel 12).
-QString obsPasswordPlaceholder(bool passwordSet, bool deleting);
+// P10c: Platzhalter im Passwortfeld. Der Wert selbst kommt nie vom Kern (Regel 12). Ohne Einstellungen
+// vom Kern ist unbekannt, ob ein Passwort gespeichert ist: leer.
+QString obsPasswordPlaceholder(const std::optional<SettingsInfo> &info, bool deleting);
 // P10c: Tooltip des OBS-Knopfes: «OBS: verbunden (OBS 33.0.1, Szene «Live»)», bei einem Problem die
 // Meldung des Kerns, sonst wie die anderen Knöpfe.
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status);
@@ -107,6 +108,15 @@ struct ObsSourceRow
     bool addsToScene = false; // Quelle da: der Knopf fügt sie in eine weitere Szene ein
 };
 ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const ObsSourceInfo &source);
+// P10c, E-29: Zustand des Fensters «Quelle in OBS anlegen». pending: Eine Anfrage läuft.
+struct ObsSourceDialogState
+{
+    QString problem;        // Meldung des Zustands, sonst leer
+    bool canEdit = false;   // Felder frei
+    bool canSubmit = false; // Knopf frei; leerer Name lässt sich nicht bestätigen (gleiche Prüfung wie im Kern)
+};
+ObsSourceDialogState obsSourceDialogState(bool coreConnected, ConnectionState obsState, int sceneCount,
+                                          const QString &name, bool pending);
 
 // --- Browserquelle (P10, Teil C) ---
 

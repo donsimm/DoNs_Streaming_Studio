@@ -71,7 +71,10 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     form->addRow(QString(), m_obsEnabled);
     form->addRow(QStringLiteral("Adresse von OBS"), m_obsHost);
     form->addRow(QStringLiteral("Port von obs-websocket"), m_obsPort);
-    form->addRow(QStringLiteral("Passwort"), passwordRow);
+    // addRow mit Layout verknüpft die Beschriftung nicht von selbst mit dem Feld.
+    auto *passwordLabel = new QLabel(QStringLiteral("Passwort"), this);
+    passwordLabel->setBuddy(m_obsPassword);
+    form->addRow(passwordLabel, passwordRow);
     column->addLayout(form);
 
     connect(m_obsDeletePassword, &QPushButton::clicked, this, [this] {
@@ -220,7 +223,7 @@ void SettingsDialog::updateState()
         w->setEnabled(usable && m_pendingRequest == 0);
     const bool passwordSet = info && info->obsPasswordSet;
     m_obsDeletePassword->setEnabled(usable && m_pendingRequest == 0 && passwordSet && !m_deleteObsPassword);
-    m_obsPassword->setPlaceholderText(dss::obsPasswordPlaceholder(passwordSet, m_deleteObsPassword));
+    m_obsPassword->setPlaceholderText(dss::obsPasswordPlaceholder(info, m_deleteObsPassword));
     m_ok->setEnabled(usable && m_pendingRequest == 0);
     m_reset->setEnabled(m_client->isConnected() && info && !info->error.isEmpty() && m_pendingRequest == 0);
     // Meldung des Zustands (ohne Verbindung, Datei ungültig) setzen bzw. wieder entfernen; eine

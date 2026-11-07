@@ -46,5 +46,6 @@ private:
     QUuid m_overlayId;
     bool m_addToScene = false;
     qint64 m_pendingRequest = 0;
-    QString m_stateProblem; // zuletzt gezeigte Meldung aus updateState
+    QString m_stateProblem;  // zuletzt gezeigte Meldung aus updateState
+    QString m_selectedScene; // gewählte Szene, auch solange die Liste ohne OBS leer ist
 };
