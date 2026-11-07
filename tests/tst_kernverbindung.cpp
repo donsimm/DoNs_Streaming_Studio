@@ -620,6 +620,140 @@ private slots:
         QVERIFY2(log.contains(QStringLiteral("OBS: Passwort verschlüsselt gespeichert")), qPrintable(log));
     }
 
+    // P10c, E-29: Quelle anlegen, in weitere Szene einfügen, Stand an alle, Overlay löschen (F8). Das
+    // Token bleibt aus Datei und Ausgabe. Eigener Kern, eigener Ordner.
+    void obsSources()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        QString error;
+        QUuid overlay;
+        QString token;
+        {
+            OverlayStore store(data.path());
+            QVERIFY(store.load(&error));
+            overlay = store.createOverlay(QStringLiteral("Quelle Test"), 1280, 720, &error);
+            QVERIFY2(!overlay.isNull(), qPrintable(error));
+            token = store.token(overlay);
+            QVERIFY(!token.isEmpty());
+        }
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("q.sock"));
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        const auto clientOf = [&socket]() {
+            CoreClient::Options o;
+            o.socketPath = socket;
+            o.program = QStringLiteral("tst_kernverbindung");
+            o.version = version();
+            o.reconnectIntervalMs = 200;
+            auto c = std::make_unique<CoreClient>(o);
+            c->start();
+            return c;
+        };
+        std::unique_ptr<CoreClient> one = clientOf();
+        std::unique_ptr<CoreClient> two = clientOf();
+        QTRY_VERIFY(one->isConnected() && two->isConnected());
+
+        // Nicht verbunden: Code obs_not_connected
+        QSignalSpy answered(one.get(), &CoreClient::obsRequestFinished);
+        QVERIFY(one->sendObsCreateSource(overlay, QStringLiteral("scene-live"), QStringLiteral("Neu")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        ChangeResult result = answered.takeFirst().first().value<ChangeResult>();
+        QVERIFY(!result.ok);
+        QCOMPARE(result.code, QString::fromLatin1(err::kObsNotConnected));
+        // Unbekanntes Overlay
+        QVERIFY(one->sendObsAddToScene(QUuid::createUuid(), QStringLiteral("scene-live")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        QCOMPARE(answered.takeFirst().first().value<ChangeResult>().code, QString::fromLatin1(err::kUnknownOverlay));
+
+        testhelp::ObsTestServer server;
+        QVERIFY(server.start());
+        SettingsUpdate update;
+        update.obsEnabled = true;
+        update.obsHost = QStringLiteral("127.0.0.1");
+        update.obsPort = server.port();
+        QSignalSpy settingsAnswered(one.get(), &CoreClient::settingsUpdateFinished);
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(settingsAnswered.size(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(one->connectionStates().value(Connection::Obs), ConnectionState::Connected, 10000);
+        // Szenen im Zustand, für die Auswahl im Anlegen-Fenster
+        QTRY_COMPARE(two->obsStatus()->scenes.size(), qsizetype(2));
+        QCOMPARE(two->obsStatus()->scenes.first().name, QStringLiteral("Live"));
+        QCOMPARE(two->obsSource(overlay).state, ObsSourceState::None);
+
+        // Name schon vergeben
+        server.addInput(QStringLiteral("Besetzt"), {{QStringLiteral("url"), QStringLiteral("http://anderes/")}});
+        QVERIFY(one->sendObsCreateSource(overlay, QStringLiteral("scene-live"), QStringLiteral("Besetzt")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        result = answered.takeFirst().first().value<ChangeResult>();
+        QCOMPARE(result.code, QString::fromLatin1(err::kObsNameTaken));
+        QCOMPARE(result.message, QStringLiteral("Der Name «Besetzt» ist in OBS schon vergeben."));
+
+        // Anlegen: Stand an beide, Adresse mit Token nur zu OBS
+        QVERIFY(one->sendObsCreateSource(overlay, QStringLiteral("scene-live"), QStringLiteral("Neu")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        result = answered.takeFirst().first().value<ChangeResult>();
+        QVERIFY2(result.ok, qPrintable(result.message));
+        QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::Present);
+        QCOMPARE(two->obsSource(overlay).inputName, QStringLiteral("Neu"));
+        const testhelp::ObsTestInput created = server.inputs.constLast();
+        QCOMPARE(created.name, QStringLiteral("Neu"));
+        QVERIFY(created.settings.value(QStringLiteral("url")).toString().contains(token));
+        QCOMPARE(created.settings.value(QStringLiteral("width")).toInt(), 1280);
+        QCOMPARE(created.settings.value(QStringLiteral("height")).toInt(), 720);
+        const QString inputUuid = created.uuid;
+
+        // Später verbunden: Stand nach hello
+        std::unique_ptr<CoreClient> late = clientOf();
+        QTRY_COMPARE(late->obsSource(overlay).state, ObsSourceState::Present);
+
+        // Zuordnung in der Datei, ohne Token
+        QFile file(data.filePath(QStringLiteral("obs-quellen.json")));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray text = file.readAll();
+        QVERIFY2(text.contains(inputUuid.toUtf8()), text.constData());
+        QVERIFY2(!text.contains(token.toUtf8()), text.constData());
+
+        // In weitere Szene
+        QVERIFY(one->sendObsAddToScene(overlay, QStringLiteral("scene-pause")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        QVERIFY(answered.takeFirst().first().value<ChangeResult>().ok);
+        QCOMPARE(server.sceneItems.value(QStringLiteral("scene-pause")), QStringList{inputUuid});
+
+        // Von Hand gelöscht: fehlt (F7)
+        server.removeInputWithEvent(inputUuid);
+        QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::Missing);
+        QVERIFY(one->sendObsAddToScene(overlay, QStringLiteral("scene-pause")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        QCOMPARE(answered.takeFirst().first().value<ChangeResult>().code, QString::fromLatin1(err::kObsSourceMissing));
+
+        // Overlay löschen: Hinweis (F8), Quelle bleibt in OBS. Dafür ist sie wieder da.
+        server.addInput(QStringLiteral("Neu"), created.settings);
+        server.sendEvent(QStringLiteral("InputCreated"), {{QStringLiteral("inputKind"), QStringLiteral("browser_source")}});
+        QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::Present);
+        const int inputs = int(server.inputs.size());
+        QSignalSpy changed(one.get(), &CoreClient::changeFinished);
+        ChangeRequest remove;
+        remove.type = QString::fromLatin1(msg::kRemoveOverlay);
+        remove.overlayId = overlay;
+        QVERIFY(one->sendChange(remove) > 0);
+        QTRY_COMPARE(changed.size(), 1);
+        result = changed.takeFirst().first().value<ChangeResult>();
+        QVERIFY2(result.ok, qPrintable(result.message));
+        QCOMPARE(result.warning, QStringLiteral("Die Quelle «Neu» bleibt in OBS und ist leer. Das Studio löscht nichts in OBS."));
+        QTRY_COMPARE(two->obsSource(overlay).state, ObsSourceState::None);
+        QCOMPARE(int(server.inputs.size()), inputs);
+
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        log += QString::fromUtf8(core->readAllStandardOutput());
+        log += QString::fromUtf8(core->readAllStandardError());
+        QVERIFY2(!log.contains(token), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("OBS: Quelle «Neu» angelegt")), qPrintable(log));
+    }
+
     // P10, Punkt 77: ungültige kern.ini über reset_settings zurücksetzen (eigener Kern mit eigener
     // kaputter Datei). Die alte Datei bleibt unter kern.ini.ungueltig-<Zeit> erhalten.
     void settingsResetInvalid()

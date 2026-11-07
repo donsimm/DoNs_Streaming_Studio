@@ -269,6 +269,10 @@ qt_add_executable(tst_obspasswort tst_obspasswort.cpp)
 target_link_libraries(tst_obspasswort PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obspasswort COMMAND tst_obspasswort)
 
+qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
+target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
+add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
+
 # P10, Stufe 1 der Prüfung der Browserquelle: Qt WebEngine (Chromium) lädt die Seite eines eigenen
 # Kerns über die Adresse im Heimnetz, Abgriff mit Durchsichtigkeit, Vergleich mit dss_render. In
 # der X11-Sitzung; ohne X11 oder ohne Adresse im Heimnetz übersprungen (77). Nur mit dem Server, dem

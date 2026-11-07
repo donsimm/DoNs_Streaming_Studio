@@ -1263,6 +1263,106 @@ bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *er
     return true;
 }
 
+QJsonObject obsSourcesMessage(const QList<ObsSourceInfo> &sources)
+{
+    QJsonArray list;
+    for (const ObsSourceInfo &s : sources) {
+        const char *state = s.state == ObsSourceState::Present   ? "present"
+                            : s.state == ObsSourceState::Missing ? "missing"
+                                                                 : "none";
+        list.append(QJsonObject{{QStringLiteral("overlay_id"), idText(s.overlayId)},
+                                {QStringLiteral("state"), QString::fromLatin1(state)},
+                                {QStringLiteral("input_name"), s.inputName}});
+    }
+    QJsonObject o = typed(msg::kObsSources);
+    o.insert(QStringLiteral("sources"), list);
+    return o;
+}
+
+bool parseObsSources(const QJsonObject &message, QList<ObsSourceInfo> *sources, QString *error)
+{
+    if (!message.value(QStringLiteral("sources")).isArray()) {
+        *error = QStringLiteral("Feld sources fehlt oder ist keine Liste");
+        return false;
+    }
+    QList<ObsSourceInfo> result;
+    const QJsonArray list = message.value(QStringLiteral("sources")).toArray();
+    for (const QJsonValue &v : list) {
+        const QJsonObject o = v.toObject();
+        ObsSourceInfo s;
+        QString state;
+        if (!requireUuid(o, QStringLiteral("overlay_id"), &s.overlayId, error)
+            || !requireString(o, QStringLiteral("state"), &state, error)
+            || !requireString(o, QStringLiteral("input_name"), &s.inputName, error))
+            return false;
+        if (state == QLatin1String("present")) {
+            s.state = ObsSourceState::Present;
+        } else if (state == QLatin1String("missing")) {
+            s.state = ObsSourceState::Missing;
+        } else if (state != QLatin1String("none")) {
+            *error = QStringLiteral("Feld state unbekannt: %1").arg(state);
+            return false;
+        }
+        result.append(s);
+    }
+    *sources = result;
+    return true;
+}
+
+namespace {
+
+QJsonObject obsSourceRequestMessage(const char *type, const ObsSourceRequest &request)
+{
+    QJsonObject o = typed(type);
+    o.insert(QStringLiteral("request_id"), double(request.requestId));
+    o.insert(QStringLiteral("overlay_id"), idText(request.overlayId));
+    o.insert(QStringLiteral("scene_uuid"), request.sceneUuid);
+    return o;
+}
+
+bool parseObsSourceRequest(const QJsonObject &message, ObsSourceRequest *request, QString *error)
+{
+    qint64 id = 0;
+    if (!requireInt(message, QStringLiteral("request_id"), 0, qint64(1) << 53, &id, error)
+        || !requireUuid(message, QStringLiteral("overlay_id"), &request->overlayId, error)
+        || !requireString(message, QStringLiteral("scene_uuid"), &request->sceneUuid, error))
+        return false;
+    request->requestId = id;
+    return true;
+}
+
+} // namespace
+
+QJsonObject obsCreateSourceMessage(const ObsSourceRequest &request)
+{
+    QJsonObject o = obsSourceRequestMessage(msg::kObsCreateSource, request);
+    o.insert(QStringLiteral("name"), request.name);
+    return o;
+}
+
+bool parseObsCreateSource(const QJsonObject &message, ObsSourceRequest *request, QString *error)
+{
+    ObsSourceRequest r;
+    if (!parseObsSourceRequest(message, &r, error) || !requireString(message, QStringLiteral("name"), &r.name, error))
+        return false;
+    *request = r;
+    return true;
+}
+
+QJsonObject obsAddToSceneMessage(const ObsSourceRequest &request)
+{
+    return obsSourceRequestMessage(msg::kObsAddToScene, request);
+}
+
+bool parseObsAddToScene(const QJsonObject &message, ObsSourceRequest *request, QString *error)
+{
+    ObsSourceRequest r;
+    if (!parseObsSourceRequest(message, &r, error))
+        return false;
+    *request = r;
+    return true;
+}
+
 QJsonObject browserSourceMessage(const BrowserSourceInfo &info)
 {
     QJsonObject o = typed(msg::kBrowserSource);

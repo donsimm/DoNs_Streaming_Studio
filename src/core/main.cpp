@@ -12,6 +12,7 @@
 #include "mediaimport.h"
 #include "obsconnection.h"
 #include "obssecretstore.h"
+#include "obssources.h"
 #include "overlaystore.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
@@ -267,7 +268,8 @@ int main(int argc, char *argv[])
     dss::obs::ObsConnection obsConnection([&obsSecrets](const dss::obs::ObsConnection::PasswordDone &done) {
         obsSecrets.read(done);
     });
-    service.setObsConnection(&obsConnection, &obsSecrets);
+    dss::obs::ObsSources obsSources(&obsConnection, dataDir + QStringLiteral("/obs-quellen.json"));
+    service.setObsConnection(&obsConnection, &obsSecrets, &obsSources);
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,
                      [](int signalNumber) {

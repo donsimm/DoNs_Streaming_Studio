@@ -530,6 +530,48 @@ private slots:
         QVERIFY(!parseObsStatus(bad, &backStatus, &error));
     }
 
+    // P10c, E-29: Quellen in OBS, ohne URL und ohne Token
+    void obsSourceMessages()
+    {
+        const QUuid a = QUuid::fromString(QStringLiteral("aaaaaaaa-0000-4000-8000-000000000001"));
+        const QUuid b = QUuid::fromString(QStringLiteral("bbbbbbbb-0000-4000-8000-000000000002"));
+        const QUuid c = QUuid::fromString(QStringLiteral("cccccccc-0000-4000-8000-000000000003"));
+        const QList<ObsSourceInfo> sources = {{a, ObsSourceState::None, QString()},
+                                              {b, ObsSourceState::Present, QStringLiteral("Quelle")},
+                                              {c, ObsSourceState::Missing, QStringLiteral("Weg")}};
+        QCOMPARE(QString::fromUtf8(encodeMessage(obsSourcesMessage({sources.at(1)}))),
+                 QStringLiteral("{\"sources\":[{\"input_name\":\"Quelle\",\"overlay_id\":\"bbbbbbbb-0000-4000-8000-000000000002\","
+                                "\"state\":\"present\"}],\"type\":\"obs_sources\"}\n"));
+        QList<ObsSourceInfo> back;
+        QString error;
+        QVERIFY2(parseObsSources(obsSourcesMessage(sources), &back, &error), qPrintable(error));
+        QCOMPARE(back, sources);
+        QVERIFY(!parseObsSources(QJsonObject{}, &back, &error));
+        QJsonObject bad = obsSourcesMessage(sources);
+        QJsonArray list = bad.value(QStringLiteral("sources")).toArray();
+        QJsonObject first = list.at(0).toObject();
+        first.insert(QStringLiteral("state"), QStringLiteral("vielleicht"));
+        list[0] = first;
+        bad.insert(QStringLiteral("sources"), list);
+        QVERIFY(!parseObsSources(bad, &back, &error));
+
+        const ObsSourceRequest request{5, a, QStringLiteral("szene"), QStringLiteral("Name")};
+        ObsSourceRequest parsed;
+        QVERIFY2(parseObsCreateSource(obsCreateSourceMessage(request), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, request);
+        QCOMPARE(messageType(obsCreateSourceMessage(request)), QStringLiteral("obs_create_source"));
+        QJsonObject noName = obsCreateSourceMessage(request);
+        noName.remove(QStringLiteral("name"));
+        QVERIFY(!parseObsCreateSource(noName, &parsed, &error));
+        QVERIFY2(parseObsAddToScene(obsAddToSceneMessage(request), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, (ObsSourceRequest{5, a, QStringLiteral("szene"), QString()}));
+        QCOMPARE(messageType(obsAddToSceneMessage(request)), QStringLiteral("obs_add_to_scene"));
+        QVERIFY(!obsAddToSceneMessage(request).contains(QStringLiteral("name")));
+        QJsonObject noScene = obsAddToSceneMessage(request);
+        noScene.remove(QStringLiteral("scene_uuid"));
+        QVERIFY(!parseObsAddToScene(noScene, &parsed, &error));
+    }
+
     // P10-vor: Einstellungen des Kerns
     void settingsMessages()
     {

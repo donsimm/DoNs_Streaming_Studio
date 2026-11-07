@@ -145,6 +145,35 @@ qint64 CoreClient::sendSettingsReset()
     return id;
 }
 
+ObsSourceInfo CoreClient::obsSource(const QUuid &overlayId) const
+{
+    for (const ObsSourceInfo &s : m_obsSources) {
+        if (s.overlayId == overlayId)
+            return s;
+    }
+    return {overlayId, ObsSourceState::None, QString()};
+}
+
+qint64 CoreClient::sendObsCreateSource(const QUuid &overlayId, const QString &sceneUuid, const QString &name)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    m_obsRequests.insert(id);
+    send(obsCreateSourceMessage({id, overlayId, sceneUuid, name}));
+    return id;
+}
+
+qint64 CoreClient::sendObsAddToScene(const QUuid &overlayId, const QString &sceneUuid)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    m_obsRequests.insert(id);
+    send(obsAddToSceneMessage({id, overlayId, sceneUuid, QString()}));
+    return id;
+}
+
 qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
 {
     if (!m_connected)
@@ -471,6 +500,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_obsStatus = info;
         emit obsStatusChanged();
+    } else if (type == QLatin1String(msg::kObsSources)) {
+        QList<ObsSourceInfo> sources;
+        if (!parseObsSources(message, &sources, &error)) {
+            qWarning("Kern: obs_sources ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_obsSources = sources;
+        emit obsSourcesChanged();
     } else if (type == QLatin1String(msg::kBrowserSource)) {
         BrowserSourceInfo info;
         if (!parseBrowserSource(message, &info, &error)) {
@@ -490,6 +527,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         if (m_settingsRequests.remove(result.requestId)) {
             emit settingsUpdateFinished(result);
+            return;
+        }
+        if (m_obsRequests.remove(result.requestId)) {
+            emit obsRequestFinished(result);
             return;
         }
         const QString key = m_keyOfRequest.take(result.requestId);
@@ -550,6 +591,7 @@ void CoreClient::clearData()
     m_requestOfKey.clear();
     m_heldChanges.clear();
     m_settingsRequests.clear();
+    m_obsRequests.clear();
     const bool hadImports = !m_importNames.isEmpty();
     m_importNames.clear();
     if (hadImports)
@@ -570,6 +612,10 @@ void CoreClient::clearData()
     if (m_obsStatus) {
         m_obsStatus.reset();
         emit obsStatusChanged();
+    }
+    if (!m_obsSources.isEmpty()) {
+        m_obsSources.clear();
+        emit obsSourcesChanged();
     }
     m_mediaList = MediaListData();
     emit mediaListChanged();

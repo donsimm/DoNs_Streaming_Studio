@@ -24,6 +24,7 @@ class OverlayServer;
 namespace dss::obs {
 class ObsConnection;
 class ObsSecretStore;
+class ObsSources;
 }
 
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
@@ -64,7 +65,8 @@ public:
     // Verbindung zu OBS (P10c, T-05). Alle connect zu ObsConnection stehen hier (Plan P10c, 1.5a);
     // Logik zu OBS gehört nach src/obs/. Verbindet sich mit den Werten aus den Einstellungen und hält
     // sie danach auf dem Stand. Ohne Aufruf: OBS bleibt «off».
-    void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets);
+    void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
+                          dss::obs::ObsSources *sources);
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -149,6 +151,11 @@ private:
     void applyObsSettings(bool passwordChanged = false);
     QJsonObject obsStatusMessage() const;
     void onObsChanged();
+    // P10c, E-29: Quellen in OBS. Antwort als change_result, sobald OBS geantwortet hat.
+    QJsonObject obsSourcesMessage() const;
+    void handleObsSourceRequest(QLocalSocket *socket, const QJsonObject &message, bool create);
+    // Sollzustand aller Overlays an ObsSources, an denselben Stellen wie updateBrowserSources.
+    void updateObsSources();
     // Einstellungen geändert: settings an alle, Adressen der Browserquellen, Server neu.
     void settingsApplied();
     void onSaveRequested();
@@ -166,6 +173,7 @@ private:
     dss::OverlayServer *m_overlayServer = nullptr;
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
+    dss::obs::ObsSources *m_obsSources = nullptr;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;
     QTimer *m_statsTimer = nullptr;

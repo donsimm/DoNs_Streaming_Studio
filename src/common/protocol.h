@@ -113,6 +113,9 @@ inline constexpr char kSetMediaFolderExpanded[] = "set_media_folder_expanded";
 inline constexpr char kCancelImport[] = "cancel_import";
 // P10c: Verbindung zu OBS
 inline constexpr char kObsStatus[] = "obs_status";
+inline constexpr char kObsSources[] = "obs_sources";
+inline constexpr char kObsCreateSource[] = "obs_create_source";
+inline constexpr char kObsAddToScene[] = "obs_add_to_scene";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -135,6 +138,11 @@ inline constexpr char kRejected[] = "rejected";       // Modell oder Datei lehnt
 inline constexpr char kSaveFailed[] = "save_failed";  // verzögertes Speichern gescheitert (error)
 inline constexpr char kCanceled[] = "canceled";       // P10b: Übernehmen abgebrochen
 inline constexpr char kInUse[] = "in_use";            // P10b: Datei wird von Quellen verwendet
+// P10c: Quellen in OBS
+inline constexpr char kObsNotConnected[] = "obs_not_connected"; // auch: Verbindung während der Anfrage verloren
+inline constexpr char kObsNameTaken[] = "obs_name_taken";
+inline constexpr char kObsSourceMissing[] = "obs_source_missing";
+inline constexpr char kObsTimeout[] = "obs_timeout";
 } // namespace err
 
 // Eine Zeile: kompaktes JSON (enthält nie ein Zeilenende) und «\n».
@@ -399,6 +407,37 @@ struct ObsStatusInfo
 };
 QJsonObject obsStatusMessage(const ObsStatusInfo &info);
 bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *error);
+
+// obs_sources (P10c, E-29): Quelle in OBS je Overlay, nach hello und nach jeder Änderung an alle.
+// Ohne URL und ohne Token. none: keine Zuordnung, present: Quelle da, missing: Zuordnung da, Quelle
+// in OBS nicht (F7).
+enum class ObsSourceState { None, Present, Missing };
+struct ObsSourceInfo
+{
+    QUuid overlayId;
+    ObsSourceState state = ObsSourceState::None;
+    QString inputName;
+
+    bool operator==(const ObsSourceInfo &) const = default;
+};
+QJsonObject obsSourcesMessage(const QList<ObsSourceInfo> &sources);
+bool parseObsSources(const QJsonObject &message, QList<ObsSourceInfo> *sources, QString *error);
+
+// obs_create_source (mit name), obs_add_to_scene (ohne name). Antwort: change_result; die Antwort
+// kommt später, OBS antwortet über das Netz.
+struct ObsSourceRequest
+{
+    qint64 requestId = 0;
+    QUuid overlayId;
+    QString sceneUuid;
+    QString name;
+
+    bool operator==(const ObsSourceRequest &) const = default;
+};
+QJsonObject obsCreateSourceMessage(const ObsSourceRequest &request);
+bool parseObsCreateSource(const QJsonObject &message, ObsSourceRequest *request, QString *error);
+QJsonObject obsAddToSceneMessage(const ObsSourceRequest &request);
+bool parseObsAddToScene(const QJsonObject &message, ObsSourceRequest *request, QString *error);
 
 // media_list (P10b, E-28): Namen und Ordner aller Mediendateien, nach hello, auf get_media_list
 // und nach jeder Änderung an alle.

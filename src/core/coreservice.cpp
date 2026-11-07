@@ -3,6 +3,7 @@
 #include "browsersource.h"
 #include "obsconnection.h"
 #include "obssecretstore.h"
+#include "obssources.h"
 #include "version.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
@@ -234,6 +235,7 @@ void CoreService::reload()
     const auto [changed, removed] = broadcastDifferences(before, listBefore);
     broadcastMediaListIfChanged();
     updateBrowserSources();
+    updateObsSources();
 #if DSS_CORE_OVERLAY_SERVER
     // Token können sich beim Neu laden geändert haben (tokens.json von Hand).
     if (m_overlayServer)
@@ -344,6 +346,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, dss::connectionsMessage(m_connectionStates));
         send(socket, serverStatusMessage());
         send(socket, obsStatusMessage());
+        send(socket, obsSourcesMessage());
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -363,6 +366,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleSettingsUpdate(socket, message);
     } else if (type == QLatin1String(dss::msg::kResetSettings) && m_settings) {
         handleSettingsReset(socket, message);
+    } else if (type == QLatin1String(dss::msg::kObsCreateSource)) {
+        handleObsSourceRequest(socket, message, true);
+    } else if (type == QLatin1String(dss::msg::kObsAddToScene)) {
+        handleObsSourceRequest(socket, message, false);
     } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
         QUuid id;
         if (!dss::parseGetBrowserSource(message, &id, &error)) {
@@ -477,14 +484,113 @@ QJsonObject CoreService::serverStatusMessage() const
     return dss::serverStatusMessage(info);
 }
 
-void CoreService::setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets)
+void CoreService::setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
+                                   dss::obs::ObsSources *sources)
 {
     using dss::obs::ObsConnection;
+    using dss::obs::ObsSources;
     m_obs = connection;
     m_obsSecrets = secrets;
+    m_obsSources = sources;
     connect(connection, &ObsConnection::stateChanged, this, &CoreService::onObsChanged);
     connect(connection, &ObsConnection::currentSceneChanged, this, &CoreService::onObsChanged);
+    connect(sources, &ObsSources::scenesChanged, this, &CoreService::onObsChanged);
+    connect(sources, &ObsSources::entriesChanged, this, [this] { broadcast(obsSourcesMessage()); });
+    // Zuerst der Sollzustand: Der Abgleich beim Verbinden braucht ihn.
+    updateObsSources();
     applyObsSettings();
+}
+
+void CoreService::updateObsSources()
+{
+    if (!m_obsSources)
+        return;
+    QList<dss::obs::ObsSources::Desired> desired;
+    for (const dss::Overlay &o : m_store->overlays())
+        desired.append({o.id, browserSourceInfo(o.id).url, o.width, o.height});
+    m_obsSources->setDesired(desired);
+}
+
+QJsonObject CoreService::obsSourcesMessage() const
+{
+    using Source = dss::obs::ObsSources;
+    QList<dss::ObsSourceInfo> sources;
+    if (m_obsSources) {
+        const QList<Source::Entry> entries = m_obsSources->entries();
+        for (const Source::Entry &e : entries) {
+            const dss::ObsSourceState state = e.state == Source::SourceState::Present   ? dss::ObsSourceState::Present
+                                              : e.state == Source::SourceState::Missing ? dss::ObsSourceState::Missing
+                                                                                        : dss::ObsSourceState::None;
+            sources.append({e.overlayId, state, e.inputName});
+        }
+    }
+    return dss::obsSourcesMessage(sources);
+}
+
+void CoreService::handleObsSourceRequest(QLocalSocket *socket, const QJsonObject &message, bool create)
+{
+    using Source = dss::obs::ObsSources;
+    dss::ObsSourceRequest request;
+    QString error;
+    const bool parsed = create ? dss::parseObsCreateSource(message, &request, &error)
+                               : dss::parseObsAddToScene(message, &request, &error);
+    if (!parsed) {
+        sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        return;
+    }
+    if (!m_store->overlay(request.overlayId)) {
+        send(socket, dss::changeResultMessage({request.requestId, false, QUuid(),
+                                               QString::fromLatin1(dss::err::kUnknownOverlay),
+                                               QStringLiteral("Kein Overlay mit dieser Kennung.")}));
+        return;
+    }
+    if (!m_obsSources) {
+        send(socket, dss::changeResultMessage({request.requestId, false, QUuid(),
+                                               QString::fromLatin1(dss::err::kObsNotConnected),
+                                               QStringLiteral("OBS ist nicht verbunden.")}));
+        return;
+    }
+    const dss::BrowserSourceInfo info = browserSourceInfo(request.overlayId);
+    if (create && info.url.isEmpty()) {
+        send(socket, dss::changeResultMessage({request.requestId, false, QUuid(),
+                                               QString::fromLatin1(dss::err::kRejected), info.problem}));
+        return;
+    }
+    const qint64 requestId = request.requestId;
+    const QPointer<QLocalSocket> target(socket);
+    const auto done = [this, target, requestId](const Source::Result &result) {
+        if (!result.message.isEmpty())
+            qWarning("OBS: %s", qPrintable(result.message));
+        if (!target || !m_clients.contains(target.data()))
+            return;
+        const char *code = dss::err::kRejected;
+        switch (result.failure) {
+        case Source::Failure::None:
+            send(target.data(), dss::changeResultMessage({requestId, true, QUuid(), QString(), QString()}));
+            return;
+        case Source::Failure::NotConnected:
+            code = dss::err::kObsNotConnected;
+            break;
+        case Source::Failure::NameTaken:
+            code = dss::err::kObsNameTaken;
+            break;
+        case Source::Failure::SourceMissing:
+            code = dss::err::kObsSourceMissing;
+            break;
+        case Source::Failure::Timeout:
+            code = dss::err::kObsTimeout;
+            break;
+        case Source::Failure::SceneMissing:
+        case Source::Failure::Rejected:
+            break;
+        }
+        send(target.data(), dss::changeResultMessage({requestId, false, QUuid(), QString::fromLatin1(code),
+                                                      result.message}));
+    };
+    if (create)
+        m_obsSources->createSource(request.overlayId, request.sceneUuid, request.name, done);
+    else
+        m_obsSources->addToScene(request.overlayId, request.sceneUuid, done);
 }
 
 void CoreService::applyObsSettings(bool passwordChanged)
@@ -523,6 +629,11 @@ QJsonObject CoreService::obsStatusMessage() const
         info.websocketVersion = m_obs->websocketVersion();
         const dss::obs::Scene scene = m_obs->currentScene();
         info.currentScene = {scene.uuid, scene.name};
+        if (m_obsSources) {
+            const QList<dss::obs::Scene> scenes = m_obsSources->scenes();
+            for (const dss::obs::Scene &s : scenes)
+                info.scenes.append({s.uuid, s.name});
+        }
     }
     return dss::obsStatusMessage(info);
 }
@@ -660,6 +771,7 @@ void CoreService::settingsApplied()
           after.obsEnabled ? qPrintable(QStringLiteral("%1:%2").arg(after.obsHost).arg(after.obsPort)) : "aus");
     broadcast(settingsMessage());
     updateBrowserSources();
+    updateObsSources();
 #if DSS_CORE_OVERLAY_SERVER
     // Neuer Port oder neue Adresse: Server neu starten (Teil A 2)
     if (m_overlayServer)
@@ -740,8 +852,15 @@ void CoreService::finishChange(QLocalSocket *socket, const dss::ChangeRequest &r
 {
     const QList<dss::Overlay> before = m_store->overlays();
     const QJsonObject listBefore = listMessage();
+    // P10c, F8: Vor dem Löschen merken, die Zuordnung fällt danach weg.
+    const QString obsSource = m_obsSources && request.type == QLatin1String(dss::msg::kRemoveOverlay)
+                                  ? m_obsSources->inputNameOf(request.overlayId)
+                                  : QString();
     dss::ChangeResult result = applyChange(request, imported);
     result.requestId = request.requestId;
+    if (result.ok && !obsSource.isEmpty())
+        result.warning = QStringLiteral("Die Quelle «%1» bleibt in OBS und ist leer. Das Studio löscht nichts "
+                                        "in OBS.").arg(obsSource);
     // Hinweis zum Videoformat (P10b, Punkt 81) zu einem Hinweis der Änderung dazu.
     if (result.ok && imported && !imported->warning.isEmpty())
         result.warning = result.warning.isEmpty()
@@ -752,6 +871,7 @@ void CoreService::finishChange(QLocalSocket *socket, const dss::ChangeRequest &r
     broadcastDifferences(before, listBefore);
     broadcastMediaListIfChanged();
     updateBrowserSources();
+    updateObsSources();
     if (m_store->hasPendingWrites())
         m_saver->changed();
     if (!result.ok)

@@ -95,6 +95,12 @@ public:
     // Einzelheiten der Verbindung zu OBS (P10c), nach hello und bei jeder Änderung; ohne Verbindung
     // leer. Die Farbe des Knopfes steht in connectionStates().
     std::optional<ObsStatusInfo> obsStatus() const { return m_obsStatus; }
+    // Quelle in OBS zu einem Overlay (P10c, E-29); ohne Eintrag: keine.
+    ObsSourceInfo obsSource(const QUuid &overlayId) const;
+    // Schicken obs_create_source bzw. obs_add_to_scene; requestId wird hier vergeben. Antwort über
+    // obsRequestFinished. 0 = nicht verbunden.
+    qint64 sendObsCreateSource(const QUuid &overlayId, const QString &sceneUuid, const QString &name);
+    qint64 sendObsAddToScene(const QUuid &overlayId, const QString &sceneUuid);
 
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
@@ -152,6 +158,10 @@ signals:
     void serverStatusChanged();
     // obsStatus() hat sich geändert (P10c).
     void obsStatusChanged();
+    void obsSourcesChanged();
+    // Antwort auf sendObsCreateSource und sendObsAddToScene, nur hier (nicht in changeFinished): Das
+    // Anlegen-Fenster zeigt eine Abweisung selbst und bleibt offen.
+    void obsRequestFinished(const dss::ChangeResult &result);
     // P10b: mediaList() bzw. imports() hat sich geändert.
     void mediaListChanged();
     void importProgressChanged();
@@ -199,6 +209,8 @@ private:
     std::optional<BrowserSourceInfo> m_browserSource;
     std::optional<ServerStatusInfo> m_serverStatus;
     std::optional<ObsStatusInfo> m_obsStatus;
+    QList<ObsSourceInfo> m_obsSources;
+    QSet<qint64> m_obsRequests;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;
