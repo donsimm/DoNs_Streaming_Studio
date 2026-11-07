@@ -2,14 +2,14 @@
 
 Private Software für den Twitch-Stream von Dominik Simmen. Sie übernimmt alles, was nicht zum Haupt-OBS gehört. Hauptfokus ist der Editor: pro Overlay eine eigene Leinwand, die als Browserquelle (später auch per NDI) an OBS ausgegeben wird.
 
-Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an. Seit P08 lassen sich Overlays (mit Ordnern), Quellen und ihre Eigenschaften im Fenster bearbeiten. Seit P09 zeichnet die Leinwand Bild, Text, Video und WebM mit Alpha, und Quellen lassen sich dort mit der Maus wählen, verschieben, skalieren und drehen. Seit P09b lassen sich Quellen spiegeln und über «Bearbeiten» → «Transformieren» (auch per Rechtsklick) wie in OBS drehen, einpassen, zentrieren, zurücksetzen, kopieren und einfügen; Bilder erscheinen mit ihrer EXIF-Ausrichtung. Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
+Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `dss-app` starten und beenden sich sauber, enthalten aber noch keine Funktion. Seit P04 gibt es das Overlay-Modell mit Speichern und Laden in `dss_common` und das Werkzeug `dss-cli` für den Handtest. Seit P05 sieht das Fenster `dss-app` aus wie `docs/bilder/oberflaeche.png`, noch ohne Daten und ohne Verbindung zum Kern; seit P06 mit Farben und Schrift wie OBS Studio (Design «Yami», Open Sans). Seit P07 läuft der Kern als Benutzerdienst von systemd (`dss-core.service`, gestartet vom Fenster), hält die Overlays und schickt sie über einen Unix-Socket an das Fenster; das Fenster zeigt Overlays, Quellen und die Werte CPU, RAM und LAN an. Seit P08 lassen sich Overlays (mit Ordnern), Quellen und ihre Eigenschaften im Fenster bearbeiten. Seit P09 zeichnet die Leinwand Bild, Text, Video und WebM mit Alpha, und Quellen lassen sich dort mit der Maus wählen, verschieben, skalieren und drehen. Seit P09b lassen sich Quellen spiegeln und über «Bearbeiten» → «Transformieren» (auch per Rechtsklick) wie in OBS drehen, einpassen, zentrieren, zurücksetzen, kopieren und einfügen; Bilder erscheinen mit ihrer EXIF-Ausrichtung. Seit P10a gibt es die Version im Einsatz mit Installation, Umwandeln und Sicherung (Abschnitt «Einsatz»), seit P10-vor Einstellungen des Kerns und «Leinwand als Bild speichern», seit P10 die Browserquelle in OBS mit Overlay-Server und seit P10b das Dock «Medien». Aktueller Stand: `docs/HANDOFF.md`. Technik: C++20 mit Qt 6 (siehe `docs/01-festlegungen.md`).
 
 ## Inhalt
 
 | Ordner / Datei | Inhalt |
 |---|---|
-| `docs/00-uebergabe.md` | Übergabe: Stand, Entscheide, offene Punkte, nächste Schritte (zuerst lesen) |
-| `CLAUDE.md` | Regeln für Claude Code in diesem Projekt |
+| `CLAUDE.md` | Regeln für Claude Code in diesem Projekt (zuerst lesen) |
+| `docs/HANDOFF.md` | Übergabe: aktueller Stand, nächster Schritt, Arbeitsweise |
 | `docs/01-festlegungen.md` | Alle bisherigen Entscheide, mit Stand und Herkunft |
 | `docs/02-umgebung.md` | Zielsystem (Studio-PC) mit gemessenen Ist-Werten |
 | `docs/03-funktionen-entwurf.md` | Funktionen je Modul (Editor priorisiert) |
@@ -26,10 +26,10 @@ Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `d
 | `src/render/` | Bibliothek `dss_render` (seit P10-vor): Zeichner der Quellen und Bild eines Overlays in seiner Auflösung, Qt Gui ohne Qt Widgets |
 | `src/app/` | Fenster `dss-app`; Farben und Schriftgrösse nur in `theme.cpp`, Symbole als SVG in `src/app/symbole/` (zur Laufzeit geladen, ersetzbar, einfarbig in Textfarbe gezeichnet), Schrift Open Sans in `src/app/schriften/` |
 | `src/cli/` | Werkzeug `dss-cli` ohne Fenster (Overlays anlegen und bearbeiten, Handtest) |
-| `web/` | Platz für den Zeichner der Browserquelle (noch leer) |
+| `web/` | Zeichner der Browserquelle (`overlay.html`, `overlay.js`) |
 | `tests/` | Tests mit Qt Test, ausgeführt über `ctest` |
 | `scripts/` | Einrichtungsskript, Paketliste, Startprüfung, Einrichten des Benutzerdienstes, Dienstprüfung |
-| `prototypes/` | Messprototypen aus P01 und P02, nicht Teil des Builds |
+| `prototypes/` | Messprototypen aus P01 und P02, nicht Teil des Builds; `prototypes/messung/media_erzeugen.sh` und `prototypes/media/` liefern die Testdateien der Tests |
 
 ## Bauen und starten
 
@@ -114,4 +114,4 @@ Danach eine Version starten, die dieses Format liest (die Version vor der Instal
 
 Der Kern wird immer gebaut. Die Version steht nur in `CMakeLists.txt` (`project(… VERSION …)`).
 
-Die Festlegungen wurden in einem Claude-Dokument gesammelt: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13. Dieses Repo enthält dieselben Inhalte als Dateien, damit Claude Code sie ohne Umweg lesen kann.
+Die Festlegungen wurden anfangs in einem Claude-Dokument gesammelt: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13. Es wird seit P06 nicht mehr nachgeführt; massgebend ist dieses Repo.

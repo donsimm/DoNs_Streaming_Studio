@@ -1,6 +1,6 @@
 # 04 – Offene Punkte und nächste Schritte
 
-Stand: 2026-11-04 (nach P10b, Handtest offen).
+Stand: 2026-11-07 (P10b abgenommen, Prüfung 5 offen).
 
 ## Offen
 
@@ -244,7 +244,7 @@ Stand: 2026-11-04 (nach P10b, Handtest offen).
 
 - Adresse der Browserquelle ohne Kopieren zwischen den PCs: Der Weg über Mousepad und `ssh` ist nur eine Notlösung. Entscheid: E-29 (MUSS), Browserquelle über obs-websocket direkt in OBS anlegen und nachführen, Baustein P10c mit T-05 nach P10b.
 
-## Erledigt mit P10b (2026-11-04, ausgeführt, Handtest offen)
+## Erledigt mit P10b (ausgeführt 2026-11-04, abgenommen 2026-11-07, Prüfung 5 offen)
 
 - E-28 (Dock «Medien»): Namen und Ordner in `medien.json` (nur der Kern schreibt sie, `docs/06-overlay-format.md`, «Medienliste»), Ersatznamen für Dateien ohne Namen, Dock mit Vorschau, Name, Typ, Grösse, Sortieren, Ordnern beliebig tief, Umbenennen (F2, Doppelklick), Ziehen zwischen Ordnern, «Hinzufügen» mehrerer Dateien, «Löschen» nur ungenutzter Dateien, Ziehen auf die Leinwand und in die Liste «Quellen». Schnittstelle Version 10 (`docs/08-kern-schnittstelle.md`), Befehle in `dss-cli`, Schalter `DSS_APP_MEDIA_DOCK`. Bericht `docs/berichte/P10b-bericht.md`.
 - Punkte 73, 74, 81, 83 und 85: erledigt (siehe oben).

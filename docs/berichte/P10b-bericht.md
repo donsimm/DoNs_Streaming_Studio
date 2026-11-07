@@ -1,6 +1,6 @@
 # P10b – Bericht Dock «Medien»
 
-Auftrag: `prompts/P10b-medien.md`. Ausgeführt am 2026-11-04 von Claude Code auf dem Studio-PC (Debian 13, X11, `DISPLAY=:0.0`). Stand: ausgeführt, Handtest offen.
+Auftrag: `prompts/P10b-medien.md`. Ausgeführt am 2026-11-04 von Claude Code auf dem Studio-PC (Debian 13, X11, `DISPLAY=:0.0`). Stand: abgenommen (2026-11-07), einschliesslich Handtest 1 bis 4; Prüfung 5 (Aufräumen) offen, siehe «Ergebnis des Handtests».
 
 Alle Messwerte stammen von diesem Gerät, mit Datum und Befehl. Was nur der Nutzer prüfen kann (Aussehen und Bedienung im echten Fenster, echte Installation), ist «nicht geprüft» und steht im Handtest. Tokens kommen in diesem Bericht nicht vor.
 
@@ -298,6 +298,13 @@ cd ~/DoNs_Streaming_Studio && systemctl --user stop dss-core-entwicklung.service
 ```
 
 Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` und in `~/.config/`) und `dons-streaming-studio-sicherungen`. Den Entwicklungsordner und `kern.ini` der Version in Arbeit hat diese Sitzung um 10:12 neu angelegt (Start von `dss-core-entwicklung.service` für die Prüfungen mit laufendem Dienst); sie enthalten nur Daten aus den Prüfungen 1 bis 3.
+
+### Ergebnis des Handtests (nachgetragen 2026-11-07)
+
+- Der Nutzer meldete am 2026-11-07 zu den Prüfungen 1 bis 4 «ok, passt alles». Das schliesst die Installation und den Blick auf OBS ein.
+- Von Lotse am selben Tag geprüft: installiert ist Commit `add656b` (Installiert 2026-11-07 13:16:36), `medien.json` ist angelegt, 10 Dateien in `media/`, Sicherung `2026-11-07_13-16-36`.
+- Prüfung 5 (Aufräumen) ist noch offen, das macht der Nutzer.
+- Punkte 86 (Lesbarkeit der Reiter) und 90 (Annahmen): Der Nutzer hat keine Einwände gemeldet, aber nicht einzeln dazu Stellung genommen; sie gelten nicht als ausdrücklich bestätigt.
 
 ## Commits
 

@@ -1,5 +1,7 @@
 # 00 – Übergabe an den nächsten Chat
 
+**Archiv (seit 2026-11-07).** Der aktuelle Stand und die Arbeitsweise stehen in `docs/HANDOFF.md`. Text unten unverändert; Pfade darin sind die von damals.
+
 Stand: 2026-11-03. Diese Datei zuerst lesen, danach `CLAUDE.md` und die Dokumente 01 bis 08 unter `docs/`. Die Festlegungen stehen auch im Claude Doc: https://claude.ai/artifact/HpSYSw4X1Gx5SUPZAAhW13 (gleicher Inhalt wie die Dateien, Repo ist massgebend bei Abweichungen).
 
 ## Kurzfassung
