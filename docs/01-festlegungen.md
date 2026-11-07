@@ -100,7 +100,7 @@ Entschieden (2026-11-02, vom Nutzer bestätigt): Der Nutzer testet nur, was sinn
 
 ## Arbeitsweise mit Claude Code
 
-- Claude Code darf am Ende eines Auftrags selbst `git push origin main` ausführen, ohne Rückfrage (entschieden 2026-11-02). Umgesetzt in `.claude/settings.json`. Gepusht wird per SSH-Schlüssel des Studio-PCs.
+- Agenten committen nur lokal. Gepusht wird nur nach Freigabe des Nutzers, durch Lotse (entschieden 2026-11-07, ersetzt die Erlaubnis vom 2026-11-02). Gepusht wird per SSH-Schlüssel des Studio-PCs.
 
 ## Verbindungsanzeige im Kopfbereich
 

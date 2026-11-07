@@ -1,6 +1,12 @@
 # CLAUDE.md – Regeln für Claude Code im Projekt DoNs Streaming Studio
 
-Lies diese Datei zu Beginn jeder Sitzung, danach die Dokumente unter `docs/`. Der Auftrag der Sitzung steht in der Datei unter `prompts/`, die dir genannt wird.
+Lies diese Datei zu Beginn jeder Sitzung, danach die Dokumente unter `docs/`. Der Auftrag der Sitzung kommt vom Projektleiter-Agenten oder von Lotse; nur grosse Bausteine haben eine eigene Prompt-Datei.
+
+## Rollen (entschieden vom Nutzer, 2026-11-07)
+
+- Lotse ist der Hauptagent des Nutzers und führt den Push aus (Regel 17). Der Projektleiter-Agent arbeitet unter Lotse und ersetzt den früheren Chat: Er plant die Bausteine, schreibt die Aufträge und führt Bauplan, offene Punkte und Übergabe.
+- Der Nutzer entscheidet alles, was sichtbar oder bedienbar ist. Interna entscheidet der Agent und listet sie gesammelt mit Begründung im Bericht auf.
+- Fragen an den Nutzer kommen gebündelt im Auswahldialog, höchstens 4 pro Dialog, jede mit Empfehlung.
 
 ## Projekt
 
@@ -14,14 +20,14 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 
 ## Regeln
 
-1. Baue nur, was im aktuellen Prompt steht. Alles andere kommt in `docs/04-offene-punkte.md`.
+1. Baue nur, was im aktuellen Auftrag steht. Alles andere kommt in `docs/04-offene-punkte.md`.
 2. Nichts raten. Fehlt eine Angabe oder scheint sie falsch, schreibe es als `[OFFEN]` in den Abschlussbericht.
 3. Ungeprüftes wird als «nicht geprüft» gekennzeichnet. Messwerte stammen nur von diesem Gerät und stehen mit Datum und Befehl im Bericht.
 4. Externe Aussagen (Programmverhalten, Protokolle, Paketversionen) gegen die aktuelle Dokumentation prüfen und die Quelle (URL) im Bericht oder Code-Kommentar nennen. Immer alle Quellen nennen.
-5. Pakete: Versionen festhalten. Neue Pakete nur mit Begründung im Bericht installieren (`sudo apt install` fragt den Nutzer). Keine Pakete im System ändern, die der Prompt nicht verlangt.
+5. Pakete: Versionen festhalten. Neue Pakete nur mit Begründung im Bericht installieren (`sudo apt install` fragt den Nutzer). Keine Pakete im System ändern, die der Auftrag nicht verlangt.
 6. Tests laufen mit echtem Fenstersystem (X11-Sitzung), nicht nur offscreen. Wo ein Start geprüft wird: mindestens 20 Starts, Exit-Code und sauberes Beenden prüfen.
 7. Tests nutzen echte Daten (Kopie davon) und, wo es einen Handtest gibt, dieselben Daten wie dieser.
-8. Ein Commit pro Funktion. Ändern mehrere kleine Punkte dieselbe Stelle und dieselbe Version der Schnittstelle, dürfen sie in einen Commit, mit Begründung im Bericht (entschieden vom Nutzer, 2026-11-04). Neue grössere Teile lassen sich per Schalter abschalten.
+8. Ein Commit pro Funktion. Ändern mehrere kleine Punkte dieselbe Stelle und dieselbe Version der Schnittstelle, dürfen sie in einen Commit, mit Begründung im Bericht (entschieden vom Nutzer, 2026-11-04). Neue Schalter nur bei riskanten Teilen; die 17 bestehenden bleiben, Bauten mit abgeschalteten Schaltern laufen nicht mehr bei jedem Baustein (entschieden vom Nutzer, 2026-11-07).
 9. Logik und Daten laufen ohne die Oberflächen-Bibliothek und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern. Qt-Module werden genutzt, wo sie nötig sind; «ohne Oberflächen-Bibliothek» heisst ohne Qt Widgets und ohne Fenster. Zeichnen (`QPainter`, `QImage`, Schriften) darf Qt Gui nutzen; Tests des Zeichners laufen ohne Fenster (entschieden vom Nutzer, P10-vor, 2026-11-03).
 10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code auf dem Studio-PC schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
 11. Lage und Grösse von Quellen sind ganze Pixel der Overlay-Auflösung, keine Prozentwerte.
@@ -30,6 +36,6 @@ Private Overlay-Software für einen Twitch-Stream. Nur ein Nutzer, kein Verkauf.
 14. Module sind fest eingebaut. Jedes Modul nutzt dieselbe Schnittstelle zum Ereignisfluss. Es gibt kein Plugin-System, auch nicht für Dritte.
 15. Der Abschlussbericht nennt: geänderte Dateien, ausgeführte Befehle und Tests mit Ergebnis, nicht erledigte Punkte, getroffene Annahmen, Quellen.
 16. Technisch bleiben. Keine Aussagen über die eigene Leistung oder Intelligenz.
-17. Commits enden mit den Zeilen aus der Sitzungsvorgabe (Co-Authored-By). Am Ende jedes Auftrags pusht Claude Code selbst: zuerst `git pull --rebase origin main`, dann `git push origin main` (erlaubt in `.claude/settings.json`, entschieden vom Nutzer am 2026-11-02). Andere Pushes (andere Zweige, `--force`) nur mit ausdrücklichem Auftrag des Nutzers.
+17. Commits enden mit den Zeilen aus der Sitzungsvorgabe (Co-Authored-By). Agenten committen nur lokal. Gepusht wird nur nach Freigabe des Nutzers, und zwar durch Lotse (entschieden vom Nutzer, 2026-11-07). `--force` nur mit ausdrücklichem Auftrag des Nutzers.
 18. Claude Code installiert nie in `~/.local/opt/dons-streaming-studio/` (kein `scripts/installieren.sh` gegen diesen Ort) und verändert die echten Daten `~/.local/share/dons-streaming-studio` nicht. Es arbeitet mit der Version aus dem Repo (`build/`) und deren Entwicklungsordner (`~/.local/share/dons-streaming-studio-entwicklung`, Einheit `dss-core-entwicklung.service`); Prüfungen der Installation nur mit den Testoptionen von `scripts/installieren.sh` und eigenen Testdaten (entschieden vom Nutzer, P10a, 2026-11-03).
 19. Claude Code antwortet dem Nutzer im Terminal auf Deutsch in Schweizer Rechtschreibung (Zwischenstände, Rückfragen, Zusammenfassungen), wie in Regel 13 für Oberfläche und Dokumente (Wunsch des Nutzers, 2026-11-03).
