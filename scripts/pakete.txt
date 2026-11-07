@@ -14,3 +14,7 @@ libswscale-dev 7:7.1.5-0+deb13u1
 # Seit P05: dss-app lädt die Symbole unter src/app/symbole/ als SVG (Laufzeit-Plugin).
 # War schon installiert (empfohlen von libqt6gui6), gemessen 2026-11-02.
 qt6-svg-plugins 6.8.2-3
+# Seit P10c: dss-core spricht mit OBS über obs-websocket (QWebSocket), die Tests nutzen
+# QWebSocketServer. Gemessen 2026-11-07 (installiert vom Nutzer, Begründung im Bericht P10c).
+qt6-websockets-dev 6.8.2-3
+libqt6websockets6 6.8.2-3
