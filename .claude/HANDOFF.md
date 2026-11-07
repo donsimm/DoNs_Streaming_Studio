@@ -4,7 +4,7 @@ Stand: 2026-11-07. Einstiegspunkt jeder Sitzung, nach `CLAUDE.md`. Diese Datei h
 
 ## Stand
 
-- Abgenommen sind die Bausteine bis und mit P10b (`docs/07-bauplan.md`). Die Software kann heute: Overlays mit Ordnern, Quellen Text, Bild, Video und WebM mit Alpha, Bearbeiten auf der Leinwand, Transformieren wie OBS, Dock «Medien», Browserquelle in OBS, Kern als Benutzerdienst, Installation mit Umwandeln und Sicherung.
+- Abgenommen sind die Bausteine bis und mit P10b, P10c ist gebaut (`docs/07-bauplan.md`). Die Software kann heute: Overlays mit Ordnern, Quellen Text, Bild, Video und WebM mit Alpha, Bearbeiten auf der Leinwand, Transformieren wie OBS, Dock «Medien», Browserquelle in OBS, Kern als Benutzerdienst, Installation mit Umwandeln und Sicherung.
 - **P10b abgenommen (2026-11-07):**
   - Der Nutzer meldete zu den Handtest-Prüfungen 1 bis 4 aus dem Bericht P10b «ok, passt alles». Das schliesst die Installation und den Blick auf OBS ein.
   - Von Lotse am selben Tag geprüft: installiert ist Commit `add656b` (Installiert 2026-11-07 13:16:36), `medien.json` ist angelegt, 10 Dateien in `media/`, Sicherung `2026-11-07_13-16-36`.
@@ -12,9 +12,13 @@ Stand: 2026-11-07. Einstiegspunkt jeder Sitzung, nach `CLAUDE.md`. Diese Datei h
 
 ## Nächster Schritt
 
-Probelauf des schlanken Ablaufs (Stufe «Klein», Punkt 91) am 2026-11-07 bestanden: 38 von 38 Tests. Offen ist, wie viel der Ablauf bei einem ganzen Baustein spart; P10c ist die erste Messung.
+P10c ist gebaut (2026-11-07): Branch `lotse/p10c`, nichts gepusht, Bericht `docs/archiv/berichte/P10c-bericht.md`, Schnittstelle Version 11, neue Punkte ab 96, Dauer 119 Minuten. `ctest` von Lotse in der echten Sitzungsumgebung: 42 von 42, keiner übersprungen. Gegen echtes OBS und Nobara 44 ist nichts geprüft.
 
-1. P10c (Anbindung an OBS: T-05, E-29), P11 (Bildvergleich), P12 (Ton) nach `docs/07-bauplan.md`.
+1. Handtest des Nutzers, Prüfungen 1 bis 10 im Bericht, nicht während eines Streams.
+2. Stufe «Vor der Installation» (eigener Auftrag), dann Prüfung 11, dann Push nach Freigabe.
+3. P11 (Bildvergleich), P12 (Ton; zuerst Grundfrage klären), danach die Twitch-Verbindung mit dem Ereignisfluss (Punkt 92). Bericht zur Bauplan-Prüfung: `~/.claude/lotse/berichte/dss-bauplan-pruefung.md`.
+
+Hinweis: `tst_fensterbearbeiten` scheiterte im 50er-Lauf einmal mit «im Streamzt», vermutlich Tasten ins Testfenster, nicht bewiesen. Reste in `build/` (`pruefkopie-7f3a91c2`, `frischer-klon-p10c` mit 1,9 GB, `pruefung-p10c`) entfernt Prüfung 10.
 
 ## Arbeitsweise mit dem Nutzer
 
@@ -35,7 +39,7 @@ Probelauf des schlanken Ablaufs (Stufe «Klein», Punkt 91) am 2026-11-07 bestan
 
 ## Netzwerk
 
-Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Die Adresse der Browserquelle kommt bis P10c über Mousepad und `ssh` auf den Streaming-PC.
+Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Mit P10c führt der Kern die Adresse in OBS nach, sobald sie abgenommen ist.
 
 ## Zugriff auf das Repo
 
