@@ -83,15 +83,21 @@ private slots:
     void settingsForm()
     {
         const CoreSettings current{8081, QStringLiteral("192.168.1.9")};
-        QVERIFY(!settingsUpdateFromForm(current, 8081, QStringLiteral(" 192.168.1.9 ")));
-        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, 8090, QStringLiteral("192.168.1.9"));
+        const auto form = [](int port, const QString &address) {
+            SettingsForm f;
+            f.port = port;
+            f.address = address;
+            return f;
+        };
+        QVERIFY(!settingsUpdateFromForm(current, form(8081, QStringLiteral(" 192.168.1.9 ")), false));
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, form(8090, QStringLiteral("192.168.1.9")), false);
         QVERIFY(u);
         QCOMPARE(u->port, std::optional<int>(8090));
         QVERIFY(!u->homeAddress);
-        u = settingsUpdateFromForm(current, 8081, QString());
+        u = settingsUpdateFromForm(current, form(8081, QString()), false);
         QVERIFY(u && !u->port);
         QCOMPARE(u->homeAddress, std::optional<QString>(QString()));
-        u = settingsUpdateFromForm(current, 80, QStringLiteral("abc"));
+        u = settingsUpdateFromForm(current, form(80, QStringLiteral("abc")), false);
         QVERIFY(u && u->port == 80 && u->homeAddress == QStringLiteral("abc")); // prüft der Kern
         QVERIFY(settingsDialogHint().contains(QStringLiteral("Nur Adressen dieses PCs")));
         // P10b, Punkt 85: leere Adresse ohne Neustart
@@ -100,6 +106,71 @@ private slots:
         QVERIFY(settingsDialogProblem(true, std::nullopt).isEmpty());
         SettingsInfo info{current, 1024, 32767, QStringLiteral("/x/kern.ini"), QStringLiteral("kaputt")};
         QCOMPARE(settingsDialogProblem(true, info), QStringLiteral("kaputt"));
+    }
+
+    // P10c: Bereich «OBS» im Dialog
+    void settingsFormObs()
+    {
+        CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        SettingsForm f;
+        f.port = 8081;
+        f.address = QStringLiteral("192.168.1.9");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        // Einzeln, nur Geändertes; Adresse ohne Leerzeichen am Rand
+        f.obsEnabled = true;
+        f.obsHost = QStringLiteral(" 192.168.1.116 ");
+        f.obsPort = 4456;
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && !u->port && !u->homeAddress && !u->obsPassword);
+        QCOMPARE(u->obsEnabled, std::optional<bool>(true));
+        QCOMPARE(u->obsHost, std::optional<QString>(QStringLiteral("192.168.1.116")));
+        QCOMPARE(u->obsPort, std::optional<int>(4456));
+        // Leer = behalten; «Passwort löschen» schickt leer; ein neues Passwort geht vor
+        current.obsEnabled = true;
+        current.obsHost = QStringLiteral("192.168.1.116");
+        current.obsPort = 4456;
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        f.deleteObsPassword = true;
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && u->obsPassword && u->obsPassword->isEmpty());
+        f.obsPassword = QStringLiteral("testwert");
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u);
+        QCOMPARE(u->obsPassword, std::optional<QString>(QStringLiteral("testwert")));
+        // Rot und unverändert: «OK» versucht es wieder, aber nicht, wenn OBS aus ist
+        f.deleteObsPassword = false;
+        f.obsPassword.clear();
+        u = settingsUpdateFromForm(current, f, true);
+        QVERIFY(u);
+        QCOMPARE(u->obsEnabled, std::optional<bool>(true));
+        QVERIFY(!u->obsHost && !u->obsPort && !u->obsPassword);
+        current.obsEnabled = false;
+        f.obsEnabled = false;
+        QVERIFY(!settingsUpdateFromForm(current, f, true));
+
+        QVERIFY(obsPasswordPlaceholder(true, false).contains(QStringLiteral("behalten")));
+        QVERIFY(obsPasswordPlaceholder(false, false).contains(QStringLiteral("kein Passwort")));
+        QVERIFY(obsPasswordPlaceholder(true, true).contains(QStringLiteral("gelöscht")));
+    }
+
+    void obsToolTipTexts()
+    {
+        ObsStatusInfo status;
+        // Ohne Stand und aus: wie die anderen Knöpfe
+        QCOMPARE(obsToolTip(ConnectionState::Off, std::nullopt), QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"));
+        status.message = QStringLiteral("Nicht eingerichtet oder abgeschaltet");
+        QCOMPARE(obsToolTip(ConnectionState::Off, status), QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"));
+        // Problem: die Meldung des Kerns
+        status.message = QStringLiteral("OBS hat das Passwort abgelehnt. Im Dialog «Einstellungen» neu eingeben.");
+        QCOMPARE(obsToolTip(ConnectionState::Error, status), status.message);
+        status.message.clear();
+        QCOMPARE(obsToolTip(ConnectionState::Connecting, status), QStringLiteral("OBS: Verbindungsversuch läuft"));
+        // Verbunden: mit Einzelheiten, soweit bekannt
+        QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden"));
+        status.obsVersion = QStringLiteral("33.0.1");
+        QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden (OBS 33.0.1)"));
+        status.currentScene = {QStringLiteral("a"), QStringLiteral("Live")};
+        QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden (OBS 33.0.1, Szene «Live»)"));
     }
 
     // P10, Teil C

@@ -72,12 +72,30 @@ QString importStatusText(const QStringList &fileNames);
 // P10-vor, Teil B 1: Dialog «Werkzeuge → Einstellungen …». Nur die Werte, die sich gegenüber dem
 // Stand des Kerns geändert haben (Adresse ohne Leerzeichen am Rand); std::nullopt, wenn nichts
 // geändert ist. Geprüft wird im Kern, der Dialog zeigt dessen Meldung.
-std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, int port,
-                                                     const QString &addressText);
+struct SettingsForm
+{
+    int port = 0;
+    QString address;
+    // P10c: Verbindung zu OBS
+    bool obsEnabled = false;
+    QString obsHost;
+    int obsPort = kObsDefaultPort;
+    QString obsPassword;            // leer = behalten
+    bool deleteObsPassword = false; // Knopf «Passwort löschen»; ein neues Passwort geht vor
+};
+// obsInError: Der OBS-Knopf ist rot. Dann geht auch ein unverändertes Formular an den Kern, denn
+// «OK» versucht es nach einem Abbruch durch OBS neu (P10c, Plan 1.7).
+std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, const SettingsForm &form,
+                                                     bool obsInError);
 // Hinweis im Dialog: Die Werte wirken sofort (Server startet neu, P10), nur Adressen dieses PCs.
 QString settingsDialogHint();
 // Meldung im Dialog: Datei ungültig (settings_error) bzw. ohne Verbindung; sonst leer.
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info);
+// P10c: Platzhalter im Passwortfeld. Der Wert selbst kommt nie vom Kern (Regel 12).
+QString obsPasswordPlaceholder(bool passwordSet, bool deleting);
+// P10c: Tooltip des OBS-Knopfes: «OBS: verbunden (OBS 33.0.1, Szene «Live»)», bei einem Problem die
+// Meldung des Kerns, sonst wie die anderen Knöpfe.
+QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status);
 
 // --- Browserquelle (P10, Teil C) ---
 

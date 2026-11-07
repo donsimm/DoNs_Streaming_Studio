@@ -112,27 +112,65 @@ QString importStatusText(const QStringList &fileNames)
         .arg(fileNames.size()).arg(quoted.join(QStringLiteral(", ")));
 }
 
-std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, int port,
-                                                     const QString &addressText)
+std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current, const SettingsForm &form,
+                                                     bool obsInError)
 {
     SettingsUpdate update;
-    const QString address = addressText.trimmed();
-    if (port != current.port)
-        update.port = port;
+    const QString address = form.address.trimmed();
+    const QString obsHost = form.obsHost.trimmed();
+    if (form.port != current.port)
+        update.port = form.port;
     if (address != current.homeAddress)
         update.homeAddress = address;
-    if (!update.port && !update.homeAddress)
-        return std::nullopt;
+    if (form.obsEnabled != current.obsEnabled)
+        update.obsEnabled = form.obsEnabled;
+    if (obsHost != current.obsHost)
+        update.obsHost = obsHost;
+    if (form.obsPort != current.obsPort)
+        update.obsPort = form.obsPort;
+    if (!form.obsPassword.isEmpty())
+        update.obsPassword = form.obsPassword;
+    else if (form.deleteObsPassword)
+        update.obsPassword = QString();
+    if (!update.port && !update.homeAddress && !update.obsEnabled && !update.obsHost && !update.obsPort
+        && !update.obsPassword) {
+        if (!form.obsEnabled || !obsInError)
+            return std::nullopt;
+        update.obsEnabled = form.obsEnabled;
+    }
     return update;
 }
 
 QString settingsDialogHint()
 {
     return QStringLiteral("Port und Adresse gelten sofort: Der Overlay-Server startet mit den neuen "
-                          "Werten neu, und in OBS muss die neue Adresse der Browserquelle eingetragen "
-                          "werden. Nur Adressen dieses PCs. Leere Adresse: Der Kern trägt innerhalb "
-                          "von 2 s die Adresse der Netzwerkkarte mit der Standardroute ein, sobald es "
-                          "eine gibt.");
+                          "Werten neu. Quellen, die das Studio in OBS angelegt hat, führt es nach; "
+                          "andere Browserquellen brauchen in OBS die neue Adresse. Nur Adressen dieses "
+                          "PCs. Leere Adresse: Der Kern trägt innerhalb von 2 s die Adresse der "
+                          "Netzwerkkarte mit der Standardroute ein, sobald es eine gibt.");
+}
+
+QString obsPasswordPlaceholder(bool passwordSet, bool deleting)
+{
+    if (deleting)
+        return QStringLiteral("wird mit «OK» gelöscht");
+    return passwordSet ? QStringLiteral("gespeichert; leer lassen = behalten")
+                       : QStringLiteral("kein Passwort gespeichert");
+}
+
+QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status)
+{
+    const QString plain = connectionStateText(Connection::Obs, state);
+    if (!status || state == ConnectionState::Off)
+        return plain;
+    if (state != ConnectionState::Connected)
+        return status->message.isEmpty() ? plain : status->message;
+    QStringList details;
+    if (!status->obsVersion.isEmpty())
+        details.append(QStringLiteral("OBS %1").arg(status->obsVersion));
+    if (!status->currentScene.name.isEmpty())
+        details.append(QStringLiteral("Szene «%1»").arg(status->currentScene.name));
+    return details.isEmpty() ? plain : QStringLiteral("%1 (%2)").arg(plain, details.join(QStringLiteral(", ")));
 }
 
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info)

@@ -3,8 +3,11 @@
 #include "coreclient.h"
 #include "windowdata.h"
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -32,12 +35,53 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     form->addRow(QStringLiteral("Port des Overlay-Servers"), m_port);
     form->addRow(QStringLiteral("Adresse im Heimnetz (IPv4)"), m_address);
     form->addRow(QStringLiteral("Datei"), m_file);
-    column->addLayout(form);
-
     auto *hint = new QLabel(dss::settingsDialogHint(), this);
     hint->setObjectName(QStringLiteral("settingsHint"));
     hint->setWordWrap(true);
-    column->addWidget(hint);
+    form->addRow(hint);
+
+    // P10c, Bereich «OBS»: Titel und Linie wie die Bereiche im Dock «Eigenschaften». In demselben
+    // Formular, damit die Felder bündig stehen.
+    auto *obsTitle = new QLabel(QStringLiteral("OBS"), this);
+    obsTitle->setObjectName(QStringLiteral("propertySectionTitle"));
+    form->addRow(obsTitle);
+    auto *obsLine = new QFrame(this);
+    obsLine->setObjectName(QStringLiteral("propertySectionLine"));
+    obsLine->setFixedHeight(1);
+    form->addRow(obsLine);
+    m_obsEnabled = new QCheckBox(QStringLiteral("Mit OBS verbinden"), this);
+    m_obsEnabled->setObjectName(QStringLiteral("settingsObsEnabled"));
+    m_obsHost = new QLineEdit(this);
+    m_obsHost->setObjectName(QStringLiteral("settingsObsHost"));
+    m_obsHost->setPlaceholderText(QStringLiteral("192.168.1.116"));
+    m_obsPort = new QSpinBox(this);
+    m_obsPort->setObjectName(QStringLiteral("settingsObsPort"));
+    m_obsPort->setRange(dss::kObsPortMin, dss::kObsPortMax);
+    m_obsPort->setValue(dss::kObsDefaultPort);
+    m_obsPassword = new QLineEdit(this);
+    m_obsPassword->setObjectName(QStringLiteral("settingsObsPassword"));
+    m_obsPassword->setEchoMode(QLineEdit::Password);
+    m_obsDeletePassword = new QPushButton(QStringLiteral("Passwort löschen"), this);
+    m_obsDeletePassword->setObjectName(QStringLiteral("settingsObsDeletePassword"));
+    m_obsDeletePassword->setAutoDefault(false);
+    m_obsDeletePassword->setToolTip(QStringLiteral("Löscht das gespeicherte Passwort mit «OK»"));
+    auto *passwordRow = new QHBoxLayout;
+    passwordRow->addWidget(m_obsPassword, 1);
+    passwordRow->addWidget(m_obsDeletePassword);
+    form->addRow(QString(), m_obsEnabled);
+    form->addRow(QStringLiteral("Adresse von OBS"), m_obsHost);
+    form->addRow(QStringLiteral("Port von obs-websocket"), m_obsPort);
+    form->addRow(QStringLiteral("Passwort"), passwordRow);
+    column->addLayout(form);
+
+    connect(m_obsDeletePassword, &QPushButton::clicked, this, [this] {
+        m_deleteObsPassword = true;
+        m_obsPassword->clear();
+        updateState();
+    });
+    // Das eingegebene Passwort bleibt nicht im Fenster, auch nicht nach «Abbrechen» (Regel 12).
+    connect(this, &QDialog::finished, m_obsPassword, &QLineEdit::clear);
+
     // Meldung des Kerns: Platz für drei Zeilen von Anfang an, damit das Setzen des Textes das
     // Layout nicht ändert (Regel 9).
     m_problem = new QLabel(this);
@@ -82,6 +126,7 @@ void SettingsDialog::showFromCore()
     m_filled = false;
     m_pendingRequest = 0;
     m_pendingReset = false;
+    m_deleteObsPassword = false;
     m_problem->clear();
     m_client->requestSettings();
     onSettingsChanged();
@@ -95,8 +140,17 @@ void SettingsDialog::accept()
         updateState();
         return;
     }
+    dss::SettingsForm values;
+    values.port = m_port->value();
+    values.address = m_address->text();
+    values.obsEnabled = m_obsEnabled->isChecked();
+    values.obsHost = m_obsHost->text();
+    values.obsPort = m_obsPort->value();
+    values.obsPassword = m_obsPassword->text();
+    values.deleteObsPassword = m_deleteObsPassword;
+    const bool obsInError = m_client->connectionStates().value(dss::Connection::Obs) == dss::ConnectionState::Error;
     const std::optional<dss::SettingsUpdate> update =
-        dss::settingsUpdateFromForm(info->settings, m_port->value(), m_address->text());
+        dss::settingsUpdateFromForm(info->settings, values, obsInError);
     if (!update) {
         QDialog::accept(); // nichts geändert
         return;
@@ -124,6 +178,9 @@ void SettingsDialog::onSettingsChanged()
         if (!m_filled) {
             m_port->setValue(info->settings.port);
             m_address->setText(info->settings.homeAddress);
+            m_obsEnabled->setChecked(info->settings.obsEnabled);
+            m_obsHost->setText(info->settings.obsHost);
+            m_obsPort->setValue(info->settings.obsPort);
             m_filled = true;
         }
     }
@@ -159,6 +216,11 @@ void SettingsDialog::updateState()
     const bool usable = problem.isEmpty() && info.has_value();
     m_port->setEnabled(usable && m_pendingRequest == 0);
     m_address->setEnabled(usable && m_pendingRequest == 0);
+    for (QWidget *w : std::initializer_list<QWidget *>{m_obsEnabled, m_obsHost, m_obsPort, m_obsPassword})
+        w->setEnabled(usable && m_pendingRequest == 0);
+    const bool passwordSet = info && info->obsPasswordSet;
+    m_obsDeletePassword->setEnabled(usable && m_pendingRequest == 0 && passwordSet && !m_deleteObsPassword);
+    m_obsPassword->setPlaceholderText(dss::obsPasswordPlaceholder(passwordSet, m_deleteObsPassword));
     m_ok->setEnabled(usable && m_pendingRequest == 0);
     m_reset->setEnabled(m_client->isConnected() && info && !info->error.isEmpty() && m_pendingRequest == 0);
     // Meldung des Zustands (ohne Verbindung, Datei ungültig) setzen bzw. wieder entfernen; eine

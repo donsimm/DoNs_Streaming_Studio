@@ -315,6 +315,12 @@ void MainWindow::connectCore()
     connect(m_client, &dss::CoreClient::connectedChanged, this, &MainWindow::onCoreConnectedChanged);
     connect(m_client, &dss::CoreClient::statsReceived, this, &MainWindow::onStats);
     connect(m_client, &dss::CoreClient::connectionStatesChanged, this, &MainWindow::refreshConnections);
+    connect(m_client, &dss::CoreClient::obsStatusChanged, this, &MainWindow::refreshConnections); // Tooltip
+    // P10c: Klick auf den OBS-Knopf; ohne Verbindung zum Kern ist die Aktion gesperrt.
+    connect(m_header, &HeaderBar::obsClicked, this, [this] {
+        if (m_settingsAction)
+            m_settingsAction->trigger();
+    });
     connect(m_client, &dss::CoreClient::overlayListChanged, this, &MainWindow::refreshOverlayList);
     connect(m_client, &dss::CoreClient::overlayChanged, this, [this](const QUuid &id) {
         if (id == m_selectedOverlay)
@@ -460,6 +466,9 @@ void MainWindow::refreshConnections()
     const dss::ConnectionStates states = m_client->connectionStates();
     for (dss::Connection c : dss::kAllConnections)
         setConnectionState(c, states.value(c, dss::ConnectionState::Off));
+    m_header->setConnectionToolTip(dss::Connection::Obs,
+                                   dss::obsToolTip(states.value(dss::Connection::Obs, dss::ConnectionState::Off),
+                                                   m_client->obsStatus()));
 }
 
 void MainWindow::refreshOverlayList()

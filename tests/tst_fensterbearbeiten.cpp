@@ -22,6 +22,7 @@
 #include "fontcatalog.h"
 #include "headerbar.h"
 #include "mainwindow.h"
+#include "obstestserver.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
 #include "settingsdialog.h"
@@ -1555,6 +1556,114 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
         QTest::qWait(300);
         QCOMPARE(m_check->settings()->settings.port, 9000);
+    }
+
+    // P10c: Bereich «OBS» im Dialog, OBS-Knopf und Tooltip, gegen den Testserver auf 127.0.0.1
+    void settingsDialogObs()
+    {
+        QToolButton *obsButton = nullptr;
+        for (QToolButton *b : m_window->findChildren<QToolButton *>(QStringLiteral("connectionButton")))
+            if (b->text() == QStringLiteral("OBS"))
+                obsButton = b;
+        QVERIFY(obsButton);
+        QCOMPARE(obsButton->property("state").toString(), QStringLiteral("off"));
+        QCOMPARE(obsButton->toolTip(), QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"));
+
+        testhelp::ObsTestServer server;
+        server.password = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QVERIFY(server.start());
+
+        // Klick auf den Knopf öffnet die Einstellungen
+        QTest::mouseClick(obsButton, Qt::LeftButton);
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
+                                     && dialog->isVisible(), 3000);
+        auto *enabled = dialog->findChild<QCheckBox *>(QStringLiteral("settingsObsEnabled"));
+        auto *host = dialog->findChild<QLineEdit *>(QStringLiteral("settingsObsHost"));
+        auto *port = dialog->findChild<QSpinBox *>(QStringLiteral("settingsObsPort"));
+        auto *password = dialog->findChild<QLineEdit *>(QStringLiteral("settingsObsPassword"));
+        auto *deletePassword = dialog->findChild<QPushButton *>(QStringLiteral("settingsObsDeletePassword"));
+        auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("settingsOk"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("settingsProblem"));
+        QVERIFY(enabled && host && port && password && deletePassword && ok && problem);
+        QVERIFY(dialog->findChild<QLabel *>(QStringLiteral("propertySectionTitle")));
+        QVERIFY(dialog->findChild<QFrame *>(QStringLiteral("propertySectionLine")));
+        QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 3000);
+        QVERIFY(!enabled->isChecked());
+        QCOMPARE(host->placeholderText(), QStringLiteral("192.168.1.116"));
+        QCOMPARE(host->text(), QString());
+        QCOMPARE(port->value(), 4455);
+        QCOMPARE(password->echoMode(), QLineEdit::Password);
+        QVERIFY(password->placeholderText().contains(QStringLiteral("kein Passwort")));
+        QVERIFY(!deletePassword->isEnabled()); // nichts gespeichert
+
+        // Einschalten ohne Adresse: Meldung des Kerns, Dialog bleibt offen, Passwort nicht gespeichert
+        const int problemHeight = problem->height();
+        enabled->setChecked(true);
+        password->setText(server.password);
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("braucht die Adresse")), 3000);
+        QVERIFY(dialog->isVisible());
+        QCOMPARE(problem->height(), problemHeight);
+        QVERIFY(!m_check->settings()->obsPasswordSet);
+
+        // Gültig: Dialog schliesst, Knopf wird grün, Tooltip mit Version und Szene
+        host->setText(QStringLiteral("127.0.0.1"));
+        port->setValue(server.port());
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 10000);
+        QVERIFY(password->text().isEmpty()); // bleibt nicht im Fenster (Regel 12)
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->property("state").toString(), QStringLiteral("connected"), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->toolTip(), QStringLiteral("OBS: verbunden (OBS 33.0.1, Szene «Live»)"), 3000);
+        server.switchScene(server.scenes.at(1));
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->toolTip(), QStringLiteral("OBS: verbunden (OBS 33.0.1, Szene «Pause»)"), 3000);
+
+        // Abgelehntes Passwort: Knopf rot, Tooltip mit der Meldung, kein neuer Versuch; «OK» ohne
+        // Änderung versucht es wieder (Plan 1.7)
+        const QString rightPassword = server.password;
+        server.password = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        server.closeClients(4000);
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->property("state").toString(), QStringLiteral("error"), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(obsButton->toolTip().contains(QStringLiteral("Passwort abgelehnt")), 3000);
+        server.password = rightPassword;
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && ok->isEnabled() && enabled->isChecked(), 3000);
+        QVERIFY(password->placeholderText().contains(QStringLiteral("behalten")));
+        QVERIFY(password->text().isEmpty());
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->property("state").toString(), QStringLiteral("connected"), 10000);
+
+        // «Passwort löschen» gilt erst mit «OK»; Abbrechen behält es
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && deletePassword->isEnabled(), 3000);
+        QTest::mouseClick(deletePassword, Qt::LeftButton);
+        QVERIFY(!deletePassword->isEnabled());
+        QVERIFY(password->placeholderText().contains(QStringLiteral("gelöscht")));
+        clickButton(dialog, QStringLiteral("Abbrechen"));
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTest::qWait(300);
+        QVERIFY(m_check->settings()->obsPasswordSet);
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && deletePassword->isEnabled(), 3000);
+        QTest::mouseClick(deletePassword, Qt::LeftButton);
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!m_check->settings()->obsPasswordSet, 3000);
+
+        // Abschalten: wieder grau
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && ok->isEnabled() && enabled->isChecked(), 3000);
+        enabled->setChecked(false);
+        host->clear();
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(obsButton->property("state").toString(), QStringLiteral("off"), 3000);
+        QCOMPARE(obsButton->toolTip(), QStringLiteral("OBS: nicht eingerichtet oder abgeschaltet"));
+        QTest::qWait(100);
+        const int connections = server.connectionCount();
+        QTest::qWait(2500);
+        QCOMPARE(server.connectionCount(), connections);
     }
 
     // P10, Punkt 77: Dialog mit einem eigenen Kern, dessen kern.ini ungültig ist: «OK» ausgegraut,

@@ -32,9 +32,13 @@ public:
 
     // Zeigt den Zustand einer Verbindung an (Farbe des Rahmens, Tooltip). Setzt später der Kern.
     void setConnectionState(dss::Connection connection, dss::ConnectionState state);
+    // P10c: Tooltip mit Einzelheiten (nach setConnectionState, das den einfachen Text setzt).
+    void setConnectionToolTip(dss::Connection connection, const QString &text);
 
 signals:
     void moduleSelected(int module);
+    // P10c: Klick auf den OBS-Knopf
+    void obsClicked();
 
 private:
     QButtonGroup *m_modules = nullptr;

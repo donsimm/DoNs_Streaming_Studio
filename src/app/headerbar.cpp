@@ -204,6 +204,8 @@ HeaderBar::HeaderBar(const Theme &theme, QWidget *parent)
         buttonRow->addWidget(button);
         // Ohne Kern: alle grau.
         setConnectionState(connection, dss::ConnectionState::Off);
+        if (connection == dss::Connection::Obs)
+            connect(button, &QToolButton::clicked, this, &HeaderBar::obsClicked);
     }
     // Anzeigen rechts in fester Breite (Entscheid 2 in P09b).
     const QList<std::tuple<QString, QColor, const char *>> gauges = {
@@ -244,4 +246,12 @@ void HeaderBar::setConnectionState(dss::Connection connection, dss::ConnectionSt
     // https://doc.qt.io/qt-6.8/stylesheet-syntax.html#selector-types (Hinweis zu Eigenschaften)
     button->style()->unpolish(button);
     button->style()->polish(button);
+}
+
+void HeaderBar::setConnectionToolTip(dss::Connection connection, const QString &text)
+{
+    if (QToolButton *button = m_connections.value(connection)) {
+        button->setToolTip(text);
+        button->setAccessibleName(text);
+    }
 }
