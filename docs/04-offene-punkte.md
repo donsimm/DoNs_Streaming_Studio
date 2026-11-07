@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 91 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 92 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -12,6 +12,7 @@ Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in
 87. Aus P10b: Bleibt ein Test mit eigenem Kern stehen, weil er abstürzt, läuft sein Kern weiter (Elternprozess 1). Am 2026-11-04 um 10:23 liefen noch zwei Kerne von `tst_fensterbearbeiten` von 10:04 und 10:05 (Läufe, die an einer Prüfzeile abstürzten, die vor dem Commit entfernt wurde); beendet mit `kill` und Ordner gelöscht. Nicht im Auftrag; zu entscheiden, ob Testkerne sich beenden, wenn der Test endet (zum Beispiel `prctl(PR_SET_PDEATHSIG)`, https://man7.org/linux/man-pages/man2/prctl.2.html, nur für Tests).
 88. Aus P10b: Erlaubte Endungen für Videos sind weiterhin nur `.webm` und `.mp4` (`docs/06-overlay-format.md`, «media/»). Eine `.mov` (das Beispiel im Entscheid zu Punkt 81 nennt «zaehler.mov (ProRes)») weist der Kern beim Hinzufügen ab («Endung «mov» nicht erlaubt …»); der Hinweis zu ProRes kommt also nur bei ProRes in `.mp4` (so geprüft). Nicht im Auftrag; zu entscheiden, ob `.mov` (und `.mkv`) erlaubt werden.
 89. Aus P10b: Schriften im Dock «Medien» lassen sich nicht auf die Leinwand oder in die Liste «Quellen» ziehen (Ziehen gibt nur Bild- und Videodateien weiter, Entscheid E-28 nennt «neue Quelle»; eine Schrift ist keine Quelle). Zu entscheiden, ob Ziehen einer Schrift eine Textquelle mit dieser Schrift anlegen soll.
+91. Aus dem Umbau (2026-11-07): `tst_fensterbearbeiten`, `mediaDockSavedLayout(echte fenster.ini (Kopie))` schlägt fehl, solange die echte `~/.config/dons-streaming-studio/fenster.ini` den Schlüssel `fenster/medien` enthält: Die Prüfzeile (`tests/tst_fensterbearbeiten.cpp:1773`) verlangt eine Datei von vor P10b, das Fenster ab P10b schreibt den Schlüssel beim Schliessen (`src/app/mainwindow.cpp:286`). Die Zeile hängt also an den Daten des Nutzers, nicht am Code; vermutlich seit dem Handtest von P10b mit der installierten Fassung (nicht geprüft). Der Rest dieser Testzeile läuft dadurch nicht mehr. Zu entscheiden, wie die Zeile zu festen Testdaten kommt (zum Beispiel eine eingefrorene Kopie unter `tests/daten/`).
 - Ohne Nummer, aus «Entschieden nach P09»: Zuschneiden von Quellen später als eigenen Punkt besprechen (E-25 enthält es nicht).
 
 ## Entschieden, Umsetzung steht aus
