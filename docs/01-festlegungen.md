@@ -1,6 +1,6 @@
 # 01 – Festlegungen
 
-Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
+Stand: 2026-11-07. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
 
 ## Ziel
 
@@ -24,7 +24,7 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 
 ## Oberfläche
 
-- Die Oberfläche bleibt wie auf dem Bild des Nutzers (`docs/bilder/oberflaeche.png`): Menüleiste, Kopfbereich mit Modul-Reitern, Verbindungssymbole (Twitch, YouTube, OBS, NDI) und Anzeigen für CPU, RAM und LAN, Leinwand in der Mitte mit Linealen in Pixeln und Schachbrettmuster, vier Docks unten (Overlays, Quellen, Eigenschaften, Steuerung), Statuszeile. (entschieden)
+- Die Oberfläche bleibt wie auf dem Bild des Nutzers (`docs/bilder/oberflaeche.png`): Menüleiste, Kopfbereich mit Modul-Reitern, Verbindungssymbole (Twitch, YouTube, OBS, NDI) und Anzeigen für CPU, RAM und LAN, Leinwand in der Mitte mit Linealen in Pixeln und Schachbrettmuster, fünf Docks unten (Overlays, Quellen, Medien, Eigenschaften, Steuerung; «Medien» kam mit P10b dazu), Statuszeile. (entschieden)
 - Die Software besteht aus zwei Teilen: dem Fenster zum Bedienen und einem Hintergrundprogramm (dem Kern), das Twitch, OBS und die Overlays dauerhaft betreibt. Stürzt das Fenster ab, laufen die Overlays im Stream weiter. Das Fenster enthält keine Logik. Ob der Aufbau zur Technikwahl passt, zeigen die Messungen T-01 bis T-03. (entschieden)
 
 ## Editor
@@ -56,7 +56,7 @@ Stand: 2026-11-02. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» 
 - Bekanntes Risiko dieser Wahl: Die zwei Zeichner können voneinander abweichen (Schrift, Zeilenumbruch, Animationen), sodass der Editor etwas anderes zeigt als der Stream. Das ist eine Einschätzung von Claude, nicht gemessen. Gegenmassnahmen: siehe Abschnitt «Konzept der zwei Zeichner».
 - Video mit Alpha in der eigenen Leinwand: eigener Dekodierweg über libavcodec mit `libvpx-vp9` (gemessen in P02, M1). Qt Multimedia 6.8.2 liefert den Alpha nicht.
 - Sprache des Kerns (Hintergrundprogramm): entschieden (2026-11-02, vom Nutzer bestätigt): C++, dieselbe Sprache und Werkzeugkette wie das Fenster. Begründung: gemeinsamer Code für Leinwand-Modell, Dekodierung und Zeichnen. Ungeprüft: Was Qt 6.8.2 unter Debian 13 für Webserver und Twitch-Anbindung mitbringt; das klärt der Prompt für den Kern.
-- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket). Seit 2026-11-03 besteht das Netzwerk; T-04 ist mit P10 vorbereitet (Stufe 1 mit Qt WebEngine auf dem Studio-PC), die Prüfung in OBS ist der Handtest P10.
+- Zurückgestellt, bis das Netzwerk besteht: T-03 (NDI) und T-04 (Browserquelle in OBS), T-05 (obs-websocket). Seit 2026-11-03 besteht das Netzwerk; T-04 ist erledigt (Handtest P10 mit OBS, 2026-11-04), T-05 kommt mit P10c, T-03 ist offen.
 
 ## Konzept der zwei Zeichner
 
@@ -192,7 +192,7 @@ Festgelegt mit P10 (2026-11-04, Teil B 3 des Auftrags; Vorgaben aus Teil B 2):
 - **Video beim Wechsel des Overlays:** Ein Video beginnt immer von vorne, wenn seine Quelle wieder gezeigt wird. Im Editor gilt das schon: Beim Wechsel auf ein anderes Overlay werden die Spieler beendet, beim Zurückwechseln neu angelegt, und das Video beginnt bei 0 (geprüft mit `tst_leinwandbild`, Slot `videoRestartsAfterOverlaySwitch`, 2026-11-04). In der Browserquelle beginnt ein Video beim Einblenden der Quelle, beim Laden oder Neuladen der Seite, beim Einschalten der Ausgabe und bei einer anderen Datei von vorne. Begründung: Beide Zeichner verhalten sich gleich, und es gibt keine Stelle, an der der Editor eine Laufzeit merken müsste. Der Wechsel des Overlays im Editor wirkt nicht auf die Browserquelle: Sie spielt unabhängig vom Editor und zeigt ihr Overlay weiter, auch wenn im Editor ein anderes gewählt ist.
 - **Video in der Browserquelle:** stumm; Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Die Drehung aus den Metadaten und die EXIF-Ausrichtung setzt die Seite selbst um, nach Angaben des Kerns. Der Kern liefert die Dateien dafür mit Ausrichtung 1 bzw. Einheitsmatrix aus, damit das Ergebnis nicht von der Chromium-Version abhängt (`docs/08-kern-schnittstelle.md`, «Overlay-Server»).
 - **Ausgabe ein/aus (E-24):** Der Zustand steht in der Overlay-Datei (Feld `output`, Format 4, `docs/06-overlay-format.md`), damit er einen Neustart übersteht und Editor und Browserquelle denselben Stand haben. Aus heisst: Die Browserquelle ist leer und durchsichtig, bleibt aber verbunden; der Editor bleibt bearbeitbar.
-- **Nicht abspielbare Videos:** Kann Chromium ein Video nicht abspielen (auf dem Studio-PC mit Qt WebEngine 6.8.2: HEVC, MPEG-4 Part 2, ProRes; Bericht P10), bleibt die Quelle leer, und die Seite meldet es dem Kern (Protokoll). Was mit solchen Dateien geschehen soll (Hinweis beim Hinzufügen, Umwandeln), ist offen (`docs/04-offene-punkte.md`).
+- **Nicht abspielbare Videos:** Kann Chromium ein Video nicht abspielen (auf dem Studio-PC mit Qt WebEngine 6.8.2: HEVC, MPEG-4 Part 2, ProRes; Bericht P10), bleibt die Quelle leer, und die Seite meldet es dem Kern (Protokoll). Beim Hinzufügen erscheint ein Hinweis, im Dock «Medien» ein Warnzeichen; kein automatisches Umwandeln (entschieden 2026-11-04, umgesetzt mit P10b, Punkt 81 in `docs/archiv/04-erledigte-punkte.md`).
 
 ## Einsatz (Version im Stream)
 
