@@ -1736,18 +1736,19 @@ private slots:
     // sind «Overlays» und «Quellen» Reiter, als dritter. Ein zweiter Start lässt es dort.
     void mediaDockSavedLayout_data()
     {
-        QTest::addColumn<QString>("source");
-        QTest::newRow("Reiter Overlays und Quellen") << QString();
-        // Kopie der echten fenster.ini des Nutzers, wie im Handtest (nur lesen)
-        QTest::newRow("echte fenster.ini (Kopie)")
-            << QDir::homePath() + QStringLiteral("/.config/dons-streaming-studio/fenster.ini");
+        QTest::addColumn<bool>("tabbed");
+        QTest::newRow("Reiter Overlays und Quellen") << true;
+        // Beide Anordnungen erzeugt der Test, keine stammt vom echten Gerät (Abweichung von Regel 7,
+        // Punkt 91): Die echte fenster.ini enthält seit dem 2026-11-07 den Eintrag fenster/medien,
+        // eine Kopie von vor P10b gibt es im Repo nicht.
+        QTest::newRow("Docks nebeneinander") << false;
     }
 
     void mediaDockSavedLayout()
     {
         if (!DSS_APP_MEDIA_DOCK)
             QSKIP("Schalter DSS_APP_MEDIA_DOCK ist aus");
-        QFETCH(QString, source);
+        QFETCH(bool, tabbed);
         QTemporaryDir config;
         const QByteArray oldConfig = qgetenv("XDG_CONFIG_HOME");
         qputenv("XDG_CONFIG_HOME", config.path().toUtf8());
@@ -1755,24 +1756,18 @@ private slots:
         const QString ini = configDir() + QStringLiteral("/fenster.ini");
         QVERIFY(QDir().mkpath(configDir()));
         const Theme theme = darkTheme();
-        if (source.isEmpty()) {
-            // Anordnung wie vor P10b: Overlays und Quellen als Reiter, ohne Dock «Medien»
+        {
+            // Anordnung wie vor P10b: ohne Dock «Medien» und ohne Eintrag fenster/medien
             MainWindow old(theme, false, nullptr);
             old.resize(1280, 800);
-            old.tabifyDockWidget(old.findChild<QDockWidget *>(QStringLiteral("overlaysDock")),
-                                 old.findChild<QDockWidget *>(QStringLiteral("sourcesDock")));
+            if (tabbed)
+                old.tabifyDockWidget(old.findChild<QDockWidget *>(QStringLiteral("overlaysDock")),
+                                     old.findChild<QDockWidget *>(QStringLiteral("sourcesDock")));
             old.removeDockWidget(old.findChild<QDockWidget *>(QStringLiteral("mediaDock")));
             QSettings settings(ini, QSettings::IniFormat);
             settings.setValue(QStringLiteral("fenster/geometrie"), old.saveGeometry());
             settings.setValue(QStringLiteral("fenster/anordnung"), old.saveState(1));
-        } else {
-            if (!QFile::exists(source))
-                QSKIP("keine fenster.ini des Nutzers");
-            QVERIFY(QFile::copy(source, ini));
-            QSettings settings(ini, QSettings::IniFormat);
-            QVERIFY(!settings.contains(QStringLiteral("fenster/medien"))); // gespeichert vor P10b
         }
-        bool overlaysTabbed = false;
         {
             MainWindow w(theme, true, nullptr);
             w.show();
@@ -1781,14 +1776,11 @@ private slots:
             auto *sources = w.findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
             auto *overlays = w.findChild<QDockWidget *>(QStringLiteral("overlaysDock"));
             QVERIFY(w.tabifiedDockWidgets(sources).contains(media));
-            overlaysTabbed = w.tabifiedDockWidgets(sources).contains(overlays);
-            if (source.isEmpty())
-                QVERIFY(overlaysTabbed);
-            if (overlaysTabbed) {
-                const QList<QDockWidget *> tabs = w.tabifiedDockWidgets(media);
-                QVERIFY(tabs.contains(overlays) && tabs.contains(sources));
-                QCOMPARE(tabs.size(), 2); // drei Reiter
-            }
+            QCOMPARE(w.tabifiedDockWidgets(sources).contains(overlays), tabbed);
+            const QList<QDockWidget *> tabs = w.tabifiedDockWidgets(media);
+            QVERIFY(tabs.contains(sources));
+            QCOMPARE(tabs.contains(overlays), tabbed);
+            QCOMPARE(tabs.size(), tabbed ? 2 : 1); // drei oder zwei Reiter
             // Bild für den Bericht (nur mit DSS_TEST_BILDER, ein Ordner)
             if (const QString dir = qEnvironmentVariable("DSS_TEST_BILDER"); !dir.isEmpty()) {
                 media->raise();
@@ -1806,7 +1798,7 @@ private slots:
             auto *media = w.findChild<QDockWidget *>(QStringLiteral("mediaDock"));
             auto *sources = w.findChild<QDockWidget *>(QStringLiteral("sourcesDock"));
             QVERIFY(w.tabifiedDockWidgets(sources).contains(media));
-            QCOMPARE(w.tabifiedDockWidgets(media).size(), overlaysTabbed ? 2 : 1);
+            QCOMPARE(w.tabifiedDockWidgets(media).size(), tabbed ? 2 : 1);
             // lösbar wie die anderen Docks
             QVERIFY(media->features() & QDockWidget::DockWidgetFloatable);
             QVERIFY(media->features() & QDockWidget::DockWidgetMovable);
