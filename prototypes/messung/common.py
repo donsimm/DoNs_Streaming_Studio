@@ -6,8 +6,8 @@ import time
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PROTO = os.path.join(ROOT, "prototypes")
 MEDIA = os.path.join(PROTO, "media")
-OUT = os.path.join(ROOT, "docs", "messungen", "P01-daten")
-SHOTS = os.path.join(ROOT, "docs", "messungen", "P01-bilder")
+OUT = os.path.join(ROOT, "docs", "archiv", "messungen", "P01-daten")
+SHOTS = os.path.join(ROOT, "docs", "archiv", "messungen", "P01-bilder")
 CORE_PORT = 8765
 
 A_BIN = os.path.join(PROTO, "a-cpp-qt", "build", "p01_a")

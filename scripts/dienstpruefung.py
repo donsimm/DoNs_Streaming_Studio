@@ -28,7 +28,7 @@ Startbegrenzung (Vorgabe DefaultStartLimitIntervalSec=10s, DefaultStartLimitBurs
 https://www.freedesktop.org/software/systemd/man/latest/systemd-system.conf.html
 Zwischen zwei kill -9 wartet das Skript deshalb mindestens 3 s.
 
-  python3 scripts/dienstpruefung.py [--kills 5] [--build build] [--out docs/berichte/P07-daten]
+  python3 scripts/dienstpruefung.py [--kills 5] [--build build] [--out build/dienstpruefung]
 """
 import argparse
 import json

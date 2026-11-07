@@ -598,7 +598,7 @@ Punkt 77 (Entscheid 2026-11-03): Knopf «Auf Standardwerte zurücksetzen» im Di
 
 ## Overlay-Server (P10)
 
-Der Kern liefert jedem Overlay eine Webseite für die Browserquelle in OBS (E-12, zweiter Zeichner K-01 bis K-08). Code: `src/server/` (`dss_server`, Schalter `DSS_CORE_OVERLAY_SERVER`, Standard ON), Seite: `web/overlay.html`, `web/overlay.js`. Begründung der Technik im Bericht `docs/berichte/P10-bericht.md`.
+Der Kern liefert jedem Overlay eine Webseite für die Browserquelle in OBS (E-12, zweiter Zeichner K-01 bis K-08). Code: `src/server/` (`dss_server`, Schalter `DSS_CORE_OVERLAY_SERVER`, Standard ON), Seite: `web/overlay.html`, `web/overlay.js`. Begründung der Technik im Bericht `docs/archiv/berichte/P10-bericht.md`.
 
 | Punkt | Festlegung |
 |---|---|

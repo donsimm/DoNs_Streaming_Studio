@@ -26,7 +26,7 @@ Je Start:
   Zeitüberschreitung, keine unerwarteten Protokollzeilen und 2 s nach Ende kein Prozess der
   Sitzung mehr vorhanden (Sitzungs-ID aus /proc/<pid>/stat, proc(5)).
 
-  python3 scripts/startpruefung.py [--runs 20] [--build build] [--out docs/berichte/P03-daten]
+  python3 scripts/startpruefung.py [--runs 20] [--build build] [--out build/startpruefung]
 """
 import argparse
 import json
@@ -255,7 +255,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=20)
     ap.add_argument("--build", default=os.path.join(ROOT, "build"))
-    ap.add_argument("--out", default=os.path.join(ROOT, "docs", "berichte", "P03-daten"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "build", "startpruefung"))
     ap.add_argument("--cases", nargs="+", choices=list(CASES), default=list(CASES))
     args = ap.parse_args()
 

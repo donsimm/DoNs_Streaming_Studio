@@ -1,5 +1,5 @@
 // Messprototyp Variante A: C++ mit Qt 6, nativ (QWidget + QPainter, Qt Multimedia).
-// Nur für die Messungen T-01 und T-02 aus prompts/P01-messprototypen.md.
+// Nur für die Messungen T-01 und T-02 aus docs/archiv/prompts/P01-messprototypen.md.
 //
 //   --mode t01                     Fenster zeigen, nach dem ersten Bild 1 s warten, beenden.
 //                                  Gibt "FIRST_FRAME_NS <CLOCK_MONOTONIC ns>" aus.

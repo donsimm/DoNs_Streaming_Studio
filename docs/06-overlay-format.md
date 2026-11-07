@@ -4,7 +4,7 @@ Stand: 2026-11-04 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.jso
 
 ## Datenordner
 
-Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation` liefert, mit dem Programmnamen `dons-streaming-studio`. Unter Linux ist das `~/.local/share/dons-streaming-studio` bzw. `$XDG_DATA_HOME/dons-streaming-studio`, wenn `XDG_DATA_HOME` gesetzt ist (Quelle: https://doc.qt.io/qt-6.8/qstandardpaths.html; auf dem Studio-PC geprüft, siehe `docs/berichte/P04-bericht.md`). Für Tests und Handtest lässt sich ein anderer Ordner wählen (`dss-cli --datenordner PFAD`).
+Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation` liefert, mit dem Programmnamen `dons-streaming-studio`. Unter Linux ist das `~/.local/share/dons-streaming-studio` bzw. `$XDG_DATA_HOME/dons-streaming-studio`, wenn `XDG_DATA_HOME` gesetzt ist (Quelle: https://doc.qt.io/qt-6.8/qstandardpaths.html; auf dem Studio-PC geprüft, siehe `docs/archiv/berichte/P04-bericht.md`). Für Tests und Handtest lässt sich ein anderer Ordner wählen (`dss-cli --datenordner PFAD`).
 
 ```
 <Datenordner>/

@@ -120,4 +120,4 @@ Abgerufen in P09b (2026-11-03):
 - Chromium, `eXIf` in PNG: https://chromium.googlesource.com/chromium/src/+/694d9d3a5cc2bc5fa8b36a5dd11b55d437555ca6
 - Qt 6.8: QImageReader::setAutoTransform https://doc.qt.io/qt-6.8/qimagereader.html#setAutoTransform, eigenes Layout https://doc.qt.io/qt-6.8/layout.html#how-to-write-a-custom-layout-manager
 
-Weitere Qt-Quellen je Baustein: `docs/berichte/`.
+Weitere Qt-Quellen je Baustein: `docs/archiv/berichte/`.

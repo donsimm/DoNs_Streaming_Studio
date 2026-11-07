@@ -5,7 +5,7 @@
 
 // Schrift des Fensters (Auftrag P06): Open Sans als Datei unter src/app/schriften/, nicht aus
 // einer Installation. Herkunft und Lizenz: src/app/schriften/OFL.txt und
-// docs/berichte/P06-bericht.md.
+// docs/archiv/berichte/P06-bericht.md.
 
 // Ordner der Schriftdateien (src/app/schriften/).
 QString fontDir();

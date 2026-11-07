@@ -2,7 +2,7 @@
 // OpenType, Lesen der Ausgabe von fc-list, Auflösung Schriftname und Schnitt → Datei, die
 // mitgelieferte Be Vietnam Pro und das Laden mit fc-list und fc-query auf dem Studio-PC.
 // Feste Daten: tests/daten/schriften/fc-list.txt ist die Ausgabe von fc-list auf dem Studio-PC
-// (2026-11-02 23:48:09 +0100, Befehl siehe docs/berichte/P08-bericht.md).
+// (2026-11-02 23:48:09 +0100, Befehl siehe docs/archiv/berichte/P08-bericht.md).
 
 #include "fontcatalog.h"
 

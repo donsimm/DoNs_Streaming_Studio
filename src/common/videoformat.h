@@ -7,7 +7,7 @@
 // Videoformate, die die Browserquelle nicht abspielt (P10b, Punkt 81). Nur Qt Core.
 //
 // Die Liste steht nur hier. Gemessen in P10 mit Chromium aus Qt WebEngine 6.8.2 (Bericht
-// docs/berichte/P10-bericht.md, Abschnitt «Videoformate»): HEVC (H.265), MPEG-4 Part 2 und ProRes
+// docs/archiv/berichte/P10-bericht.md, Abschnitt «Videoformate»): HEVC (H.265), MPEG-4 Part 2 und ProRes
 // geben Fehler 4 «DEMUXER_ERROR_NO_SUPPORTED_STREAMS», canPlayType ist leer. H.264, VP9 (auch
 // mit Alpha) und AV1 laufen. Ob das Chromium der Browserquelle in OBS dieselben Formate kann, ist
 // nicht geprüft (Punkt 81).

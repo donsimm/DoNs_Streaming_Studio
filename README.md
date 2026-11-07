@@ -18,8 +18,7 @@ Status: Aufbau. Es gibt das Projektgerüst (P03): Kern `dss-core` und Fenster `d
 | `docs/07-bauplan.md` | Reihenfolge der Bausteine (Prompts) |
 | `docs/06-overlay-format.md` | Format der Overlay-Datei und Aufbau des Datenordners (Vorlage für beide Zeichner) |
 | `docs/08-kern-schnittstelle.md` | Schnittstelle Fenster–Kern (Unix-Socket, JSON pro Zeile), Kern als Benutzerdienst |
-| `docs/berichte/` | Berichte der Bau-Prompts (ab P03) |
-| `prompts/` | Aufträge an Claude Code, in Reihenfolge, je eine eigene Sitzung |
+| `docs/archiv/` | Zum Nachschlagen, keine Lesepflicht: frühere Übergabe, erledigte Punkte, Berichte (`berichte/`), Messungen P01 und P02 (`messungen/`), Prompts (`prompts/`) |
 | `CMakeLists.txt` | Oberste Build-Datei (C++20, Qt 6), Version des Programms, Schalter |
 | `src/common/` | Bibliothek `dss_common`: Logik und Daten für Kern und Fenster, nur Qt Core |
 | `src/core/` | Kern `dss-core` (Hintergrundprogramm, ohne Fenster) |

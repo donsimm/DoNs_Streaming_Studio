@@ -6,7 +6,7 @@
   python3 prototypes/messung/m1.py B          Wiederholung P01-Variante B (Vergleich, gleiche Sitzung)
   python3 prototypes/messung/m1.py A-libvpx t01   20 Starts mit t01.py (ebenfalls unverändert)
 
-Ablage: docs/messungen/P02-daten/m1-<NAME>/t02-<A|B>/ und docs/messungen/P02-bilder/m1-<NAME>/t02-<A|B>.png.
+Ablage: docs/archiv/messungen/P02-daten/m1-<NAME>/t02-<A|B>/ und docs/archiv/messungen/P02-bilder/m1-<NAME>/t02-<A|B>.png.
 t01.py und t02.py rufen common.app_cmd und common.OUT/SHOTS erst zur Laufzeit ab; deshalb genügt es, diese
 Werte hier vor dem Aufruf zu ersetzen.
 """
@@ -26,8 +26,8 @@ def main():
         print(__doc__)
         return 2
     name = sys.argv[1]
-    common.OUT = os.path.join(common.ROOT, "docs", "messungen", "P02-daten", f"m1-{name}")
-    common.SHOTS = os.path.join(common.ROOT, "docs", "messungen", "P02-bilder", f"m1-{name}")
+    common.OUT = os.path.join(common.ROOT, "docs", "archiv", "messungen", "P02-daten", f"m1-{name}")
+    common.SHOTS = os.path.join(common.ROOT, "docs", "archiv", "messungen", "P02-bilder", f"m1-{name}")
     if name == "A-libvpx":
         original = common.app_cmd
 

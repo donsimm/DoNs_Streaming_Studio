@@ -25,8 +25,8 @@ import time
 import common
 import t02
 
-OUT = os.path.join(common.ROOT, "docs", "messungen", "P02-daten")
-SHOTS = os.path.join(common.ROOT, "docs", "messungen", "P02-bilder")
+OUT = os.path.join(common.ROOT, "docs", "archiv", "messungen", "P02-daten")
+SHOTS = os.path.join(common.ROOT, "docs", "archiv", "messungen", "P02-bilder")
 BIN = os.path.join(common.PROTO, "b-web-capture", "host", "build", "p02_b_capture")
 
 
