@@ -7,6 +7,7 @@
 #include "dockviews.h"
 #include "docks.h"
 #include "headerbar.h"
+#include "obssourcedialog.h"
 #include "symbols.h"
 #if DSS_APP_SETTINGS_DIALOG
 #include "settingsdialog.h"
@@ -337,6 +338,9 @@ void MainWindow::connectCore()
         refreshBrowserSource(); // verbundene Seiten in «Ausgabe: …»
     });
     connect(m_controlDock.copyAddress, &QPushButton::clicked, this, &MainWindow::copyBrowserSource);
+    connect(m_client, &dss::CoreClient::obsSourcesChanged, this, &MainWindow::refreshObsSource);
+    connect(m_client, &dss::CoreClient::connectionStatesChanged, this, &MainWindow::refreshObsSource);
+    connect(m_controlDock.obsSourceButton, &QPushButton::clicked, this, &MainWindow::showObsSourceDialog);
 #endif
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
@@ -637,7 +641,46 @@ void MainWindow::refreshBrowserSource()
         pages = status->pages.value(m_selectedOverlay, 0);
     m_controlDock.outputState->setText(
         dss::outputStateText(summary ? std::optional<bool>(summary->output) : std::nullopt, pages));
+    refreshObsSource();
     refreshActions();
+}
+
+void MainWindow::refreshObsSource()
+{
+    if (!m_client)
+        return;
+    const dss::ObsSourceRow row = dss::obsSourceRow(
+        !m_selectedOverlay.isNull(),
+        m_client->connectionStates().value(dss::Connection::Obs, dss::ConnectionState::Off),
+        m_client->obsSource(m_selectedOverlay));
+    QLabel *state = m_controlDock.obsSourceState;
+    state->setText(row.text);
+    state->setToolTip(row.text);
+    if (state->property("problem").toBool() != row.problem) {
+        state->setProperty("problem", row.problem);
+        // Das Stylesheet wertet [problem="…"] nur beim Polieren aus.
+        state->style()->unpolish(state);
+        state->style()->polish(state);
+    }
+    QPushButton *button = m_controlDock.obsSourceButton;
+    button->setText(row.buttonText);
+    button->setToolTip(row.buttonToolTip);
+    button->setEnabled(row.canAct);
+}
+
+void MainWindow::showObsSourceDialog()
+{
+    if (m_selectedOverlay.isNull())
+        return;
+    if (!m_obsSourceDialog) {
+        m_obsSourceDialog = new ObsSourceDialog(m_client, this);
+        connect(m_obsSourceDialog, &ObsSourceDialog::succeeded, this, &MainWindow::showStatus);
+    }
+    const dss::ObsSourceInfo source = m_client->obsSource(m_selectedOverlay);
+    const dss::OverlaySummary *summary = m_client->listData().summary(m_selectedOverlay);
+    const bool addToScene = source.state == dss::ObsSourceState::Present;
+    m_obsSourceDialog->showFor(m_selectedOverlay,
+                               addToScene ? source.inputName : (summary ? summary->name : QString()), addToScene);
 }
 
 void MainWindow::refreshServerStatus()

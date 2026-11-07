@@ -428,6 +428,18 @@ ControlDock createControlDock(QWidget *parent)
     auto *message = new QLabel(content);
     message->setWordWrap(true);
     message->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // P10c, E-29: Zeile «OBS», Text und Knopf setzt MainWindow::refreshObsSource.
+    // Platz für zwei Zeilen von Anfang an: Das Setzen des Textes ändert die Anordnung nicht (Regel 9).
+    // Längeres steht im Tooltip.
+    auto *obsState = new QLabel(QStringLiteral("–"), content);
+    obsState->setWordWrap(true);
+    obsState->setFixedHeight(obsState->fontMetrics().lineSpacing() * 2);
+    obsState->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    auto *obsButton = new QPushButton(QStringLiteral("In OBS anlegen …"), content);
+    obsButton->setEnabled(false);
+    nameWidgets({{obsState, "obsSourceState"}, {obsButton, "obsSourceButton"}});
+    result.obsSourceState = obsState;
+    result.obsSourceButton = obsButton;
     auto *output = new QComboBox(content);
     output->addItem(QStringLiteral("Browserquelle"));
     auto *outputState = new QLabel(QStringLiteral("Ausgabe: –"), content);
@@ -466,20 +478,24 @@ ControlDock createControlDock(QWidget *parent)
     addressButtons->addWidget(newToken);
     grid->addLayout(addressButtons, 0, 3);
     grid->addWidget(message, 1, 1, 1, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Ausgabe"), content), 2, 0);
-    grid->addWidget(output, 2, 1);
-    grid->addWidget(outputState, 2, 2, 1, 2);
-    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 3, 0);
-    grid->addWidget(preview, 3, 1);
-    grid->addWidget(previewSmall, 3, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("OBS"), content), 2, 0);
+    // Der Knopf belegt zwei Spalten: Sein längerer Text macht das Dock nicht breiter.
+    grid->addWidget(obsState, 2, 1);
+    grid->addWidget(obsButton, 2, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Ausgabe"), content), 3, 0);
+    grid->addWidget(output, 3, 1);
+    grid->addWidget(outputState, 3, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 4, 0);
+    grid->addWidget(preview, 4, 1);
+    grid->addWidget(previewSmall, 4, 2, 1, 2);
     auto *snapRow = new QHBoxLayout;
     snapRow->setSpacing(8);
     snapRow->addWidget(snap);
     snapRow->addStretch(1);
     snapRow->addWidget(gridCheck);
-    grid->addLayout(snapRow, 4, 0, 1, 2);
-    grid->addWidget(gridSize, 4, 2);
-    grid->addWidget(clearGuides, 4, 3);
+    grid->addLayout(snapRow, 5, 0, 1, 2);
+    grid->addWidget(gridSize, 5, 2);
+    grid->addWidget(clearGuides, 5, 3);
     // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
     result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
     result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
@@ -492,13 +508,13 @@ ControlDock createControlDock(QWidget *parent)
     result.overlayWidth->setEnabled(false);
     result.overlayHeight->setEnabled(false);
     nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
-    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 5, 0);
-    grid->addWidget(result.overlayWidth, 5, 1);
-    grid->addWidget(result.overlayHeight, 5, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 6, 0);
+    grid->addWidget(result.overlayWidth, 6, 1);
+    grid->addWidget(result.overlayHeight, 6, 2);
 
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(6, 1);
+    grid->setRowStretch(7, 1);
     result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
     return result;
 }

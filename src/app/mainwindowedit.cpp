@@ -509,7 +509,9 @@ void MainWindow::newToken()
     const QUuid id = m_selectedOverlay;
     if (id.isNull() || !m_client->isConnected())
         return;
-    if (!confirm(this, QStringLiteral("Neuer Token?"), dss::newTokenQuestion(),
+    // P10c: Mit einer Quelle in OBS führt der Kern die neue Adresse nach (auch später, wenn OBS aus ist).
+    const bool obsFollows = m_client->obsSource(id).state == dss::ObsSourceState::Present;
+    if (!confirm(this, QStringLiteral("Neuer Token?"), dss::newTokenQuestion(obsFollows),
                  QStringLiteral("Neuer Token"), QStringLiteral("Abbrechen")))
         return;
     dss::ChangeRequest r = request(dss::msg::kNewToken);

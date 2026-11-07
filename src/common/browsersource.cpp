@@ -17,8 +17,10 @@ QString browserSourceLogPath(const QString &address)
     return QStringLiteral("/o/%1/…").arg(address);
 }
 
-QString newTokenQuestion()
+QString newTokenQuestion(bool obsFollows)
 {
+    if (obsFollows)
+        return QStringLiteral("Die alte Adresse funktioniert danach nicht mehr. OBS wird nachgeführt. Fortfahren?");
     return QStringLiteral("Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue "
                           "Adresse eingetragen werden. Fortfahren?");
 }

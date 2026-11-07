@@ -96,6 +96,17 @@ QString obsPasswordPlaceholder(bool passwordSet, bool deleting);
 // P10c: Tooltip des OBS-Knopfes: «OBS: verbunden (OBS 33.0.1, Szene «Live»)», bei einem Problem die
 // Meldung des Kerns, sonst wie die anderen Knöpfe.
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status);
+// P10c, E-29: Zeile «OBS» im Dock «Steuerung».
+struct ObsSourceRow
+{
+    QString text;
+    bool problem = false;     // roter Text wie #serverMessage
+    QString buttonText;       // «In OBS anlegen …» bzw. «In weitere Szene einfügen …» (F6)
+    QString buttonToolTip;
+    bool canAct = false;      // Knopf frei: Overlay gewählt und OBS verbunden
+    bool addsToScene = false; // Quelle da: der Knopf fügt sie in eine weitere Szene ein
+};
+ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const ObsSourceInfo &source);
 
 // --- Browserquelle (P10, Teil C) ---
 

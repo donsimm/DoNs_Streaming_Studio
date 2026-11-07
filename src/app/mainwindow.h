@@ -16,6 +16,7 @@
 
 class CanvasWidget;
 class HeaderBar;
+class ObsSourceDialog;
 class SettingsDialog;
 class SourceRenderer;
 class QAction;
@@ -107,6 +108,9 @@ private:
     void refreshBrowserSource();
     void refreshServerStatus();
     void copyBrowserSource();
+    // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
+    void refreshObsSource();
+    void showObsSourceDialog();
     std::optional<dss::Overlay> selectedOverlay() const;
 
     // Bearbeiten (mainwindowedit.cpp)
@@ -190,6 +194,7 @@ private:
     QAction *m_canvasImageAction = nullptr;    // P10-vor, nur mit DSS_APP_CANVAS_IMAGE
     QString m_canvasImageDir;                  // Ablage der Bilder der Leinwand
     SettingsDialog *m_settingsDialog = nullptr;
+    ObsSourceDialog *m_obsSourceDialog = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     CanvasWidget *m_canvas = nullptr;

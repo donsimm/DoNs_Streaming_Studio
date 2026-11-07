@@ -121,6 +121,9 @@ struct ControlDock
     // Meldungen des Overlay-Servers (Port belegt, Adresse fehlt, ungültige Adresse benutzt);
     // immer da, leer ohne Meldung (keine Änderung der Anordnung).
     QLabel *serverMessage = nullptr;
+    // P10c, E-29: Zeile «OBS»
+    QLabel *obsSourceState = nullptr;
+    QPushButton *obsSourceButton = nullptr;
     QSpinBox *overlayWidth = nullptr;
     QSpinBox *overlayHeight = nullptr;
 };

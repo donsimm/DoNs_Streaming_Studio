@@ -12,6 +12,7 @@ add_library(dss_app_ui STATIC
   docks.h docks.cpp
   dockviews.h dockviews.cpp
   dialogs.h dialogs.cpp
+  obssourcedialog.h obssourcedialog.cpp
   mainwindowedit.cpp
   translation.h translation.cpp
 )

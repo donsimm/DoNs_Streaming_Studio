@@ -173,6 +173,42 @@ QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &st
     return details.isEmpty() ? plain : QStringLiteral("%1 (%2)").arg(plain, details.join(QStringLiteral(", ")));
 }
 
+ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const ObsSourceInfo &source)
+{
+    ObsSourceRow row;
+    const bool connected = obsState == ConnectionState::Connected;
+    row.addsToScene = overlaySelected && source.state == ObsSourceState::Present;
+    row.canAct = overlaySelected && connected;
+    row.buttonText = row.addsToScene ? QStringLiteral("In weitere Szene einfügen …") : QStringLiteral("In OBS anlegen …");
+    if (!row.canAct)
+        row.buttonToolTip = QStringLiteral("Geht nur mit gewähltem Overlay und verbundenem OBS");
+    else if (row.addsToScene)
+        row.buttonToolTip = QStringLiteral("Fügt dieselbe Quelle in eine weitere Szene ein");
+    else
+        row.buttonToolTip = QStringLiteral("Legt für dieses Overlay eine Browserquelle in OBS an");
+    if (!overlaySelected) {
+        row.text = QStringLiteral("–");
+    } else if (source.state == ObsSourceState::Missing) {
+        row.text = QStringLiteral("Quelle in OBS fehlt");
+        row.problem = true;
+    } else if (source.state == ObsSourceState::Present) {
+        row.text = QStringLiteral("Quelle «%1» in OBS").arg(source.inputName);
+        if (!connected && obsState != ConnectionState::Off)
+            row.text += QStringLiteral(", OBS gerade nicht verbunden");
+        row.problem = obsState == ConnectionState::Error;
+    } else if (connected) {
+        row.text = QStringLiteral("Noch keine Quelle in OBS");
+    } else if (obsState == ConnectionState::Connecting) {
+        row.text = QStringLiteral("Verbindung zu OBS wird aufgebaut");
+    } else if (obsState == ConnectionState::Error) {
+        row.text = QStringLiteral("OBS nicht verbunden");
+        row.problem = true;
+    } else {
+        row.text = QStringLiteral("OBS nicht eingerichtet oder abgeschaltet");
+    }
+    return row;
+}
+
 QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> &info)
 {
     if (!connected)

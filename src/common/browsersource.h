@@ -15,7 +15,8 @@ QString browserSourcePath(const QString &address, const QString &token);
 QString browserSourceUrl(const QString &host, int port, const QString &address, const QString &token);
 // Pfad für das Protokoll: "/o/<adresse>/…" (Token ausgelassen).
 QString browserSourceLogPath(const QString &address);
-// Rückfrage vor «Neuer Token» (Teil A 8), im Fenster und in dss-cli gleich.
-QString newTokenQuestion();
+// Rückfrage vor «Neuer Token» (Teil A 8), im Fenster und in dss-cli gleich. obsFollows (P10c): Das
+// Overlay hat eine Quelle in OBS, der Kern führt die Adresse dort nach.
+QString newTokenQuestion(bool obsFollows = false);
 
 } // namespace dss

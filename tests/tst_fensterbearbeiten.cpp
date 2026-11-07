@@ -1558,6 +1558,138 @@ private slots:
         QCOMPARE(m_check->settings()->settings.port, 9000);
     }
 
+    // P10c, E-29: Zeile «OBS» im Dock, Anlegen-Fenster, Rückfrage «Neuer Token», gegen den Testserver
+    void obsSourceRow()
+    {
+        auto *state = m_window->findChild<QLabel *>(QStringLiteral("obsSourceState"));
+        auto *button = m_window->findChild<QPushButton *>(QStringLiteral("obsSourceButton"));
+        auto *newToken = m_window->findChild<QPushButton *>(QStringLiteral("browserSourceNewToken"));
+        QVERIFY(state && button && newToken);
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("OBS nicht eingerichtet oder abgeschaltet"), 3000);
+        QVERIFY(!button->isEnabled());
+        QCOMPARE(button->text(), QStringLiteral("In OBS anlegen …"));
+
+        testhelp::ObsTestServer server;
+        QVERIFY(server.start());
+        server.current = server.scenes.at(1); // aktuelle Szene wird vorgewählt
+        server.addInput(QStringLiteral("Besetzt"), {{QStringLiteral("url"), QStringLiteral("http://anderes/")}});
+        SettingsUpdate update;
+        update.obsEnabled = true;
+        update.obsHost = QStringLiteral("127.0.0.1");
+        update.obsPort = server.port();
+        QVERIFY(m_client->sendSettingsUpdate(update) > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Noch keine Quelle in OBS"), 10000);
+        QVERIFY(button->isEnabled());
+
+        // Anlegen-Fenster: Name vorbelegt, aktuelle Szene vorgewählt
+        QTest::mouseClick(button, Qt::LeftButton);
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("obsSourceDialog")))
+                                     && dialog->isVisible(), 3000);
+        QCOMPARE(dialog->windowTitle(), QStringLiteral("Quelle in OBS anlegen"));
+        auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("obsSourceName"));
+        auto *scene = dialog->findChild<QComboBox *>(QStringLiteral("obsSourceScene"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("obsSourceProblem"));
+        auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("obsSourceOk"));
+        QVERIFY(name && scene && problem && ok);
+        QCOMPARE(name->text(), QStringLiteral("Test Szene"));
+        QCOMPARE(ok->text(), QStringLiteral("Anlegen"));
+        QTRY_COMPARE_WITH_TIMEOUT(scene->count(), 2, 3000);
+        QCOMPARE(scene->itemText(0), QStringLiteral("Live"));
+        QTRY_COMPARE_WITH_TIMEOUT(scene->currentText(), QStringLiteral("Pause"), 3000);
+        QVERIFY(ok->isEnabled());
+
+        // Leerer Name lässt sich nicht bestätigen
+        name->setText(QStringLiteral("   "));
+        QVERIFY(!ok->isEnabled());
+
+        // Name vergeben: Meldung, Fenster bleibt offen, feste Höhe
+        const int problemHeight = problem->height();
+        name->setText(QStringLiteral("Besetzt"));
+        QVERIFY(ok->isEnabled());
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(), QStringLiteral("Der Name «Besetzt» ist in OBS schon vergeben."), 3000);
+        QVERIFY(dialog->isVisible());
+        QCOMPARE(problem->height(), problemHeight);
+        QVERIFY(ok->isEnabled());
+        // Meldung nur im Fenster, nicht in der Statuszeile
+        QVERIFY(!m_window->statusBar()->currentMessage().contains(QStringLiteral("Besetzt")));
+
+        // Abbrechen legt nichts an
+        clickButton(dialog, QStringLiteral("Abbrechen"));
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QCOMPARE(server.inputs.size(), qsizetype(1));
+
+        // Anlegen: Fenster schliesst, Zeile zeigt die Quelle, Knopf wird zu «In weitere Szene einfügen …»
+        QTest::mouseClick(button, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible(), 3000);
+        QVERIFY(problem->text().isEmpty());
+        name->setText(QStringLiteral("Quelle Test"));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Quelle «Quelle Test» in OBS"), 3000);
+        QCOMPARE(button->text(), QStringLiteral("In weitere Szene einfügen …"));
+        QCOMPARE(m_window->statusBar()->currentMessage(), QStringLiteral("Quelle «Quelle Test» in OBS angelegt"));
+        QCOMPARE(server.inputs.constLast().name, QStringLiteral("Quelle Test"));
+        const QString uuid = server.inputs.constLast().uuid;
+        QCOMPARE(server.sceneItems.value(QStringLiteral("scene-pause")), QStringList{uuid});
+
+        // In weitere Szene: dasselbe Fenster, Name nur zu lesen
+        QTest::mouseClick(button, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible(), 3000);
+        QCOMPARE(dialog->windowTitle(), QStringLiteral("Quelle in weitere Szene einfügen"));
+        QCOMPARE(ok->text(), QStringLiteral("Einfügen"));
+        QVERIFY(name->isReadOnly());
+        QCOMPARE(name->text(), QStringLiteral("Quelle Test"));
+        scene->setCurrentIndex(scene->findText(QStringLiteral("Live")));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QCOMPARE(server.sceneItems.value(QStringLiteral("scene-live")), QStringList{uuid});
+        QCOMPARE(server.inputs.size(), qsizetype(2));
+
+        // Rückfrage «Neuer Token»: OBS wird nachgeführt; die Quelle folgt ohne Kopieren
+        const QString urlBefore = server.input(uuid)->settings.value(QStringLiteral("url")).toString();
+        QString question;
+        answerDialog([&question](QWidget *d) {
+            if (auto *box = qobject_cast<QMessageBox *>(d))
+                question = box->text();
+            clickButton(d, QStringLiteral("Neuer Token"));
+        });
+        newToken->click();
+        QVERIFY2(question.contains(QStringLiteral("OBS wird nachgeführt")), qPrintable(question));
+        QCOMPARE(question, newTokenQuestion(true));
+        QTRY_VERIFY_WITH_TIMEOUT(server.input(uuid)->settings.value(QStringLiteral("url")).toString() != urlBefore, 3000);
+
+        // Von Hand gelöscht: rot, Knopf wieder «In OBS anlegen …» (F7)
+        server.removeInputWithEvent(uuid);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Quelle in OBS fehlt"), 3000);
+        QCOMPARE(state->property("problem").toBool(), true);
+        QCOMPARE(button->text(), QStringLiteral("In OBS anlegen …"));
+        QVERIFY(button->isEnabled());
+
+        // Beendet sich OBS: rot, Knopf gesperrt, offenes Fenster meldet es
+        QTest::mouseClick(button, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible(), 3000);
+        QVERIFY(ok->isEnabled());
+        server.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!ok->isEnabled(), 10000);
+        QCOMPARE(problem->text(), QStringLiteral("OBS ist nicht verbunden."));
+        clickButton(dialog, QStringLiteral("Abbrechen"));
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!button->isEnabled(), 3000);
+        QCOMPARE(state->property("problem").toBool(), true);
+
+        // Ohne Quelle: Rückfrage wie bisher. Aufräumen: OBS aus für die folgenden Tests
+        update = SettingsUpdate();
+        update.obsEnabled = false;
+        update.obsHost = QString();
+        update.obsPort = 4455;
+        QVERIFY(m_client->sendSettingsUpdate(update) > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Quelle in OBS fehlt"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->settings() && !m_check->settings()->settings.obsEnabled, 3000);
+    }
+
     // P10c: Bereich «OBS» im Dialog, OBS-Knopf und Tooltip, gegen den Testserver auf 127.0.0.1
     void settingsDialogObs()
     {
@@ -2127,7 +2259,9 @@ private slots:
         const auto center = [&](const QString &name) {
             QTreeWidgetItem *item = mediaItem(name);
             tree->scrollToItem(item);
-            return tree->visualItemRect(item).center();
+            // Die Zeile ist breiter als die Ansicht; auch mit Rollbalken bleibt das Ziehen in der Ansicht.
+            const QRect rect = tree->visualItemRect(item);
+            return QPoint(qMin(rect.center().x(), tree->viewport()->width() / 2), rect.center().y());
         };
         // Datei auf einen Ordner
         QVERIFY(dragWithMouse(tree->viewport(), center(QStringLiteral("bild2.png")), tree->viewport(),

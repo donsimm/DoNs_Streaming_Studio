@@ -173,6 +173,55 @@ private slots:
         QCOMPARE(obsToolTip(ConnectionState::Connected, status), QStringLiteral("OBS: verbunden (OBS 33.0.1, Szene «Live»)"));
     }
 
+    // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
+    void obsSourceRowTexts()
+    {
+        const QUuid id = QUuid::createUuid();
+        const ObsSourceInfo none{id, ObsSourceState::None, QString()};
+        const ObsSourceInfo present{id, ObsSourceState::Present, QStringLiteral("Quelle")};
+        const ObsSourceInfo missing{id, ObsSourceState::Missing, QStringLiteral("Quelle")};
+        const QString create = QStringLiteral("In OBS anlegen …");
+        const QString add = QStringLiteral("In weitere Szene einfügen …");
+
+        ObsSourceRow row = obsSourceRow(false, ConnectionState::Connected, none);
+        QCOMPARE(row.text, QStringLiteral("–"));
+        QVERIFY(!row.canAct && !row.problem);
+        QCOMPARE(row.buttonText, create);
+
+        row = obsSourceRow(true, ConnectionState::Connected, none);
+        QCOMPARE(row.text, QStringLiteral("Noch keine Quelle in OBS"));
+        QVERIFY(row.canAct && !row.problem && !row.addsToScene);
+        QCOMPARE(row.buttonText, create);
+
+        // F6: Quelle da, weitere Szene
+        row = obsSourceRow(true, ConnectionState::Connected, present);
+        QCOMPARE(row.text, QStringLiteral("Quelle «Quelle» in OBS"));
+        QVERIFY(row.canAct && !row.problem && row.addsToScene);
+        QCOMPARE(row.buttonText, add);
+
+        // F7: fehlt, wieder anlegen
+        row = obsSourceRow(true, ConnectionState::Connected, missing);
+        QCOMPARE(row.text, QStringLiteral("Quelle in OBS fehlt"));
+        QVERIFY(row.canAct && row.problem && !row.addsToScene);
+        QCOMPARE(row.buttonText, create);
+
+        // Getrennt: letzter bekannter Stand, Knopf gesperrt
+        row = obsSourceRow(true, ConnectionState::Error, present);
+        QVERIFY(row.text.contains(QStringLiteral("gerade nicht verbunden")));
+        QVERIFY(!row.canAct && row.problem);
+        QCOMPARE(row.buttonText, add);
+        row = obsSourceRow(true, ConnectionState::Error, none);
+        QCOMPARE(row.text, QStringLiteral("OBS nicht verbunden"));
+        QVERIFY(!row.canAct && row.problem);
+        row = obsSourceRow(true, ConnectionState::Connecting, none);
+        QVERIFY(!row.canAct && !row.problem);
+        row = obsSourceRow(true, ConnectionState::Off, none);
+        QCOMPARE(row.text, QStringLiteral("OBS nicht eingerichtet oder abgeschaltet"));
+        QVERIFY(!row.canAct && !row.problem);
+        // Tooltip nennt den Grund für den gesperrten Knopf
+        QVERIFY(row.buttonToolTip.contains(QStringLiteral("verbundenem OBS")));
+    }
+
     // P10, Teil C
     void browserSourceTexts()
     {
