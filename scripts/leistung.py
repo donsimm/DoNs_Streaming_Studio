@@ -13,7 +13,12 @@ und einmal PSS aus /proc/<pid>/smaps_rollup bei 30 s. Bildrate, Einbrüche (> 50
 werden mit derselben Rechnung wie T-02 ausgewertet (prototypes/messung/t02.py: rate, stat,
 parse_pidstat, parse_mpstat).
 
-  python3 scripts/leistung.py [--build build] [--out build/leistung]
+  python3 scripts/leistung.py [--build build] [--out build/leistung] [--video]
+
+--video (P11, Punkt 79): statt der 10 Quellen der ungünstigste Fall der Farbumrechnung, zwei Videos
+1080p30 mit «Wiederholen» nebeneinander (je 960x540), eines mit BT.709 und eines mit SMPTE170M
+(tests/daten/bildvergleich/h264-1920x1080-bt709.mp4 und -bt601.mp4). Die Bilder sind gleich, das
+Dekodieren ist billig; ins Gewicht fällt die Umrechnung YUV → RGB in voller Grösse.
 
 Quellen: pidstat(1), mpstat(1): https://sysstat.github.io/ (sysstat 12.7.5),
 nvidia-smi --help-query-gpu.
@@ -33,6 +38,7 @@ import common  # noqa: E402  (descendants, pss_kib)
 import t02  # noqa: E402  (rate, stat, parse_pidstat, parse_mpstat)
 
 MEDIA = os.path.join(ROOT, "prototypes", "media")
+COLOR_VIDEOS = os.path.join(ROOT, "tests", "daten", "bildvergleich")
 FONT = os.path.join(ROOT, "src", "common", "schriften", "be-vietnam-pro", "BeVietnamPro-Regular.ttf")
 DURATION_APP = 75
 WARMUP = 5
@@ -74,10 +80,23 @@ def prepare(build, data):
     return cmds
 
 
+def prepare_video(build, data):
+    """--video: zwei Videos 1080p30 (BT.709, SMPTE170M) nebeneinander; gibt die dss-cli-Befehle zurück."""
+    a = "messung-p11-video"
+    cmds = [cli(build, data, "overlay-neu", "Messung P11 Video", "1920", "1080")]
+    for name in ("h264-1920x1080-bt709.mp4", "h264-1920x1080-bt601.mp4"):
+        cmds.append(cli(build, data, "quelle-video", a, os.path.join(COLOR_VIDEOS, name), "--wiederholen"))
+    for n, x in ((1, 0), (2, 960)):
+        cmds.append(cli(build, data, "quelle-geometrie", a, str(n), str(x), "270", "960", "540", "0.0"))
+    return cmds
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", default=os.path.join(ROOT, "build"))
     ap.add_argument("--out", default=os.path.join(ROOT, "build", "leistung"))
+    ap.add_argument("--video", action="store_true",
+                    help="zwei Videos 1080p30 (BT.709, SMPTE170M) statt der 10 Quellen")
     args = ap.parse_args()
     build = os.path.realpath(args.build)
     os.makedirs(args.out, exist_ok=True)
@@ -88,7 +107,7 @@ def main():
     cfg = os.path.join(work, "cfg")
     sock = os.path.join(run, "kern.sock")
     stats_path = os.path.join(work, "zeitstempel.json")
-    cli_cmds = prepare(build, data)
+    cli_cmds = prepare_video(build, data) if args.video else prepare(build, data)
 
     core_cmd = [os.path.join(build, "src", "core", "dss-core"), "--datenordner", data, "--verbindung", sock]
     core = subprocess.Popen(core_cmd, stderr=subprocess.PIPE, text=True)

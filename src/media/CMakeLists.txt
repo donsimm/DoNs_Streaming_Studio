@@ -8,6 +8,7 @@ pkg_check_modules(DSS_FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec lib
 add_library(dss_media STATIC
   avsupport.h avsupport.cpp
   mediainfo.h mediainfo.cpp
+  videocolor.h videocolor.cpp
   videoplayer.h videoplayer.cpp
 )
 target_include_directories(dss_media PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

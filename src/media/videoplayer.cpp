@@ -7,6 +7,12 @@
 //   av_read_frame, av_seek_frame (AVSEEK_FLAG_BACKWARD): https://ffmpeg.org/doxygen/7.1/group__lavf__decoding.html
 //   best_effort_timestamp: https://ffmpeg.org/doxygen/7.1/structAVFrame.html
 //   sws_getCachedContext, sws_scale: https://ffmpeg.org/doxygen/7.1/group__libsws.html
+//   Farbumrechnung (P11, Punkt 79): sws_setColorspaceDetails, sws_getCoefficients, SWS_CS_*
+//     https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libswscale/swscale.h; ohne Aufruf rechnet
+//     swscale immer mit SWS_CS_DEFAULT (BT.601). Bei gleichen Werten kehrt sws_setColorspaceDetails
+//     früh zurück (need_reinit), deshalb geht der Aufruf bei jedem Bild:
+//     https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libswscale/utils.c
+//   AVFrame::colorspace, color_range: https://ffmpeg.org/doxygen/7.1/structAVFrame.html
 //   AV_PIX_FMT_FLAG_ALPHA: https://ffmpeg.org/doxygen/7.1/pixdesc_8h.html
 //   AV_PIX_FMT_BGRA ist auf Little Endian dieselbe Byte-Folge wie QImage::Format_ARGB32
 //     (0xAARRGGBB als 32-Bit-Wert): https://doc.qt.io/qt-6.8/qimage.html#Format-enum
@@ -15,6 +21,7 @@
 #include "videoplayer.h"
 
 #include "avsupport.h"
+#include "videocolor.h"
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -56,6 +63,35 @@ double alphaMean(const VideoFrame &frame)
 VideoPlayer::Clock::duration seconds(double s)
 {
     return std::chrono::duration_cast<VideoPlayer::Clock::duration>(std::chrono::duration<double>(s));
+}
+
+int swsColorspace(VideoMatrix matrix)
+{
+    switch (matrix) {
+    case VideoMatrix::Bt709:
+        return SWS_CS_ITU709;
+    case VideoMatrix::Fcc:
+        return SWS_CS_FCC;
+    case VideoMatrix::Smpte240m:
+        return SWS_CS_SMPTE240M;
+    case VideoMatrix::Bt2020:
+        return SWS_CS_BT2020;
+    case VideoMatrix::Bt601:
+        break;
+    }
+    return SWS_CS_ITU601;
+}
+
+// Angaben des Bildes, sonst des Stroms (Container)
+VideoColorTags colorTags(const AVFrame *frame, const AVStream *stream)
+{
+    VideoColorTags tags;
+    tags.matrix = frame->colorspace != AVCOL_SPC_UNSPECIFIED ? frame->colorspace : stream->codecpar->color_space;
+    tags.range = frame->color_range != AVCOL_RANGE_UNSPECIFIED ? frame->color_range : stream->codecpar->color_range;
+    const AVCodecID codec = stream->codecpar->codec_id;
+    tags.heightRule = codec != AV_CODEC_ID_VP9 && codec != AV_CODEC_ID_AV1;
+    tags.height = frame->height;
+    return tags;
 }
 
 } // namespace
@@ -205,6 +241,7 @@ void VideoPlayer::run()
     bool draining = false;
     bool ended = false;
     bool firstFrame = true;
+    VideoColor shownColor; // gleich wie m_stats.color zu Beginn
 
     while (!ended) {
         {
@@ -279,6 +316,22 @@ void VideoPlayer::run()
             }
             sws = sws_getCachedContext(sws, w, h, format, w, h, AV_PIX_FMT_BGRA, SWS_BILINEAR,
                                        nullptr, nullptr, nullptr);
+            if (!sws) {
+                const std::lock_guard lock(m_mutex);
+                m_error = QStringLiteral("Umrechnung des Bildes nicht möglich");
+                m_failed = true;
+                ended = true;
+                break;
+            }
+            // Matrix und Bereich wie die Browserquelle (Punkt 79, videocolor.h); Ziel RGB voll.
+            const VideoColor color = chooseVideoColor(colorTags(frame, stream));
+            sws_setColorspaceDetails(sws, sws_getCoefficients(swsColorspace(color.matrix)), color.fullRange ? 1 : 0,
+                                     sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
+            if (color != shownColor) {
+                shownColor = color;
+                const std::lock_guard lock(m_mutex);
+                m_stats.color = color;
+            }
             uint8_t *dst[4] = {out->data.data(), nullptr, nullptr, nullptr};
             int dstStride[4] = {out->stride, 0, 0, 0};
             sws_scale(sws, frame->data, frame->linesize, 0, h, dst, dstStride);

@@ -203,6 +203,12 @@ if(TARGET dss_media)
   endif()
   add_dependencies(tst_medien dss-core) # P10b: Kern für Videoformate und Lage
   set_tests_properties(tst_medien PROPERTIES FIXTURES_REQUIRED dss_media)
+
+  # P11, Punkt 79: Farbumrechnung der Videos (Regel und Farbfelder der Testdaten), ohne Qt Gui.
+  dss_add_test(tst_videofarbe)
+  target_link_libraries(tst_videofarbe PRIVATE dss_media)
+  target_compile_definitions(tst_videofarbe PRIVATE
+    DSS_TEST_BILDVERGLEICH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/bildvergleich")
 endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "videocolor.h"
+
 #include <QString>
 
 #include <atomic>
@@ -14,7 +16,8 @@
 
 // Abspielen eines Videos für den Zeichner im Editor (P09, Teil B). Dekodiert in einem eigenen
 // Thread, nie im Thread der Oberfläche, wie M1 aus P02: libvpx-vp9 für VP9 mit Alpha, sonst der
-// Standard-Decoder (avsupport.h). Ohne Ton (P12). Nur Qt Core (CLAUDE.md Regel 9): Das Bild ist
+// Standard-Decoder (avsupport.h). Farben wie die Browserquelle (P11, Punkt 79, videocolor.h).
+// Ohne Ton (P12). Nur Qt Core (CLAUDE.md Regel 9): Das Bild ist
 // ein Puffer BGRA mit vormultipliziertem Alpha; das Fenster legt ein QImage
 // Format_ARGB32_Premultiplied darüber, ohne zu kopieren.
 // Der Thread dekodiert einige Bilder voraus (kQueueSize), jedes mit seinem Abstand zum ersten Bild.
@@ -54,6 +57,7 @@ public:
         uint64_t dropped = 0;  // nie abgeholt, weil mehr als 100 ms überfällig (niemand fragt)
         double firstAlphaMean = -1.0; // Mittel des Alphakanals im ersten Bild vor dem
                                       // Vormultiplizieren, wie P02; -1 ohne Alpha
+        VideoColor color;             // Farbumrechnung des letzten Bildes (P11, Punkt 79)
     };
 
     using Clock = std::chrono::steady_clock;
