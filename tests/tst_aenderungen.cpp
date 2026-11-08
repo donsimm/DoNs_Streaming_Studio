@@ -575,10 +575,12 @@ private slots:
             text += QString::number(v) + QLatin1Char(' ');
         qInfo("Speichern bei %s ms (letzte Änderung %lld ms)", qPrintable(text), static_cast<long long>(last));
         // Qt::CoarseTimer (Standard von QTimer) darf um 5 % abweichen, auch nach vorne
-        // (https://doc.qt.io/qt-6.8/qt.html#TimerType-enum).
+        // (https://doc.qt.io/qt-6.8/qt.html#TimerType-enum), bei 1000 ms also ab 950 ms. Dazu kommt
+        // die Messung in ganzen Millisekunden (QElapsedTimer::elapsed), gemessen wurden 949 ms.
+        // Reserve deshalb 5 ms je Ablauf von maxDelayMs, beim zweiten Speichern zwei Abläufe.
         QCOMPARE(times.size(), 3);
-        QVERIFY(times.at(0) >= 950 && times.at(0) < 1200);
-        QVERIFY(times.at(1) >= 1900 && times.at(1) < 2300);
+        QVERIFY(times.at(0) >= 945 && times.at(0) < 1200);
+        QVERIFY(times.at(1) >= 1890 && times.at(1) < 2300);
         QVERIFY(times.at(2) >= last + 280 && times.at(2) < last + 500);
     }
 
