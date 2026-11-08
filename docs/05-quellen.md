@@ -34,6 +34,13 @@ https://github.com/donsimm/donstv_Studio (CLAUDE.md, docs/01 bis 05)
 - Fernsteuerung und Browserquelle: https://obsproject.com/kb/remote-control-guide, https://raw.githubusercontent.com/obsproject/obs-browser/master/obs-browser-source.cpp
 - Qt WebSockets und Speichern (P10c): https://doc.qt.io/qt-6.8/qwebsocket.html, https://doc.qt.io/qt-6.8/qwebsockethandshakeoptions.html, https://doc.qt.io/qt-6.8/qwebsocketserver.html, https://doc.qt.io/qt-6.8/qsavefile.html
 - Passwort von OBS (P10c): https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html
+- Bild einer Quelle (P11, `GetSourceScreenshot`, vormultipliziert): https://raw.githubusercontent.com/obsproject/obs-websocket/5.7.4/src/requesthandler/RequestHandler_Sources.cpp, https://raw.githubusercontent.com/obsproject/obs-browser/master/obs-browser-source.cpp
+
+## Farben und Drehung von Videos (P11)
+
+- Wahl von Matrix und Bereich, Display-Matrix in Chromium: https://raw.githubusercontent.com/chromium/chromium/146.0.7680.177/media/ffmpeg/ffmpeg_common.cc, https://raw.githubusercontent.com/chromium/chromium/122.0.6261.171/media/ffmpeg/ffmpeg_common.cc
+- swscale: https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libswscale/swscale.h, https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libswscale/utils.c; Kennungen: https://www.itu.int/rec/T-REC-H.273
+- Matroska und EBML: https://www.rfc-editor.org/rfc/rfc8794, https://www.rfc-editor.org/rfc/rfc9559, https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libavformat/matroskadec.c, https://raw.githubusercontent.com/FFmpeg/FFmpeg/n7.1/libavformat/matroskaenc.c
 
 ## NDI
 

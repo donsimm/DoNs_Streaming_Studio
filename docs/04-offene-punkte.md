@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 96 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-08 (P11: Punkte 79 und 80 erledigt und ins Archiv verschoben, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -10,12 +10,11 @@ Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier
 87. Aus P10b: Bleibt ein Test mit eigenem Kern stehen, weil er abstürzt, läuft sein Kern weiter (Elternprozess 1). Am 2026-11-04 um 10:23 liefen noch zwei Kerne von `tst_fensterbearbeiten` von 10:04 und 10:05 (Läufe, die an einer Prüfzeile abstürzten, die vor dem Commit entfernt wurde); beendet mit `kill` und Ordner gelöscht. Nicht im Auftrag; zu entscheiden, ob Testkerne sich beenden, wenn der Test endet (zum Beispiel `prctl(PR_SET_PDEATHSIG)`, https://man7.org/linux/man-pages/man2/prctl.2.html, nur für Tests).
 88. Aus P10b: Erlaubte Endungen für Videos sind weiterhin nur `.webm` und `.mp4` (`docs/06-overlay-format.md`, «media/»). Eine `.mov` (das Beispiel im Entscheid zu Punkt 81 nennt «zaehler.mov (ProRes)») weist der Kern beim Hinzufügen ab («Endung «mov» nicht erlaubt …»); der Hinweis zu ProRes kommt also nur bei ProRes in `.mp4` (so geprüft). Nicht im Auftrag; zu entscheiden, ob `.mov` (und `.mkv`) erlaubt werden.
 89. Aus P10b: Schriften im Dock «Medien» lassen sich nicht auf die Leinwand oder in die Liste «Quellen» ziehen (Ziehen gibt nur Bild- und Videodateien weiter, Entscheid E-28 nennt «neue Quelle»; eine Schrift ist keine Quelle). Zu entscheiden, ob Ziehen einer Schrift eine Textquelle mit dieser Schrift anlegen soll.
+101. Aus P11: Der absichtliche Fehler «falsches Schriftgewicht» (Urbanist 300 statt 400) liegt in `tst_bildvergleich` über der Grenze für Text (wird erkannt), erreicht aber nur das 1.96-fache statt das verlangte Doppelte (Mittel 3.919 gegen 2.0, 2026-11-08). Die Grenze Text (Mittel 2.0) kommt aus «Text über dem Video» im Overlay «Gesamt» (1.534, Text über einem Video); ohne diesen Bereich wäre sie 1.9 und der Fehler läge beim 2.06-fachen. Nicht zurechtgebogen (Plan P11, Abschnitt 4.6), im Test als `QEXPECT_FAIL`. Zu entscheiden: so lassen, «Text über dem Video» als eigenen bekannten Wert führen oder den Fehler mit einem grösseren Schritt prüfen.
 - Ohne Nummer, aus «Entschieden nach P09»: Zuschneiden von Quellen später als eigenen Punkt besprechen (E-25 enthält es nicht).
 
 ## Entschieden, Umsetzung steht aus
 
-79. Aus P10: Videos ohne Angaben zur Farbe (Matrix, Grundfarben) zeigt Chromium (Qt WebEngine 6.8.2) wie BT.601 (`smpte170m`) mit Umrechnung der Grundfarben; der Editor (swscale) rechnet nicht um. Gemessen am 2026-11-04 mit `tests/daten/video-drehung/` (Viertel rot, grün, blau): Seite Rot 248/36/0, Grün 64/252/0, Blau 27/34/255; mit Kennung BT.709 255/24/0, 0/216/0, 0/14/255. Abweichung der Videos gegen den Editor im Mittel 10.4, höchstens 95 (Bericht P10). Gehört zur festen Grenze des Bildvergleichs (P11). Entscheid 2026-11-04: Der Editor passt sich der Browserquelle an (Videos ohne Farbangabe wie Chromium umrechnen, Videos mit Angabe nach der Angabe); Dateien bleiben unverändert. Umsetzung in P11.
-80. Aus P10: Die Drehung von WebM-Videos (Matroska, zum Beispiel `ProjectionPoseRoll`) neutralisiert der Server nicht; nur JPEG, PNG und MP4/MOV. Ob der Editor und Chromium bei WebM mit Drehung dasselbe zeigen, ist nicht geprüft (keine Testdatei). Entscheid 2026-11-04: In P11 eine WebM-Testdatei mit Drehangabe erzeugen und Editor gegen Seite vergleichen; nur bei Abweichung neutralisiert der Server auch bei WebM.
 - Ohne Nummer, aus «Entschieden vor P06»: Wird NDI gebaut, gilt der Markenhinweis in «Hilfe → Über» immer; das kommt mit dem NDI-Baustein.
 
 ## Später zu klären
@@ -38,7 +37,13 @@ Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier
 15. Aus P03: Der Installationsweg von `scripts/einrichten.sh` (fehlendes Paket, `sudo apt install Name=Version`) ist nicht geprüft, weil auf dem Studio-PC alle Pakete schon installiert waren.
 21. Aus P04: Erlaubte Dateiendungen (Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`) sind eine Annahme; geprüft wird nur die Endung, nicht der Inhalt. Siehe Punkt 88.
 25. Aus P04: Dass die temporäre Datei von `tokens.json` schon vor dem Schreiben des Tokens die Rechte 0600 hat, ist nicht geprüft (`strace` nicht installiert); geprüft sind die Rechte der fertigen Datei.
-- Rest aus Punkt 81: Ob die Browserquelle in OBS (eigenes Chromium) HEVC, MPEG-4 Part 2 und ProRes abspielt, ist nicht geprüft.
+- Rest aus Punkt 81: HEVC spielt die Browserquelle in OBS 32.2.2 nicht ab (Prüfung V, 2026-11-08, Bericht P11). Ob sie MPEG-4 Part 2 und ProRes in MP4 abspielt, ist nicht geprüft.
+96. Aus P11: Urbanist 800 und Be Vietnam Pro klein liegen im Editor neben beiden Browsern (Seite–Editor 6.19 bzw. 6.01 im Mittel, in allen 30 Läufen gleich; Prüfung V: OBS–Editor bis 6.5, OBS–Seite 0.6 bis 2.4); die anderen Textbereiche 0.82 bis 1.53. Ursache nicht untersucht. `tst_bildvergleich` hält beide als bekannte Werte fest.
+97. Aus P11: Der Abgriff von Qt WebEngine (Chromium 122) enthält im Overlay «Gesamt» von `tst_bildvergleich` 48641 Pixel mit Farbe grösser als Alpha (ungültig vormultipliziert), vermutlich im WebM mit Alpha. Ob das an Qt WebEngine oder am Abgriff liegt und ob OBS dasselbe zeigt, ist nicht geprüft.
+98. Aus P11: AV1 ist nicht gemessen (keine Testdatei). Die Regel «AV1 ohne Farbangabe wie BT.601» (`src/media/videocolor.h`) stammt nur aus dem Quelltext von Chromium.
+99. Aus P11: Videos mit nicht quadratischen Pixeln: Chromium wählt die Matrix ohne Farbangabe nach `natural_size` (mit Seitenverhältnis der Pixel), der Editor nach der Höhe des Bildes. Nicht geprüft.
+100. Aus P11: Videos mit Angabe der Grundfarben oder der Übertragung, aber ohne Matrix: Der Editor nimmt die Höhenregel; ob Chromium gleich wählt, ist nicht geprüft.
+102. Aus P11, nicht im Auftrag: `tst_kernverbindung::settingsReadAndChange` scheiterte am 2026-11-08 in zwei vollen `ctest`-Läufen hintereinander an Zeile 454 («der Standardroute, ohne Neustart)» fehlt im Protokoll des Kerns), danach `browserSource` als Folgefehler (Port 9000 blieb stehen). Einzeln, in den Tests 1 bis 17, im frischen Klon und im dritten vollen Lauf bestanden. Vermutung, nicht geprüft: Zeile 452 wartet nur auf den Anfang der Zeile («eingetragen (Netzwerkkarte»), Zeile 454 prüft sofort das Ende. P11 ändert weder den Test noch `src/common/coresettings.cpp`.
 - Rest aus Punkt 85: Der echte Fall (Kabel ziehen, Kern starten, Kabel einstecken) ist nicht geprüft.
 
 ## Machbarkeitstests
