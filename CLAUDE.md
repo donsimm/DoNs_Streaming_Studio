@@ -27,7 +27,7 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
 ## Umgebung (Zielsystem = Entwicklungssystem)
 
 - Claude Code läuft direkt auf dem Studio-PC: Debian 13, Xfce unter X11, 8 Threads, 32 GB, GTX 1660 SUPER, Bildschirm 1920x1080 (`docs/02-umgebung.md`).
-- OBS läuft auf dem Streaming-PC. Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`. Claude Code hat dort keinen Zugang: Prüfungen dort (Browserquelle in OBS, NDI, obs-websocket) macht der Nutzer im Handtest; Ergebnisse werden nicht erfunden.
+- OBS läuft auf dem Streaming-PC. Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`. Seit 2026-11-08 läuft dort Nobara 44 GNOME (Wayland), und Lotse erreicht den Streaming-PC per SSH (`ssh dominik@192.168.1.116`, Schlüssel vom Studio-PC). Dort wird nur gelesen (Pakete, Logs, Konfiguration, offene Ports). Änderungen gibt es erst nach dem OK des Nutzers, `sudo` gibt der Nutzer selbst ein. Gestartete Agenten nutzen den Zugang nur, wenn ihr Auftrag es ausdrücklich erlaubt. Was man sehen oder bedienen muss (Browserquelle in OBS, NDI, Bild und Ton), prüft der Nutzer im Handtest. Ergebnisse werden nicht erfunden.
 - Technik und Betriebssystem sind entschieden: C++ mit Qt 6 auf Debian 13 mit Xfce unter X11 (`docs/01-festlegungen.md`).
 
 ## Prüfstufen (entschieden vom Nutzer, 2026-11-07)
