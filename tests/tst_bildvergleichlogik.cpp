@@ -225,6 +225,36 @@ private slots:
         QVERIFY(std::abs(qGreen(p) - 50) <= 1);
         QVERIFY(std::abs(qBlue(p) - 25) <= 1);
     }
+
+    // Bild von GetSourceScreenshot: Farben im PNG schon vormultipliziert
+    void obsScreenshotIsPremultiplied()
+    {
+        // Seite: Rot mit Alpha 128, vormultipliziert 128/0/0/128
+        QImage page(4, 2, QImage::Format_ARGB32);
+        page.fill(qRgba(255, 0, 0, 128));
+        page.setPixel(0, 0, qRgba(10, 200, 30, 255));
+        // OBS schickt die vormultiplizierten Bytes als gewöhnliches RGBA
+        QImage png(4, 2, QImage::Format_ARGB32);
+        png.fill(qRgba(128, 0, 0, 128));
+        png.setPixel(0, 0, qRgba(10, 200, 30, 255));
+        qint64 over = -1;
+        const QImage read = fromObsScreenshot(png, &over);
+        QCOMPARE(over, 0);
+        QCOMPARE(read.format(), QImage::Format_ARGB32_Premultiplied);
+        const QImage expected = page.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        QCOMPARE(read, expected);
+        QCOMPARE(measure(read, expected, edgeMask(read, expected), read.rect()).mean, 0.0);
+        // So gelesen wie ein gewöhnliches PNG läge es daneben wie in Prüfung V (doppelt vormultipliziert)
+        QVERIFY(measure(png, expected, edgeMask(png, expected), png.rect()).mean > 10);
+        // Umkehrung (Testserver) und zurück
+        QCOMPARE(fromObsScreenshot(toObsScreenshot(page)), expected);
+        // Farbe grösser als Alpha: begrenzt und gezählt
+        png.setPixel(1, 1, qRgba(200, 0, 0, 100));
+        const QImage clamped = fromObsScreenshot(png, &over);
+        QCOMPARE(over, 1);
+        // Rohwert (pixel() rechnet vormultiplizierte Bilder zurück)
+        QCOMPARE(reinterpret_cast<const QRgb *>(clamped.constScanLine(1))[1], qRgba(100, 0, 0, 100));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestBildvergleichLogik)

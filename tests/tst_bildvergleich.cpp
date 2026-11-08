@@ -21,7 +21,8 @@
 // Der Test liest das Passwort mit systemd-creds (ObsSecretStore mit diesem Namen), legt in der Szene
 // die Browserquelle «DSS Bildvergleich» an, stellt sie nacheinander auf jedes Overlay, holt
 // GetSourceScreenshot und vergleicht mit Editor und Qt WebEngine. Am Ende löscht er die eigene Quelle
-// wieder (RemoveInput). Das Passwort kommt nie in die Ausgabe (Regel 12).
+// wieder (RemoveInput). Das Passwort kommt nie in die Ausgabe (Regel 12). Die Farben im Bild von
+// GetSourceScreenshot sind schon vormultipliziert und werden so gelesen (bv::fromObsScreenshot).
 // Ohne die Variable läuft derselbe Weg gegen den Testserver (obstestserver.h) mit Szene «test 2» und
 // eigener Zugangsdatei mit Zufallspasswort; «OBS» liefert dort das Bild der Seite (Werte als
 // «Testserver–…»). So fällt ein Fehler, der nur mit OBS auftritt, schon in ctest auf.
@@ -64,6 +65,7 @@
 #include <QProcess>
 #include <QQuickWidget>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QSet>
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -453,11 +455,16 @@ public:
         QString data = r->data.value(QStringLiteral("imageData")).toString();
         if (data.startsWith(QLatin1String("data:")))
             data = data.section(QLatin1Char(','), 1);
-        QImage image = QImage::fromData(QByteArray::fromBase64(data.toLatin1()), "PNG");
-        if (image.isNull())
+        const QImage image = QImage::fromData(QByteArray::fromBase64(data.toLatin1()), "PNG");
+        if (image.isNull()) {
             *error = QStringLiteral("GetSourceScreenshot: Bild nicht lesbar");
-        return image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+            return {};
+        }
+        // Farben im PNG schon vormultipliziert (bv::fromObsScreenshot)
+        return bv::fromObsScreenshot(image, &m_overAlpha);
     }
+    // Pixel mit Farbe grösser als Alpha im letzten Bild (Gegenprobe zu bv::fromObsScreenshot)
+    qint64 overAlpha() const { return m_overAlpha; }
 
     // Wartet, bis zwei Bilder nacheinander gleich und nicht einfarbig sind (Videos halten am Ende).
     QImage stableScreenshot(int firstWaitMs, int timeoutMs, QString *error)
@@ -542,6 +549,7 @@ private:
     QString m_inputUuid;
     QString m_info;
     QImage m_lastImage;
+    qint64 m_overAlpha = 0;
 };
 
 } // namespace
@@ -990,6 +998,8 @@ private slots:
         {
             ObsSession::Settings wrongName = *settings;
             wrongName.credentialName = QStringLiteral("dss-obs-passwort");
+            // systemd-creds lehnt den falschen Namen ab; die Warnung von ObsSecretStore ist hier erwartet
+            QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^OBS-Passwort: Entschlüsseln fehlgeschlagen: ")));
             ObsSession session;
             QVERIFY(!session.start(wrongName, QStringLiteral("http://x/"), QSize(64, 32), &error));
             QVERIFY2(error.contains(QStringLiteral("nicht lesbar")), qPrintable(error));
@@ -1066,10 +1076,12 @@ private slots:
         if (m_obs) {
             QString error;
             if (m_fakeObs) {
-                // Testserver: liefert die Seite, abwechselnd mit Alpha und deckend auf Schwarz (beide Wege)
+                // Testserver: liefert die Seite wie obs-websocket (vormultipliziert im PNG), abwechselnd
+                // mit Alpha und deckend auf Schwarz (beide Wege)
                 QBuffer buffer(&m_fakeObs->screenshotPng);
                 m_fakeObs->screenshotPng.clear();
-                QVERIFY(buffer.open(QIODevice::WriteOnly) && (index % 2 ? bv::onBlack(page) : page).save(&buffer, "PNG"));
+                QVERIFY(buffer.open(QIODevice::WriteOnly)
+                        && bv::toObsScreenshot(index % 2 ? bv::onBlack(page) : page).save(&buffer, "PNG"));
             }
             QVERIFY2(m_obs->show(url, o.size, &error), qPrintable(error));
             if (m_fakeObs) {
@@ -1084,6 +1096,15 @@ private slots:
             QVERIFY2(!obs.isNull(), qPrintable(error));
             QCOMPARE(obs.size(), o.size);
             save(obs, file + QStringLiteral("-obs.png"));
+            qInfo("%s: Bild von %s vormultipliziert gelesen, Pixel mit Farbe grösser als Alpha: %lld",
+                  qPrintable(o.name), qPrintable(m_obsLabel), static_cast<long long>(m_obs->overAlpha()));
+            if (m_fakeObs) {
+                // Schon der Abgriff von Qt WebEngine hat solche Pixel (bei WebM mit Alpha); gezählt
+                // werden muss genau, was im verschickten PNG steht.
+                qint64 sent = -1;
+                bv::fromObsScreenshot(QImage::fromData(m_fakeObs->screenshotPng, "PNG"), &sent);
+                QCOMPARE(m_obs->overAlpha(), sent);
+            }
             // Ohne Alpha (deckend): Seite und Editor auf Schwarz gelegt vergleichen
             const bool opaque = bv::fullyOpaque(obs);
             if (opaque)
@@ -1095,7 +1116,7 @@ private slots:
             record(m_obsLabel + QStringLiteral("–Seite"), o, obs, pageCmp);
             if (m_fakeObs) { // genau das verschickte PNG zurück (der Weg über PNG rundet, deshalb nicht die Seite)
                 QCOMPARE(opaque, index % 2 == 1);
-                QCOMPARE(obs, QImage::fromData(m_fakeObs->screenshotPng, "PNG").convertToFormat(QImage::Format_ARGB32_Premultiplied));
+                QCOMPARE(obs, bv::fromObsScreenshot(QImage::fromData(m_fakeObs->screenshotPng, "PNG")));
             }
         }
         QVERIFY(m_recorder.flush());

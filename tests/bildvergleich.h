@@ -59,4 +59,19 @@ QImage onBlack(const QImage &image);
 // Alle Pixel deckend.
 bool fullyOpaque(const QImage &image);
 
+// Bild von GetSourceScreenshot (obs-websocket 5.7.4) einer Browserquelle (P11, Prüfung V): OBS
+// zeichnet die Browserquelle vormultipliziert (obs-browser, BrowserSource::Render:
+// gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA)); obs-websocket rendert die Quelle mit
+// gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO) auf durchsichtiges Schwarz und kopiert die Bytes
+// unverändert in ein QImage Format_RGBA8888 (nicht vormultipliziert), das als PNG geht. Die Farben
+// im PNG sind also schon vormultipliziert; so gelesen gibt es das Bild, das OBS zeigt.
+// Pixel mit einer Farbe grösser als Alpha (dann wäre die Annahme falsch) werden auf Alpha begrenzt
+// und in *overAlpha gezählt.
+// Quellen: https://raw.githubusercontent.com/obsproject/obs-websocket/5.7.4/src/requesthandler/RequestHandler_Sources.cpp
+//   (TakeSourceScreenshot), https://raw.githubusercontent.com/obsproject/obs-browser/master/obs-browser-source.cpp
+//   (BrowserSource::Render), https://doc.qt.io/qt-6.8/qimage.html#reinterpretAsFormat
+QImage fromObsScreenshot(const QImage &png, qint64 *overAlpha = nullptr);
+// Umkehrung für den Testserver: vormultipliziertes Bild so, wie obs-websocket es als PNG schickt.
+QImage toObsScreenshot(const QImage &image);
+
 } // namespace bildvergleich

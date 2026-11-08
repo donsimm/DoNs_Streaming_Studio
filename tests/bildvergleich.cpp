@@ -208,4 +208,31 @@ bool fullyOpaque(const QImage &image)
     return true;
 }
 
+QImage fromObsScreenshot(const QImage &png, qint64 *overAlpha)
+{
+    QImage out = png.convertToFormat(QImage::Format_ARGB32);
+    out.reinterpretAsFormat(QImage::Format_ARGB32_Premultiplied);
+    qint64 over = 0;
+    for (int y = 0; y < out.height(); ++y) {
+        QRgb *l = reinterpret_cast<QRgb *>(out.scanLine(y));
+        for (int x = 0; x < out.width(); ++x) {
+            const int a = qAlpha(l[x]);
+            if (qRed(l[x]) <= a && qGreen(l[x]) <= a && qBlue(l[x]) <= a)
+                continue;
+            ++over;
+            l[x] = qRgba(std::min(qRed(l[x]), a), std::min(qGreen(l[x]), a), std::min(qBlue(l[x]), a), a);
+        }
+    }
+    if (overAlpha)
+        *overAlpha = over;
+    return out;
+}
+
+QImage toObsScreenshot(const QImage &image)
+{
+    QImage out = premultiplied(image).copy();
+    out.reinterpretAsFormat(QImage::Format_ARGB32);
+    return out;
+}
+
 } // namespace bildvergleich
