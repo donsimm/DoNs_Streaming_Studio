@@ -27,6 +27,9 @@ class QTimer;
 
 namespace dss::obs {
 
+// Name im verschlüsselten Inhalt: systemd-creds prüft ihn beim Entschlüsseln.
+inline constexpr char kDefaultCredentialName[] = "dss-obs-passwort";
+
 class ObsSecretStore : public QObject
 {
     Q_OBJECT
@@ -44,6 +47,11 @@ public:
     ~ObsSecretStore() override;
 
     QString filePath() const { return m_filePath; }
+    // Name für --name= (P11): Eine Datei, die mit einem anderen Namen verschlüsselt wurde (zum
+    // Beispiel die Zugangsdatei von Lotse, Name «obs-websocket»), lässt sich nur mit diesem Namen
+    // lesen. Gilt für Aufträge, die danach beginnen.
+    QString credentialName() const { return m_credentialName; }
+    void setCredentialName(const QString &name) { m_credentialName = name; }
     bool isSet() const;
 
     void read(ReadDone done);
@@ -66,6 +74,7 @@ private:
 
     QString m_filePath;
     QString m_program;
+    QString m_credentialName = QString::fromLatin1(kDefaultCredentialName);
     QList<Job> m_jobs;
     QProcess *m_process = nullptr;
     QTimer *m_timeout = nullptr;

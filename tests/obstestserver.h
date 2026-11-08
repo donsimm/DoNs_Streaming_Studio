@@ -177,6 +177,7 @@ public:
     QString busyRequest;               // nur diese Anfrage; leer = alle
     bool collectionChanging = false;
     int requestsDuringCollectionChange = 0;
+    QByteArray screenshotPng;          // Antwort auf GetSourceScreenshot (P11)
 
 private:
     void send(QWebSocket *socket, dss::obs::OpCode op, const QJsonObject &data)
@@ -349,6 +350,25 @@ private:
             }
             sceneItems[sceneUuid].append(sourceUuid);
             *response = {{QStringLiteral("sceneItemId"), 2}};
+        } else if (type == QLatin1String("RemoveInput")) { // P11
+            if (!input(inputUuid)) {
+                *code = dss::obs::kStatusResourceNotFound;
+                return;
+            }
+            inputs.removeIf([&inputUuid](const ObsTestInput &x) { return x.uuid == inputUuid; });
+            for (QStringList &items : sceneItems)
+                items.removeAll(inputUuid);
+        } else if (type == QLatin1String("GetSourceScreenshot")) { // P11: Bild aus screenshotPng
+            if (!input(fields.value(QStringLiteral("sourceUuid")).toString())) {
+                *code = dss::obs::kStatusResourceNotFound;
+                return;
+            }
+            if (fields.value(QStringLiteral("imageFormat")).toString() != QLatin1String("png")) {
+                *code = 400; // InvalidRequestField
+                return;
+            }
+            *response = {{QStringLiteral("imageData"),
+                          QStringLiteral("data:image/png;base64,") + QString::fromLatin1(screenshotPng.toBase64())}};
         } else {
             *code = 204; // UnknownRequestType
         }

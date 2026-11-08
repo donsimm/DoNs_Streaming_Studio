@@ -145,6 +145,25 @@ Measure measure(const QImage &a, const QImage &b, const QImage &mask, const QRec
     return d;
 }
 
+Measure combine(const QList<Measure> &parts)
+{
+    Measure all;
+    double meanSum = 0;
+    double edgeSum = 0;
+    for (const Measure &m : parts) {
+        all.pixels += m.pixels;
+        all.edgePixels += m.edgePixels;
+        all.maxOutsideEdges = std::max(all.maxOutsideEdges, m.maxOutsideEdges);
+        meanSum += m.mean * double(m.pixels);
+        edgeSum += m.edgeOver32 * double(m.edgePixels);
+    }
+    if (all.pixels > 0)
+        all.mean = meanSum / double(all.pixels);
+    if (all.edgePixels > 0)
+        all.edgeOver32 = edgeSum / double(all.edgePixels);
+    return all;
+}
+
 QImage differenceImage(const QImage &a, const QImage &b, const QImage &mask, int gain)
 {
     if (a.size() != b.size())

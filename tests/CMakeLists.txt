@@ -303,5 +303,22 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RE
     add_dependencies(tst_browserquelle dss-core)
     add_test(NAME tst_browserquelle COMMAND tst_browserquelle)
     set_tests_properties(tst_browserquelle PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media)
+
+    # P11, K-08: Bildvergleich der zwei Zeichner mit den Testdaten tests/daten/bildvergleich/, noch
+    # ohne feste Grenze. Werte je Lauf unter build/tests/bildvergleich/. Mit DSS_BILDVERGLEICH_OBS
+    # auch gegen OBS (sonst ohne Verbindung); der Weg zu OBS wird gegen obstestserver.h geprüft.
+    qt_add_executable(tst_bildvergleich tst_bildvergleich.cpp obstestserver.h)
+    target_link_libraries(tst_bildvergleich PRIVATE dss_render dss_media dss_obs dss_bildvergleich dss_warnings
+      Qt6::Test Qt6::WebEngineWidgets Qt6::QuickWidgets)
+    target_compile_definitions(tst_bildvergleich PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+      DSS_TEST_BILDVERGLEICH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/bildvergleich"
+      DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+      DSS_TEST_FONT="${DSS_TEST_FONT}"
+      DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf"
+      DSS_TEST_BUILTIN_FONT_DIR="${PROJECT_SOURCE_DIR}/src/common/schriften/be-vietnam-pro"
+      DSS_BILDVERGLEICH_AUSGABE="${CMAKE_CURRENT_BINARY_DIR}/bildvergleich")
+    add_dependencies(tst_bildvergleich dss-core)
+    add_test(NAME tst_bildvergleich COMMAND tst_bildvergleich)
+    set_tests_properties(tst_bildvergleich PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 endif()

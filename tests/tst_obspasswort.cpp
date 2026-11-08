@@ -122,6 +122,57 @@ private slots:
         QCOMPARE(*read, second);
     }
 
+    // P11: Name wählbar (Zugangsdatei von Lotse heisst «obs-websocket»). Eine Datei mit anderem
+    // Namen lässt sich nicht lesen; systemd-creds prüft den Namen beim Entschlüsseln.
+    void realToolCredentialName()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("systemd-creds")).isEmpty())
+            QSKIP("systemd-creds fehlt");
+        QTemporaryDir dir;
+        const QString path = dir.path() + QStringLiteral("/obs-websocket.cred");
+        ObsSecretStore writer(path);
+        QCOMPARE(writer.credentialName(), QStringLiteral("dss-obs-passwort"));
+        writer.setCredentialName(QStringLiteral("obs-websocket"));
+        const QString password = randomPassword();
+        std::optional<QString> writeResult;
+        writer.write(password, [&writeResult](const QString &error) { writeResult = error; });
+        QTRY_VERIFY_WITH_TIMEOUT(writeResult.has_value(), kWait);
+        QVERIFY2(writeResult->isEmpty(), qPrintable(*writeResult));
+
+        ObsSecretStore sameName(path);
+        sameName.setCredentialName(QStringLiteral("obs-websocket"));
+        std::optional<std::optional<QString>> readResult;
+        sameName.read([&readResult](const std::optional<QString> &value) { readResult = value; });
+        QTRY_VERIFY_WITH_TIMEOUT(readResult.has_value(), kWait);
+        QVERIFY(readResult->has_value());
+        QCOMPARE(**readResult, password);
+
+        ObsSecretStore defaultName(path);
+        readResult.reset();
+        defaultName.read([&readResult](const std::optional<QString> &value) { readResult = value; });
+        QTRY_VERIFY_WITH_TIMEOUT(readResult.has_value(), kWait);
+        QVERIFY(!readResult->has_value());
+    }
+
+    void credentialNameOnCommandLine()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + QStringLiteral("/obs-websocket.cred");
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("verschluesselt");
+        f.close();
+        ObsSecretStore store(path, fakeProgram(dir.path(), QStringLiteral("klartext"), 0));
+        store.setCredentialName(QStringLiteral("obs-websocket"));
+        std::optional<std::optional<QString>> result;
+        store.read([&result](const std::optional<QString> &value) { result = value; });
+        QTRY_VERIFY_WITH_TIMEOUT(result.has_value(), kWait);
+        QCOMPARE(result->value_or(QString()), QStringLiteral("klartext"));
+        const QString commandLine = QString::fromUtf8(readAll(dir.path() + QStringLiteral("/befehlszeile")));
+        QVERIFY2(commandLine.contains(QStringLiteral("--name=obs-websocket ")), qPrintable(commandLine));
+        QVERIFY(commandLine.contains(QStringLiteral("decrypt ") + path + QStringLiteral(" -")));
+    }
+
     void withoutFileReadGivesEmpty()
     {
         QTemporaryDir dir;
@@ -180,6 +231,7 @@ private slots:
         QVERIFY2(result->isEmpty(), qPrintable(*result));
         const QString commandLine = QString::fromUtf8(readAll(dir.path() + QStringLiteral("/befehlszeile")));
         QVERIFY(commandLine.contains(QStringLiteral("--user")));
+        QVERIFY(commandLine.contains(QStringLiteral("--name=dss-obs-passwort ")));
         QVERIFY(commandLine.contains(QStringLiteral("encrypt - -")));
         QVERIFY(!commandLine.contains(password));
         QCOMPARE(QString::fromUtf8(readAll(dir.path() + QStringLiteral("/eingabe"))), password);

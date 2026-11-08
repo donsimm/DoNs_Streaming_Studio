@@ -15,6 +15,7 @@
 //   https://doc.qt.io/qt-6.8/qimage.html#scanLine, https://doc.qt.io/qt-6.8/qimage.html#Format-enum
 
 #include <QImage>
+#include <QList>
 #include <QRect>
 
 namespace bildvergleich {
@@ -45,6 +46,9 @@ struct Measure
 QImage edgeMask(const QImage &a, const QImage &b, int jump = kEdgeJump);
 // mask aus edgeMask(a, b). Leere Masszahlen, wenn die Grössen verschieden sind.
 Measure measure(const QImage &a, const QImage &b, const QImage &mask, const QRect &area);
+// Mehrere Bereiche zusammen (je Quellenart): Mittel nach Pixeln gewichtet, grösste Abweichung als
+// Maximum, Anteil an den Kanten nach Kantenpixeln gewichtet.
+Measure combine(const QList<Measure> &parts);
 
 // Grösste Abweichung eines Kanals je Pixel mal gain (höchstens 255), deckend auf Schwarz; zum
 // Speichern bei einer Abweichung. Kanten der Maske (falls nicht leer) blau eingefärbt.

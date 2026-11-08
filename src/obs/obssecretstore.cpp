@@ -11,8 +11,6 @@ namespace dss::obs {
 
 namespace {
 
-// Name im verschlüsselten Inhalt: systemd-creds prüft ihn beim Entschlüsseln.
-constexpr char kCredentialName[] = "dss-obs-passwort";
 constexpr int kProcessTimeoutMs = 10000;
 
 } // namespace
@@ -95,7 +93,7 @@ void ObsSecretStore::startNext()
         }
         m_running = true;
         QStringList arguments{QStringLiteral("--user"),
-                              QStringLiteral("--name=") + QLatin1String(kCredentialName)};
+                              QStringLiteral("--name=") + m_credentialName};
         if (encrypt)
             arguments << QStringLiteral("encrypt") << QStringLiteral("-") << QStringLiteral("-");
         else

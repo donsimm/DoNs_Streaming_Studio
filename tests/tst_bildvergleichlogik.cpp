@@ -155,6 +155,31 @@ private slots:
         QCOMPARE(none.mean, 0.0);
     }
 
+    // Zusammenfassen je Quellenart
+    void combineWeighted()
+    {
+        Measure a;
+        a.mean = 1.0;
+        a.maxOutsideEdges = 5;
+        a.edgeOver32 = 10.0;
+        a.pixels = 100;
+        a.edgePixels = 10;
+        Measure b;
+        b.mean = 4.0;
+        b.maxOutsideEdges = 3;
+        b.edgeOver32 = 40.0;
+        b.pixels = 300;
+        b.edgePixels = 30;
+        const Measure all = combine({a, b});
+        QCOMPARE(all.pixels, qint64(400));
+        QCOMPARE(all.edgePixels, qint64(40));
+        QCOMPARE(all.maxOutsideEdges, 5);
+        QCOMPARE(all.mean, (1.0 * 100 + 4.0 * 300) / 400);
+        QCOMPARE(all.edgeOver32, (10.0 * 10 + 40.0 * 30) / 40);
+        QCOMPARE(combine({}).pixels, qint64(0));
+        QCOMPARE(combine({}).mean, 0.0);
+    }
+
     void differentSizesGiveNothing()
     {
         const QImage a = halves(50);
