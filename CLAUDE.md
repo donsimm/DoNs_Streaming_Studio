@@ -31,7 +31,7 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
 - Lotse erreicht den Streaming-PC per SSH (`ssh dominik@192.168.1.116`, Schlüssel vom Studio-PC). Dort wird nur gelesen (Pakete, Logs, Konfiguration, offene Ports). Änderungen gibt es erst nach dem OK des Nutzers, `sudo` gibt der Nutzer selbst ein. Gestartete Agenten nutzen den Zugang nur, wenn ihr Auftrag es ausdrücklich erlaubt.
 - Ausnahme in angekündigten Handtests, ab dem Baustein nach P10c (entschieden vom Nutzer, 2026-11-08): Lotse darf
   - OBS auf dem Streaming-PC per SSH schliessen und wieder öffnen, nie während eines Streams (vorher Prozess und Ausgabe prüfen);
-  - obs-websocket nur für Tests nutzen (Quellen prüfen und anlegen, Szene wechseln, Bild einer Quelle holen). Das Passwort liegt mit `systemd-creds --user` verschlüsselt in `~/.config/lotse/obs-websocket.cred` (Name `obs-websocket`, nicht in der Sicherung). Der Nutzer legt es selbst an, es kommt nie in einen Chat, ein Protokoll oder eine Datei im Klartext;
+  - obs-websocket nur für Tests nutzen (Quellen prüfen und anlegen, Szene wechseln, Bild einer Quelle holen, die eigene Testquelle in der Szene «test 2» nach der Prüfung wieder löschen, entschieden vom Nutzer 2026-11-08). Das Passwort liegt mit `systemd-creds --user` verschlüsselt in `~/.config/lotse/obs-websocket.cred` (Name `obs-websocket`, nicht in der Sicherung). Der Nutzer legt es selbst an, es kommt nie in einen Chat, ein Protokoll oder eine Datei im Klartext;
   - Bildschirmfotos vom Studio-PC machen und auswerten, Ablage nur im Scratchpad.
 
 ## Prüfstufen (entschieden vom Nutzer, 2026-11-07)

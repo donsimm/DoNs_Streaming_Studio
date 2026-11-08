@@ -11,8 +11,8 @@ Stand: 2026-11-08. Einstiegspunkt jeder Sitzung, nach `CLAUDE.md`. Nur der aktue
 
 ## Nächster Schritt
 
-1. Testgrenze `schedulerMaxDelay` erledigt (2026-11-08, Branch `lotse/scheduler-grenze`, noch nicht auf `main`): untere Grenzen 945/1890 ms statt 950/1900 ms. Geprüft: Bau, `ctest` 42 von 42 ohne Skipped, `tst_aenderungen` 50 von 50 (erstes Speichern 949 bis 1053 ms, zweites 1910 bis 2121 ms). Übernahme auf `main` und Push nach Freigabe des Nutzers.
-2. P11 (Bildvergleich, Punkte 79 und 80).
+1. Testgrenze `schedulerMaxDelay` erledigt (2026-11-08, auf `main` und gepusht): untere Grenzen 945/1890 ms statt 950/1900 ms. Geprüft: Bau, `ctest` 42 von 42 ohne Skipped, `tst_aenderungen` 50 von 50 (erstes Speichern 949 bis 1053 ms, zweites 1910 bis 2121 ms). Übernahme auf `main` und Push nach Freigabe des Nutzers.
+2. P11 (Bildvergleich, Punkte 79 und 80): Plan mit Entscheiden in `docs/archiv/prompts/P11-bildvergleich.md`, Branch `lotse/p11`. Läuft: P11a (Commits 1–3), danach Prüfung V durch Lotse, dann P11b.
 3. P12 (Ton; zuerst Grundfrage klären, Antworten des Nutzers im Archiv der Übergabe).
 4. Twitch-Verbindung mit dem Ereignisfluss (Punkt 92). Bericht zur Bauplan-Prüfung: `~/.claude/lotse/berichte/archiv/dss-bauplan-pruefung.md`.
 
