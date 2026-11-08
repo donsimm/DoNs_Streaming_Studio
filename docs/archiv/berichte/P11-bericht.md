@@ -9,6 +9,7 @@ Stand: 2026-11-08. Plan: `docs/archiv/prompts/P11-bildvergleich.md`. Ausgeführt
 - **WebM-Drehung (Punkt 80):** `src/server/mediapatch.{h,cpp}` (EBML-Leser, `ProjectionPoseYaw` und `ProjectionPoseRoll` auf 0.0); Tests in `tst_overlayserver` (`webmRotationNeutralized`), Ausrichtung in `tst_bildvergleich`.
 - **Bild von `GetSourceScreenshot`:** `tests/bildvergleich.{h,cpp}` (`fromObsScreenshot`, `toObsScreenshot`), `tst_bildvergleichlogik`, `tst_bildvergleich`; die Warnung «Entschlüsseln fehlgeschlagen» beim absichtlich falschen Namen ist nun erwartet (`QTest::ignoreMessage`).
 - **Feste Grenze:** `tst_bildvergleich` (`kKindLimits`, `kKnown`, Slot `absichtlicheFehler`), `tst_browserquelle` (Toleranz der Videos getrennt für Editor und Seite).
+- **Punkt 101 (Nachtrag):** `tst_bildvergleich` (Grenze Text, eigener Wert «Gesamt|Text über dem Video», `QEXPECT_FAIL` entfernt).
 - **Dokumente:** `docs/01-festlegungen.md` («Farben von Videos»), `docs/04-offene-punkte.md` (79 und 80 ins Archiv, neue Punkte 96 bis 102), `docs/05-quellen.md`, `docs/archiv/04-erledigte-punkte.md`, `docs/07-bauplan.md`, `docs/08-kern-schnittstelle.md` (Overlay-Server, WebM).
 
 ## Befunde und Entscheide
@@ -41,7 +42,7 @@ Gemessen mit `scripts/wiederholen.sh build tst_bildvergleich 30 <Ordner>`, 2026-
 | Grenze | Mittel | grösste ausserhalb Kanten | über 32 an Kanten | Grundlage (grösster Wert) |
 |---|---|---|---|---|
 | Bild (je Bereich) | 1.5 | 4 | 13 % | 1.124 verkleinert, 2, 10.00 % gedreht 12.5° |
-| Text (je Bereich) | 2.0 | 4 | 21 % | 1.534 «Text über dem Video» (Gesamt), 2, 16.73 % Be Vietnam Pro gedreht |
+| Text (je Bereich) | 1.9 | 2 | 21 % | 1.466 «Text rechts» (Gesamt), 0, 16.73 % Be Vietnam Pro gedreht (seit Punkt 101; vorher 2.0, 4, 21 % aus «Text über dem Video») |
 | Video (je Bereich) | 1.6 | 6 | 7 % | 1.250 `bildwechsel.mp4`, 4, 5.37 % Video BT.709 1280x720 (Gesamt) |
 
 Bekannte Werte je Fall (`kKnown`), gleiche Reserve:
@@ -57,6 +58,7 @@ Bekannte Werte je Fall (`kKnown`), gleiche Reserve:
 | WebM, `alpha.webm` 1:1 und vergrössert; Gesamt, «WebM mit Alpha» | 4.27/4.25, 38/39, 22.76/21.24 % | 5.4, 48/49, 29/27 % | ebenso |
 | Text, Urbanist 800 Mitte | 6.193, 0, 27.86 % | 7.8, 2, 35 % | Punkt 96 |
 | Text, Be Vietnam Pro klein | 6.009, 0, 27.41 % | 7.6, 2, 35 % | Punkt 96 |
+| Gesamt, «Text über dem Video» | 1.534, 2, 7.11 % | 2.0, 4, 9 % | Text über einem Video; eigener Wert, damit die Grenze Text nicht steigt (Punkt 101, Entscheid des Nutzers 2026-11-08) |
 | ganzes Overlay Bild / Text / Videofarbe / WebM / Gesamt | 0.108/1.422/1.607/1.295/0.618, 2/0/70/39/39, 1.34/15.93/7.34/22.60/4.73 % | 0.3/1.8/2.1/1.7/0.8, 4/2/88/49/49, 3/20/10/29/6 % | enthält die Fälle oben |
 
 Nicht geprüft: «Weitere Formate» (HEVC, nur notiert) und die Zusammenfassungen «alle (Art)».
@@ -72,10 +74,30 @@ Absichtliche Fehler (Slot `absichtlicheFehler`, Editorbild absichtlich falsch ge
 | Alpha um 8 daneben | Bild, PNG mit Alpha 1:1 | 4.422, 8, 0 % | 2.9 |
 | BT.601 statt BT.709 | Videofarbe, `h264-1920x1080-bt709.mp4` | 3.215, 32, 0 % | 5.3 |
 | falsches Videobild | Videofarbe, `bildwechsel.mp4` | 96.000, 129, 100 % | 60.0 |
-| falsches Schriftgewicht (Urbanist 300 statt 400) | Text, Urbanist 300 Mitte | 3.919, 0, 28.89 % | **1.96**, `[OFFEN]` Punkt 101 |
-| Grundlinie 1 Pixel daneben | Text, DejaVu links | 5.062, 0, 24.63 % | 2.5 |
+| falsches Schriftgewicht (Urbanist 300 statt 400) | Text, Urbanist 300 Mitte | 3.919, 0, 28.89 % | 1.96 (Grenze 2.0); seit Punkt 101 **2.06** (Grenze 1.9) |
+| Grundlinie 1 Pixel daneben | Text, DejaVu links | 5.062, 0, 24.63 % | 2.5; seit Punkt 101 2.66 |
 
-«Falsches Schriftgewicht» liegt über der Grenze (der Test würde den Fehler melden), erreicht aber das verlangte Doppelte nicht. Die Grenze wurde nicht angepasst (Plan, Abschnitt 4.6); der Test führt den Fall als `QEXPECT_FAIL` und scheitert, sobald er das Doppelte erreicht (XPASS) oder unter die Grenze fällt.
+«Falsches Schriftgewicht» lag mit der Grenze Text 2.0 über der Grenze, erreichte aber das verlangte Doppelte nicht (`QEXPECT_FAIL`, Punkt 101). Entscheid des Nutzers (2026-11-08): «Text über dem Video» bekommt einen eigenen bekannten Wert, die Grenze wird nicht aufgeweicht. Seither ist die Grenze Text 1.9 (aus den übrigen Textbereichen, gleiche Reserve), der Fehler liegt beim 2.06-fachen und `QEXPECT_FAIL` ist entfernt (Nachtrag Punkt 101, unten).
+
+### Nachtrag Punkt 101 (2026-11-08)
+
+Neue Werte aus denselben 30 Läufen (`build/tests/bildvergleich/zusammenfassung.tsv`, Seite–Editor, jede Masszahl in allen Läufen gleich), Reserve wie oben:
+
+- Grenze Text: Mittel 1.466 × 1.25 = 1.83 → **1.9**; grösste ausserhalb Kanten 0 → 0 + 2 = **2** (vorher 4, weil nur «Text über dem Video» 2 hatte); Kanten 16.73 % × 1.25 = 20.9 → **21 %**.
+- Eigener Wert «Gesamt|Text über dem Video»: 1.534 × 1.25 = 1.92 → **2.0**; 2 + 2 = **4**; 7.11 % × 1.25 = 8.9 → **9 %**.
+- Absichtliche Fehler Text: «falsches Schriftgewicht» 3.919 / 1.9 = **2.06-fach**, «Grundlinie 1 Pixel daneben» 5.062 / 1.9 = 2.66-fach (im Protokoll gerundet 2.1 und 2.7).
+
+Geprüft am 2026-11-08 auf dem Studio-PC, X11-Sitzung aktiv, daneben keine Bauten oder Tests (`pgrep -af "cmake|ctest|unittest|wiederholen"`), ohne `DSS_BILDVERGLEICH_OBS`:
+
+| Prüfung | Befehl | Ergebnis |
+|---|---|---|
+| Bau | `cmake --build build -j8` | Exit 0, keine Warnung |
+| Einzeln | `ctest --test-dir build -R "^tst_bildvergleich$" -V` | bestanden, 10 passed, kein XFAIL |
+| Grenze | `scripts/wiederholen.sh build tst_bildvergleich 30 <Ordner>`, Ende 22:58:28 | 30 von 30, jede Masszahl in allen Läufen gleich und wie in P11b |
+| 50 Wiederholungen | `scripts/wiederholen.sh build tst_bildvergleich 50 <Ordner>`, Ende 23:23:43 | 50 von 50, Masszahlen unverändert |
+| Tests, voll | `ctest --test-dir build` | 45 von 45, 188 s, kein Test übersprungen |
+
+Prüfung N gegen das echte OBS wurde nicht wiederholt: Geändert sind nur Grenzen im Test (Seite–Editor), nicht Zeichner, Seite oder Weg zu OBS; die Werte mit OBS werden ohne Grenze nur festgehalten.
 
 `tst_browserquelle`: Toleranz der Videofarben für den Editor 80 → 4 (gemessen 2), für die Seite weiter 80 (gemessen 64).
 
@@ -142,7 +164,7 @@ Kein Handtest nötig. Grund: Die sichtbare Änderung (Farben von HD-Videos im Ed
 
 - **Prüfung N** gegen das echte OBS steht aus (Lotse). Erst sie bestätigt die Videofarben nach P11b, die WebM-Ausrichtung in OBS und die Erklärung zu Alpha.
 - Punkt 96: Urbanist 800 und Be Vietnam Pro klein liegen im Editor neben beiden Browsern (Seite–Editor 6.19 bzw. 6.01 im Mittel; Prüfung V: OBS–Editor bis 6.5, OBS–Seite 0.6 bis 2.4). Ursache nicht untersucht; festgehalten als bekannte Werte.
-- Punkt 101: Der absichtliche Fehler «falsches Schriftgewicht» erreicht nur das 1.96-fache der Grenze Text (siehe «Grenze»). Zu entscheiden: so lassen, «Text über dem Video» als eigenen bekannten Wert führen (dann Grenze Text 1.9, Fehler 2.06-fach) oder den Fehler mit einem grösseren Schritt prüfen.
+- Punkt 101: erledigt (2026-11-08), siehe «Nachtrag Punkt 101».
 - Punkt 102 (nicht im Auftrag): `tst_kernverbindung::settingsReadAndChange` scheiterte in zwei von drei vollen `ctest`-Läufen (Zeile 454), sonst bestanden. Vermutete Ursache im Test (wartet auf den Anfang der Protokollzeile, prüft sofort das Ende), nicht geprüft. P11 ändert weder den Test noch `coresettings`.
 - Punkt 97: Der Abgriff von Qt WebEngine enthält im Overlay «Gesamt» 48641 Pixel mit Farbe grösser als Alpha (ungültig vormultipliziert), vermutlich im WebM mit Alpha. Ob das an Qt WebEngine 122 oder am Abgriff liegt und ob OBS dasselbe zeigt, ist nicht geprüft.
 - Punkt 98: AV1 ist nicht gemessen (keine Testdatei). Die Regel «AV1 ohne Angabe wie BT.601» stammt nur aus dem Quelltext von Chromium.
@@ -159,7 +181,8 @@ Kein Handtest nötig. Grund: Die sichtbare Änderung (Farben von HD-Videos im Ed
 - **Bild von `GetSourceScreenshot`:** als vormultipliziert gelesen, Farben grösser als Alpha auf Alpha begrenzt und gezählt (Gegenprobe). Der Testserver sendet die Seite auf dieselbe Art, damit `ctest` den Weg prüft.
 - **Commit «Bild von GetSourceScreenshot …, erwartete Warnung»:** zwei kleine Punkte in derselben Testdatei `tst_bildvergleich` (Weg über obs-websocket), deshalb ein Commit (Regel 8).
 - **Form der Grenze:** eine Grenze je Quellenart (Bild, Text, Video) für alle Bereiche ohne eigenen Eintrag; bekannte Werte je Fall (`kKnown`) für die Fälle, in denen Qt WebEngine anders rechnet als OBS, für Urbanist 800 und Be Vietnam Pro klein und für «ganzes Overlay» je Overlay. Reserve: × 1.25 mit Mindestabstand (Mittel + 0.1, grösste Abweichung + 2, Kanten + 1 Prozentpunkt), damit keine Grenze 0 ist. Geprüft wird jede der drei Masszahlen. Die Zusammenfassungen «alle (Art)» werden nicht geprüft (sie sind aus den Bereichen gerechnet).
-- **`QEXPECT_FAIL` für «falsches Schriftgewicht»:** Ein dauerhaft roter Test hätte die 50 Wiederholungen und jeden `ctest`-Lauf unbrauchbar gemacht; die Grenze anzupassen verbietet der Plan. So bleibt der Fehlbetrag sichtbar (XFAIL im Protokoll), der Test prüft weiter, dass der Fehler über der Grenze liegt, und scheitert, sobald er das Doppelte erreicht (XPASS) oder unter die Grenze fällt.
+- **`QEXPECT_FAIL` für «falsches Schriftgewicht»:** Ein dauerhaft roter Test hätte die 50 Wiederholungen und jeden `ctest`-Lauf unbrauchbar gemacht; die Grenze anzupassen verbietet der Plan. So bleibt der Fehlbetrag sichtbar (XFAIL im Protokoll), der Test prüft weiter, dass der Fehler über der Grenze liegt, und scheitert, sobald er das Doppelte erreicht (XPASS) oder unter die Grenze fällt. Mit Punkt 101 entfernt; der Fehler gilt nun wie alle anderen (mindestens das Doppelte).
+- **Punkt 101, grösste Abweichung ausserhalb der Kanten:** Die Grenze Text sinkt dabei von 4 auf 2, weil alle Textbereiche ausser «Text über dem Video» dort 0 hatten (gleiche Reserve wie bei allen Grenzen, «+ 2»). Die Grenze ist damit strenger, nicht weicher.
 - **Absichtliche Fehler:** erzeugt aus den Bildern des Laufs (Editor neu gezeichnet mit geänderter Quelle oder Pixel im Kasten ersetzt), verglichen mit der Seite. Massgebend ist das grösste Verhältnis der drei Masszahlen zur Grenze des Bereichs.
 - **`tst_browserquelle`:** Toleranz der Videos für Editor und Seite getrennt. Für die Seite bleibt 80 (Qt WebEngine 122 rechnet die Grundfarben um, OBS nicht).
 - **`scripts/leistung.py --video`:** zwei Videos 1080p30 (BT.709 und SMPTE170M) je 960x540 im Overlay 1920x1080, damit beide Matrizen gleichzeitig laufen.

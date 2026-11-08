@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-08 (P11: Punkte 79 und 80 erledigt und ins Archiv verschoben, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-08 (P11: Punkte 79, 80 und 101 erledigt und ins Archiv verschoben, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -10,7 +10,6 @@ Stand: 2026-11-08 (P11: Punkte 79 und 80 erledigt und ins Archiv verschoben, neu
 87. Aus P10b: Bleibt ein Test mit eigenem Kern stehen, weil er abstürzt, läuft sein Kern weiter (Elternprozess 1). Am 2026-11-04 um 10:23 liefen noch zwei Kerne von `tst_fensterbearbeiten` von 10:04 und 10:05 (Läufe, die an einer Prüfzeile abstürzten, die vor dem Commit entfernt wurde); beendet mit `kill` und Ordner gelöscht. Nicht im Auftrag; zu entscheiden, ob Testkerne sich beenden, wenn der Test endet (zum Beispiel `prctl(PR_SET_PDEATHSIG)`, https://man7.org/linux/man-pages/man2/prctl.2.html, nur für Tests).
 88. Aus P10b: Erlaubte Endungen für Videos sind weiterhin nur `.webm` und `.mp4` (`docs/06-overlay-format.md`, «media/»). Eine `.mov` (das Beispiel im Entscheid zu Punkt 81 nennt «zaehler.mov (ProRes)») weist der Kern beim Hinzufügen ab («Endung «mov» nicht erlaubt …»); der Hinweis zu ProRes kommt also nur bei ProRes in `.mp4` (so geprüft). Nicht im Auftrag; zu entscheiden, ob `.mov` (und `.mkv`) erlaubt werden.
 89. Aus P10b: Schriften im Dock «Medien» lassen sich nicht auf die Leinwand oder in die Liste «Quellen» ziehen (Ziehen gibt nur Bild- und Videodateien weiter, Entscheid E-28 nennt «neue Quelle»; eine Schrift ist keine Quelle). Zu entscheiden, ob Ziehen einer Schrift eine Textquelle mit dieser Schrift anlegen soll.
-101. Aus P11: Der absichtliche Fehler «falsches Schriftgewicht» (Urbanist 300 statt 400) liegt in `tst_bildvergleich` über der Grenze für Text (wird erkannt), erreicht aber nur das 1.96-fache statt das verlangte Doppelte (Mittel 3.919 gegen 2.0, 2026-11-08). Die Grenze Text (Mittel 2.0) kommt aus «Text über dem Video» im Overlay «Gesamt» (1.534, Text über einem Video); ohne diesen Bereich wäre sie 1.9 und der Fehler läge beim 2.06-fachen. Nicht zurechtgebogen (Plan P11, Abschnitt 4.6), im Test als `QEXPECT_FAIL`. Zu entscheiden: so lassen, «Text über dem Video» als eigenen bekannten Wert führen oder den Fehler mit einem grösseren Schritt prüfen.
 - Ohne Nummer, aus «Entschieden nach P09»: Zuschneiden von Quellen später als eigenen Punkt besprechen (E-25 enthält es nicht).
 
 ## Entschieden, Umsetzung steht aus
