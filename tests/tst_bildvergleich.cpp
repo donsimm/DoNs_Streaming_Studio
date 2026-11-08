@@ -6,8 +6,7 @@
 // Bereich unter der Grenze bleiben (kKindLimits je Quellenart, kKnown je Fall, siehe dort); sonst
 // scheitert der Test mit Bereich und Zahlen, Seite, Editor und Differenzbild liegen in der Ausgabe.
 // absichtlicheFehler: Jeder absichtliche Fehler (Plan P11, Abschnitt 4) muss mindestens das Doppelte
-// der Grenze erreichen; «falsches Schriftgewicht» erreicht es nicht und steht als QEXPECT_FAIL da
-// ([OFFEN], Punkt 101). Der Test scheitert ausserdem, wenn ein Bild fehlt, die Grösse nicht stimmt,
+// der Grenze erreichen. Der Test scheitert ausserdem, wenn ein Bild fehlt, die Grösse nicht stimmt,
 // ein Video mit «Am Ende anhalten» nicht das letzte Bild zeigt (K-05) oder die Ausrichtung eines
 // WebM nicht stimmt (Punkt 80).
 //
@@ -132,7 +131,7 @@ struct Limit
 // Je Quellenart, für jeden Bereich dieser Art ohne eigenen Eintrag in kKnown
 const QHash<QString, Limit> kKindLimits = {
     {QStringLiteral("Bild"), {1.5, 4, 13}},  // gemessen 1.124 (verkleinert), 2, 10.00 % (gedreht 12.5°)
-    {QStringLiteral("Text"), {2.0, 4, 21}},  // 1.534 (Gesamt, Text über dem Video), 2, 16.73 % (Be Vietnam Pro gedreht)
+    {QStringLiteral("Text"), {1.9, 2, 21}},  // 1.466 (Gesamt, Text rechts), 0, 16.73 % (Be Vietnam Pro gedreht)
     {QStringLiteral("Video"), {1.6, 6, 7}},  // 1.250 (bildwechsel.mp4), 4, 5.37 % (Gesamt, Video BT.709 1280x720)
 };
 
@@ -143,6 +142,9 @@ const QHash<QString, Limit> kKindLimits = {
 //   WebM mit Drehangabe und mit Alpha).
 // - Urbanist 800 und Be Vietnam Pro klein: Der Editor weicht von beiden Browsern ab (Prüfung V:
 //   OBS–Editor bis 6.5, OBS–Seite 0.6 bis 2.4), Ursache [OFFEN] (Punkt 96).
+// - Text über dem Video (Gesamt): Text über einem Video liegt weiter neben der Seite als Text auf
+//   leerem Grund; als eigener Wert, damit die Grenze Text nicht steigt (Entscheid des Nutzers
+//   2026-11-08, Punkt 101).
 // - «ganzes Overlay» je Overlay (enthält die Fälle oben).
 // Kommentar: gemessen Mittel, grösste ausserhalb Kanten, über 32 an Kanten (in allen 30 Läufen gleich).
 const QHash<QString, Limit> kKnown = {
@@ -159,6 +161,7 @@ const QHash<QString, Limit> kKnown = {
     {QStringLiteral("Gesamt|WebM mit Alpha"), {5.4, 49, 27}},                // 4.246, 39, 21.24 %
     {QStringLiteral("Text|Urbanist 800 Mitte"), {7.8, 2, 35}},               // 6.193, 0, 27.86 %
     {QStringLiteral("Text|Be Vietnam Pro klein"), {7.6, 2, 35}},             // 6.009, 0, 27.41 %
+    {QStringLiteral("Gesamt|Text über dem Video"), {2.0, 4, 9}},             // 1.534, 2, 7.11 %
     {QStringLiteral("Bild|ganzes Overlay"), {0.3, 4, 3}},                    // 0.108, 2, 1.34 %
     {QStringLiteral("Text|ganzes Overlay"), {1.8, 2, 20}},                   // 1.422, 0, 15.93 %
     {QStringLiteral("Videofarbe|ganzes Overlay"), {2.1, 88, 10}},            // 1.607, 70, 7.34 %
@@ -1335,7 +1338,6 @@ private slots:
             QString overlay;
             QString region;
             QImage editor;
-            bool knownShort = false; // erreicht das Doppelte nicht, [OFFEN] (siehe unten)
         };
         QList<Fault> faults;
         const QRect enlarged(600, 140, 352, 264);
@@ -1381,8 +1383,7 @@ private slots:
                            return q;
                        })});
         faults.append({QStringLiteral("falsches Schriftgewicht"), QStringLiteral("Text"), QStringLiteral("Urbanist 300 Mitte"),
-                       rerender(QStringLiteral("Text"), QRect(10, 130, 460, 110), [](Source &s) { s.text.weight = 400; }),
-                       true});
+                       rerender(QStringLiteral("Text"), QRect(10, 130, 460, 110), [](Source &s) { s.text.weight = 400; })});
         faults.append({QStringLiteral("Grundlinie 1 Pixel daneben"), QStringLiteral("Text"), QStringLiteral("DejaVu links"),
                        rerender(QStringLiteral("Text"), QRect(10, 10, 460, 110), [](Source &s) { s.y += 1; })});
 
@@ -1400,15 +1401,7 @@ private slots:
                   qPrintable(f.region), qPrintable(measureText(m)), qPrintable(limitText(*l)), times);
             save(bv::differenceImage(page, f.editor, bv::edgeMask(page, f.editor)),
                  QStringLiteral("fehler-%1.png").arg(f.name.toLower().replace(QLatin1Char(' '), QLatin1Char('-'))));
-            if (f.knownShort) {
-                // [OFFEN] Punkt 101: Urbanist 300 statt 400 liegt über der Grenze Text (wird erkannt),
-                // erreicht aber nur das 1.96-fache (Mittel 3.919 gegen 2.0, 2026-11-08). Die Grenze
-                // wird nicht zurechtgebogen (Plan P11, Abschnitt 4.6). Erreicht der Fehler das Doppelte,
-                // scheitert der Test (XPASS) und der Eintrag muss weg.
-                QVERIFY2(times > 1.0, qPrintable(QStringLiteral("%1 liegt unter der Grenze").arg(f.name)));
-                QEXPECT_FAIL("", "[OFFEN] Punkt 101: falsches Schriftgewicht erreicht das Doppelte der Grenze nicht", Continue);
-                QVERIFY2(times >= 2.0, qPrintable(QStringLiteral("%1: %2-fach").arg(f.name).arg(times, 0, 'f', 2)));
-            } else if (times < 2.0) {
+            if (times < 2.0) {
                 tooSmall << QStringLiteral("%1: %2-fach").arg(f.name).arg(times, 0, 'f', 1);
             }
         }
