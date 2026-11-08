@@ -65,6 +65,12 @@ const Quarter kQuarters[] = {{{0.25, 0.25}, QColor(255, 0, 0)},
                              {{0.25, 0.75}, QColor(0, 0, 255)},
                              {{0.75, 0.75}, QColor(255, 255, 0)}};
 
+// Toleranz der Videofarben in checkQuarters (grösster Kanal), siehe dort. Gemessen 2026-11-08 (P11):
+// Editor höchstens 2, Seite höchstens 64. Editor: Reserve wie die Grenze in tst_bildvergleich
+// (× 1.25, mindestens + 2).
+constexpr int kEditorVideoTolerance = 4;
+constexpr int kPageVideoTolerance = 80;
+
 int distance(const QColor &a, const QColor &b)
 {
     return std::max({std::abs(a.red() - b.red()), std::abs(a.green() - b.green()),
@@ -237,15 +243,18 @@ private:
         return true;
     }
 
-    void checkQuarters(const QImage &image, const QString &what)
+    // videoTolerance: JPEG ist verlustbehaftet (40), PNG 4. Videos (H.264 ohne Farbangabe, kleiner
+    // als 720 Pixel): Der Editor rechnet seit P11 (Punkt 79) wie die Browserquelle in OBS (BT.601
+    // ohne Umrechnung der Grundfarben). Qt WebEngine (Chromium 122) rechnet die Grundfarben um (Rot
+    // 248/36/0, Grün 64/252/0, Bericht P10); OBS (Chromium 146) tut das nicht (Prüfung V, Bericht
+    // P11). Für die Seite gilt deshalb weiter 80 als bekannter Unterschied.
+    void checkQuarters(const QImage &image, const QString &what, int videoTolerance)
     {
+        int worstVideo = 0;
         for (int i = 0; i < m_oriented.size(); ++i) {
             const QRect box = m_oriented.at(i);
-            // JPEG verlustbehaftet. Videos: Chromium rechnet H.264 ohne Farbangaben wie BT.601 mit
-            // Umrechnung der Grundfarben auf sRGB (Rot 248/36/0, Grün 64/252/0), der Editor
-            // (swscale) ohne; geprüft wird dort nur die Ausrichtung (nächstliegende Farbe).
             const bool video = i >= 16;
-            const int tolerance = video ? 80 : i < 8 ? 40 : 4;
+            const int tolerance = video ? videoTolerance : i < 8 ? 40 : 4;
             for (const Quarter &q : kQuarters) {
                 const QPoint p(box.x() + int(box.width() * q.at.x()), box.y() + int(box.height() * q.at.y()));
                 const QColor c = image.pixelColor(p);
@@ -261,8 +270,12 @@ private:
                 QVERIFY2(distance(c, q.color) <= tolerance && c.alpha() >= 250,
                          qPrintable(QStringLiteral("%1: %2 bei %3,%4: %5 statt %6")
                                         .arg(what, name).arg(p.x()).arg(p.y()).arg(c.name(QColor::HexArgb), q.color.name())));
+                if (video)
+                    worstVideo = std::max(worstVideo, distance(c, q.color));
             }
         }
+        qInfo("%s: Videos höchstens %d neben den Farben der Viertel (Toleranz %d)", qPrintable(what), worstVideo,
+              videoTolerance);
     }
 
 private slots:
@@ -405,9 +418,9 @@ private slots:
         const QImage editor = renderOverlayImage(renderer, overlay);
         save(editor, QStringLiteral("editor.png"));
 
-        checkQuarters(editor, QStringLiteral("Editor"));
-        checkQuarters(page, QStringLiteral("Seite"));
-        // Abweichungen mit Zahlen (Grenze kommt mit P11)
+        checkQuarters(editor, QStringLiteral("Editor"), kEditorVideoTolerance);
+        checkQuarters(page, QStringLiteral("Seite"), kPageVideoTolerance);
+        // Abweichungen mit Zahlen (nur Protokoll; die feste Grenze prüft tst_bildvergleich, P11)
         const auto line = [&](const QString &name, const QRect &r) {
             const Difference d = compare(page, editor, r);
             qInfo("Abweichung %-26s mittel %6.2f, grösste %3d, Pixel > 32: %5.2f %%", qPrintable(name), d.mean, d.max, d.over32);
@@ -497,7 +510,7 @@ private slots:
         QVERIFY(t < 0.5);
         QVERIFY(pageReady(5));
         QTest::qWait(300);
-        checkQuarters(grab(), QStringLiteral("nach Ausgabe ein"));
+        checkQuarters(grab(), QStringLiteral("nach Ausgabe ein"), kPageVideoTolerance);
     }
 
     // Video beginnt beim Einblenden der Quelle von vorne (Teil B 2)
@@ -569,7 +582,7 @@ private slots:
         QVERIFY(waitForPage(1));
         QVERIFY(pageReady(5));
         QTest::qWait(300);
-        checkQuarters(grab(), QStringLiteral("neue Adresse"));
+        checkQuarters(grab(), QStringLiteral("neue Adresse"), kPageVideoTolerance);
     }
 
     // Neustart des Kerns: letztes Bild bleibt stehen, die Seite verbindet sich von selbst wieder

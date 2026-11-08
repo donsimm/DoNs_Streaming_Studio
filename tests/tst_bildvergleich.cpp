@@ -1,10 +1,15 @@
-// P11, K-08: Bildvergleich der zwei Zeichner, noch ohne feste Grenze (P11a). Der Test legt die
-// Overlays «Bild», «Text», «Videofarbe», «WebM» und «Gesamt» zur Laufzeit an (OverlayStore, Medien
-// aus tests/daten/bildvergleich/, ../exif/, Schriften), startet einen eigenen Kern und vergleicht je
+// P11, K-08: Bildvergleich der zwei Zeichner mit fester Grenze. Der Test legt die Overlays «Bild»,
+// «Text», «Videofarbe», «WebM» und «Gesamt» zur Laufzeit an (OverlayStore, Medien aus
+// tests/daten/bildvergleich/, ../exif/, Schriften), startet einen eigenen Kern und vergleicht je
 // Overlay das Bild der Seite in Qt WebEngine (Chromium) mit dem Zeichner des Editors (dss_render).
-// Masszahlen je Bereich und Quellenart nach tests/bildvergleich.h; der Test gibt sie aus und
-// scheitert noch nicht an ihnen. Er scheitert, wenn ein Bild fehlt, die Grösse nicht stimmt oder
-// ein Video mit «Am Ende anhalten» nicht das letzte Bild zeigt (K-05).
+// Masszahlen je Bereich und Quellenart nach tests/bildvergleich.h. Seite–Editor muss in jedem
+// Bereich unter der Grenze bleiben (kKindLimits je Quellenart, kKnown je Fall, siehe dort); sonst
+// scheitert der Test mit Bereich und Zahlen, Seite, Editor und Differenzbild liegen in der Ausgabe.
+// absichtlicheFehler: Jeder absichtliche Fehler (Plan P11, Abschnitt 4) muss mindestens das Doppelte
+// der Grenze erreichen; «falsches Schriftgewicht» erreicht es nicht und steht als QEXPECT_FAIL da
+// ([OFFEN], Punkt 101). Der Test scheitert ausserdem, wenn ein Bild fehlt, die Grösse nicht stimmt,
+// ein Video mit «Am Ende anhalten» nicht das letzte Bild zeigt (K-05) oder die Ausrichtung eines
+// WebM nicht stimmt (Punkt 80).
 //
 // Chromium läuft in einem echten X11-Fenster ausserhalb des Bildschirms, ohne Fenstermanager und
 // ohne Fokus (wie P02, M2 «ausserhalb»; Regel 6). Abgriff wie tst_browserquelle.
@@ -77,7 +82,11 @@
 #include <QWebSocket>
 #include <QWebSocketHandshakeOptions>
 
+#include <algorithm>
 #include <climits>
+#include <cmath>
+#include <cstring>
+#include <functional>
 
 using namespace dss;
 using namespace testhelp;
@@ -107,6 +116,58 @@ struct Region
     QString kind; // Bild, Text, Video, WebM
     QRect rect;
 };
+
+// Feste Grenze Seite–Editor (K-08). Gemessen am 2026-11-08 mit 30 Läufen (Bericht P11):
+// Grenze = grösster Wert + Reserve, aufgerundet. Reserve: Mittel × 1.25 (mindestens + 0.1, auf 0.1
+// aufgerundet), grösste Abweichung ausserhalb der Kanten × 1.25 (mindestens + 2, ganze Zahl), Anteil
+// über 32 an den Kanten × 1.25 (mindestens + 1, ganze Prozent). Eine neue Grenze nur mit Commit und
+// Begründung im Bericht (Plan P11, Abschnitt 4).
+struct Limit
+{
+    double mean = 0;
+    int maxOutsideEdges = 0;
+    double edgeOver32 = 0;
+};
+
+// Je Quellenart, für jeden Bereich dieser Art ohne eigenen Eintrag in kKnown
+const QHash<QString, Limit> kKindLimits = {
+    {QStringLiteral("Bild"), {1.5, 4, 13}},  // gemessen 1.124 (verkleinert), 2, 10.00 % (gedreht 12.5°)
+    {QStringLiteral("Text"), {2.0, 4, 21}},  // 1.534 (Gesamt, Text über dem Video), 2, 16.73 % (Be Vietnam Pro gedreht)
+    {QStringLiteral("Video"), {1.6, 6, 7}},  // 1.250 (bildwechsel.mp4), 4, 5.37 % (Gesamt, Video BT.709 1280x720)
+};
+
+// Bekannte Werte je Fall («Overlay|Bereich»), ebenfalls aus den 30 Läufen mit derselben Reserve:
+// - Videos, bei denen Qt WebEngine (Chromium 122) anders rechnet als die Browserquelle in OBS
+//   (Chromium 146), die massgebend ist (Entscheid des Nutzers 2026-11-08, Frage 2: A); der Editor
+//   folgt OBS (Prüfung V): H.264 unter 720 Pixeln oder mit SMPTE170M, VP9 ohne Farbangabe (auch die
+//   WebM mit Drehangabe und mit Alpha).
+// - Urbanist 800 und Be Vietnam Pro klein: Der Editor weicht von beiden Browsern ab (Prüfung V:
+//   OBS–Editor bis 6.5, OBS–Seite 0.6 bis 2.4), Ursache [OFFEN] (Punkt 96).
+// - «ganzes Overlay» je Overlay (enthält die Fälle oben).
+// Kommentar: gemessen Mittel, grösste ausserhalb Kanten, über 32 an Kanten (in allen 30 Läufen gleich).
+const QHash<QString, Limit> kKnown = {
+    {QStringLiteral("Videofarbe|h264-640x360-ohne.mp4"), {6.0, 88, 32}},     // 4.746, 70, 24.95 %
+    {QStringLiteral("Videofarbe|h264-1280x718-ohne.mp4"), {5.7, 88, 27}},    // 4.538, 70, 21.24 %
+    {QStringLiteral("Videofarbe|h264-1920x1080-bt601.mp4"), {5.7, 88, 32}},  // 4.541, 70, 24.99 %
+    {QStringLiteral("Videofarbe|vp9-640x360-ohne.webm"), {4.7, 50, 15}},     // 3.732, 40, 11.86 %
+    {QStringLiteral("Videofarbe|vp9-1920x1080-ohne.webm"), {4.0, 40, 1}},    // 3.154, 32, 0.00 %
+    {QStringLiteral("WebM|drehung-90.webm"), {8.7, 49, 46}},                 // 6.936, 39, 36.30 %
+    {QStringLiteral("WebM|drehung-180.webm"), {8.8, 49, 49}},                // 7.009, 39, 38.71 %
+    {QStringLiteral("WebM|drehung-270.webm"), {8.7, 49, 48}},                // 6.933, 39, 37.62 %
+    {QStringLiteral("WebM|alpha.webm 1:1"), {5.4, 48, 29}},                  // 4.271, 38, 22.76 %
+    {QStringLiteral("WebM|alpha.webm vergrössert"), {5.4, 49, 27}},          // 4.246, 39, 21.24 %
+    {QStringLiteral("Gesamt|WebM mit Alpha"), {5.4, 49, 27}},                // 4.246, 39, 21.24 %
+    {QStringLiteral("Text|Urbanist 800 Mitte"), {7.8, 2, 35}},               // 6.193, 0, 27.86 %
+    {QStringLiteral("Text|Be Vietnam Pro klein"), {7.6, 2, 35}},             // 6.009, 0, 27.41 %
+    {QStringLiteral("Bild|ganzes Overlay"), {0.3, 4, 3}},                    // 0.108, 2, 1.34 %
+    {QStringLiteral("Text|ganzes Overlay"), {1.8, 2, 20}},                   // 1.422, 0, 15.93 %
+    {QStringLiteral("Videofarbe|ganzes Overlay"), {2.1, 88, 10}},            // 1.607, 70, 7.34 %
+    {QStringLiteral("WebM|ganzes Overlay"), {1.7, 49, 29}},                  // 1.295, 39, 22.60 %
+    {QStringLiteral("Gesamt|ganzes Overlay"), {0.8, 49, 6}},                 // 0.618, 39, 4.73 %
+};
+
+// Nur notieren (Entscheid des Nutzers 2026-11-08): HEVC spielt kein Browser ab, ohne Grenze.
+const QString kNotedOnly = QStringLiteral("Weitere Formate");
 // Video mit Farbfeldern: Kasten im Overlay und Grösse der Datei
 struct FieldVideo
 {
@@ -127,6 +188,22 @@ struct TestOverlay
     QList<Region> oriented; // Ausrichtung ablesen: Viertel rot, grün, blau, gelb
     QRect lastFrame;        // K-05: bildwechsel.mp4, letztes Bild Grau 128
 };
+
+// Absichtlicher Fehler «BT.601 statt BT.709» (deckende Farbe): nach Y'CbCr mit BT.709 und mit BT.601
+// zurück, wie der Editor vor Punkt 79 ein BT.709-Video zeigte. Der Bereich hebt sich auf.
+// Kr/Kb: ITU-R BT.709-6 (0.2126/0.0722), BT.601-7 (0.299/0.114)
+QRgb bt709AsBt601(QRgb c)
+{
+    const double r = qRed(c) / 255.0, g = qGreen(c) / 255.0, b = qBlue(c) / 255.0;
+    const double y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const double pb = (b - y) / (2 * (1 - 0.0722));
+    const double pr = (r - y) / (2 * (1 - 0.2126));
+    const double R = y + 2 * (1 - 0.299) * pr;
+    const double B = y + 2 * (1 - 0.114) * pb;
+    const double G = (y - 0.299 * R - 0.114 * B) / (1 - 0.299 - 0.114);
+    const auto to8 = [](double v) { return std::clamp(int(std::lround(255 * v)), 0, 255); };
+    return qRgba(to8(R), to8(G), to8(B), qAlpha(c));
+}
 
 QString rgbText(QRgb p)
 {
@@ -577,6 +654,10 @@ private:
     std::unique_ptr<ObsTestServer> m_fakeObs;
     QTemporaryDir m_credentialDir;
     QString m_obsLabel = QStringLiteral("OBS");
+    // Je Overlay (Name): Seite, Editor und Overlay aus overlays(), für absichtlicheFehler()
+    QHash<QString, QImage> m_pages;
+    QHash<QString, QImage> m_editors;
+    QHash<QString, Overlay> m_overlayData;
 
     QVariant js(const QString &code)
     {
@@ -825,16 +906,57 @@ private:
         return result;
     }
 
-    void record(const QString &comparison, const TestOverlay &o, const QImage &a, const QImage &b)
+    // Grenze eines Bereichs; nullptr, wenn keine festgelegt ist
+    static const Limit *limitFor(const QString &overlay, const QString &region, const QString &kind)
     {
+        const auto known = kKnown.constFind(overlay + QLatin1Char('|') + region);
+        if (known != kKnown.constEnd())
+            return &*known;
+        const auto byKind = kKindLimits.constFind(kind);
+        return byKind != kKindLimits.constEnd() ? &*byKind : nullptr;
+    }
+
+    // Grösstes Verhältnis Masszahl / Grenze der drei Masszahlen (über 1 = über der Grenze)
+    static double ratio(const bv::Measure &m, const Limit &l)
+    {
+        return std::max({m.mean / l.mean, double(m.maxOutsideEdges) / l.maxOutsideEdges, m.edgeOver32 / l.edgeOver32});
+    }
+
+    static QString limitText(const Limit &l)
+    {
+        return QStringLiteral("Grenze mittel %1, grösste ausserhalb Kanten %2, über 32 an Kanten %3 %")
+            .arg(l.mean, 0, 'f', 1).arg(l.maxOutsideEdges).arg(l.edgeOver32, 0, 'f', 0);
+    }
+
+    static QString measureText(const bv::Measure &m)
+    {
+        return QStringLiteral("mittel %1, grösste ausserhalb Kanten %2, über 32 an Kanten %3 %")
+            .arg(m.mean, 0, 'f', 3).arg(m.maxOutsideEdges).arg(m.edgeOver32, 0, 'f', 2);
+    }
+
+    // exceeded: nur für Seite–Editor; sammelt Bereiche über der Grenze oder ohne Grenze
+    void record(const QString &comparison, const TestOverlay &o, const QImage &a, const QImage &b,
+                QStringList *exceeded = nullptr)
+    {
+        const auto check = [&](const QString &region, const QString &kind, const bv::Measure &m) {
+            if (!exceeded)
+                return;
+            const Limit *l = limitFor(o.name, region, kind);
+            if (!l)
+                *exceeded << QStringLiteral("%1 | %2: keine Grenze festgelegt").arg(o.name, region);
+            else if (ratio(m, *l) > 1.0)
+                *exceeded << QStringLiteral("%1 | %2: %3 (%4)").arg(o.name, region, measureText(m), limitText(*l));
+        };
         const QImage mask = bv::edgeMask(a, b);
-        m_recorder.add(comparison, o.name, QStringLiteral("ganzes Overlay"), QStringLiteral("alle"),
-                       bv::measure(a, b, mask, QRect(QPoint(0, 0), o.size)));
+        const bv::Measure whole = bv::measure(a, b, mask, QRect(QPoint(0, 0), o.size));
+        m_recorder.add(comparison, o.name, QStringLiteral("ganzes Overlay"), QStringLiteral("alle"), whole);
+        check(QStringLiteral("ganzes Overlay"), QString(), whole);
         QHash<QString, QList<bv::Measure>> byKind;
         QStringList kinds;
         for (const Region &r : o.regions) {
             const bv::Measure m = bv::measure(a, b, mask, r.rect);
             m_recorder.add(comparison, o.name, r.name, r.kind, m);
+            check(r.name, r.kind, m);
             if (!kinds.contains(r.kind))
                 kinds << r.kind;
             byKind[r.kind].append(m);
@@ -1069,7 +1191,11 @@ private slots:
         save(page, file + QStringLiteral("-seite.png"));
         save(editor, file + QStringLiteral("-editor.png"));
         save(bv::differenceImage(page, editor, bv::edgeMask(page, editor)), file + QStringLiteral("-differenz.png"));
-        record(QStringLiteral("Seite–Editor"), o, page, editor);
+        QStringList exceeded;
+        record(QStringLiteral("Seite–Editor"), o, page, editor, o.name == kNotedOnly ? nullptr : &exceeded);
+        m_pages.insert(o.name, page);
+        m_editors.insert(o.name, editor);
+        m_overlayData.insert(o.name, overlay);
 
         // OBS
         QImage obs;
@@ -1155,6 +1281,139 @@ private slots:
                          qPrintable(QStringLiteral("%1 zeigt am Ende nicht das letzte Bild: %2").arg(QLatin1String(who), rgbText(p))));
             }
         }
+        // Feste Grenze (K-08); Bilder liegen schon in der Ausgabe
+        QVERIFY2(exceeded.isEmpty(), qPrintable(QStringLiteral("Seite–Editor über der Grenze (Bilder in %1):\n").arg(kOut)
+                                                 + exceeded.join(QLatin1Char('\n'))));
+    }
+
+    // Absichtliche Fehler (Plan P11, Abschnitt 4): Der Editor wird absichtlich falsch gezeichnet
+    // (Overlay geändert oder Bild nachbearbeitet) und gegen dieselbe Seite gemessen. Jeder Fehler muss
+    // in seinem Bereich mindestens das Doppelte der Grenze erreichen (in einer der drei Masszahlen).
+    void absichtlicheFehler()
+    {
+        for (const char *name : {"Bild", "Text", "Videofarbe"})
+            QVERIFY2(m_pages.contains(QLatin1String(name)), "overlays() muss vorher gelaufen sein");
+        const auto region = [&](const QString &overlay, const QString &name) {
+            for (const TestOverlay &o : std::as_const(m_overlays))
+                if (o.name == overlay)
+                    for (const Region &r : o.regions)
+                        if (r.name == name)
+                            return r;
+            return Region{};
+        };
+        // Editor mit geändertem Overlay neu zeichnen (nur Overlays ohne Videos)
+        const auto rerender = [&](const QString &overlay, const QRect &sourceBox, const std::function<void(Source &)> &change) {
+            Overlay copy = m_overlayData.value(overlay);
+            bool found = false;
+            for (Source &s : copy.sources) {
+                if (QRect(s.x, s.y, s.width, s.height) == sourceBox) {
+                    change(s);
+                    found = true;
+                }
+            }
+            if (!found)
+                return QImage();
+            SourceRenderer renderer;
+            renderer.setDataDir(m_client->coreHello().dataDir);
+            renderer.setOverlay(&copy);
+            if (!QTest::qWaitFor([&] { return renderer.imagesLoaded(); }, 5000))
+                return QImage();
+            return renderOverlayImage(renderer, copy);
+        };
+        // Bild nachbearbeiten: Inhalt eines Kastens ersetzen
+        const auto edited = [&](const QString &overlay, const QRect &box, const std::function<QImage(const QImage &)> &change) {
+            QImage out = m_editors.value(overlay).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+            const QImage part = change(out.copy(box)).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+            for (int y = 0; y < box.height(); ++y)
+                memcpy(out.scanLine(box.y() + y) + 4 * box.x(), part.constScanLine(y), 4 * size_t(box.width()));
+            return out;
+        };
+
+        struct Fault
+        {
+            QString name;
+            QString overlay;
+            QString region;
+            QImage editor;
+            bool knownShort = false; // erreicht das Doppelte nicht, [OFFEN] (siehe unten)
+        };
+        QList<Fault> faults;
+        const QRect enlarged(600, 140, 352, 264);
+        faults.append({QStringLiteral("1 Pixel verschoben"), QStringLiteral("Bild"), QStringLiteral("vergrössert"),
+                       rerender(QStringLiteral("Bild"), enlarged, [](Source &s) { s.x += 1; })});
+        faults.append({QStringLiteral("1° gedreht"), QStringLiteral("Bild"), QStringLiteral("gedreht 12.5°"),
+                       rerender(QStringLiteral("Bild"), QRect(300, 250, 160, 120), [](Source &s) { s.rotation += 10; })});
+        faults.append({QStringLiteral("falsch gespiegelt"), QStringLiteral("Bild"), QStringLiteral("gespiegelt waagrecht"),
+                       rerender(QStringLiteral("Bild"), QRect(290, 140, 140, 70), [](Source &s) { s.flipHorizontal = false; })});
+        // EXIF 6 (90° im Uhrzeigersinn) als 8 gelesen: Inhalt um 180° falsch
+        faults.append({QStringLiteral("falsche EXIF-Angabe"), QStringLiteral("Bild"), QStringLiteral("JPEG mit EXIF 1–8"),
+                       edited(QStringLiteral("Bild"), QRect(10 + 5 * 116, 10, 104, 52),
+                              [](const QImage &p) { return p.mirrored(true, true); })});
+        faults.append({QStringLiteral("Alpha um 8 daneben"), QStringLiteral("Bild"), QStringLiteral("PNG mit Alpha 1:1"),
+                       edited(QStringLiteral("Bild"), QRect(10, 140, 128, 64), [](const QImage &p) {
+                           QImage q = p.convertToFormat(QImage::Format_ARGB32);
+                           for (int y = 0; y < q.height(); ++y)
+                               for (int x = 0; x < q.width(); ++x) {
+                                   const QRgb c = q.pixel(x, y);
+                                   q.setPixel(x, y, qRgba(qRed(c), qGreen(c), qBlue(c), std::max(0, qAlpha(c) - 8)));
+                               }
+                           return q.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+                       })});
+        // BT.709-Video mit BT.601 zurückgerechnet (wie vor Punkt 79)
+        const QRect bt709Box = region(QStringLiteral("Videofarbe"), QStringLiteral("h264-1920x1080-bt709.mp4")).rect;
+        faults.append({QStringLiteral("BT.601 statt BT.709"), QStringLiteral("Videofarbe"),
+                       QStringLiteral("h264-1920x1080-bt709.mp4"),
+                       edited(QStringLiteral("Videofarbe"), bt709Box, [](const QImage &p) {
+                           QImage q = p.copy();
+                           for (int y = 0; y < q.height(); ++y) {
+                               QRgb *l = reinterpret_cast<QRgb *>(q.scanLine(y));
+                               for (int x = 0; x < q.width(); ++x)
+                                   l[x] = bt709AsBt601(l[x]);
+                           }
+                           return q;
+                       })});
+        // Falsches Videobild: das vorletzte Bild von bildwechsel.mp4 (weiss) statt des letzten (grau)
+        const QRect lastBox = region(QStringLiteral("Videofarbe"), QStringLiteral("bildwechsel.mp4")).rect;
+        faults.append({QStringLiteral("falsches Videobild"), QStringLiteral("Videofarbe"), QStringLiteral("bildwechsel.mp4"),
+                       edited(QStringLiteral("Videofarbe"), lastBox, [](const QImage &p) {
+                           QImage q = p.copy();
+                           q.fill(qRgb(255, 255, 255));
+                           return q;
+                       })});
+        faults.append({QStringLiteral("falsches Schriftgewicht"), QStringLiteral("Text"), QStringLiteral("Urbanist 300 Mitte"),
+                       rerender(QStringLiteral("Text"), QRect(10, 130, 460, 110), [](Source &s) { s.text.weight = 400; }),
+                       true});
+        faults.append({QStringLiteral("Grundlinie 1 Pixel daneben"), QStringLiteral("Text"), QStringLiteral("DejaVu links"),
+                       rerender(QStringLiteral("Text"), QRect(10, 10, 460, 110), [](Source &s) { s.y += 1; })});
+
+        QStringList tooSmall;
+        for (const Fault &f : std::as_const(faults)) {
+            QVERIFY2(!f.editor.isNull(), qPrintable(f.name));
+            const Region r = region(f.overlay, f.region);
+            QVERIFY2(!r.rect.isNull(), qPrintable(f.region));
+            const Limit *l = limitFor(f.overlay, r.name, r.kind);
+            QVERIFY(l);
+            const QImage &page = m_pages.value(f.overlay);
+            const bv::Measure m = bv::measure(page, f.editor, bv::edgeMask(page, f.editor), r.rect);
+            const double times = ratio(m, *l);
+            qInfo("Absichtlicher Fehler %-28s | %s | %s: %s (%s) → %.1f-fach", qPrintable(f.name), qPrintable(f.overlay),
+                  qPrintable(f.region), qPrintable(measureText(m)), qPrintable(limitText(*l)), times);
+            save(bv::differenceImage(page, f.editor, bv::edgeMask(page, f.editor)),
+                 QStringLiteral("fehler-%1.png").arg(f.name.toLower().replace(QLatin1Char(' '), QLatin1Char('-'))));
+            if (f.knownShort) {
+                // [OFFEN] Punkt 101: Urbanist 300 statt 400 liegt über der Grenze Text (wird erkannt),
+                // erreicht aber nur das 1.96-fache (Mittel 3.919 gegen 2.0, 2026-11-08). Die Grenze
+                // wird nicht zurechtgebogen (Plan P11, Abschnitt 4.6). Erreicht der Fehler das Doppelte,
+                // scheitert der Test (XPASS) und der Eintrag muss weg.
+                QVERIFY2(times > 1.0, qPrintable(QStringLiteral("%1 liegt unter der Grenze").arg(f.name)));
+                QEXPECT_FAIL("", "[OFFEN] Punkt 101: falsches Schriftgewicht erreicht das Doppelte der Grenze nicht", Continue);
+                QVERIFY2(times >= 2.0, qPrintable(QStringLiteral("%1: %2-fach").arg(f.name).arg(times, 0, 'f', 2)));
+            } else if (times < 2.0) {
+                tooSmall << QStringLiteral("%1: %2-fach").arg(f.name).arg(times, 0, 'f', 1);
+            }
+        }
+        QVERIFY2(tooSmall.isEmpty(), qPrintable(QStringLiteral("Fehler erreicht nicht das Doppelte der Grenze: ")
+                                                 + tooSmall.join(QStringLiteral(", "))));
     }
 };
 
