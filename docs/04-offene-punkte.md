@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-08 (P11: Punkte 79, 80 und 101 erledigt und ins Archiv verschoben, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-09 (Punkt 102 erledigt und ins Archiv verschoben; davor P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -42,7 +42,6 @@ Stand: 2026-11-08 (P11: Punkte 79, 80 und 101 erledigt und ins Archiv verschoben
 98. Aus P11: AV1 ist nicht gemessen (keine Testdatei). Die Regel «AV1 ohne Farbangabe wie BT.601» (`src/media/videocolor.h`) stammt nur aus dem Quelltext von Chromium.
 99. Aus P11: Videos mit nicht quadratischen Pixeln: Chromium wählt die Matrix ohne Farbangabe nach `natural_size` (mit Seitenverhältnis der Pixel), der Editor nach der Höhe des Bildes. Nicht geprüft.
 100. Aus P11: Videos mit Angabe der Grundfarben oder der Übertragung, aber ohne Matrix: Der Editor nimmt die Höhenregel; ob Chromium gleich wählt, ist nicht geprüft.
-102. Aus P11, nicht im Auftrag: `tst_kernverbindung::settingsReadAndChange` scheiterte am 2026-11-08 in zwei vollen `ctest`-Läufen hintereinander an Zeile 454 («der Standardroute, ohne Neustart)» fehlt im Protokoll des Kerns), danach `browserSource` als Folgefehler (Port 9000 blieb stehen). Einzeln, in den Tests 1 bis 17, im frischen Klon und im dritten vollen Lauf bestanden. Vermutung, nicht geprüft: Zeile 452 wartet nur auf den Anfang der Zeile («eingetragen (Netzwerkkarte»), Zeile 454 prüft sofort das Ende. P11 ändert weder den Test noch `src/common/coresettings.cpp`.
 - Rest aus Punkt 85: Der echte Fall (Kabel ziehen, Kern starten, Kabel einstecken) ist nicht geprüft.
 
 ## Machbarkeitstests
