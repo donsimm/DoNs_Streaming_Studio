@@ -449,9 +449,15 @@ private slots:
         if (!detected.isEmpty()) {
             QVERIFY(parseSettings(two.waitFor(QStringLiteral("settings"), 4000), &broadcast, &error));
             QCOMPARE(broadcast.settings, (CoreSettings{9000, detected}));
-            QVERIFY(waitForLog(m_core.get(), QStringLiteral("Adresse im Heimnetz %1 eingetragen (Netzwerkkarte").arg(detected),
-                               &m_coreLog));
-            QVERIFY(m_coreLog.contains(QStringLiteral("der Standardroute, ohne Neustart)")));
+            // Punkt 102: auf das Ende der Zeile des Wächters warten. Der Anfang «… eingetragen
+            // (Netzwerkkarte» steht schon in der Zeile vom Start (fillHomeAddress); darauf zu warten
+            // kehrte sofort zurück, und die Zeile des Wächters war oft noch nicht gelesen.
+            QVERIFY(waitForLog(m_core.get(), QStringLiteral("der Standardroute, ohne Neustart)"), &m_coreLog));
+            QVERIFY2(m_coreLog.contains(QRegularExpression(
+                         QStringLiteral("Adresse im Heimnetz %1 eingetragen \\(Netzwerkkarte \\S+ der Standardroute, "
+                                        "ohne Neustart\\)")
+                             .arg(QRegularExpression::escape(detected)))),
+                     qPrintable(m_coreLog));
         }
 
 #ifdef DSS_CLI_BIN
