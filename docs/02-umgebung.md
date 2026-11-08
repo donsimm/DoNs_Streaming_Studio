@@ -1,6 +1,6 @@
 # 02 – Umgebung (Zielsystem)
 
-Stand: 2026-11-02. Alle Werte wurden auf dem Studio-PC gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben.
+Stand: 2026-11-08 (Streaming-PC und Netz nachgeführt; Studio-PC und Pakete Stand 2026-11-02). Die Werte des Studio-PCs wurden dort gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben. Systemangaben beider Rechner führt `~/projekte/privat/it-system/SYSTEM.md`; hier steht, was das Studio braucht.
 
 ## Studio-PC
 
@@ -15,11 +15,11 @@ Stand: 2026-11-02. Alle Werte wurden auf dem Studio-PC gemessen (Ausgaben des Nu
 | Bildschirm | HDMI-0, 1920x1080 |
 | Mainboard | ASUS Z87-A, BIOS-Modus Legacy (Angabe des Nutzers) |
 | Datenträger | System `/dev/sda1` 42 GB, `/home` auf `/dev/sda6` 614 GB |
-| Netz | Kabel; Heimnetz noch nicht aufgebaut |
+| Netz | Kabel, Heimnetz besteht seit 2026-11-03 (siehe «Netzwerk») |
 | Python | 3.13.5 |
 | GCC | 14.2.0 (Debian 14.2.0-19) |
 | Git | 2.47.3 |
-| Claude Code | 2.1.309, aus dem apt-Repository (Kanal «stable») |
+| Claude Code | aus dem apt-Repository (Kanal «stable»); am 2026-11-02 Version 2.1.309, aktuelle Version nicht festgehalten |
 
 Nicht installiert (Stand der ersten Messung): `pip3`, `cmake`, `node`, `ffmpeg`. Seither installiert: `cmake` und `ffmpeg` (P01), die FFmpeg-Entwicklungspakete (P02), siehe unten. `pip3` und `node` sind weiterhin nicht installiert (nicht erneut geprüft).
 
@@ -76,7 +76,22 @@ Streaming-PC (Ausgabe von `ip -br addr && ip route && ping -c 4 192.168.1.9` auf
 
 ## Streaming-PC (nicht Teil der Entwicklung)
 
-Angaben des Nutzers: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, ASUS ROG Maximus Z790 Dark Hero. Betriebssystem am 2026-11-03 noch Zorin OS (Rechnername `Dominik-Desktop`), Wechsel zu Nobara zeitnah geplant (Angabe des Nutzers). Dort läuft das Haupt-OBS, das meist Browserquellen nutzt.
+Hardware laut Nutzer: Intel i9-14900KF, NVIDIA RTX 4090 mit 24 GB, 64 GB DDR5, ASUS ROG Maximus Z790 Dark Hero. Dort läuft das Haupt-OBS, das meist Browserquellen nutzt. Weitere Systemangaben: `~/projekte/privat/it-system/SYSTEM.md`.
+
+Für das Studio wichtig, von Lotse per SSH lesend geprüft am 2026-11-08 (Bericht `~/.claude/lotse/berichte/pruefung-einrichtung-2026-11-08.md`, Teil C):
+
+| Angabe | Wert |
+|---|---|
+| Betriebssystem | Nobara 44 GNOME (Wayland), seit 2026-11-08 (vorher Zorin OS, Rechnername `Dominik-Desktop`) |
+| Rechnername | `streamin-pc` |
+| Kernel | 7.3.1 (`7.3.1-202.nobara.fc44`) |
+| Grafik | RTX 4090, Treiber 595.112.07 |
+| OBS | 32.2.2 (rpm) |
+| obs-websocket | 5.7.4 auf Port 4455 (IPv4 und IPv6), mit Anmeldung, vom Studio-PC aus erreichbar |
+| Firewall | Zone `FedoraWorkstation` auf `eno2`, Ports 1025–65535 TCP/UDP offen |
+| NDI-Plugin | fehlt (Angabe von Lotse in der Übergabe vom 2026-11-08, `docs/archiv/uebergabe-2026-11-08.md`) |
+
+Zugang und Rechte: `CLAUDE.md`, «Umgebung».
 
 ## Nicht geprüft
 

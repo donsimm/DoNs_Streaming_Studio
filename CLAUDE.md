@@ -18,7 +18,7 @@
 
 - Lotse ist der Hauptagent des Nutzers und führt den Push aus (Regel 17). Der Projektleiter-Agent arbeitet unter Lotse und ersetzt den früheren Chat: Er plant die Bausteine, schreibt die Aufträge und führt Bauplan, offene Punkte und Übergabe.
 - Der Nutzer entscheidet alles, was sichtbar oder bedienbar ist. Interna entscheidet der Agent und listet sie gesammelt mit Begründung im Bericht auf.
-- Fragen an den Nutzer kommen gebündelt im Auswahldialog, höchstens 4 pro Dialog, jede mit Empfehlung.
+- Fragen an den Nutzer kommen in der Sitzung gebündelt im Auswahldialog, höchstens 4 pro Dialog, jede mit Empfehlung. Ins Panel von Lotse kommen nur Fragen, die warten können (entschieden vom Nutzer, 2026-11-08).
 
 ## Projekt
 
@@ -26,9 +26,13 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
 
 ## Umgebung (Zielsystem = Entwicklungssystem)
 
-- Claude Code läuft direkt auf dem Studio-PC: Debian 13, Xfce unter X11, 8 Threads, 32 GB, GTX 1660 SUPER, Bildschirm 1920x1080 (`docs/02-umgebung.md`).
-- OBS läuft auf dem Streaming-PC. Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`. Seit 2026-11-08 läuft dort Nobara 44 GNOME (Wayland), und Lotse erreicht den Streaming-PC per SSH (`ssh dominik@192.168.1.116`, Schlüssel vom Studio-PC). Dort wird nur gelesen (Pakete, Logs, Konfiguration, offene Ports). Änderungen gibt es erst nach dem OK des Nutzers, `sudo` gibt der Nutzer selbst ein. Gestartete Agenten nutzen den Zugang nur, wenn ihr Auftrag es ausdrücklich erlaubt. Was man sehen oder bedienen muss (Browserquelle in OBS, NDI, Bild und Ton), prüft der Nutzer im Handtest. Ergebnisse werden nicht erfunden.
-- Technik und Betriebssystem sind entschieden: C++ mit Qt 6 auf Debian 13 mit Xfce unter X11 (`docs/01-festlegungen.md`).
+- Claude Code läuft direkt auf dem Studio-PC `192.168.1.9`: Debian 13, Xfce unter X11, 8 Threads, 32 GB, GTX 1660 SUPER, Bildschirm 1920x1080 (`docs/02-umgebung.md`). Technik und Betriebssystem entschieden: C++ mit Qt 6 auf Debian 13 mit Xfce unter X11 (`docs/01-festlegungen.md`).
+- OBS läuft auf dem Streaming-PC `192.168.1.116` (Nobara 44 GNOME, Wayland). Systemangaben beider Rechner führt nur `~/projekte/privat/it-system/SYSTEM.md`; was das Studio braucht, steht in `docs/02-umgebung.md`.
+- Lotse erreicht den Streaming-PC per SSH (`ssh dominik@192.168.1.116`, Schlüssel vom Studio-PC). Dort wird nur gelesen (Pakete, Logs, Konfiguration, offene Ports). Änderungen gibt es erst nach dem OK des Nutzers, `sudo` gibt der Nutzer selbst ein. Gestartete Agenten nutzen den Zugang nur, wenn ihr Auftrag es ausdrücklich erlaubt.
+- Ausnahme in angekündigten Handtests, ab dem Baustein nach P10c (entschieden vom Nutzer, 2026-11-08): Lotse darf
+  - OBS auf dem Streaming-PC per SSH schliessen und wieder öffnen, nie während eines Streams (vorher Prozess und Ausgabe prüfen);
+  - obs-websocket nur für Tests nutzen (Quellen prüfen und anlegen, Szene wechseln, Bild einer Quelle holen). Das Passwort liegt mit `systemd-creds --user` verschlüsselt in `~/.config/lotse/obs-websocket.cred` (Name `obs-websocket`, nicht in der Sicherung). Der Nutzer legt es selbst an, es kommt nie in einen Chat, ein Protokoll oder eine Datei im Klartext;
+  - Bildschirmfotos vom Studio-PC machen und auswerten, Ablage nur im Scratchpad.
 
 ## Prüfstufen (entschieden vom Nutzer, 2026-11-07)
 
@@ -53,7 +57,7 @@ Die Nummern bleiben, der Code verweist auf sie.
 7. Tests nutzen echte Daten (einmal als Kopie unter `tests/daten/` eingefroren) und, wo es einen Handtest gibt, dieselben Daten wie dieser. Tests in `ctest` lesen zur Laufzeit nicht aus dem Benutzerordner (entschieden vom Nutzer, 2026-11-07, Punkt 91). Ausnahme ist die Stufe «Vor der Installation»: `scripts/installieren-pruefen.sh` kopiert absichtlich den aktuellen Stand der echten Daten.
 8. Ein Commit pro Funktion. Ändern mehrere kleine Punkte dieselbe Stelle und dieselbe Version der Schnittstelle, dürfen sie in einen Commit, mit Begründung im Bericht (entschieden vom Nutzer, 2026-11-04). Neue Schalter nur bei riskanten Teilen; die 17 bestehenden bleiben, Bauten mit abgeschalteten Schaltern laufen nicht mehr bei jedem Baustein (entschieden vom Nutzer, 2026-11-07).
 9. Logik und Daten laufen ohne die Oberflächen-Bibliothek (ohne Qt Widgets und ohne Fenster) und werden dort getestet. Die Oberfläche ist dünn und enthält keine Logik. Keine Layout-Änderungen in Ereignis-Behandlern. Zeichnen (`QPainter`, `QImage`, Schriften) darf Qt Gui nutzen; Tests des Zeichners laufen ohne Fenster (entschieden vom Nutzer, 2026-11-03).
-10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest durch den Nutzer nur, wo er etwas prüft, das Claude Code nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Was Claude Code schon geprüft hat, wiederholt der Nutzer nicht. Der Bericht nennt, was der Nutzer prüfen soll und warum; gibt es nichts, steht dort «kein Handtest nötig».
+10. Abnahme erst nach Messung und Tests auf dem Studio-PC. Ein Handtest nur, wo etwas zu prüfen ist, das Claude Code im Bau nicht selbst prüfen kann: Aussehen und Bedienung (Fenster, Leinwand, Browserquelle in OBS, NDI, Bild und Ton), Geräte und Rechner ausserhalb des Studio-PCs, Eingaben, die nur der Nutzer machen kann. Der Handtest-Bericht teilt in «prüft Lotse» (mit den Rechten aus «Umgebung») und «prüft der Nutzer», je mit Grund (entschieden vom Nutzer, 2026-11-08, ab dem Baustein nach P10c). Was Claude Code schon geprüft hat, wiederholt der Nutzer nicht. Gibt es nichts zu prüfen, steht dort «kein Handtest nötig». Ergebnisse werden nicht erfunden.
 11. Lage und Grösse von Quellen sind ganze Pixel der Overlay-Auflösung, keine Prozentwerte.
 12. Zugangsdaten (Twitch-Token, OBS-Passwort) nie im Klartext in Konfiguration, Protokoll oder Tests.
 13. Oberflächentexte und Dokumentation auf Deutsch in Schweizer Rechtschreibung (kein «ß», «Grösse», «ss»). Bezeichner im Code auf Englisch, Kommentare auf Deutsch.
@@ -70,7 +74,7 @@ Kleine Änderung: als Rückmeldung an Lotse. Baustein: zusätzlich als Datei unt
 
 - **Geändert:** Dateien, nach Funktion
 - **Geprüft:** Stufe, Befehle mit Datum und Ergebnis; Ungeprüftes als «nicht geprüft»
-- **Handtest:** was der Nutzer prüfen soll und warum, jede Prüfung ein eigener Abschnitt; sonst «kein Handtest nötig»
+- **Handtest:** geteilt in «prüft Lotse» und «prüft der Nutzer», je was und warum, jede Prüfung ein eigener Abschnitt; sonst «kein Handtest nötig»
 - **Nicht erledigt, `[OFFEN]`**
 - **Annahmen, Interna-Entscheide:** gesammelt mit Begründung
 - **Quellen**
