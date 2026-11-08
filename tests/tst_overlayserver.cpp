@@ -3,7 +3,8 @@
 // Adressen, Protokoll ohne Token, Änderungen über Server-Sent Events, Medien nur des Overlays mit
 // Bereichen und neutralisierter Ausrichtung, Port belegt (Meldung mit Programm), Adresse fehlt
 // (nur 127.0.0.1, später von selbst), nur IPv4 (ss -ltn), Meldungen der Seite.
-// Daten: Bilder und Videos aus tests/daten/exif/ und tests/daten/video-drehung/ (wie im Handtest).
+// Daten: Bilder und Videos aus tests/daten/exif/ und tests/daten/video-drehung/ (wie im Handtest),
+// WebM mit Drehangabe aus tests/daten/bildvergleich/ (P11, Punkt 80).
 
 #include "browsersource.h"
 #include "httpmessage.h"
@@ -37,6 +38,7 @@ namespace {
 
 const QString kExif = QStringLiteral(DSS_TEST_EXIF_DIR);
 const QString kVideos = QStringLiteral(DSS_TEST_VIDEO_ROTATION_DIR);
+const QString kBildvergleich = QStringLiteral(DSS_TEST_BILDVERGLEICH_DIR);
 const QString kWeb = QStringLiteral(DSS_WEB_DIR);
 
 // Protokoll des Tests mitlesen (Token darf nie darin stehen).
@@ -383,6 +385,63 @@ private slots:
         QCOMPARE(whole.mid(patches.first().offset, 36), patches.first().bytes);
         r = request(m_port, "GET", base() + mp4.toUtf8(), {"Range: bytes=999999-"});
         QCOMPARE(r.status, 416);
+    }
+
+    // P11, Punkt 80: WebM mit Drehangabe (Projection) wird neutralisiert, gleiche Länge. Gespiegelt
+    // (Yaw 180) wird zur Laufzeit mit ffmpeg erzeugt (-display_hflip).
+    void webmRotationNeutralized_data()
+    {
+        QTest::addColumn<QString>("file");
+        QTest::addColumn<int>("orientation"); // vor dem Neutralisieren (mit DSS_VIDEO_ROTATION)
+        QTest::addColumn<int>("patches");
+        QTest::newRow("90") << kBildvergleich + QStringLiteral("/drehung-90.webm") << 6 << 1;
+        QTest::newRow("180") << kBildvergleich + QStringLiteral("/drehung-180.webm") << 3 << 1;
+        QTest::newRow("270") << kBildvergleich + QStringLiteral("/drehung-270.webm") << 8 << 1;
+        QTest::newRow("gespiegelt 90") << QStringLiteral("gespiegelt") << 7 << 2;
+        QTest::newRow("ohne Drehung") << kBildvergleich + QStringLiteral("/vp9-640x360-ohne.webm") << 1 << 0;
+        QTest::newRow("Alpha ohne Drehung") << kBildvergleich + QStringLiteral("/alpha.webm") << 1 << 0;
+    }
+
+    void webmRotationNeutralized()
+    {
+        QFETCH(QString, file);
+        QFETCH(int, orientation);
+        QFETCH(int, patches);
+        QTemporaryDir dir;
+        if (file == QLatin1String("gespiegelt")) {
+            file = dir.filePath(QStringLiteral("gespiegelt.webm"));
+            QProcess ff;
+            ff.start(QStringLiteral("ffmpeg"), {QStringLiteral("-loglevel"), QStringLiteral("error"), QStringLiteral("-nostdin"),
+                                                QStringLiteral("-display_rotation"), QStringLiteral("90"),
+                                                QStringLiteral("-display_hflip"), QStringLiteral("-i"),
+                                                kBildvergleich + QStringLiteral("/drehung-90.webm"), QStringLiteral("-c"),
+                                                QStringLiteral("copy"), file});
+            QVERIFY(ff.waitForFinished(30000) && ff.exitCode() == 0);
+        }
+#if DSS_VIDEO_ROTATION
+        QCOMPARE(readVideoOrientation(file), orientation);
+#endif
+        const BytePatches p = orientationPatches(file);
+        QCOMPARE(p.size(), patches);
+        for (const BytePatch &one : p)
+            QCOMPARE(one.bytes, QByteArray(8, '\0')); // FFmpeg schreibt 8 Byte
+        QFile in(file);
+        QVERIFY(in.open(QIODevice::ReadOnly));
+        QByteArray all = in.readAll();
+        const qint64 size = all.size();
+        applyPatches(&all, 0, p);
+        QCOMPARE(all.size(), size);
+        const QString out = dir.filePath(QStringLiteral("geliefert.webm"));
+        QFile f(out);
+        QVERIFY(f.open(QIODevice::WriteOnly) && f.write(all) == size);
+        f.close();
+        // Nach dem Neutralisieren ohne Drehung; Bild unverändert lesbar
+        QCOMPARE(readVideoOrientation(out), 1);
+        int w = 0, h = 0;
+        QString error;
+        QVERIFY2(readMediaSize(out, &w, &h, &error), qPrintable(error));
+        QVERIFY(orientationPatches(out).isEmpty());
+        Q_UNUSED(orientation);
     }
 
     void pageDataForThePage()

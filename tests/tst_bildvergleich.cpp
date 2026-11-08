@@ -1112,11 +1112,15 @@ private slots:
                                      .join(QLatin1Char('\t')));
             }
         }
-        // Ausrichtung (Punkt 80)
-        for (const Region &r : o.oriented)
+        // Ausrichtung (Punkt 80): Editor richtig, Seite gleich (der Server neutralisiert die Drehung
+        // auch bei WebM); OBS nur im Protokoll
+        for (const Region &r : o.oriented) {
             qInfo("%s | Ausrichtung %s: Editor %s | Seite %s%s", qPrintable(o.name), qPrintable(r.name),
                   qPrintable(orientation(editor, r.rect)), qPrintable(orientation(page, r.rect)),
                   obs.isNull() ? "" : qPrintable(QStringLiteral(" | OBS ") + orientation(obs, r.rect)));
+            QCOMPARE(orientation(editor, r.rect), QStringLiteral("rot grün blau gelb"));
+            QCOMPARE(orientation(page, r.rect), orientation(editor, r.rect));
+        }
         // K-05: letztes Bild (Grau 128) in beiden Zeichnern, nicht 0 oder 255
         if (!o.lastFrame.isNull()) {
             const QPoint c = o.lastFrame.center();

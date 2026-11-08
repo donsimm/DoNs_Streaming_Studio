@@ -5,7 +5,9 @@
 #include <QFile>
 #include <QtEndian>
 
+#include <algorithm>
 #include <array>
+#include <optional>
 
 namespace dss {
 
@@ -158,6 +160,161 @@ void moviePatches(const QString &path, BytePatches *patches)
     }
 }
 
+// Matroska/WebM (EBML): IDs der Elemente (FFmpeg matroska.h)
+constexpr quint32 kEbmlHeader = 0x1A45DFA3;
+constexpr quint32 kSegment = 0x18538067;
+constexpr quint32 kTracks = 0x1654AE6B;
+constexpr quint32 kCluster = 0x1F43B675;
+constexpr quint32 kTrackEntry = 0xAE;
+constexpr quint32 kTrackVideo = 0xE0;
+constexpr quint32 kProjection = 0x7670;
+constexpr quint32 kProjectionType = 0x7671;
+constexpr quint32 kProjectionPoseYaw = 0x7673;
+constexpr quint32 kProjectionPoseRoll = 0x7675;
+// Tracks ist klein (Angaben der Spuren); grösser lesen wir nicht in den Speicher.
+constexpr qint64 kMaxTracksBytes = 16 * 1024 * 1024;
+
+// Kopf eines EBML-Elements: ID (1 bis 4 Byte, mit Längenmarke) und Grösse (1 bis 8 Byte, ohne
+// Längenmarke; alle Bits 1 = unbekannt).
+struct EbmlHead
+{
+    quint32 id = 0;
+    int length = 0; // Bytes von ID und Grösse
+    quint64 size = 0;
+    bool unknownSize = false;
+};
+
+int vintLength(uchar first)
+{
+    for (int n = 1; n <= 8; ++n)
+        if (first & (0x80 >> (n - 1)))
+            return n;
+    return 0;
+}
+
+std::optional<EbmlHead> ebmlHead(const uchar *p, qint64 available)
+{
+    if (available < 2)
+        return std::nullopt;
+    const int idLength = vintLength(p[0]);
+    if (idLength == 0 || idLength > 4 || idLength >= available)
+        return std::nullopt;
+    EbmlHead h;
+    for (int i = 0; i < idLength; ++i)
+        h.id = (h.id << 8) | p[i];
+    const uchar *s = p + idLength;
+    const int sizeLength = vintLength(s[0]);
+    if (sizeLength == 0 || idLength + sizeLength > available)
+        return std::nullopt;
+    const quint64 mask = 0xFFu >> sizeLength;
+    h.size = s[0] & mask;
+    bool allOnes = h.size == mask;
+    for (int i = 1; i < sizeLength; ++i) {
+        h.size = (h.size << 8) | s[i];
+        allOnes = allOnes && s[i] == 0xFF;
+    }
+    h.unknownSize = allOnes;
+    h.length = idLength + sizeLength;
+    return h;
+}
+
+struct EbmlElement
+{
+    quint32 id = 0;
+    qint64 payload = 0; // Lage der Daten in data
+    qint64 end = 0;
+};
+
+// Kinder in data[from, to); unbekannte Grösse oder kaputter Kopf beendet die Liste.
+QList<EbmlElement> ebmlChildren(const QByteArray &data, qint64 from, qint64 to)
+{
+    QList<EbmlElement> result;
+    const auto *p = reinterpret_cast<const uchar *>(data.constData());
+    qint64 at = from;
+    for (int i = 0; i < kMaxBoxes && at < to; ++i) {
+        const std::optional<EbmlHead> h = ebmlHead(p + at, to - at);
+        if (!h || h->unknownSize || qint64(h->size) > to - at - h->length)
+            break;
+        result.append({h->id, at + h->length, at + h->length + qint64(h->size)});
+        at = result.last().end;
+    }
+    return result;
+}
+
+// Projection: Yaw und Roll → 0.0 (nur Typ «rechteckig», der Standard; die anderen Typen sind 360°
+// und ergeben bei FFmpeg keine Display-Matrix). Gleiche Länge (4 oder 8 Byte Gleitkomma).
+void projectionPatches(const QByteArray &tracks, qint64 base, const EbmlElement &projection, BytePatches *patches)
+{
+    const QList<EbmlElement> children = ebmlChildren(tracks, projection.payload, projection.end);
+    for (const EbmlElement &c : children) {
+        if (c.id != kProjectionType)
+            continue;
+        for (qint64 i = c.payload; i < c.end; ++i)
+            if (tracks.at(i) != 0)
+                return; // nicht rechteckig
+    }
+    for (const EbmlElement &c : children) {
+        const qint64 size = c.end - c.payload;
+        if ((c.id != kProjectionPoseYaw && c.id != kProjectionPoseRoll) || (size != 4 && size != 8))
+            continue;
+        const QByteArray zero(size, '\0');
+        if (tracks.mid(c.payload, size) != zero)
+            patches->append({base + c.payload, zero});
+    }
+}
+
+void matroskaPatches(const QString &path, BytePatches *patches)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+    const qint64 fileSize = file.size();
+    const auto headAt = [&](qint64 at) -> std::optional<EbmlHead> {
+        if (!file.seek(at))
+            return std::nullopt;
+        const QByteArray h = file.read(12);
+        return ebmlHead(reinterpret_cast<const uchar *>(h.constData()), h.size());
+    };
+    const std::optional<EbmlHead> ebml = headAt(0);
+    if (!ebml || ebml->id != kEbmlHeader || ebml->unknownSize)
+        return;
+    const qint64 segmentAt = ebml->length + qint64(ebml->size);
+    const std::optional<EbmlHead> segment = headAt(segmentAt);
+    if (!segment || segment->id != kSegment)
+        return;
+    qint64 at = segmentAt + segment->length;
+    const qint64 segmentEnd = segment->unknownSize ? fileSize : std::min(fileSize, at + qint64(segment->size));
+    // Oberste Ebene des Segments nur über die Köpfe, bis Tracks; die Bilder (Cluster) folgen danach.
+    for (int i = 0; i < kMaxBoxes && at < segmentEnd; ++i) {
+        const std::optional<EbmlHead> h = headAt(at);
+        if (!h || h->unknownSize || h->id == kCluster)
+            return;
+        const qint64 payload = at + h->length;
+        if (qint64(h->size) > segmentEnd - payload)
+            return;
+        if (h->id == kTracks) {
+            if (qint64(h->size) > kMaxTracksBytes || !file.seek(payload))
+                return;
+            const QByteArray tracks = file.read(qint64(h->size));
+            if (tracks.size() != qint64(h->size))
+                return;
+            for (const EbmlElement &entry : ebmlChildren(tracks, 0, tracks.size())) {
+                if (entry.id != kTrackEntry)
+                    continue;
+                for (const EbmlElement &video : ebmlChildren(tracks, entry.payload, entry.end)) {
+                    if (video.id != kTrackVideo)
+                        continue;
+                    for (const EbmlElement &p : ebmlChildren(tracks, video.payload, video.end))
+                        if (p.id == kProjection)
+                            projectionPatches(tracks, payload, p, patches);
+                }
+            }
+            return;
+        }
+        at = payload + qint64(h->size);
+    }
+}
+
 } // namespace
 
 quint32 pngCrc32(QByteArrayView data)
@@ -191,6 +348,8 @@ BytePatches orientationPatches(const QString &path)
     else if (start.mid(4, 4) == "ftyp" || start.mid(4, 4) == "moov" || start.mid(4, 4) == "mdat"
              || start.mid(4, 4) == "wide" || start.mid(4, 4) == "free")
         moviePatches(path, &patches);
+    else if (start.startsWith("\x1A\x45\xDF\xA3"))
+        matroskaPatches(path, &patches);
     return patches;
 }
 
