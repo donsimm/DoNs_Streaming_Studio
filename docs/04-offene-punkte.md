@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 96 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 96 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -28,8 +28,6 @@ Stand: 2026-11-07. Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in
 32. Aus P05: Werte der ausgegrauten Bedienelemente in «Steuerung» (30 Bilder/s, Raster 20 px, Einrasten an) sind vom Bild übernommen und nicht entschieden (E-10, E-13).
 92. Ereignisfluss (Regel 14): nicht gebaut, P10c nutzt Qt-Signale von `ObsConnection`, verbunden in `CoreService::setObsConnection`. Gebaut wird er mit der Twitch-Verbindung, im Plan dort festzulegen: Felder eines Ereignisses, Abonnieren, ob Ereignisse über den Socket zum Fenster gehen. Kommt E-18 früher, ist er dort der erste Nutzer und wird dort gebaut.
 93. Aus P10c: Die Meldung im Dialog «Einstellungen» (`settingsProblem`) rechnet ihre feste Höhe mit `lineSpacing() * 3`. Im Fenster «Quelle in OBS anlegen» reichte diese Rechnung im Test nicht (45 statt 48 Pixel für drei Zeilen, `tst_fensterbearbeiten`, 2026-11-07), dort misst sie nun drei gesetzte Zeilen. Der Test setzt nur das Stylesheet, nicht die Schrift der Anwendung (`src/app/main.cpp`); ob die Rechnung auch mit der echten Schrift zu knapp ist, und ob beim Dialog «Einstellungen» eine dreizeilige Meldung abgeschnitten wird, ist nicht geprüft. Nicht im Auftrag.
-94. Aus P10c: Ein Klick auf den OBS-Knopf ohne Verbindung zum Kern bleibt ohne Rückmeldung, denn der Menüeintrag «Einstellungen …» ist dann gesperrt. Der Knopf sieht trotzdem aktiv aus. Sichtbar, also zu entscheiden: so lassen, Knopf sperren oder Meldung in der Statuszeile. Empfehlung: so lassen, der Knopf «Kern» zeigt das Problem schon.
-95. Aus P10c: Im Fenster «Quelle in OBS anlegen» bleibt eine ältere Abweisung des Kerns stehen, wenn OBS danach wegfällt; «Anlegen» ist dann gesperrt, ohne dass das Fenster den Grund nennt (OBS-Knopf und Zeile im Dock zeigen ihn). Grund: Die Meldung «Verbindung zu OBS abgebrochen …» kommt zusammen mit dem Zustand und muss stehen bleiben.
 
 ## Nicht geprüft
 
