@@ -18,6 +18,7 @@
 // QQuickWidget::grabFramebuffer https://doc.qt.io/qt-6.8/qquickwidget.html#grabFramebuffer,
 // /proc/<pid>/stat und statm: https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html
 
+#include "bildvergleich.h"
 #include "coreclient.h"
 #include "coresettings.h"
 #include "overlayimage.h"
@@ -70,41 +71,9 @@ int distance(const QColor &a, const QColor &b)
                      std::abs(a.blue() - b.blue())});
 }
 
-// Unterschied zweier Bilder (vormultipliziert) in einem Bereich.
-struct Difference
-{
-    double mean = 0;  // mittlere Abweichung je Kanal (0 bis 255)
-    int max = 0;      // grösste Abweichung eines Kanals
-    double over32 = 0; // Anteil der Pixel mit einer Abweichung > 32 (Prozent)
-};
-Difference compare(const QImage &a, const QImage &b, const QRect &area)
-{
-    Difference d;
-    qint64 sum = 0;
-    qint64 count = 0;
-    qint64 over = 0;
-    const QRect r = area.intersected(a.rect());
-    for (int y = r.top(); y <= r.bottom(); ++y) {
-        for (int x = r.left(); x <= r.right(); ++x) {
-            const QRgb p = a.pixel(x, y);
-            const QRgb q = b.pixel(x, y);
-            const int dr = std::abs(qRed(p) - qRed(q));
-            const int dg = std::abs(qGreen(p) - qGreen(q));
-            const int db = std::abs(qBlue(p) - qBlue(q));
-            const int da = std::abs(qAlpha(p) - qAlpha(q));
-            const int m = std::max({dr, dg, db, da});
-            sum += dr + dg + db + da;
-            d.max = std::max(d.max, m);
-            over += m > 32 ? 1 : 0;
-            ++count;
-        }
-    }
-    if (count > 0) {
-        d.mean = double(sum) / double(count * 4);
-        d.over32 = 100.0 * double(over) / double(count);
-    }
-    return d;
-}
+// Unterschied zweier Bilder (vormultipliziert) in einem Bereich: tests/bildvergleich.h (P11)
+using bildvergleich::compare;
+using bildvergleich::Difference;
 
 // CPU-Zeit (utime + stime, Ticks) und RSS (KiB) eines Prozesses
 struct ProcessSample

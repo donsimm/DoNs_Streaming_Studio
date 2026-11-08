@@ -273,6 +273,17 @@ qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
 target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
 
+# P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
+# Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
+if(DSS_BUILD_APP)
+  add_library(dss_bildvergleich STATIC bildvergleich.cpp bildvergleich.h)
+  target_include_directories(dss_bildvergleich PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(dss_bildvergleich PUBLIC Qt6::Gui PRIVATE dss_warnings)
+  qt_add_executable(tst_bildvergleichlogik tst_bildvergleichlogik.cpp)
+  target_link_libraries(tst_bildvergleichlogik PRIVATE dss_bildvergleich dss_warnings Qt6::Test)
+  add_test(NAME tst_bildvergleichlogik COMMAND tst_bildvergleichlogik)
+endif()
+
 # P10, Stufe 1 der Prüfung der Browserquelle: Qt WebEngine (Chromium) lädt die Seite eines eigenen
 # Kerns über die Adresse im Heimnetz, Abgriff mit Durchsichtigkeit, Vergleich mit dss_render. In
 # der X11-Sitzung; ohne X11 oder ohne Adresse im Heimnetz übersprungen (77). Nur mit dem Server, dem
@@ -281,8 +292,8 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RE
   find_package(Qt6 QUIET COMPONENTS WebEngineWidgets QuickWidgets)
   if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::QuickWidgets)
     qt_add_executable(tst_browserquelle tst_browserquelle.cpp)
-    target_link_libraries(tst_browserquelle PRIVATE dss_render dss_media dss_warnings Qt6::Test
-      Qt6::WebEngineWidgets Qt6::QuickWidgets)
+    target_link_libraries(tst_browserquelle PRIVATE dss_render dss_media dss_bildvergleich dss_warnings
+      Qt6::Test Qt6::WebEngineWidgets Qt6::QuickWidgets)
     target_compile_definitions(tst_browserquelle PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
       DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}"
       DSS_TEST_LARGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/gross-daten"
