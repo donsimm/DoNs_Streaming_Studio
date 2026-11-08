@@ -31,7 +31,7 @@ Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier
 
 ## Nicht geprüft
 
-6. Machbarkeitstests T-03 und T-05 siehe unten. T-05 ist mit P10c gebaut, die Prüfung mit dem echten OBS steht im Handtest aus; T-03 wird später eingeplant.
+6. Machbarkeitstests T-03 und T-05 siehe unten. T-05 ist mit P10c gebaut und mit dem echten OBS bestanden (Handtest P10c, 2026-11-08); T-03 wird später eingeplant.
 9. Aus P01: Der GPU-Weg von Qt (Qt Quick) ist nicht gemessen; A und C nutzen QPainter in Software.
 12. Aus P02 (M2): Qt WebEngine rendert minimiert nicht (Abgriff schwarz), verdeckt und ausserhalb des Bildschirms schon. Mit zwei Overlays im selben Prozess nur 26 bis 29 neue Bilder pro Sekunde; Abgriff in getrennten Threads oder Prozessen nicht gemessen.
 14. Aus P03: Die Startprüfung beendet `dss-app` per SIGTERM (das Programm schliesst dann sein Fenster). Das Schliessen über den Schliessknopf des Fenstermanagers prüft nur der Handtest (bestanden am 2026-11-02); für eine automatische Prüfung fehlt ein Werkzeug wie `xdotool` (nicht installiert).
@@ -46,4 +46,4 @@ Stand: 2026-11-08 (Punkte 94 und 95 entschieden und ins Archiv verschoben). Hier
 | Nr. | Test | Entscheidet über | Stand |
 |---|---|---|---|
 | T-03 | NDI mit Alpha senden (1080p30, dann 1080p60, dann zwei Ausgänge), CPU, Verluste und Verzögerung am OBS-PC messen | NDI, Technikwahl | Netzwerk besteht (2026-11-03), offen |
-| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | gebaut mit P10c, gegen Testserver geprüft (2026-11-07); mit dem echten OBS offen bis zum Handtest P10c |
+| T-05 | obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart | Anbindung an OBS | gebaut mit P10c, gegen Testserver geprüft (2026-11-07), mit dem echten OBS im Handtest P10c bestanden (2026-11-08) |
