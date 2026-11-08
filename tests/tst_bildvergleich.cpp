@@ -16,14 +16,18 @@
 //   felder.tsv           Farbe jedes Farbfelds je Video im letzten Lauf (Soll, Editor, Seite, OBS)
 //   <Overlay>-seite.png, -editor.png, -differenz.png (bei OBS dazu -obs.png, -differenz-obs.png)
 //
-// OBS (nur mit DSS_BILDVERGLEICH_OBS, sonst übersprungen und ohne Verbindung):
+// OBS (echtes OBS nur mit DSS_BILDVERGLEICH_OBS):
 //   DSS_BILDVERGLEICH_OBS="<Adresse>[:<Port>];<Szene>;<Zugangsdatei>;<Name der Zugangsdatei>"
 // Der Test liest das Passwort mit systemd-creds (ObsSecretStore mit diesem Namen), legt in der Szene
 // die Browserquelle «DSS Bildvergleich» an, stellt sie nacheinander auf jedes Overlay, holt
-// GetSourceScreenshot und vergleicht mit Editor und Qt WebEngine. Dazu das Overlay «Weitere Formate»
-// (HEVC, ProRes, zur Laufzeit erzeugt, nur notieren). Am Ende löscht er die eigene Quelle wieder
-// (RemoveInput). Das Passwort kommt nie in die Ausgabe (Regel 12). Der Weg zu OBS wird zuerst gegen
-// den Testserver (obstestserver.h) geprüft, ohne das echte OBS.
+// GetSourceScreenshot und vergleicht mit Editor und Qt WebEngine. Am Ende löscht er die eigene Quelle
+// wieder (RemoveInput). Das Passwort kommt nie in die Ausgabe (Regel 12).
+// Ohne die Variable läuft derselbe Weg gegen den Testserver (obstestserver.h) mit Szene «test 2» und
+// eigener Zugangsdatei mit Zufallspasswort; «OBS» liefert dort das Bild der Seite (Werte als
+// «Testserver–…»). So fällt ein Fehler, der nur mit OBS auftritt, schon in ctest auf.
+// Overlay «Weitere Formate» (nur notieren): HEVC in MP4, zur Laufzeit erzeugt. ProRes gibt es nur in
+// MOV und wird vom Studio nicht angenommen (nur webm, mp4); der Test prüft das und schreibt es ins
+// Protokoll.
 //
 // Quellen:
 //   obs-websocket: https://raw.githubusercontent.com/obsproject/obs-websocket/master/docs/generated/protocol.md
@@ -561,6 +565,10 @@ private:
     Recorder m_recorder;
     std::optional<ObsSession::Settings> m_obsSettings;
     std::unique_ptr<ObsSession> m_obs;
+    // Ohne DSS_BILDVERGLEICH_OBS: derselbe Weg gegen den Testserver; «OBS» liefert das Bild der Seite.
+    std::unique_ptr<ObsTestServer> m_fakeObs;
+    QTemporaryDir m_credentialDir;
+    QString m_obsLabel = QStringLiteral("OBS");
 
     QVariant js(const QString &code)
     {
@@ -744,8 +752,10 @@ private:
         text(QStringLiteral("Be Vietnam Pro rechts"), kVietnam + QStringLiteral("/BeVietnamPro-Bold.ttf"), 700,
              QRect(1300, 950, 600, 100), 48, TextAlign::Right, QStringLiteral("#FFE040FF"), QStringLiteral("Text rechts"));
 
-        // Weitere Formate (nur mit OBS, nur notieren): HEVC und ProRes, zur Laufzeit erzeugt
-        if (m_obsSettings) {
+        // Weitere Formate (nur notieren): HEVC in MP4, zur Laufzeit erzeugt, dazu die Vorlage als PNG,
+        // damit das Bild nie einfarbig ist, auch wenn kein Zeichner HEVC abspielt. ProRes gibt es nur in
+        // MOV; das Studio nimmt es nicht an (nur webm, mp4), geprüft und im Protokoll festgehalten.
+        {
             const QString dir = kOut + QStringLiteral("/formate");
             QVERIFY(QDir().mkpath(dir));
             const QString base = QStringLiteral("scale=640:360:flags=neighbor,scale=out_color_matrix=bt709:out_range=tv,");
@@ -769,8 +779,10 @@ private:
             create(QStringLiteral("Weitere Formate"), QSize(960, 540));
             video(dir + QStringLiteral("/hevc.mp4"), QRect(0, 0, 480, 270), QStringLiteral("HEVC 640x360"), QStringLiteral("Video"));
             o->fieldVideos.append({QStringLiteral("hevc.mp4"), QRect(0, 0, 480, 270), QSize(640, 360)});
-            video(dir + QStringLiteral("/prores.mov"), QRect(480, 0, 480, 270), QStringLiteral("ProRes 640x360"), QStringLiteral("Video"));
-            o->fieldVideos.append({QStringLiteral("prores.mov"), QRect(480, 0, 480, 270), QSize(640, 360)});
+            image(kData + QStringLiteral("/farbfelder.png"), QRect(480, 0, 480, 270), QStringLiteral("Vorlage farbfelder.png"));
+            const QUuid prores = store.addVideoSource(o->id, dir + QStringLiteral("/prores.mov"), false, &error, nullptr, true);
+            QVERIFY2(prores.isNull(), "ProRes (.mov) wird vom Studio angenommen; Overlay «Weitere Formate» nachführen");
+            qInfo("ProRes: vom Studio nicht angenommen (nur webm, mp4): %s", qPrintable(error));
         }
     }
 
@@ -865,14 +877,33 @@ private slots:
         m_view->setGeometry(3840, 0, 960, 540);
         m_view->show();
 
-        if (m_obsSettings) {
-            m_obs = std::make_unique<ObsSession>();
-            const TestOverlay &first = m_overlays.first();
+        if (!m_obsSettings) {
+            // Testserver auf 127.0.0.1 mit Szene «test 2», eigenes Zufallspasswort in einer eigenen
+            // Zugangsdatei (systemd-creds, Name obs-websocket); keine Datei des Nutzers, kein OBS.
+            m_fakeObs = std::make_unique<ObsTestServer>();
+            m_fakeObs->password = QStringLiteral("test-") + QString::number(QRandomGenerator::system()->generate64(), 36);
+            m_fakeObs->scenes.append({QStringLiteral("scene-test-2"), QStringLiteral("test 2")});
+            m_fakeObs->current = m_fakeObs->scenes.last();
+            QVERIFY(m_fakeObs->start());
+            const QString cred = m_credentialDir.filePath(QStringLiteral("obs-websocket.cred"));
+            dss::obs::ObsSecretStore store(cred);
+            store.setCredentialName(QStringLiteral("obs-websocket"));
+            std::optional<QString> written;
+            store.write(m_fakeObs->password, [&written](const QString &e) { written = e; });
+            QTRY_VERIFY_WITH_TIMEOUT(written.has_value(), 15000);
+            QVERIFY2(written->isEmpty(), qPrintable(*written));
             QString error;
-            QVERIFY2(m_obs->start(*m_obsSettings, urlOf(first.id), first.size, &error), qPrintable(error));
-            qInfo("OBS: %s; Quelle «%s» in der Szene «%s» angelegt", qPrintable(m_obs->info()), qPrintable(kObsInputName),
-                  qPrintable(m_obsSettings->scene));
+            m_obsSettings = ObsSession::parse(
+                QStringLiteral("127.0.0.1:%1;test 2;%2;obs-websocket").arg(m_fakeObs->port()).arg(cred), &error);
+            QVERIFY2(m_obsSettings, qPrintable(error));
+            m_obsLabel = QStringLiteral("Testserver");
         }
+        m_obs = std::make_unique<ObsSession>();
+        const TestOverlay &first = m_overlays.first();
+        QString error;
+        QVERIFY2(m_obs->start(*m_obsSettings, urlOf(first.id), first.size, &error), qPrintable(error));
+        qInfo("%s: %s; Quelle «%s» in der Szene «%s» angelegt", qPrintable(m_obsLabel), qPrintable(m_obs->info()),
+              qPrintable(kObsInputName), qPrintable(m_obsSettings->scene));
     }
 
     void cleanupTestCase()
@@ -1034,8 +1065,20 @@ private slots:
         QImage obs;
         if (m_obs) {
             QString error;
+            if (m_fakeObs) {
+                // Testserver: liefert die Seite, abwechselnd mit Alpha und deckend auf Schwarz (beide Wege)
+                QBuffer buffer(&m_fakeObs->screenshotPng);
+                m_fakeObs->screenshotPng.clear();
+                QVERIFY(buffer.open(QIODevice::WriteOnly) && (index % 2 ? bv::onBlack(page) : page).save(&buffer, "PNG"));
+            }
             QVERIFY2(m_obs->show(url, o.size, &error), qPrintable(error));
-            obs = m_obs->stableScreenshot(2000, 30000, &error);
+            if (m_fakeObs) {
+                QCOMPARE(m_fakeObs->inputs.size(), 1);
+                const QJsonObject s = m_fakeObs->inputs.first().settings;
+                QCOMPARE(s.value(QStringLiteral("url")).toString(), url);
+                QCOMPARE(QSize(s.value(QStringLiteral("width")).toInt(), s.value(QStringLiteral("height")).toInt()), o.size);
+            }
+            obs = m_obs->stableScreenshot(m_fakeObs ? 0 : 2000, 30000, &error);
             if (obs.isNull() && !m_obs->lastImage().isNull())
                 save(m_obs->lastImage(), file + QStringLiteral("-obs-letztes.png"));
             QVERIFY2(!obs.isNull(), qPrintable(error));
@@ -1048,8 +1091,12 @@ private slots:
             const QImage pageCmp = opaque ? bv::onBlack(page) : page;
             const QImage editorCmp = opaque ? bv::onBlack(editor) : editor;
             save(bv::differenceImage(obs, editorCmp, bv::edgeMask(obs, editorCmp)), file + QStringLiteral("-differenz-obs.png"));
-            record(QStringLiteral("OBS–Editor"), o, obs, editorCmp);
-            record(QStringLiteral("OBS–Seite"), o, obs, pageCmp);
+            record(m_obsLabel + QStringLiteral("–Editor"), o, obs, editorCmp);
+            record(m_obsLabel + QStringLiteral("–Seite"), o, obs, pageCmp);
+            if (m_fakeObs) { // genau das verschickte PNG zurück (der Weg über PNG rundet, deshalb nicht die Seite)
+                QCOMPARE(opaque, index % 2 == 1);
+                QCOMPARE(obs, QImage::fromData(m_fakeObs->screenshotPng, "PNG").convertToFormat(QImage::Format_ARGB32_Premultiplied));
+            }
         }
         QVERIFY(m_recorder.flush());
 

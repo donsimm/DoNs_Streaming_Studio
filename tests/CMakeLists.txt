@@ -306,7 +306,7 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RE
 
     # P11, K-08: Bildvergleich der zwei Zeichner mit den Testdaten tests/daten/bildvergleich/, noch
     # ohne feste Grenze. Werte je Lauf unter build/tests/bildvergleich/. Mit DSS_BILDVERGLEICH_OBS
-    # auch gegen OBS (sonst ohne Verbindung); der Weg zu OBS wird gegen obstestserver.h geprüft.
+    # auch gegen OBS; ohne die Variable läuft derselbe Weg gegen obstestserver.h (kein echtes OBS).
     qt_add_executable(tst_bildvergleich tst_bildvergleich.cpp obstestserver.h)
     target_link_libraries(tst_bildvergleich PRIVATE dss_render dss_media dss_obs dss_bildvergleich dss_warnings
       Qt6::Test Qt6::WebEngineWidgets Qt6::QuickWidgets)
