@@ -33,6 +33,7 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
   - OBS auf dem Streaming-PC per SSH schliessen und wieder öffnen, nie während eines Streams (vorher Prozess und Ausgabe prüfen);
   - obs-websocket nur für Tests nutzen (Quellen prüfen und anlegen, Szene wechseln, Bild einer Quelle holen, die Szene «test 2» anlegen und für Tests nutzen, die eigene Testquelle in der Szene «test 2» nach der Prüfung wieder löschen, entschieden vom Nutzer 2026-11-08). Das Passwort liegt mit `systemd-creds --user` verschlüsselt in `~/.config/lotse/obs-websocket.cred` (Name `obs-websocket`, nicht in der Sicherung). Der Nutzer legt es selbst an, es kommt nie in einen Chat, ein Protokoll oder eine Datei im Klartext;
   - Bildschirmfotos vom Studio-PC machen und auswerten, Ablage nur im Scratchpad.
+  - für den Messtest P12a in OBS eine Aufnahme von höchstens 60 s in der Szene «test 2» machen, nie während eines Streams (vorher Stream und Aufnahme prüfen), die Datei nach der Auswertung löschen (entschieden vom Nutzer, 2026-11-09).
 
 ## Prüfstufen (entschieden vom Nutzer, 2026-11-07)
 
