@@ -25,9 +25,14 @@ grep -E "älteres Format|umgewandelt|Sicherung|gesichert|Einsatz, Commit|Warnung
 
 echo "== Sicherung"
 BACKUPS="$WORK/daten-sicherungen"
-ls "$BACKUPS"
-B="$BACKUPS/$(ls "$BACKUPS" | tail -1)"
-diff -r "$WORK/vorher" "$B" > /dev/null && echo "Sicherung gleich den Daten vorher" || echo "FEHLER: Sicherung weicht ab"
+# Ohne Umwandeln legt die Installation keine Sicherung an (Daten schon im aktuellen Format): kein Fehler.
+if [[ -d "$BACKUPS" ]] && [[ -n "$(ls -A "$BACKUPS")" ]]; then
+    ls "$BACKUPS"
+    B="$BACKUPS/$(ls "$BACKUPS" | tail -1)"
+    diff -r "$WORK/vorher" "$B" > /dev/null && echo "Sicherung gleich den Daten vorher" || echo "FEHLER: Sicherung weicht ab"
+else
+    echo "keine Sicherung nötig (nichts umgewandelt)"
+fi
 
 echo "== Daten nachher"
 diff -rq "$WORK/vorher" "$WORK/daten" | sed "s|$WORK/||g"
