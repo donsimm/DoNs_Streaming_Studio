@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+  Messseite P12a. Spielt ein Video stumm und meldet dem Prototyp (POST /melden, JSON) je Bild die
+  Lage über requestVideoFrameCallback (mediaTime, presentationTime, expectedDisplayTime).
+  In OBS (window.obsstudio vorhanden) wartet das Video auf «aktiv» und beginnt dann von vorne;
+  bei «inaktiv» hält es an und springt auf den Anfang (wie für P12b geplant). Mit sofort=1
+  läuft es auch in OBS sofort (für M3, falls die Quelle beim Laden schon aktiv ist: obs-browser
+  meldet den Zustand nur bei Änderung).
+  Parameter: datei=<Name in /medien/> (Standard blitz-piep.webm), wiederholen=0|1 (Standard 1),
+             alle=N (nur jede N-te Meldung «bild», Standard 1), seite=<Kennung>, sofort=0|1
+  Quellen: https://wicg.github.io/video-rvfc/ (VideoFrameCallbackMetadata),
+           https://raw.githubusercontent.com/obsproject/obs-browser/master/obs-browser-source.cpp
+           und browser-app.cpp (obsSourceActiveChanged/obsSourceVisibleChanged als CustomEvent auf
+           window, event.detail.active/.visible; window.obsstudio.pluginVersion, getControlLevel)
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>DSS Messseite P12a</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  video { width: 100vw; height: 100vh; object-fit: contain; display: block; }
+</style>
+</head>
+<body>
+<video id="v" muted playsinline preload="auto"></video>
+<script>
+'use strict';
+const q = new URLSearchParams(location.search);
+const datei = q.get('datei') || 'blitz-piep.webm';
+const wiederholen = q.get('wiederholen') !== '0';
+const alle = Math.max(1, parseInt(q.get('alle') || '1', 10));
+const sofort = q.get('sofort') === '1';
+const seite = q.get('seite') || Math.random().toString(36).slice(2, 10);
+const obs = typeof window.obsstudio !== 'undefined';
+const v = document.getElementById('v');
+let n = 0, lauf = 0, schleife = 0, letzte = -1, bilder = 0;
+
+function melden(art, daten) {
+  const m = Object.assign({art, seite, n: n++, now: performance.now(), datei, obs, lauf}, daten || {});
+  fetch('/melden', {method: 'POST', body: JSON.stringify(m),
+                    headers: {'Content-Type': 'text/plain'}, keepalive: true}).catch(() => {});
+}
+
+function bild(jetzt, md) {
+  if (md.mediaTime < letzte - 0.5) schleife++;
+  letzte = md.mediaTime;
+  if (bilder++ % alle === 0) {
+    melden('bild', {mediaTime: md.mediaTime, presentationTime: md.presentationTime,
+                    expectedDisplayTime: md.expectedDisplayTime, presentedFrames: md.presentedFrames,
+                    rueckruf: jetzt, schleife, dauer: v.duration});
+  }
+  v.requestVideoFrameCallback(bild);
+}
+
+function neuStart() {
+  lauf++; schleife = 0; letzte = -1;
+  v.currentTime = 0;
+  melden('start', {});
+  v.play().catch(e => melden('fehler', {text: 'play: ' + e}));
+}
+
+function halt() {
+  v.pause();
+  v.currentTime = 0;
+  melden('stop', {});
+}
+
+for (const e of ['playing', 'waiting', 'stalled', 'seeked', 'ended', 'pause', 'error']) {
+  v.addEventListener(e, () => melden('video', {ereignis: e, currentTime: v.currentTime}));
+}
+document.addEventListener('visibilitychange', () => melden('sichtbarkeit', {zustand: document.visibilityState}));
+
+v.loop = wiederholen;
+v.muted = true;
+v.src = '/medien/' + encodeURIComponent(datei);
+
+if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+  v.requestVideoFrameCallback(bild);
+} else {
+  melden('fehler', {text: 'requestVideoFrameCallback fehlt'});
+  setInterval(() => melden('zeit', {currentTime: v.currentTime, schleife}), 33);
+}
+
+melden('hallo', {userAgent: navigator.userAgent, sichtbarkeit: document.visibilityState,
+                 pluginVersion: obs ? window.obsstudio.pluginVersion : null, sofort});
+if (obs) {
+  window.addEventListener('obsSourceActiveChanged', e => {
+    melden('aktiv', {aktiv: e.detail.active});
+    if (e.detail.active) neuStart(); else halt();
+  });
+  window.addEventListener('obsSourceVisibleChanged', e => melden('sichtbar', {sichtbar: e.detail.visible}));
+  if (typeof window.obsstudio.getControlLevel === 'function') {
+    window.obsstudio.getControlLevel(stufe => melden('stufe', {stufe}));
+  }
+  if (sofort) neuStart();
+} else {
+  neuStart();
+}
+</script>
+</body>
+</html>
