@@ -47,3 +47,7 @@ Offen aus der Stufe «Vor der Installation», noch nicht in `docs/04-offene-punk
 - Offen im Bericht P11/Archiv: Vermerk «Prüfung N steht aus» nachführen (erledigt 22:10).
 - Nächster Schritt: Freigabe main/Push durch Dominik; danach in `CLAUDE.md` eintragen, dass Lotse die Szene «test 2» anlegen/nutzen darf; dann Punkt 102 als eigener Auftrag.
 - Dominik löscht zusätzlich: `build/pruefung-p11-101/`, `build/p11-101-einzeln.log`.
+
+## Punkt 102 fertig (09.11. ~00:35)
+- `lotse/p102`, Commits c8c96d0 (Test) und 0b83b19 (Doku), nicht gepusht. Ursache belegt und im Test: Zeile 452 traf schon die Startzeile des Kerns (`fillHomeAddress`), `waitForLog` kehrte nach 0 ms zurück; Fehler und Folgefehler `browserSource` mit 1 s Pause erzwungen. Test wartet jetzt auf das Ende der Zeile des Wächters und prüft die ganze Zeile. Agent: einzeln grün, 50/50, ctest 45/45 (188,6 s); Lotse: einzeln grün.
+- Nächster Schritt: Freigabe main/Push durch Dominik. Dominik löscht `build/pruefung-p102/`.
