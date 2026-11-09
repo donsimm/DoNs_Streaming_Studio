@@ -1,8 +1,8 @@
 # 07 – Bauplan
 
-Stand: 2026-11-08. Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
+Stand: 2026-11-09. Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
 
-Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach kommt, ist noch offen.
+Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02), P12 bis P14 vom Nutzer entschieden (2026-11-09). Was danach kommt, ist noch offen.
 
 ## Erledigt
 
@@ -21,6 +21,8 @@ Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02). Was danach k
 | P10-vor | Vorarbeiten Browserquelle | abgenommen (2026-11-03), einschliesslich Handtest; keine neue echte Installation nötig (folgt mit P10). Übernehmen von Dateien im eigenen Thread des Kerns (Punkt 67, 1 GiB: Fenster bedienbar, 4 GiB: kein Neustart durch den Watchdog), Aufräumen der Reste von `QSaveFile` beim Start (68), `installieren.sh` leert die Programmordner vor dem Kopieren (69), Testmöglichkeit beim Umwandeln (70), Einstellungen des Kerns in `kern.ini` (Port 8080 / 8081, Adresse im Heimnetz, Schnittstelle Version 5, `dss-cli`), Dialog «Werkzeuge → Einstellungen …», «Datei → Leinwand als Bild speichern» (Strg+Umschalt+B, Zeichner in `dss_render`); Bericht `docs/archiv/berichte/P10-vor-bericht.md` |
 | P10 | Browserquelle | abgenommen (2026-11-04), einschliesslich Handtest mit OBS 33.0.1 auf dem Streaming-PC (T-04) und echter Installation (Commit `c6b3cb1`). Overlay-Server im Kern (nur HTTP, nur IPv4 auf `127.0.0.1` und der Adresse im Heimnetz, Token mit gleichbleibender Laufzeit, leere Seite bei alter Adresse, Meldung «Port belegt» mit dem Programm, Warten auf die Adresse), Seite als zweiter Zeichner (`web/`, Änderungen per Server-Sent Events ohne Neuladen), Ausgabe ein/aus pro Overlay (E-24, Format 4), «Neuer Token» im Fenster und in `dss-cli`, Dock «Steuerung» mit Adresse, «Kopieren» und «Ausgabe: …», Punkte 76 bis 78, Schnittstelle Version 9; Stufe 1 der Prüfung mit Qt WebEngine (`tst_browserquelle`); Bericht `docs/archiv/berichte/P10-bericht.md` |
 | P10b | Medien | abgenommen (2026-11-07), einschliesslich Handtest und echter Installation (Commit `add656b`); Prüfung 5 (Aufräumen) macht der Nutzer. Dock «Medien» (E-28): Liste mit Vorschaubild, Name, Typ, Grösse; ursprüngliche Namen in `medien.json`, umbenennbar; Ordner beliebig tief; Hinzufügen; Löschen nur ungenutzter Dateien; Ziehen auf die Leinwand und in die Liste «Quellen». Datei in Übernahme mit Fortschritt in Prozent und Abbrechen (Punkt 73). Leere «Adresse im Heimnetz» wird während des Laufs eingetragen (Punkt 85). Hinweis beim Hinzufügen und Warnzeichen für Videoformate, die die Browserquelle nicht abspielt (Punkt 81). Eigene Ports für alle Tests und die Startprüfung (Punkt 83). Schnittstelle Version 10; Bericht `docs/archiv/berichte/P10b-bericht.md` |
+| P10c | Anbindung an OBS | abgenommen (2026-11-08), einschliesslich Handtest und echter Installation (Commit `ca8f539`). T-05 (obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart) und E-29 (Browserquelle direkt in OBS anlegen und nachführen); Passwort von OBS nie im Klartext (Regel 12); Schnittstelle Version 11. Punkte 94 und 95 vom Nutzer entschieden: so lassen. Bericht `docs/archiv/berichte/P10c-bericht.md` |
+| P11 | Bildvergleich der zwei Zeichner | abgeschlossen (2026-11-08/09), auf `main`, noch nicht installiert. K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder mit gemessener Grenze; Prüfung N (Vergleich mit OBS) durch Lotse bestanden. Editor rechnet Farben von Videos wie Chromium (Punkt 79), WebM-Drehung geprüft (Punkt 80, in Prüfung N überall «rot grün blau gelb»), eigener bekannter Wert «Text über dem Video» (Punkt 101), `tst_kernverbindung` robust gemacht (Punkt 102). Bericht `docs/archiv/berichte/P11-bericht.md` |
 
 ## Geplant
 
@@ -28,12 +30,12 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
-| P10c | Anbindung an OBS | Gebaut (2026-11-07), Handtest und Abnahme stehen aus; Bericht `docs/archiv/berichte/P10c-bericht.md`. T-05 (obs-websocket: Verbinden, Szenenwechsel erkennen, Wiederverbinden nach OBS-Neustart) und E-29 (Browserquelle direkt in OBS anlegen und nachführen). Passwort von OBS nie im Klartext (Regel 12). Schnittstelle Version 11. Entscheid des Nutzers 2026-11-04 | P10b | E-29 |
-| P11 | Bildvergleich der zwei Zeichner | Gebaut (2026-11-08, P11a und P11b nach Prüfung V), Prüfung N und Abnahme stehen aus; Bericht `docs/archiv/berichte/P11-bericht.md`. K-08: Test-Overlays, beide Zeichner ohne Fenster, Vergleich der Bilder, Grenze für Unterschiede messen. Editor rechnet Farben von Videos wie Chromium (Punkt 79). WebM mit Drehangabe prüfen, bei Abweichung neutralisieren (Punkt 80) | P10 | (Voraussetzung für K-07) |
-| P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar | P09 | E-20, E-21 |
+| P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar. Entscheid des Nutzers 2026-11-09 zur Reihenfolge | P09 | E-20, E-21 |
+| P13 | Twitch-Anbindung mit Ereignisfluss | Verbindung zu Twitch und Ereignisfluss (Regel 14, Punkt 92: Felder eines Ereignisses, Abonnieren, ob Ereignisse über den Socket zum Fenster gehen). Zugangsdaten nie im Klartext (Regel 12). Entscheid des Nutzers 2026-11-09 | P10c | |
+| P14 | Basisfunktion Chat-Bot | Chat-Bot-Modul mit Chat und Commands; Umfang und Streamer.bot-Import werden vor dem Baustein geklärt (`docs/04-offene-punkte.md`, Frage 3). Entscheid des Nutzers 2026-11-09 | P13 | |
 
-Danach (Reihenfolge noch offen): SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); Chat-Bot-Modul; Twitch-Verbindung mit Ereignisfluss (Regel 14, Punkt 92); NDI (E-19, T-03).
+Danach (Reihenfolge noch offen): SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); NDI (E-19, T-03). Weitere Chat-Bot-Funktionen (später Streamer.bot-Funktionen) nach P14.
 
 ## Offene Fragen zur Reihenfolge
 
-1. Chat-Bot: laut Festlegung «zuerst» neben dem Editor. Im Vorschlag kommt er nach den MUSS-Punkten des Editors.
+Keine zu P12 bis P14. Die frühere Frage «Chat-Bot zuerst» ist entschieden (Nutzer, 2026-11-09): Reihenfolge P12 Ton, P13 Twitch-Anbindung, P14 Basisfunktion Chat-Bot. Offen bleibt, ob nach P14 zuerst SOLL-Punkte des Editors oder NDI kommen.
