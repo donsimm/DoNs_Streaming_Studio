@@ -1,0 +1,66 @@
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794434771687 ms, Dauer 180 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 350.9 ms, Ende der Klicks bei 180.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.0 ms: unconnected → connecting
+  Zustand ausgabe bei 0.5 ms: unconnected → connecting
+  Zustand aufnahme bei 1.1 ms: connecting → paused
+  Zustand ausgabe bei 1.1 ms: connecting → paused
+  Zustand aufnahme bei 11.5 ms: paused → streaming
+  Zustand ausgabe bei 15.6 ms: paused → streaming
+  Zustand aufnahme bei 59371.7 ms: streaming → paused
+  Zustand ausgabe bei 59372.0 ms: streaming → paused
+  Zustand aufnahme bei 59374.8 ms: paused → streaming
+  Zustand ausgabe bei 59375.4 ms: paused → streaming
+  Zustand aufnahme bei 99485.0 ms: streaming → paused
+  Zustand ausgabe bei 99485.3 ms: streaming → paused
+  Zustand aufnahme bei 99488.0 ms: paused → streaming
+  Zustand ausgabe bei 99488.6 ms: paused → streaming
+  Zustand ausgabe bei 181055.0 ms: streaming → paused
+  Zustand ausgabe bei 181055.3 ms: paused → unconnected
+  Zustand aufnahme bei 181055.5 ms: streaming → paused
+  Zustand aufnahme bei 181055.6 ms: paused → unconnected
+Klicks geschrieben 360, gefunden 358, fehlend 2, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.734 ms, Abstand zum Bezug n=358 min -31.344 p5 -22.179 Median 1.976 p95 9.992 max 10.039 ms (Spanne 41.383 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 661.289 ms
+Verzögerung roh (Schreiben → Aufnahme): n=358 min 457.390 p5 466.555 Median 490.710 p95 498.726 max 498.774 ms (Spanne 41.383 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=360 min -0.090 p5 -0.048 Median 7.953 p95 31.915 max 41.274 ms (Spanne 41.363 ms)
+Rest (Aufnahme − erwartet): n=358 min 450.324 p5 457.460 Median 478.792 p95 494.769 max 494.791 ms (Spanne 44.467 ms)
+  p5–p95 des Rests: 37.310 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=13148 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=360 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=360 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 3
+  bei 59.376 s: delay 0 → 0 (0.00 → 0.00 ms), size 1024 → 2048
+  bei 99.489 s: delay 0 → 0 (0.00 → 0.00 ms), size 2048 → 256
+  bei 139.318 s: delay 0 → 0 (0.00 → 0.00 ms), size 256 → 1024
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=13149 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=13148 min 0.104 p5 0.273 Median 0.280 p95 0.546 max 8.982 µs (Spanne 8.878 µs)
+Abrufe Ausgabe: 13148, Abstand n=13147 min 5.283 p5 5.327 Median 5.339 p95 42.656 max 42.725 ms (Spanne 37.442 ms)
+  Länge: n=13148 min 5.333 p5 5.333 Median 5.333 p95 42.667 max 42.667 ms (Spanne 37.333 ms)
+  Δticks (Anzahl×Wert): 7468×256 1×318 1×680 4737×1024 940×2048
+Abrufe Aufnahme: 13149, Δticks (Anzahl×Wert): 7468×256 1×318 1×680 4738×1024 940×2048
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 2, Aufnahme 2; leere Abrufe Aufnahme 0
+  Ausgabe bei 59.376 s: Δticks 680, vorige Zyklusgrösse 1024
+  Ausgabe bei 99.489 s: Δticks 318, vorige Zyklusgrösse 2048
+  Aufnahme bei 59.376 s: Δticks 680, vorige Zyklusgrösse 1024
+  Aufnahme bei 99.489 s: Δticks 318, vorige Zyklusgrösse 2048
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+Marke «clock.force-quantum 2048» bei 59.373 s (je 5 Klicks vor / 5 nach):
+  Rest Median 478.768 → 457.476 ms, Änderung -21.292 ms (E1 ≤ 10 ms: nein)
+  roh Median 485.447 → 480.045 ms, Änderung -5.402 ms (roher Sprung)
+  erwartete Verzögerung Median 13.297 → 22.599 ms, Änderung 9.302 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+Marke «clock.force-quantum 256» bei 99.487 s (je 5 Klicks vor / 5 nach):
+  Rest Median 457.503 → 494.768 ms, Änderung 37.265 ms (E1 ≤ 10 ms: nein)
+  roh Median 482.768 → 496.070 ms, Änderung 13.303 ms (roher Sprung)
+  erwartete Verzögerung Median 25.265 → 1.311 ms, Änderung -23.954 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+Marke «clock.force-quantum 0» bei 139.320 s (je 5 Klicks vor / 5 nach):
+  Rest Median 494.741 → 478.785 ms, Änderung -15.956 ms (E1 ≤ 10 ms: nein)
+  roh Median 496.060 → 489.403 ms, Änderung -6.656 ms (roher Sprung)
+  erwartete Verzögerung Median 2.620 → 10.618 ms, Änderung 7.998 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+E1 (alle 3 Marken, Änderung des Rests ≤ 10 ms): NICHT erfüllt

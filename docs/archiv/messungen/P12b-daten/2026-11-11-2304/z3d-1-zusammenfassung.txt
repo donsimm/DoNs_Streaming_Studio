@@ -1,0 +1,35 @@
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794435154846 ms, Dauer 300 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 350.9 ms, Ende der Klicks bei 300.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.0 ms: unconnected → connecting
+  Zustand ausgabe bei 0.6 ms: unconnected → connecting
+  Zustand aufnahme bei 1.2 ms: connecting → paused
+  Zustand ausgabe bei 1.3 ms: connecting → paused
+  Zustand aufnahme bei 12.1 ms: paused → streaming
+  Zustand ausgabe bei 16.7 ms: paused → streaming
+  Zustand ausgabe bei 301095.7 ms: streaming → paused
+  Zustand ausgabe bei 301096.0 ms: paused → unconnected
+  Zustand aufnahme bei 301096.1 ms: streaming → paused
+  Zustand aufnahme bei 301096.3 ms: paused → unconnected
+Klicks geschrieben 600, gefunden 599, fehlend 1, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.777 ms, Abstand zum Bezug n=599 min -13.142 p5 -10.010 Median -0.622 p95 9.951 max 13.040 ms (Spanne 26.182 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 661.463 ms
+Verzögerung roh (Schreiben → Aufnahme): n=599 min 475.635 p5 478.767 Median 488.155 p95 498.729 max 501.817 ms (Spanne 26.182 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=600 min -3.185 p5 -0.066 Median 9.921 p95 19.894 max 19.943 ms (Spanne 23.128 ms)
+Rest (Aufnahme − erwartet): n=599 min 478.769 p5 478.801 Median 478.831 p95 478.963 max 489.884 ms (Spanne 11.114 ms)
+  p5–p95 des Rests: 0.162 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=14113 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 0
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=14114 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=14113 min 0.254 p5 0.778 Median 1.159 p95 3.195 max 33.247 µs (Spanne 32.993 µs)
+Abrufe Ausgabe: 14113, Abstand n=14112 min 13.417 p5 21.264 Median 21.334 p95 21.400 max 29.255 ms (Spanne 15.838 ms)
+  Länge: n=14113 min 21.333 p5 21.333 Median 21.333 p95 21.333 max 21.333 ms (Spanne 0.000 ms)
+  Δticks (Anzahl×Wert): 14112×1024
+Abrufe Aufnahme: 14114, Δticks (Anzahl×Wert): 14113×1024
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 0, Aufnahme 0; leere Abrufe Aufnahme 0
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0

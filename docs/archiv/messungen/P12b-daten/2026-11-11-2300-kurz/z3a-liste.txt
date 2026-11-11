@@ -1,0 +1,9 @@
+QCoreApplication (ohne QGuiApplication), Qt 6.8.2, libpipewire 1.4.2 (Header 1.4.2)
+Ausgänge (Registry, media.class Audio/Sink):
+  dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», id 35, object.serial 592
+  alsa_output.pci-0000_00_1b.0.iec958-stereo «Internes Audio Digital Stereo (IEC958)» [Standard], id 44, object.serial 60
+  alsa_output.pci-0000_01_00.1.hdmi-stereo «TU116 High Definition Audio Controller Digital Stereo (HDMI)», id 57, object.serial 57
+Eingänge (Registry, media.class Audio/Source…):
+  alsa_input.pci-0000_00_1b.0.analog-stereo «Internes Audio Analog Stereo», id 45, object.serial 61, media.class Audio/Source
+  dss_p12a_aufnahme «DSS P12a Messung Aufnahme», id 74, object.serial 591, media.class Audio/Source
+Standard (Metadaten «default»): default.audio.sink alsa_output.pci-0000_00_1b.0.iec958-stereo, default.audio.source alsa_output.pci-0000_00_1b.0.iec958-stereo

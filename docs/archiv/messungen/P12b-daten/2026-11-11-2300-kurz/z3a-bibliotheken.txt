@@ -1,0 +1,2 @@
+libQt6Core.so.6
+libpipewire-0.3.so.0

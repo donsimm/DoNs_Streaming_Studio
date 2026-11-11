@@ -1,0 +1,225 @@
+P12b Z3 2026-11-11-2304 (voll), Protokoll: pw-lauf.log
+
+===== z3b-zusammenfassung.txt
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794434645445 ms, Dauer 120 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 350.9 ms, Ende der Klicks bei 120.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.0 ms: unconnected → connecting
+  Zustand ausgabe bei 0.5 ms: unconnected → connecting
+  Zustand aufnahme bei 1.2 ms: connecting → paused
+  Zustand ausgabe bei 1.2 ms: connecting → paused
+  Zustand aufnahme bei 11.4 ms: paused → streaming
+  Zustand ausgabe bei 16.1 ms: paused → streaming
+  Zustand ausgabe bei 121055.1 ms: streaming → paused
+  Zustand ausgabe bei 121055.3 ms: paused → unconnected
+  Zustand aufnahme bei 121055.5 ms: streaming → paused
+  Zustand aufnahme bei 121055.6 ms: paused → unconnected
+Klicks geschrieben 240, gefunden 239, fehlend 1, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.738 ms, Abstand zum Bezug n=239 min -10.068 p5 -9.964 Median -0.485 p95 9.973 max 10.027 ms (Spanne 20.095 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 661.584 ms
+Verzögerung roh (Schreiben → Aufnahme): n=239 min 478.670 p5 478.774 Median 488.254 p95 498.711 max 498.765 ms (Spanne 20.095 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=240 min -0.091 p5 -0.047 Median 9.288 p95 19.944 max 19.979 ms (Spanne 20.069 ms)
+Rest (Aufnahme − erwartet): n=239 min 478.739 p5 478.753 Median 478.782 p95 478.820 max 480.605 ms (Spanne 1.866 ms)
+  p5–p95 des Rests: 0.067 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=5673 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=240 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=240 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 0
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=5674 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=5673 min 0.240 p5 0.274 Median 0.281 p95 0.900 max 8.764 µs (Spanne 8.524 µs)
+Abrufe Ausgabe: 5673, Abstand n=5672 min 19.520 p5 21.295 Median 21.333 p95 21.372 max 23.140 ms (Spanne 3.621 ms)
+  Länge: n=5673 min 21.333 p5 21.333 Median 21.333 p95 21.333 max 21.333 ms (Spanne 0.000 ms)
+  Δticks (Anzahl×Wert): 5672×1024
+Abrufe Aufnahme: 5674, Δticks (Anzahl×Wert): 5673×1024
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 0, Aufnahme 0; leere Abrufe Aufnahme 0
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+
+===== z3cq-zusammenfassung.txt
+M1 Klickmessung, Beginn (Wanduhr) 1794434959004 ms, Dauer 180 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 40 ms, erhalten 11520 Bytes = 30.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 179931687, elapsedUSecs 180018712 (Differenz -87.0 ms)
+Klicks geschrieben 361, gefunden 360, fehlend 1, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 64.116 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 448.1 ms
+Verzögerung Schreiben → Aufnahme: n=360 min 24.228 p5 34.669 Median 87.294 p95 117.158 max 127.855 ms (Spanne 103.627 ms)
+  ohne geschätzten Pufferinhalt: n=360 min 21.018 p5 23.654 Median 73.291 p95 83.418 max 86.521 ms (Spanne 65.503 ms)
+Abstand der Abrufe durch QAudioSink: n=4218 min 29.144 p5 30.197 Median 45.278 p95 45.350 max 45.609 ms (Spanne 16.465 ms)
+Länge der Abrufe: n=4219 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 4 Wechsel, davon «leer» 1, Fehler «Unterlauf» 1
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 1
+  bei Klick 117 (58.5 s): 2048 Proben = 42.67 ms
+
+===== z3c-zusammenfassung.txt
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794434771687 ms, Dauer 180 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 350.9 ms, Ende der Klicks bei 180.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.0 ms: unconnected → connecting
+  Zustand ausgabe bei 0.5 ms: unconnected → connecting
+  Zustand aufnahme bei 1.1 ms: connecting → paused
+  Zustand ausgabe bei 1.1 ms: connecting → paused
+  Zustand aufnahme bei 11.5 ms: paused → streaming
+  Zustand ausgabe bei 15.6 ms: paused → streaming
+  Zustand aufnahme bei 59371.7 ms: streaming → paused
+  Zustand ausgabe bei 59372.0 ms: streaming → paused
+  Zustand aufnahme bei 59374.8 ms: paused → streaming
+  Zustand ausgabe bei 59375.4 ms: paused → streaming
+  Zustand aufnahme bei 99485.0 ms: streaming → paused
+  Zustand ausgabe bei 99485.3 ms: streaming → paused
+  Zustand aufnahme bei 99488.0 ms: paused → streaming
+  Zustand ausgabe bei 99488.6 ms: paused → streaming
+  Zustand ausgabe bei 181055.0 ms: streaming → paused
+  Zustand ausgabe bei 181055.3 ms: paused → unconnected
+  Zustand aufnahme bei 181055.5 ms: streaming → paused
+  Zustand aufnahme bei 181055.6 ms: paused → unconnected
+Klicks geschrieben 360, gefunden 358, fehlend 2, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.734 ms, Abstand zum Bezug n=358 min -31.344 p5 -22.179 Median 1.976 p95 9.992 max 10.039 ms (Spanne 41.383 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 661.289 ms
+Verzögerung roh (Schreiben → Aufnahme): n=358 min 457.390 p5 466.555 Median 490.710 p95 498.726 max 498.774 ms (Spanne 41.383 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=360 min -0.090 p5 -0.048 Median 7.953 p95 31.915 max 41.274 ms (Spanne 41.363 ms)
+Rest (Aufnahme − erwartet): n=358 min 450.324 p5 457.460 Median 478.792 p95 494.769 max 494.791 ms (Spanne 44.467 ms)
+  p5–p95 des Rests: 37.310 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=13148 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=360 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=360 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 3
+  bei 59.376 s: delay 0 → 0 (0.00 → 0.00 ms), size 1024 → 2048
+  bei 99.489 s: delay 0 → 0 (0.00 → 0.00 ms), size 2048 → 256
+  bei 139.318 s: delay 0 → 0 (0.00 → 0.00 ms), size 256 → 1024
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=13149 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=13148 min 0.104 p5 0.273 Median 0.280 p95 0.546 max 8.982 µs (Spanne 8.878 µs)
+Abrufe Ausgabe: 13148, Abstand n=13147 min 5.283 p5 5.327 Median 5.339 p95 42.656 max 42.725 ms (Spanne 37.442 ms)
+  Länge: n=13148 min 5.333 p5 5.333 Median 5.333 p95 42.667 max 42.667 ms (Spanne 37.333 ms)
+  Δticks (Anzahl×Wert): 7468×256 1×318 1×680 4737×1024 940×2048
+Abrufe Aufnahme: 13149, Δticks (Anzahl×Wert): 7468×256 1×318 1×680 4738×1024 940×2048
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 2, Aufnahme 2; leere Abrufe Aufnahme 0
+  Ausgabe bei 59.376 s: Δticks 680, vorige Zyklusgrösse 1024
+  Ausgabe bei 99.489 s: Δticks 318, vorige Zyklusgrösse 2048
+  Aufnahme bei 59.376 s: Δticks 680, vorige Zyklusgrösse 1024
+  Aufnahme bei 99.489 s: Δticks 318, vorige Zyklusgrösse 2048
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+Marke «clock.force-quantum 2048» bei 59.373 s (je 5 Klicks vor / 5 nach):
+  Rest Median 478.768 → 457.476 ms, Änderung -21.292 ms (E1 ≤ 10 ms: nein)
+  roh Median 485.447 → 480.045 ms, Änderung -5.402 ms (roher Sprung)
+  erwartete Verzögerung Median 13.297 → 22.599 ms, Änderung 9.302 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+Marke «clock.force-quantum 256» bei 99.487 s (je 5 Klicks vor / 5 nach):
+  Rest Median 457.503 → 494.768 ms, Änderung 37.265 ms (E1 ≤ 10 ms: nein)
+  roh Median 482.768 → 496.070 ms, Änderung 13.303 ms (roher Sprung)
+  erwartete Verzögerung Median 25.265 → 1.311 ms, Änderung -23.954 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+Marke «clock.force-quantum 0» bei 139.320 s (je 5 Klicks vor / 5 nach):
+  Rest Median 494.741 → 478.785 ms, Änderung -15.956 ms (E1 ≤ 10 ms: nein)
+  roh Median 496.060 → 489.403 ms, Änderung -6.656 ms (roher Sprung)
+  erwartete Verzögerung Median 2.620 → 10.618 ms, Änderung 7.998 ms
+  Lage-Differenz Median 25024 → 25024 Proben
+E1 (alle 3 Marken, Änderung des Rests ≤ 10 ms): NICHT erfüllt
+
+===== z3d-1-zusammenfassung.txt
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794435154846 ms, Dauer 300 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 350.9 ms, Ende der Klicks bei 300.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.0 ms: unconnected → connecting
+  Zustand ausgabe bei 0.6 ms: unconnected → connecting
+  Zustand aufnahme bei 1.2 ms: connecting → paused
+  Zustand ausgabe bei 1.3 ms: connecting → paused
+  Zustand aufnahme bei 12.1 ms: paused → streaming
+  Zustand ausgabe bei 16.7 ms: paused → streaming
+  Zustand ausgabe bei 301095.7 ms: streaming → paused
+  Zustand ausgabe bei 301096.0 ms: paused → unconnected
+  Zustand aufnahme bei 301096.1 ms: streaming → paused
+  Zustand aufnahme bei 301096.3 ms: paused → unconnected
+Klicks geschrieben 600, gefunden 599, fehlend 1, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.777 ms, Abstand zum Bezug n=599 min -13.142 p5 -10.010 Median -0.622 p95 9.951 max 13.040 ms (Spanne 26.182 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 661.463 ms
+Verzögerung roh (Schreiben → Aufnahme): n=599 min 475.635 p5 478.767 Median 488.155 p95 498.729 max 501.817 ms (Spanne 26.182 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=600 min -3.185 p5 -0.066 Median 9.921 p95 19.894 max 19.943 ms (Spanne 23.128 ms)
+Rest (Aufnahme − erwartet): n=599 min 478.769 p5 478.801 Median 478.831 p95 478.963 max 489.884 ms (Spanne 11.114 ms)
+  p5–p95 des Rests: 0.162 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=14113 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 0
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=14114 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=14113 min 0.254 p5 0.778 Median 1.159 p95 3.195 max 33.247 µs (Spanne 32.993 µs)
+Abrufe Ausgabe: 14113, Abstand n=14112 min 13.417 p5 21.264 Median 21.334 p95 21.400 max 29.255 ms (Spanne 15.838 ms)
+  Länge: n=14113 min 21.333 p5 21.333 Median 21.333 p95 21.333 max 21.333 ms (Spanne 0.000 ms)
+  Δticks (Anzahl×Wert): 14112×1024
+Abrufe Aufnahme: 14114, Δticks (Anzahl×Wert): 14113×1024
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 0, Aufnahme 0; leere Abrufe Aufnahme 0
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+
+===== z3d-2-zusammenfassung.txt
+Z3 Klickmessung pw_stream (pw-messen), Beginn (Wanduhr) 1794435456227 ms, Dauer 300 s
+libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2, QCoreApplication ohne Qt Gui und Qt Multimedia
+Ausgang: dss_p12a_ausgabe (id 81), Eingang: dss_p12a_aufnahme (id 35), node.latency 1920/48000 = 40 ms
+Freigabe der Klicks nach 352.1 ms, Ende der Klicks bei 300.4 s, Exit-Code 0
+  Zustand aufnahme bei 0.1 ms: unconnected → connecting
+  Zustand ausgabe bei 1.6 ms: unconnected → connecting
+  Zustand aufnahme bei 10.8 ms: connecting → paused
+  Zustand ausgabe bei 10.9 ms: connecting → paused
+  Zustand aufnahme bei 26.2 ms: paused → streaming
+  Zustand ausgabe bei 30.7 ms: paused → streaming
+  Zustand ausgabe bei 301078.5 ms: streaming → paused
+  Zustand ausgabe bei 301078.7 ms: paused → unconnected
+  Zustand aufnahme bei 301078.9 ms: streaming → paused
+  Zustand aufnahme bei 301079.0 ms: paused → unconnected
+Klicks geschrieben 600, gefunden 599, fehlend 1, fremde Einsätze 1, ohne Zeitangabe 0
+Zuordnung nach der Zeit: Bezug 488.758 ms, Abstand zum Bezug n=599 min -10.024 p5 -9.945 Median -0.568 p95 9.948 max 10.047 ms (Spanne 20.071 ms)
+Startverzögerung (Freigabe bis Klick 0 in der Aufnahme): 674.364 ms
+Verzögerung roh (Schreiben → Aufnahme): n=599 min 478.734 p5 478.813 Median 488.191 p95 498.706 max 498.805 ms (Spanne 20.071 ms)
+Erwartete Verzögerung aus pw_time (erwartet − Schreiben): n=600 min -0.085 p5 -0.055 Median 9.924 p95 19.890 max 19.961 ms (Spanne 20.047 ms)
+Rest (Aufnahme − erwartet): n=599 min 478.770 p5 478.789 Median 478.823 p95 478.909 max 479.025 ms (Spanne 0.255 ms)
+  p5–p95 des Rests: 0.119 ms (E4 in Ruhe ≤ 15 ms)
+Gemeldete Verzögerung pw_time.delay (Ausgabe): n=14111 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+  queued (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  buffered (Frames) je Klick: n=600 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 Frames (Spanne 0.000 Frames)
+  Änderungen von delay, size oder rate: 0
+Gemeldete Verzögerung pw_time.delay (Aufnahme): n=14112 min 0.000 p5 0.000 Median 0.000 p95 0.000 max 0.000 ms (Spanne 0.000 ms)
+Uhr: pw_stream_get_nsec − steady_clock je Abruf: n=14111 min 0.272 p5 0.782 Median 1.207 p95 3.162 max 730.235 µs (Spanne 729.963 µs)
+Abrufe Ausgabe: 14111, Abstand n=14110 min 14.082 p5 21.269 Median 21.334 p95 21.394 max 28.550 ms (Spanne 14.468 ms)
+  Länge: n=14111 min 21.333 p5 21.333 Median 21.333 p95 21.333 max 21.333 ms (Spanne 0.000 ms)
+  Δticks (Anzahl×Wert): 14110×1024
+Abrufe Aufnahme: 14112, Δticks (Anzahl×Wert): 14111×1024
+Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+Sprünge der Zeitachse (Δticks ≠ vorige Zyklusgrösse, Hinweis auf Aussetzer, nicht geprüft): Ausgabe 0, Aufnahme 0; leere Abrufe Aufnahme 0
+Listen voll (verworfen): Abrufe Ausgabe 0, Aufnahme 0, Einsätze 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+
+===== z3d-last-art-zusammenfassung.txt
+Last in Z3d: leistung.py --video (2 Videos 1080p30 im Editor) in Schleife
+
+===== z3a-bibliotheken.txt
+libQt6Core.so.6
+libpipewire-0.3.so.0
+
+===== z3a-liste.txt
+QCoreApplication (ohne QGuiApplication), Qt 6.8.2, libpipewire 1.4.2 (Header 1.4.2)
+Ausgänge (Registry, media.class Audio/Sink):
+  alsa_output.pci-0000_00_1b.0.iec958-stereo «Internes Audio Digital Stereo (IEC958)» [Standard], id 44, object.serial 60
+  alsa_output.pci-0000_01_00.1.hdmi-stereo «TU116 High Definition Audio Controller Digital Stereo (HDMI)», id 57, object.serial 57
+  dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», id 81, object.serial 698
+Eingänge (Registry, media.class Audio/Source…):
+  dss_p12a_aufnahme «DSS P12a Messung Aufnahme», id 35, object.serial 697, media.class Audio/Source
+  alsa_input.pci-0000_00_1b.0.analog-stereo «Internes Audio Analog Stereo», id 45, object.serial 61, media.class Audio/Source
+Standard (Metadaten «default»): default.audio.sink alsa_output.pci-0000_00_1b.0.iec958-stereo, default.audio.source alsa_output.pci-0000_00_1b.0.iec958-stereo
+
+===== z3a-vergleich-m1a.txt
+gleich wie M1a: alsa_output.pci-0000_01_00.1.hdmi-stereo
+gleich wie M1a: alsa_output.pci-0000_00_1b.0.iec958-stereo
+gleich wie M1a: dss_p12a_ausgabe
+gleich wie M1a: alsa_input.pci-0000_00_1b.0.analog-stereo
+gleich wie M1a: dss_p12a_aufnahme
+
+===== Aufräumen
+2026-11-11 23:22:41 Aufräumen geprüft: keine dss_p12a-Knoten, clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo

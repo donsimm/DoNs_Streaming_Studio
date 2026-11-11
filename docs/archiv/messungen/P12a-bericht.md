@@ -10,6 +10,8 @@ Stand: 2026-11-11, nachgeführt mit Z0 (Neuauswertung von M1d, Abschnitt «Z0»)
 
 M3 (OBS, Lotse mit dem Nutzer) und M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, stehen aus.
 
+Nachgeführt 2026-11-11 (spät) mit **Z3** (P12b b1, Prototyp `pw-messen` mit `pw_stream`): Abschnitt «Z3» unten. Ergebnis: E2, E3, E4 erfüllt, **E1 nicht erfüllt** → Halt nach Plan.
+
 ## Kurzfassung
 
 | Messung | Grenze im Plan | Messwert (voller Lauf) | Urteil |
@@ -321,7 +323,84 @@ Z0 ändert an der Empfehlung P nichts:
 | Z0 | **ausgeführt 2026-11-11** (Auswertung, keine Messung): M1d aus den vorhandenen CSV-Dateien neu ausgewertet, Zuordnung nach der Zeit statt nach der Probenlage. Ergebnis im Abschnitt «Z0» | echte Streuung und Aussetzer unter Last, Verlauf der Verzögerung |
 | Z1 | M1c mit Puffer 40 und 80 ms, je 180 s; Wechsel 0 → 1024 → 2048 → 0; wirksames Quantum dabei mit `pw-top` lesen | Sprung bei Puffer ≥ 1 Quantum? Sprung auch beim Wechsel auf das Standard-Quantum 1024? |
 | Z2 | M1d mit Puffer 40 und 80 ms je 10 min unter derselben Last | Unterläufe und Probenverlust der Aufnahme bei grösserem Puffer |
-| Z3 | nur bei P: Prototyp mit `pw_stream`, M1c wiederholen, gemeldete Verzögerung gegen die Klickmessung | ob P den Sprung erkennt und meldet |
+| Z3 | **ausgeführt 2026-11-11** (P12b b1): Prototyp mit `pw_stream`, M1c wiederholen, gemeldete Verzögerung gegen die Klickmessung. Ergebnis im Abschnitt «Z3» | ob P den Sprung erkennt und meldet |
+
+## Z3: Prototyp mit `pw_stream` (P12b b1, Nachtlauf 11.11.)
+
+Plan: `docs/archiv/prompts/P12-ton.md`, Abschnitt «b1». Prototyp `pw-messen` und `pw-lauf.sh` im Stand des Commits «P12b b1: Prototyp pw-messen (pw_stream) und pw-lauf.sh für Z3». Daten: `docs/archiv/messungen/P12b-daten/`. Gemessen auf dem Studio-PC, libpipewire 1.4.2 (Header 1.4.2), Qt 6.8.2.
+
+### Befehle
+
+```
+bash /home/dominik/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh --kurz   # 2026-11-11 23:00:30–23:03:54, Exit-Code 0
+bash /home/dominik/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh          # 2026-11-11 23:04:02–23:22:41, Exit-Code 0
+```
+
+- Beide Läufe: vorher und nachher `clock.force-quantum 0`, Standardausgang `alsa_output.pci-0000_00_1b.0.iec958-stereo`; Aufräumen geprüft, keine `dss_p12a`-Knoten übrig. Alle Programme als `systemd-run --user` (`pw-lauf.sh:163`).
+- Weg wie M1: `pw_stream` (Ausgabe) → virtuelle Senke `dss_p12a_ausgabe` → `pw-loopback` → virtuelle Quelle `dss_p12a_aufnahme` → `pw_stream` (Aufnahme) im selben Prozess. `node.latency` 1920/48000 (40 ms).
+- Z3d-Last: `scripts/leistung.py --video` (2 Videos 1080p30 im Editor) in Schleife, keine Ersatzlast. CPU und GPU während Z3d sind nicht protokolliert (nicht geprüft).
+- Ordner: voller Lauf `2026-11-11-2304/`, Probelauf `2026-11-11-2300-kurz/`.
+
+### Kennzahlen
+
+«Rest» = Einsatz in der Aufnahme − erwartete hörbare Zeit aus `pw_time` (`pwklick.cpp:652-655`: Abrufzeit + (`buffered` + `queued` + Lage im Abruf)/Rate + `delay` − seit `pw_time.now` vergangene Zeit). Der Rest enthält den Messweg.
+
+| | Z3b Ruhe (voll 120 s / kurz 15 s) | Z3c Quantum (voll 180 s / kurz 45 s) | Z3d Last 1 / 2 (voll je 300 s) |
+|---|---|---|---|
+| Klicks geschrieben / gefunden | 240 / 239; 30 / 29 | 360 / 358; 90 / 89 | 600 / 599; 600 / 599 |
+| Rest Median | 478,782 ms | 478,792 ms (drei Stufen, siehe unten) | 478,831 / 478,823 ms |
+| **Rest p5–p95** | **0,067 ms**; 0,058 ms | 37,310 ms; 37,314 ms | 0,162 / 0,119 ms |
+| Rest Spanne | 1,866 ms; 0,080 ms | 44,467 ms; 37,330 ms | 11,114 / 0,255 ms |
+| Verzögerung roh, Median / Spanne | 488,254 / 20,095 ms | 490,710 / 41,383 ms | 488,155 / 26,182; 488,191 / 20,071 ms |
+| **Unterläufe** (leere / zu kurze Abrufe) | **0 / 0**; 0 / 0 | **0 / 0**; 0 / 0 | **0 / 0**; 0 / 0 |
+| `pw_time.delay`, `queued`, `buffered` (Ausgabe und Aufnahme) | immer 0 | immer 0 | immer 0 |
+| Sprünge der Lage (> 2 Proben) | 0 | 0 (Lage-Differenz immer 25 024 Proben) | 0 / 0 |
+| Sprünge der Zeitachse | 0 | 2 (bei den Wechseln, siehe unten) | 0 / 0 |
+| Abrufe: Länge | 21,333 ms (1024) | 5,333 / 21,333 / 42,667 ms je Quantum | 21,333 ms |
+
+Z3c-Q (Gegenlauf `ton-messen`, Q, Puffer 40 ms gewünscht, 30 ms erhalten), voller Lauf: 361 / 360 Klicks, **1 Unterlauf**, Sprung der Lage **+2048 Proben = +42,67 ms** bei Klick 117 (58,5 s, Wechsel auf 2048); ohne Pufferinhalt Median 73,3 ms, Spanne 65,5 ms. Probelauf gleich (1 Unterlauf, +2048 Proben bei Klick 27). Das Bild von M1c ist damit in derselben Nacht bestätigt.
+
+### E1: Wechsel des Quantums (Z3c)
+
+Median von 5 Klicks vor gegen 5 Klicks nach dem Wechsel (`z3c-zusammenfassung.txt`):
+
+| Wechsel | Lauf | Rest vorher → nachher | **Änderung Rest** | roher Sprung | erwartete Verzögerung | Lage-Differenz | E1 (≤ 10 ms) |
+|---|---|---|---|---|---|---|---|
+| 1024 → **2048** | voll | 478,768 → 457,476 | **−21,292 ms** | −5,402 ms | +9,302 ms | 25 024 → 25 024 | nicht erfüllt |
+| 2048 → **256** | voll | 457,503 → 494,768 | **+37,265 ms** | +13,303 ms | −23,954 ms | 25 024 → 25 024 | nicht erfüllt |
+| 256 → **0** (1024) | voll | 494,741 → 478,785 | **−15,956 ms** | −6,656 ms | +7,998 ms | 25 024 → 25 024 | nicht erfüllt |
+| 1024 → 2048 | kurz | 478,779 → 457,458 | −21,321 ms | −7,913 ms | +13,369 ms | 25 024 → 25 024 | nicht erfüllt |
+| 2048 → 256 | kurz | 457,473 → 494,769 | +37,296 ms | +18,688 ms | −11,998 ms | 25 024 → 25 024 | nicht erfüllt |
+| 256 → 0 | kurz | 494,769 → 478,788 | −15,981 ms | −7,952 ms | +6,673 ms | 25 024 → 25 024 | nicht erfüllt |
+
+Befunde zu E1:
+1. **`pw_stream` meldet keine Verzögerung.** `pw_time.delay`, `queued` und `buffered` sind in allen Läufen, auf Ausgabe und Aufnahme, bei jedem Abruf 0 (z. B. Z3c: 13 148 Abrufe). Gemeldet wird beim Wechsel nur die neue Zyklusgrösse (`size` 1024 → 2048 → 256 → 1024). Die «erwartete Verzögerung» besteht damit nur aus der Lage im Abruf und der seit `now` vergangenen Zeit. Ob `delay` an einem echten Gerät (ALSA-Senke statt virtueller Senke) einen Wert hat, ist nicht geprüft **[OFFEN]**.
+2. **Der Rest hängt genau an der Grösse des Quantums.** In jeder Stufe ist er praktisch fest: 478,79 ms bei 1024, 457,47 ms bei 2048, 494,77 ms bei 256 (Probelauf gleich auf 0,03 ms). Die Änderungen entsprechen −1024, +1792 und −768 Proben (−21,333 / +37,333 / −16,000 ms), also genau der Änderung des Quantums mit umgekehrtem Vorzeichen. Rest + Quantum ist in allen drei Stufen 500,12 ms (± 0,03 ms). Von Hand gerechnet aus den Medianen oben.
+3. **In Proben springt nichts.** Die Lage-Differenz (Aufnahme − Ausgabe) bleibt in allen Wechseln bei 25 024 Proben; Q springt in derselben Nacht um +2048 Proben.
+4. Ob der vom Quantum abhängige Teil hörbar ist (Ausgabe) oder nur aus dem Messweg kommt (Zeitstempel der Aufnahme am Ende eines Zyklus), ist mit diesem Aufbau nicht getrennt (nicht geprüft). Befund 2 und 3 zusammen passen zu «Zeitstempel je Zyklus, Lage unverändert». Wäre die Erwartung um ein Quantum (aus `size`) ergänzt, läge die Änderung des Rests unter 0,1 ms; das ist eine Rechnung aus den Medianen, keine Messung, und nicht Teil der vereinbarten Erfolgsbedingung.
+5. **Ein Klick fehlt beim Wechsel auf 256** (voller Lauf): Klick 197, geschrieben bei 99,013 s, erwartet in der Aufnahme bei rund 99,50 s; der Wechsel kam bei 99,487 s (`z3c.csv:199`). Gleichzeitig meldet der Prototyp einen «Sprung der Zeitachse» (Δticks 318 statt 2048, Ausgabe und Aufnahme). Unterlauf der Ausgabe meldet `pw_stream` dabei nicht. Ob der Klick in der Ausgabe, in `pw-loopback` oder in der Aufnahme verloren ging, ist nicht geprüft **[OFFEN]**. Beim Wechsel auf 2048 (Δticks 680) fehlt kein Klick, im Probelauf auch nicht. Die übrigen fehlenden Klicks sind je der letzte geschriebene (nach Ende der Messdauer), wie in M1.
+6. Je Lauf gibt es einen «fremden Einsatz» (Lage 25 024, vor Klick 0, z. B. `z3c.csv:362`). Er liegt vor dem ersten Klick und stört die Zuordnung nicht. Die Ursache ist nicht geprüft.
+
+### Erfolgsbedingung b1
+
+| Bedingung | Grenze | Messwert (voll; kurz) | Urteil |
+|---|---|---|---|
+| **E1** Sprung | Änderung des Rests ≤ 10 ms bei jedem der drei Wechsel | −21,3 / +37,3 / −16,0 ms; −21,3 / +37,3 / −16,0 ms. Roher Sprung −5,4 / +13,3 / −6,7 ms; −7,9 / +18,7 / −8,0 ms | **nicht erfüllt** |
+| **E2** Aussetzer | 0 Unterläufe in Z3b und Z3c | 0 und 0; 0 und 0 (aber 1 fehlender Klick beim Wechsel auf 256 im vollen Lauf, Befund 5) | erfüllt |
+| **E3** Dienst | `systemd-run --user`, `QCoreApplication`, ohne Qt Gui und Qt Multimedia; Geräte wie M1a | gebunden: `libQt6Core.so.6`, `libpipewire-0.3.so.0`; Vergleich mit M1a: 5 gleich, 0 fehlen, 0 neu | erfüllt |
+| **E4** Streuung | p5–p95 des Rests in Ruhe ≤ 15 ms | 0,067 ms; 0,058 ms (Q in M1b: 13,4 ms) | erfüllt |
+| Z3d | 0 Unterläufe | 0 / 0; 0 / 0. Streuung p5–p95 0,162 / 0,119 ms (Last), grösster Rest 489,9 ms (einmal, Lauf 1) | erfüllt |
+
+**Ergebnis:** E1 ist nicht erfüllt. Nach Plan: **Halt, kein Einbau** (b2 ff. erst nach dem Go des Nutzers).
+
+### Einordnung für den Entscheid (Empfehlung, nicht entschieden)
+
+- Gegenüber Q: in Proben kein Sprung (Q: +2048), keine Unterläufe beim Wechsel (Q: 1), Streuung in Ruhe 0,07 statt 13,4 ms, unter Last 0,12 bis 0,16 statt 40,7 ms (Z0, ohne Pufferinhalt), ohne Qt Gui im Prozess.
+- Gegen P spricht: `pw_stream` meldet in diesem Aufbau keine Verzögerung (`delay` 0). Den Ausgleich «Sprung melden und ausgleichen» (Frage 3) kann der Kern so nicht aus `delay` holen, höchstens aus `size`. Dazu ein verlorener Klick beim Wechsel auf 256.
+- Wege:
+  1. **Empfohlen:** P behalten, b1 nicht als gescheitert werten, sondern vor b2 klären (Entscheid des Nutzers): (a) ob E1 als «Lage in Proben» statt «Rest in ms» gelten darf, oder ob die Erwartung um ein Quantum aus `size` ergänzt und neu ausgewertet wird (aus den vorhandenen CSV möglich, ohne neue Messung); (b) `delay` an einem echten Ausgang messen (IEC958 oder RØDECaster, hörbar, also nur mit dem Nutzer oder nachts stumm geschaltet). Grund: Die Messung zeigt einen Rest, der fest an der Zyklusgrösse hängt, nicht eine unbekannte Verschiebung; Q ist in allen Punkten schlechter. Gegenargument: Die vereinbarte Bedingung ist nicht erfüllt, und die Ursache des verlorenen Klicks ist offen.
+  2. Rückfall Q: zuerst Z1 (M1c mit Puffer ≥ 1 Quantum). Qt Gui und Qt Multimedia im Kern; Sprung bleibt für den Kern unsichtbar (Z3c-Q bestätigt +42,67 ms).
+  3. G1 C (Ton über die Browserquelle an OBS): widerspricht dem Entscheid vom 2026-11-02, nur der Nutzer entscheidet.
 
 ## Weitere Befunde
 
@@ -339,6 +418,8 @@ Z0 ändert an der Empfehlung P nichts:
 | `prototypes/ton/neu_auswerten.py` | neu (Z0): Zuordnung nach der Zeit, Kennzahlen, Verlauf je 60 s, Gegenprobe; nur Python-Standardbibliothek |
 | `P12a-daten/<beide Läufe>/m1-last-20-neu.txt`, `m1-last-40-neu.txt`, `m1-gegenprobe-neu.txt` | neu (Z0): Ausgaben des Skripts |
 | dieser Bericht | nachgeführt (Z0): Entscheide des Nutzers 11.11., Abschnitte «Z0» und «Folgen von Z0 für G4 und P12b», offene Punkte |
+| dieser Bericht | nachgeführt (Z3): Abschnitt «Z3», Zusatzmessungen, offene Punkte, Interna, Quellen |
+| `docs/archiv/messungen/P12b-daten/2026-11-11-2304/` und `…/2026-11-11-2300-kurz/` | neu (Z3): `ergebnis.txt`, `pw-lauf.log`, alle `*-zusammenfassung.txt`, `z3a-*.txt`, `z3c-zeiten.txt`, `z3cq-zeiten.txt`; Rohdaten nur von Z3c (`z3c.csv`, `z3c-aufrufe.csv`) |
 
 ## Geprüft
 
@@ -349,6 +430,8 @@ Z0 ändert an der Empfehlung P nichts:
   - `@`: nur in den beiden `m1-quantum-pw-dump.json` (je 12 Treffer, E-Mail-Adressen der Autoren von PipeWire-Modulen). Diese Dateien sind nicht im Commit.
 - Die Rechenschritte in diesem Bericht (Differenzen, Umrechnung der Zeiten, Zuordnung) sind von Hand aus den genannten Zeilen der Dateien gerechnet, ohne Skript. Ausnahme: Abschnitt «Z0».
 - Z0, 2026-11-11: `python3 -I prototypes/ton/neu_auswerten.py docs/archiv/messungen/P12a-daten/2026-11-11-0343 docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz` (Python 3 von Debian 13): Exit-Code 0, keine Fehlermeldung, «Gegenprobe bestanden» für beide Läufe. Summe des Verlusts je 60 s gleich dem Verlust des ganzen Laufs (92 160 bzw. 18 176 Proben). Keine Messung, nichts abgespielt, kein Dienst gestartet.
+
+- Z3, 2026-11-11: Probelauf und voller Lauf mit den Befehlen im Abschnitt «Z3», beide Exit-Code 0, Aufräumen geprüft. Sonst nichts ausgeführt (kein Bau, kein `ctest`). Suche (ripgrep) in `P12b-daten/` ohne `*.json` nach `192.168`, `ts.net` und `@`: keine Treffer. Rechnungen in «E1, Befunde» von Hand aus den Medianen der Zusammenfassungen.
 
 ## Handtest
 
@@ -368,6 +451,12 @@ Kein Handtest nötig für diesen Commit. M3 und M4 aus dem Plan stehen aus (sieh
 - M2 mit Fenster ausserhalb des Bildschirms ist nicht gemessen (Fenster lag bei 0,27). Entscheid des Nutzers 11.11.: M2 wird nicht wiederholt.
 - **[OFFEN]** Erklärung «Einschwingen» für den Probelauf nicht nach Zeitfenstern geprüft.
 - **[OFFEN]** Warum `/proc/loadavg` unter Last 0,02 zeigte.
+- **[OFFEN]** Z3, E1 nicht erfüllt: Entscheid des Nutzers zum weiteren Weg (Abschnitt «Z3», «Einordnung»). b2 ff. erst nach Go.
+- **[OFFEN]** Z3: `pw_time.delay` ist an der virtuellen Senke immer 0; Wert an einem echten Ausgang nicht gemessen.
+- **[OFFEN]** Z3: Ob der vom Quantum abhängige Rest hörbar ist oder aus dem Messweg kommt.
+- **[OFFEN]** Z3: Ursache des fehlenden Klicks 197 beim Wechsel auf 256 (voller Lauf).
+- **[OFFEN]** Z3d: CPU und GPU während der Last nicht protokolliert.
+- **[OFFEN]** API von libpipewire gegen https://docs.pipewire.org/group__pw__stream.html in diesem Schritt nicht erneut gelesen (Schritt 0 gehörte zu Commit 1).
 
 ## Annahmen, Interna-Entscheide
 
@@ -387,6 +476,9 @@ Kein Handtest nötig für diesen Commit. M3 und M4 aus dem Plan stehen aus (sieh
 | `m1-quantum-pw-dump.json` (beide Läufe) nicht im Commit, unversioniert im Datenordner gelassen | enthält Benutzer- und Rechnernamen sowie Namen und E-Mail-Adressen Dritter (Autoren der PipeWire-Module). Der Auftrag schliesst Personennamen und Adressen im Commit aus. Die benötigten Werte stehen im Bericht |
 | Rohdaten von M1 und M2 (CSV, `m2-meldungen.csv.gz`) im Commit | Auffälligkeiten (Entscheid Lotse 09.11.: Rohdaten von M2 nur bei Auffälligkeiten): Z0 und die Prüfung «Einschwingen» brauchen sie |
 | Last-Rohdaten `build/p12a-nacht/` nicht im Repo | Auftrag; im Bericht zusammengefasst |
+| Z3: Rohdaten nur von Z3c im Commit (`z3c.csv`, `z3c-aufrufe.csv`, beide Läufe) | Auffälligkeiten nur dort (E1, fehlender Klick, Sprünge der Zeitachse). Z3b, Z3d und Z3c-Q ohne Auffälligkeit: CSV unversioniert im Datenordner |
+| Z3: `z3c-pw-dump.json` und `z3cq-pw-dump.json` nicht im Commit | Auftrag; enthalten Benutzer-, Rechner- und Personennamen (wie bei M1) |
+| Z3: E1 so bewertet, wie im Plan vereinbart (Rest in ms), nicht nach Lage in Proben | vereinbarte Bedingung; die andere Lesart steht nur als Empfehlung im Bericht |
 
 ## Quellen
 
@@ -398,6 +490,7 @@ Lokal gelesen (2026-11-11):
 - `docs/archiv/messungen/P12a-daten/2026-11-11-0343/*` und `…/2026-11-11-0338-kurz/*`
 - `build/p12a-nacht/2026-11-11-0343/leistung.log`, `last-1/` bis `last-8/` (`mpstat.txt`, `ergebnis.json`)
 - Z0: `prototypes/ton/klickmessung.cpp:314-401` (Spalten der CSV, Zuordnung, Zustände), `prototypes/ton/auswertung.cpp:7-26` (Rechnung der Kennzahlen, im Skript nachgebaut)
+- Z3: `docs/archiv/prompts/P12-ton.md` (Abschnitt «b1»), `prototypes/ton/pwklick.cpp:652-655` (erwartete Zeit), `prototypes/ton/pw-lauf.sh:163` (`systemd-run --user`), `docs/archiv/messungen/P12b-daten/*/ergebnis.txt`, `pw-lauf.log`, `z3c.csv`
 
 Im Code genannt, für diesen Bericht **nicht abgerufen** (kein Webzugriff in diesem Schritt):
 - https://doc.qt.io/qt-6.8/qaudiosink.html

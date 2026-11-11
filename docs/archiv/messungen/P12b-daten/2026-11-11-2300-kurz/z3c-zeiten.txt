@@ -1,0 +1,3 @@
+1794434469012 clock.force-quantum 2048
+1794434479202 clock.force-quantum 256
+1794434489159 clock.force-quantum 0
