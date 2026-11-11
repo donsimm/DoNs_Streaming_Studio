@@ -1,0 +1,32 @@
+Server-Lauf: 3606.2 s, 108068 Meldungen
+
+== Seite m2-ausserhalb
+Meldungen «bild»: 107886 in 3600.0 s (29.97 je s), Abschnitte (Start, Wiederholung): 60
+Ausgelassene Bilder (presentedFrames): 0, grösste Lücke 0
+
+Eintreffen im Prototyp (steady_clock) gegen mediaTime:
+  Gang: -38.78 ppm = -2.327 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.013 Median 0.287 p95 0.438 max 33.515 ms (Spanne 33.515 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.212 p5 58.563 Median 58.591 p95 58.621 max 75.235 ms (Spanne 50.023 ms)
+
+performance.now() beim Senden gegen mediaTime:
+  Gang: -38.76 ppm = -2.326 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.011 Median 0.295 p95 0.416 max 33.518 ms (Spanne 33.518 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.225 p5 58.576 Median 58.589 p95 58.604 max 75.237 ms (Spanne 50.011 ms)
+
+presentationTime gegen mediaTime:
+  Gang: -38.08 ppm = -2.285 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.011 Median 0.293 p95 0.418 max 34.830 ms (Spanne 34.830 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.227 p5 58.541 Median 58.549 p95 58.564 max 75.180 ms (Spanne 49.953 ms)
+
+expectedDisplayTime gegen mediaTime:
+  Gang: -37.17 ppm = -2.230 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.014 Median 0.284 p95 0.437 max 51.284 ms (Spanne 51.284 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.171 p5 58.490 Median 58.495 p95 58.513 max 75.127 ms (Spanne 49.956 ms)
+
+Weg Seite → Prototyp über dem kürzesten (enthält auch den Gang): n=107886 min 0.000 p5 0.262 Median 0.377 p95 0.504 max 9.467 ms (Spanne 9.467 ms)
+
+Nachführen: 28181 Einträge (alle 100 ms), Sprünge > 20 ms: 86
+  |Abweichung Ton − Soll| vor dem Ausgleich: n=28095 min 0.000 p5 0.414 Median 3.833 p95 7.314 max 22.913 ms (Spanne 22.913 ms)
+  0.000 s: Ausgang dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», Puffer 11520 Bytes
+  3.359 s: Start (start)

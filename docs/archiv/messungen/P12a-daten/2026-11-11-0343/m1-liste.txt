@@ -1,0 +1,8 @@
+QCoreApplication (ohne QGuiApplication), Qt 6.8.2
+Ausgänge (QMediaDevices::audioOutputs):
+  alsa_output.pci-0000_01_00.1.hdmi-stereo «TU116 High Definition Audio Controller Digital Stereo (HDMI)», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  alsa_output.pci-0000_00_1b.0.iec958-stereo «Internes Audio Digital Stereo (IEC958)» [Standard], bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+Eingänge (QMediaDevices::audioInputs):
+  alsa_input.pci-0000_00_1b.0.analog-stereo «Internes Audio Analog Stereo» [Standard], bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  dss_p12a_aufnahme «DSS P12a Messung Aufnahme», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja

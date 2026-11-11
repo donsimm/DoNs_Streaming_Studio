@@ -1,0 +1,28 @@
+Server-Lauf: 66.3 s, 1804 Meldungen
+
+== Seite m2-ausserhalb
+Meldungen «bild»: 1799 in 59.9 s (30.01 je s), Abschnitte (Start, Wiederholung): 1
+Ausgelassene Bilder (presentedFrames): 0, grösste Lücke 0
+
+Eintreffen im Prototyp (steady_clock) gegen mediaTime:
+  Gang: -433.86 ppm = -26.032 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.001 p5 0.308 Median 3.328 p95 7.827 max 35.432 ms (Spanne 35.431 ms)
+
+performance.now() beim Senden gegen mediaTime:
+  Gang: -432.59 ppm = -25.955 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.004 p5 0.297 Median 3.301 p95 7.817 max 36.571 ms (Spanne 36.567 ms)
+
+presentationTime gegen mediaTime:
+  Gang: -39.33 ppm = -2.360 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.000 p5 0.011 Median 0.299 p95 0.402 max 20.460 ms (Spanne 20.460 ms)
+
+expectedDisplayTime gegen mediaTime:
+  Gang: -37.97 ppm = -2.278 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.000 p5 0.013 Median 0.290 p95 0.419 max 36.887 ms (Spanne 36.887 ms)
+
+Weg Seite → Prototyp über dem kürzesten (enthält auch den Gang): n=1799 min 0.000 p5 0.122 Median 0.253 p95 0.377 max 1.429 ms (Spanne 1.429 ms)
+
+Nachführen: 487 Einträge (alle 100 ms), Sprünge > 20 ms: 1
+  |Abweichung Ton − Soll| vor dem Ausgleich: n=486 min 0.036 p5 0.491 Median 3.898 p95 7.455 max 15.972 ms (Spanne 15.936 ms)
+  0.000 s: Ausgang dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», Puffer 11520 Bytes
+  3.403 s: Start (start)

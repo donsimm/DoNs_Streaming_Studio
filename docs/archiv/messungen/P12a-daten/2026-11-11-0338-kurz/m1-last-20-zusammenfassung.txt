@@ -1,0 +1,49 @@
+M1 Klickmessung, Beginn (Wanduhr) 1794364817036 ms, Dauer 30 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 20 ms, erhalten 5760 Bytes = 15.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 29990515, elapsedUSecs 30012483 (Differenz -22.0 ms)
+Klicks geschrieben 61, gefunden 60, fehlend 1, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 50.284 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.2 ms
+Verzögerung Schreiben → Aufnahme: n=60 min 19.306 p5 30.772 Median 55.492 p95 78.495 max 91.592 ms (Spanne 72.286 ms)
+  ohne geschätzten Pufferinhalt: n=60 min 9.905 p5 15.680 Median 34.779 p95 55.550 max 58.788 ms (Spanne 48.882 ms)
+Abstand der Abrufe durch QAudioSink: n=703 min 34.584 p5 41.555 Median 41.807 p95 48.701 max 49.622 ms (Spanne 15.038 ms)
+Länge der Abrufe: n=704 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 35
+  bei Klick 2 (1.0 s): -128 Proben = -2.67 ms
+  bei Klick 3 (1.5 s): -128 Proben = -2.67 ms
+  bei Klick 4 (2.0 s): -128 Proben = -2.67 ms
+  bei Klick 5 (2.5 s): -128 Proben = -2.67 ms
+  bei Klick 6 (3.0 s): -128 Proben = -2.67 ms
+  bei Klick 8 (4.0 s): -384 Proben = -8.00 ms
+  bei Klick 10 (5.0 s): -256 Proben = -5.33 ms
+  bei Klick 11 (5.5 s): -128 Proben = -2.67 ms
+  bei Klick 12 (6.0 s): -128 Proben = -2.67 ms
+  bei Klick 13 (6.5 s): -128 Proben = -2.67 ms
+  bei Klick 14 (7.0 s): -256 Proben = -5.33 ms
+  bei Klick 15 (7.5 s): -256 Proben = -5.33 ms
+  bei Klick 16 (8.0 s): -128 Proben = -2.67 ms
+  bei Klick 17 (8.5 s): -128 Proben = -2.67 ms
+  bei Klick 19 (9.5 s): -256 Proben = -5.33 ms
+  bei Klick 22 (11.0 s): -128 Proben = -2.67 ms
+  bei Klick 24 (12.0 s): -384 Proben = -8.00 ms
+  bei Klick 26 (13.0 s): -128 Proben = -2.67 ms
+  bei Klick 27 (13.5 s): -128 Proben = -2.67 ms
+  bei Klick 28 (14.0 s): -384 Proben = -8.00 ms
+  bei Klick 29 (14.5 s): -128 Proben = -2.67 ms
+  bei Klick 30 (15.0 s): -128 Proben = -2.67 ms
+  bei Klick 32 (16.0 s): -128 Proben = -2.67 ms
+  bei Klick 36 (18.0 s): -128 Proben = -2.67 ms
+  bei Klick 38 (19.0 s): -128 Proben = -2.67 ms
+  bei Klick 39 (19.5 s): -128 Proben = -2.67 ms
+  bei Klick 40 (20.0 s): -128 Proben = -2.67 ms
+  bei Klick 44 (22.0 s): -128 Proben = -2.67 ms
+  bei Klick 46 (23.0 s): -128 Proben = -2.67 ms
+  bei Klick 50 (25.0 s): -128 Proben = -2.67 ms
+  bei Klick 52 (26.0 s): -128 Proben = -2.67 ms
+  bei Klick 54 (27.0 s): -128 Proben = -2.67 ms
+  bei Klick 55 (27.5 s): -128 Proben = -2.67 ms
+  bei Klick 57 (28.5 s): -128 Proben = -2.67 ms
+  bei Klick 59 (29.5 s): -128 Proben = -2.67 ms

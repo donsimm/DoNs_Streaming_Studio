@@ -1,0 +1,34 @@
+Started dss-p12a-m2-593305.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 180 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40.
+Server: http://127.0.0.1:24990/messseite.html (Daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton)
+1 s: 0 Meldungen, davon «bild» 0
+4.013 s hallo: {"art":"hallo","datei":"blitz-piep.webm","lauf":0,"n":0,"now":88.40000000596046,"obs":false,"pluginVersion":null,"seite":"m2-ausserhalb","sichtbarkeit":"visible","sofort":false,"userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/6.8.2 Chrome/122.0.6261.171 Safari/537.36"}
+4.013 s start: {"art":"start","datei":"blitz-piep.webm","lauf":1,"n":1,"now":89,"obs":false,"seite":"m2-ausserhalb"}
+4.023 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":2,"now":98.30000001192093,"obs":false,"seite":"m2-ausserhalb"}
+4.108 s video: {"art":"video","currentTime":0.000671,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":3,"now":183.09999999403954,"obs":false,"seite":"m2-ausserhalb"}
+61 s: 1707 Meldungen, davon «bild» 1703
+64.116 s sichtbarkeit: {"art":"sichtbarkeit","datei":"blitz-piep.webm","lauf":1,"n":1803,"now":60160.40000000596,"obs":false,"seite":"m2-ausserhalb","zustand":"hidden"}
+Stopping dss-p12a-m2-593305.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 180 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40...
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+Server-Lauf: 66.3 s, 1804 Meldungen
+== Seite m2-ausserhalb
+Meldungen «bild»: 1799 in 59.9 s (30.01 je s), Abschnitte (Start, Wiederholung): 1
+Ausgelassene Bilder (presentedFrames): 0, grösste Lücke 0
+Eintreffen im Prototyp (steady_clock) gegen mediaTime:
+  Gang: -433.86 ppm = -26.032 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.001 p5 0.308 Median 3.328 p95 7.827 max 35.432 ms (Spanne 35.431 ms)
+performance.now() beim Senden gegen mediaTime:
+  Gang: -432.59 ppm = -25.955 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.004 p5 0.297 Median 3.301 p95 7.817 max 36.571 ms (Spanne 36.567 ms)
+presentationTime gegen mediaTime:
+  Gang: -39.33 ppm = -2.360 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.000 p5 0.011 Median 0.299 p95 0.402 max 20.460 ms (Spanne 20.460 ms)
+expectedDisplayTime gegen mediaTime:
+  Gang: -37.97 ppm = -2.278 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=1799 min 0.000 p5 0.013 Median 0.290 p95 0.419 max 36.887 ms (Spanne 36.887 ms)
+Weg Seite → Prototyp über dem kürzesten (enthält auch den Gang): n=1799 min 0.000 p5 0.122 Median 0.253 p95 0.377 max 1.429 ms (Spanne 1.429 ms)
+Nachführen: 487 Einträge (alle 100 ms), Sprünge > 20 ms: 1
+  |Abweichung Ton − Soll| vor dem Ausgleich: n=486 min 0.036 p5 0.491 Median 3.898 p95 7.455 max 15.972 ms (Spanne 15.936 ms)
+  0.000 s: Ausgang dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», Puffer 11520 Bytes
+  3.403 s: Start (start)
+Stopped dss-p12a-m2-593305.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 180 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40.
+dss-p12a-m2-593305.service: Consumed 2.026s CPU time, 80.9M memory peak.

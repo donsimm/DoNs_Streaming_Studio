@@ -1,0 +1,220 @@
+2026-11-11 03:38:09 P12a Nachtlauf (kurz), Ausgabe /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz
+2026-11-11 03:38:09 Rechner: Studio-PC, Last (1/5/15 min): 0.78 0.21 0.06
+2026-11-11 03:38:09 Vorher: clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:38:11 pw-loopback läuft (PID 593343), Knoten: dss_p12a_aufnahme=49 dss_p12a_ausgabe=63 
+2026-11-11 03:38:11 M1a: Geräteliste im Benutzerdienst
+QCoreApplication (ohne QGuiApplication), Qt 6.8.2
+Ausgänge (QMediaDevices::audioOutputs):
+  alsa_output.pci-0000_01_00.1.hdmi-stereo «TU116 High Definition Audio Controller Digital Stereo (HDMI)», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  alsa_output.pci-0000_00_1b.0.iec958-stereo «Internes Audio Digital Stereo (IEC958)» [Standard], bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+Eingänge (QMediaDevices::audioInputs):
+  alsa_input.pci-0000_00_1b.0.analog-stereo «Internes Audio Analog Stereo» [Standard], bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  dss_p12a_aufnahme «DSS P12a Messung Aufnahme», bevorzugt 48000 Hz 2 Kanäle, Raten 1–768000, Kanäle 1–32, float 48 kHz Stereo: ja
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:38:12 M1b: Ruhe, Puffer 10 ms, 15 s
+Messung läuft: 15 s, Puffer 10 ms gewünscht, 2944 Bytes = 7.67 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364693320 ms, Dauer 15 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 10 ms, erhalten 2944 Bytes = 7.67 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 14997730, elapsedUSecs 15011115 (Differenz -13.4 ms)
+Klicks geschrieben 31, gefunden 31, fehlend 0, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 58.855 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.1 ms
+Verzögerung Schreiben → Aufnahme: n=31 min 21.403 p5 46.983 Median 69.418 p95 87.723 max 88.532 ms (Spanne 67.129 ms)
+  ohne geschätzten Pufferinhalt: n=31 min -2.597 p5 44.582 Median 48.347 p95 50.685 max 52.009 ms (Spanne 54.607 ms)
+Abstand der Abrufe durch QAudioSink: n=664 min 2.061 p5 3.070 Median 39.024 p95 42.179 max 42.285 ms (Spanne 40.224 ms)
+Länge der Abrufe: n=665 min 0.000 p5 0.000 Median 42.667 p95 42.667 max 42.667 ms (Spanne 42.667 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 1
+  bei Klick 6 (3.0 s): -128 Proben = -2.67 ms
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:38:28 M1b: Ruhe, Puffer 20 ms, 15 s
+Messung läuft: 15 s, Puffer 20 ms gewünscht, 5760 Bytes = 15.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364710036 ms, Dauer 15 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 20 ms, erhalten 5760 Bytes = 15.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 14991385, elapsedUSecs 15011032 (Differenz -19.6 ms)
+Klicks geschrieben 31, gefunden 31, fehlend 0, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 48.096 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.1 ms
+Verzögerung Schreiben → Aufnahme: n=31 min 13.573 p5 33.496 Median 56.524 p95 76.392 max 76.935 ms (Spanne 63.362 ms)
+  ohne geschätzten Pufferinhalt: n=31 min -10.427 p5 32.470 Median 37.862 p95 41.063 max 41.300 ms (Spanne 51.727 ms)
+Abstand der Abrufe durch QAudioSink: n=351 min 35.483 p5 41.526 Median 42.514 p95 48.628 max 49.627 ms (Spanne 14.144 ms)
+Länge der Abrufe: n=352 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:38:45 M1b: Ruhe, Puffer 40 ms, 15 s
+Messung läuft: 15 s, Puffer 40 ms gewünscht, 11520 Bytes = 30.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364726738 ms, Dauer 15 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 40 ms, erhalten 11520 Bytes = 30.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 14983990, elapsedUSecs 15011491 (Differenz -27.5 ms)
+Klicks geschrieben 31, gefunden 30, fehlend 1, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 50.067 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 448.0 ms
+Verzögerung Schreiben → Aufnahme: n=30 min 23.617 p5 43.113 Median 66.045 p95 83.766 max 91.534 ms (Spanne 67.917 ms)
+  ohne geschätzten Pufferinhalt: n=30 min 23.617 p5 36.915 Median 43.546 p95 50.254 max 51.030 ms (Spanne 27.412 ms)
+Abstand der Abrufe durch QAudioSink: n=351 min 29.179 p5 30.195 Median 45.275 p95 45.304 max 45.347 ms (Spanne 16.167 ms)
+Länge der Abrufe: n=352 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:39:02 M1b: Ruhe, Puffer 80 ms, 15 s
+Messung läuft: 15 s, Puffer 80 ms gewünscht, 23040 Bytes = 60.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364743466 ms, Dauer 15 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 80 ms, erhalten 23040 Bytes = 60.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 14989815, elapsedUSecs 15012276 (Differenz -22.5 ms)
+Klicks geschrieben 31, gefunden 31, fehlend 0, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 31.451 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.0 ms
+Verzögerung Schreiben → Aufnahme: n=31 min -0.794 p5 38.028 Median 58.584 p95 79.018 max 79.134 ms (Spanne 79.928 ms)
+  ohne geschätzten Pufferinhalt: n=31 min -18.127 p5 14.296 Median 23.114 p95 32.724 max 33.620 ms (Spanne 51.748 ms)
+Abstand der Abrufe durch QAudioSink: n=351 min 0.050 p5 39.203 Median 40.204 p95 60.285 max 60.474 ms (Spanne 60.424 ms)
+Länge der Abrufe: n=352 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:39:19 M1c: Quantum, Puffer 40 ms, 45 s
+2026-11-11 03:39:34 M1c: clock.force-quantum 2048 (gelesen: 2048)
+2026-11-11 03:39:44 M1c: clock.force-quantum 256 (gelesen: 256)
+2026-11-11 03:39:54 M1c: clock.force-quantum 0 (gelesen: 0)
+Messung läuft: 45 s, Puffer 40 ms gewünscht, 11520 Bytes = 30.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364760221 ms, Dauer 45 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 40 ms, erhalten 11520 Bytes = 30.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 44950008, elapsedUSecs 45012524 (Differenz -62.5 ms)
+Klicks geschrieben 91, gefunden 90, fehlend 1, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 70.183 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.1 ms
+Verzögerung Schreiben → Aufnahme: n=90 min 42.699 p5 54.684 Median 77.356 p95 103.613 max 129.960 ms (Spanne 87.261 ms)
+  ohne geschätzten Pufferinhalt: n=90 min 41.953 p5 43.443 Median 56.106 p95 71.976 max 115.293 ms (Spanne 73.340 ms)
+Abstand der Abrufe durch QAudioSink: n=1054 min 29.178 p5 30.195 Median 45.275 p95 45.331 max 59.427 ms (Spanne 30.249 ms)
+Länge der Abrufe: n=1055 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 4 Wechsel, davon «leer» 1, Fehler «Unterlauf» 1
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 1
+  bei Klick 28 (14.0 s): 2048 Proben = 42.67 ms
+2026-11-11 03:40:05 M1d: Last gestartet: leistung.py --video (2 Videos 1080p30 im Editor) in Schleife
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:40:15 M1d: Last, Puffer 20 ms, 30 s, Last (1 min) 0.18
+Messung läuft: 30 s, Puffer 20 ms gewünscht, 5760 Bytes = 15.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364817036 ms, Dauer 30 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 20 ms, erhalten 5760 Bytes = 15.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 29990515, elapsedUSecs 30012483 (Differenz -22.0 ms)
+Klicks geschrieben 61, gefunden 60, fehlend 1, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 50.284 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 452.2 ms
+Verzögerung Schreiben → Aufnahme: n=60 min 19.306 p5 30.772 Median 55.492 p95 78.495 max 91.592 ms (Spanne 72.286 ms)
+  ohne geschätzten Pufferinhalt: n=60 min 9.905 p5 15.680 Median 34.779 p95 55.550 max 58.788 ms (Spanne 48.882 ms)
+Abstand der Abrufe durch QAudioSink: n=703 min 34.584 p5 41.555 Median 41.807 p95 48.701 max 49.622 ms (Spanne 15.038 ms)
+Länge der Abrufe: n=704 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 35
+  bei Klick 2 (1.0 s): -128 Proben = -2.67 ms
+  bei Klick 3 (1.5 s): -128 Proben = -2.67 ms
+  bei Klick 4 (2.0 s): -128 Proben = -2.67 ms
+  bei Klick 5 (2.5 s): -128 Proben = -2.67 ms
+  bei Klick 6 (3.0 s): -128 Proben = -2.67 ms
+  bei Klick 8 (4.0 s): -384 Proben = -8.00 ms
+  bei Klick 10 (5.0 s): -256 Proben = -5.33 ms
+  bei Klick 11 (5.5 s): -128 Proben = -2.67 ms
+  bei Klick 12 (6.0 s): -128 Proben = -2.67 ms
+  bei Klick 13 (6.5 s): -128 Proben = -2.67 ms
+  bei Klick 14 (7.0 s): -256 Proben = -5.33 ms
+  bei Klick 15 (7.5 s): -256 Proben = -5.33 ms
+  bei Klick 16 (8.0 s): -128 Proben = -2.67 ms
+  bei Klick 17 (8.5 s): -128 Proben = -2.67 ms
+  bei Klick 19 (9.5 s): -256 Proben = -5.33 ms
+  bei Klick 22 (11.0 s): -128 Proben = -2.67 ms
+  bei Klick 24 (12.0 s): -384 Proben = -8.00 ms
+  bei Klick 26 (13.0 s): -128 Proben = -2.67 ms
+  bei Klick 27 (13.5 s): -128 Proben = -2.67 ms
+  bei Klick 28 (14.0 s): -384 Proben = -8.00 ms
+  bei Klick 29 (14.5 s): -128 Proben = -2.67 ms
+  bei Klick 30 (15.0 s): -128 Proben = -2.67 ms
+  bei Klick 32 (16.0 s): -128 Proben = -2.67 ms
+  bei Klick 36 (18.0 s): -128 Proben = -2.67 ms
+  bei Klick 38 (19.0 s): -128 Proben = -2.67 ms
+  bei Klick 39 (19.5 s): -128 Proben = -2.67 ms
+  bei Klick 40 (20.0 s): -128 Proben = -2.67 ms
+  bei Klick 44 (22.0 s): -128 Proben = -2.67 ms
+  bei Klick 46 (23.0 s): -128 Proben = -2.67 ms
+  bei Klick 50 (25.0 s): -128 Proben = -2.67 ms
+  bei Klick 52 (26.0 s): -128 Proben = -2.67 ms
+  bei Klick 54 (27.0 s): -128 Proben = -2.67 ms
+  bei Klick 55 (27.5 s): -128 Proben = -2.67 ms
+  bei Klick 57 (28.5 s): -128 Proben = -2.67 ms
+  bei Klick 59 (29.5 s): -128 Proben = -2.67 ms
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:40:47 M1d: Last, Puffer 40 ms, 30 s, Last (1 min) 0.11
+Messung läuft: 30 s, Puffer 40 ms gewünscht, 11520 Bytes = 30.00 ms erhalten, Aufnahmepuffer 0 Bytes
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+M1 Klickmessung, Beginn (Wanduhr) 1794364848813 ms, Dauer 30 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 40 ms, erhalten 11520 Bytes = 30.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 29963894, elapsedUSecs 30015963 (Differenz -52.1 ms)
+Klicks geschrieben 60, gefunden 60, fehlend 0, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 55.711 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 449.1 ms
+Verzögerung Schreiben → Aufnahme: n=60 min 19.827 p5 24.743 Median 58.616 p95 98.551 max 103.133 ms (Spanne 83.306 ms)
+  ohne geschätzten Pufferinhalt: n=60 min 10.531 p5 13.379 Median 25.930 p95 66.819 max 72.512 ms (Spanne 61.981 ms)
+Abstand der Abrufe durch QAudioSink: n=702 min 29.211 p5 30.220 Median 45.306 p95 45.441 max 48.564 ms (Spanne 19.354 ms)
+Länge der Abrufe: n=703 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 2
+  bei Klick 23 (11.5 s): -256 Proben = -5.33 ms
+  bei Klick 40 (20.0 s): -256 Proben = -5.33 ms
+2026-11-11 03:41:21 Last beendet
+  pw: force_quantum 0
+  pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
+  pw: knoten 49 dss_p12a_aufnahme
+  pw: knoten 63 dss_p12a_ausgabe
+2026-11-11 03:41:51 M2: Server (Dienst) und Messseite in Qt WebEngine, 60 s, Nachführen: --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40
+Seite geladen: ja, Fenster bei 0,27 1290x754
+2026-11-11 03:42:24 M2: nach 30 s 838 Meldungen «bild» (Fenster ausserhalb des Bildschirms)
+2026-11-11 03:42:55 M2: Seite beendet (Exit 0)
+2026-11-11 03:42:58 Messungen fertig
+2026-11-11 03:42:58 Aufräumen (Exit-Code bis hier 0)
+2026-11-11 03:43:01 Aufräumen geprüft: keine dss_p12a-Knoten, clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
+2026-11-11 03:43:01 Ergebnis: /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz/ergebnis.txt

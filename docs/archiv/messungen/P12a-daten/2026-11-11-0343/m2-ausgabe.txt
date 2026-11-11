@@ -1,0 +1,273 @@
+Started dss-p12a-m2-595840.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 3720 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40.
+Server: http://127.0.0.1:24990/messseite.html (Daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton)
+1 s: 0 Meldungen, davon «bild» 0
+3.957 s hallo: {"art":"hallo","datei":"blitz-piep.webm","lauf":0,"n":0,"now":80,"obs":false,"pluginVersion":null,"seite":"m2-ausserhalb","sichtbarkeit":"visible","sofort":false,"userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/6.8.2 Chrome/122.0.6261.171 Safari/537.36"}
+3.957 s start: {"art":"start","datei":"blitz-piep.webm","lauf":1,"n":1,"now":80.5,"obs":false,"seite":"m2-ausserhalb"}
+3.961 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":2,"now":83.90000000596046,"obs":false,"seite":"m2-ausserhalb"}
+4.044 s video: {"art":"video","currentTime":0.002223,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":4,"now":167.40000000596046,"obs":false,"seite":"m2-ausserhalb"}
+61 s: 1707 Meldungen, davon «bild» 1703
+64.083 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":1804,"now":60205.40000000596,"obs":false,"seite":"m2-ausserhalb"}
+64.088 s video: {"art":"video","currentTime":0.001205,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":1806,"now":60210.09999999404,"obs":false,"seite":"m2-ausserhalb"}
+64.088 s video: {"art":"video","currentTime":0.001535,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":1807,"now":60210.40000000596,"obs":false,"seite":"m2-ausserhalb"}
+121 s: 3515 Meldungen, davon «bild» 3508
+124.146 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":3607,"now":120269.20000001788,"obs":false,"seite":"m2-ausserhalb"}
+124.152 s video: {"art":"video","currentTime":0.00044,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":3609,"now":120273.70000001788,"obs":false,"seite":"m2-ausserhalb"}
+124.152 s video: {"art":"video","currentTime":0.000904,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":3610,"now":120274.20000001788,"obs":false,"seite":"m2-ausserhalb"}
+181 s: 5316 Meldungen, davon «bild» 5306
+184.211 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":5410,"now":180333.70000001788,"obs":false,"seite":"m2-ausserhalb"}
+184.216 s video: {"art":"video","currentTime":0.001343,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":5412,"now":180338.70000001788,"obs":false,"seite":"m2-ausserhalb"}
+184.216 s video: {"art":"video","currentTime":0.001717,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":5413,"now":180339,"obs":false,"seite":"m2-ausserhalb"}
+241 s: 7123 Meldungen, davon «bild» 7110
+244.275 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":7213,"now":240397.70000001788,"obs":false,"seite":"m2-ausserhalb"}
+244.281 s video: {"art":"video","currentTime":0.000436,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":7215,"now":240402.40000000596,"obs":false,"seite":"m2-ausserhalb"}
+244.281 s video: {"art":"video","currentTime":0.000792,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":7216,"now":240402.80000001192,"obs":false,"seite":"m2-ausserhalb"}
+301 s: 8924 Meldungen, davon «bild» 8908
+304.339 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":9016,"now":300462.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+304.345 s video: {"art":"video","currentTime":0.000794,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":9018,"now":300467.09999999404,"obs":false,"seite":"m2-ausserhalb"}
+304.345 s video: {"art":"video","currentTime":0.001081,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":9019,"now":300467.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+361 s: 10731 Meldungen, davon «bild» 10712
+364.404 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":10819,"now":360526.59999999404,"obs":false,"seite":"m2-ausserhalb"}
+364.409 s video: {"art":"video","currentTime":0.000708,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":10821,"now":360531.5,"obs":false,"seite":"m2-ausserhalb"}
+364.409 s video: {"art":"video","currentTime":0.001115,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":10822,"now":360531.90000000596,"obs":false,"seite":"m2-ausserhalb"}
+421 s: 12532 Meldungen, davon «bild» 12510
+424.469 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":12622,"now":420591,"obs":false,"seite":"m2-ausserhalb"}
+424.474 s video: {"art":"video","currentTime":0.001038,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":12624,"now":420595.90000000596,"obs":false,"seite":"m2-ausserhalb"}
+424.474 s video: {"art":"video","currentTime":0.001429,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":12625,"now":420596.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+482 s: 14340 Meldungen, davon «bild» 14315
+484.532 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":14425,"now":480655.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+484.538 s video: {"art":"video","currentTime":0.000294,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":14427,"now":480659.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+484.538 s video: {"art":"video","currentTime":0.00068,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":14428,"now":480660,"obs":false,"seite":"m2-ausserhalb"}
+542 s: 16140 Meldungen, davon «bild» 16112
+544.597 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":16228,"now":540719.8000000119,"obs":false,"seite":"m2-ausserhalb"}
+544.602 s video: {"art":"video","currentTime":0.000201,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":16230,"now":540724.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+544.602 s video: {"art":"video","currentTime":0.00079,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":16231,"now":540724.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+602 s: 17941 Meldungen, davon «bild» 17910
+604.661 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":18031,"now":600784.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+604.666 s video: {"art":"video","currentTime":0.00038,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":18033,"now":600789,"obs":false,"seite":"m2-ausserhalb"}
+604.666 s video: {"art":"video","currentTime":0.001122,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":18034,"now":600789.8000000119,"obs":false,"seite":"m2-ausserhalb"}
+662 s: 19748 Meldungen, davon «bild» 19714
+664.726 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":19834,"now":660849,"obs":false,"seite":"m2-ausserhalb"}
+664.731 s video: {"art":"video","currentTime":0.00025,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":19836,"now":660853.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+664.731 s video: {"art":"video","currentTime":0.000743,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":19837,"now":660853.599999994,"obs":false,"seite":"m2-ausserhalb"}
+722 s: 21549 Meldungen, davon «bild» 21512
+724.790 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":21637,"now":720913.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+724.795 s video: {"art":"video","currentTime":0.000453,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":21639,"now":720917.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+724.795 s video: {"art":"video","currentTime":0.001001,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":21640,"now":720917.900000006,"obs":false,"seite":"m2-ausserhalb"}
+782 s: 23356 Meldungen, davon «bild» 23316
+784.854 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":23440,"now":780977.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+784.859 s video: {"art":"video","currentTime":0.001116,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":23442,"now":780982.099999994,"obs":false,"seite":"m2-ausserhalb"}
+784.859 s video: {"art":"video","currentTime":0.001545,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":23443,"now":780982.599999994,"obs":false,"seite":"m2-ausserhalb"}
+842 s: 25163 Meldungen, davon «bild» 25120
+844.918 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":25243,"now":841041.400000006,"obs":false,"seite":"m2-ausserhalb"}
+844.923 s video: {"art":"video","currentTime":0.00024,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":25245,"now":841046.099999994,"obs":false,"seite":"m2-ausserhalb"}
+844.924 s video: {"art":"video","currentTime":0.000721,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":25246,"now":841046.599999994,"obs":false,"seite":"m2-ausserhalb"}
+902 s: 26971 Meldungen, davon «bild» 26925
+904.983 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":27046,"now":901106.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+904.987 s video: {"art":"video","currentTime":0.000245,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":27048,"now":901110.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+904.989 s video: {"art":"video","currentTime":0.000708,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":27049,"now":901110.599999994,"obs":false,"seite":"m2-ausserhalb"}
+963 s: 28778 Meldungen, davon «bild» 28729
+965.048 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":28849,"now":961170.3000000119,"obs":false,"seite":"m2-ausserhalb"}
+965.053 s video: {"art":"video","currentTime":0.00059,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":28851,"now":961175.400000006,"obs":false,"seite":"m2-ausserhalb"}
+965.053 s video: {"art":"video","currentTime":0.001159,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":28852,"now":961176,"obs":false,"seite":"m2-ausserhalb"}
+1023 s: 30585 Meldungen, davon «bild» 30533
+1025.112 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":30652,"now":1021235.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+1025.118 s video: {"art":"video","currentTime":0.000286,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":30654,"now":1021239.900000006,"obs":false,"seite":"m2-ausserhalb"}
+1025.118 s video: {"art":"video","currentTime":0.001031,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":30655,"now":1021240.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1083 s: 32386 Meldungen, davon «bild» 32331
+1085.177 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":32455,"now":1081300,"obs":false,"seite":"m2-ausserhalb"}
+1085.181 s video: {"art":"video","currentTime":0.00025,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":32456,"now":1081304.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+1085.182 s video: {"art":"video","currentTime":0.000746,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":32457,"now":1081304.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1143 s: 34193 Meldungen, davon «bild» 34135
+1145.241 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":34258,"now":1141364.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1145.246 s video: {"art":"video","currentTime":0.000275,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":34259,"now":1141368.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1145.246 s video: {"art":"video","currentTime":0.000813,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":34260,"now":1141368.900000006,"obs":false,"seite":"m2-ausserhalb"}
+1203 s: 35994 Meldungen, davon «bild» 35933
+1205.306 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":36061,"now":1201428.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1205.310 s video: {"art":"video","currentTime":0.000236,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":36062,"now":1201432.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1205.310 s video: {"art":"video","currentTime":0.000794,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":36063,"now":1201433.099999994,"obs":false,"seite":"m2-ausserhalb"}
+1263 s: 37801 Meldungen, davon «bild» 37737
+1265.370 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":37864,"now":1261492.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1265.374 s video: {"art":"video","currentTime":0.000231,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":37865,"now":1261496.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1265.374 s video: {"art":"video","currentTime":0.000805,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":37866,"now":1261497.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1323 s: 39608 Meldungen, davon «bild» 39541
+1325.434 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":39667,"now":1321556.900000006,"obs":false,"seite":"m2-ausserhalb"}
+1325.438 s video: {"art":"video","currentTime":0.000188,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":39668,"now":1321560.800000012,"obs":false,"seite":"m2-ausserhalb"}
+1325.438 s video: {"art":"video","currentTime":0.000696,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":39669,"now":1321561.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1383 s: 41409 Meldungen, davon «bild» 41339
+1385.498 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":41470,"now":1381620.800000012,"obs":false,"seite":"m2-ausserhalb"}
+1385.503 s video: {"art":"video","currentTime":0.000218,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":41471,"now":1381625.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1385.503 s video: {"art":"video","currentTime":0.000722,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":41472,"now":1381625.800000012,"obs":false,"seite":"m2-ausserhalb"}
+1444 s: 43216 Meldungen, davon «bild» 43143
+1445.563 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":43273,"now":1441685.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1445.567 s video: {"art":"video","currentTime":0.000216,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":43274,"now":1441689.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1445.567 s video: {"art":"video","currentTime":0.000758,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":43275,"now":1441690.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+1504 s: 45017 Meldungen, davon «bild» 44941
+1505.627 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":45076,"now":1501749.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1505.632 s video: {"art":"video","currentTime":0.000272,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":45077,"now":1501754,"obs":false,"seite":"m2-ausserhalb"}
+1505.632 s video: {"art":"video","currentTime":0.00091,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":45078,"now":1501754.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1564 s: 46824 Meldungen, davon «bild» 46745
+1565.691 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":46879,"now":1561814.099999994,"obs":false,"seite":"m2-ausserhalb"}
+1565.695 s video: {"art":"video","currentTime":0.000201,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":46880,"now":1561818.099999994,"obs":false,"seite":"m2-ausserhalb"}
+1565.696 s video: {"art":"video","currentTime":0.000677,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":46881,"now":1561818.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1624 s: 48631 Meldungen, davon «bild» 48549
+1625.756 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":48682,"now":1621878.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1625.760 s video: {"art":"video","currentTime":0.000202,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":48683,"now":1621882.099999994,"obs":false,"seite":"m2-ausserhalb"}
+1625.760 s video: {"art":"video","currentTime":0.00075,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":48684,"now":1621882.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1684 s: 50439 Meldungen, davon «bild» 50354
+1685.819 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":50485,"now":1681942.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1685.823 s video: {"art":"video","currentTime":0.000202,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":50486,"now":1681946.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+1685.824 s video: {"art":"video","currentTime":0.000612,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":50487,"now":1681946.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1744 s: 52240 Meldungen, davon «bild» 52152
+1745.883 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":52288,"now":1742006.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1745.888 s video: {"art":"video","currentTime":0.000218,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":52289,"now":1742010.5,"obs":false,"seite":"m2-ausserhalb"}
+1745.888 s video: {"art":"video","currentTime":0.00081,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":52290,"now":1742011,"obs":false,"seite":"m2-ausserhalb"}
+1804 s: 54047 Meldungen, davon «bild» 53956
+1805.948 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":54091,"now":1802070.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1805.952 s video: {"art":"video","currentTime":0.000224,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":54092,"now":1802074.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1805.952 s video: {"art":"video","currentTime":0.000877,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":54093,"now":1802075.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1864 s: 55848 Meldungen, davon «bild» 55754
+1866.012 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":55894,"now":1862134.800000012,"obs":false,"seite":"m2-ausserhalb"}
+1866.016 s video: {"art":"video","currentTime":0.000237,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":55895,"now":1862138.7000000179,"obs":false,"seite":"m2-ausserhalb"}
+1866.016 s video: {"art":"video","currentTime":0.000871,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":55896,"now":1862139.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1925 s: 57655 Meldungen, davon «bild» 57558
+1926.076 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":57697,"now":1922198.900000006,"obs":false,"seite":"m2-ausserhalb"}
+1926.081 s video: {"art":"video","currentTime":0.000319,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":57699,"now":1922203.300000012,"obs":false,"seite":"m2-ausserhalb"}
+1926.081 s video: {"art":"video","currentTime":0.000914,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":57700,"now":1922203.900000006,"obs":false,"seite":"m2-ausserhalb"}
+1985 s: 59456 Meldungen, davon «bild» 59356
+1986.140 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":59500,"now":1982263.400000006,"obs":false,"seite":"m2-ausserhalb"}
+1986.145 s video: {"art":"video","currentTime":0.000627,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":59501,"now":1982267.599999994,"obs":false,"seite":"m2-ausserhalb"}
+1986.145 s video: {"art":"video","currentTime":0.001118,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":59502,"now":1982268.099999994,"obs":false,"seite":"m2-ausserhalb"}
+2045 s: 61263 Meldungen, davon «bild» 61160
+2046.205 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":61303,"now":2042327.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2046.209 s video: {"art":"video","currentTime":0.000285,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":61305,"now":2042331.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2046.210 s video: {"art":"video","currentTime":0.000982,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":61306,"now":2042332.2000000179,"obs":false,"seite":"m2-ausserhalb"}
+2105 s: 63070 Meldungen, davon «bild» 62964
+2106.269 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":63106,"now":2102391.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2106.274 s video: {"art":"video","currentTime":0.000248,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":63108,"now":2102396.200000018,"obs":false,"seite":"m2-ausserhalb"}
+2106.274 s video: {"art":"video","currentTime":0.000846,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":63109,"now":2102396.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2165 s: 64871 Meldungen, davon «bild» 64762
+2166.333 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":64909,"now":2162456.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2166.338 s video: {"art":"video","currentTime":0.000218,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":64910,"now":2162460.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2166.338 s video: {"art":"video","currentTime":0.000827,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":64911,"now":2162461.200000018,"obs":false,"seite":"m2-ausserhalb"}
+2225 s: 66678 Meldungen, davon «bild» 66566
+2226.398 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":66712,"now":2222520.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2226.402 s video: {"art":"video","currentTime":0.000213,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":66713,"now":2222524.5,"obs":false,"seite":"m2-ausserhalb"}
+2226.402 s video: {"art":"video","currentTime":0.000767,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":66714,"now":2222525,"obs":false,"seite":"m2-ausserhalb"}
+2285 s: 68479 Meldungen, davon «bild» 68364
+2286.462 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":68515,"now":2282584.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2286.467 s video: {"art":"video","currentTime":0.000694,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":68517,"now":2282590,"obs":false,"seite":"m2-ausserhalb"}
+2286.467 s video: {"art":"video","currentTime":0.001092,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":68518,"now":2282590.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2345 s: 70286 Meldungen, davon «bild» 70168
+2346.527 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":70318,"now":2342649.5,"obs":false,"seite":"m2-ausserhalb"}
+2346.531 s video: {"art":"video","currentTime":0.00026,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":70319,"now":2342653.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2346.531 s video: {"art":"video","currentTime":0.000913,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":70320,"now":2342654.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2406 s: 72093 Meldungen, davon «bild» 71972
+2406.591 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":72121,"now":2402713.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2406.596 s video: {"art":"video","currentTime":0.000192,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":72122,"now":2402717.900000006,"obs":false,"seite":"m2-ausserhalb"}
+2406.596 s video: {"art":"video","currentTime":0.000797,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":72123,"now":2402718.5,"obs":false,"seite":"m2-ausserhalb"}
+2466 s: 73894 Meldungen, davon «bild» 73770
+2466.655 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":73924,"now":2462778.099999994,"obs":false,"seite":"m2-ausserhalb"}
+2466.659 s video: {"art":"video","currentTime":0.000328,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":73925,"now":2462781.800000012,"obs":false,"seite":"m2-ausserhalb"}
+2466.659 s video: {"art":"video","currentTime":0.000984,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":73926,"now":2462782.400000006,"obs":false,"seite":"m2-ausserhalb"}
+2526 s: 75702 Meldungen, davon «bild» 75575
+2526.719 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":75727,"now":2522841.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2526.723 s video: {"art":"video","currentTime":0.000225,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":75728,"now":2522845.800000012,"obs":false,"seite":"m2-ausserhalb"}
+2526.723 s video: {"art":"video","currentTime":0.000809,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":75729,"now":2522846.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2586 s: 77509 Meldungen, davon «bild» 77379
+2586.783 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":77530,"now":2582905.800000012,"obs":false,"seite":"m2-ausserhalb"}
+2586.789 s video: {"art":"video","currentTime":0.000193,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":77532,"now":2582911,"obs":false,"seite":"m2-ausserhalb"}
+2586.789 s video: {"art":"video","currentTime":0.000725,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":77533,"now":2582911.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2646 s: 79310 Meldungen, davon «bild» 79177
+2646.849 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":79333,"now":2642971.099999994,"obs":false,"seite":"m2-ausserhalb"}
+2646.853 s video: {"art":"video","currentTime":0.000282,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":79334,"now":2642975.200000018,"obs":false,"seite":"m2-ausserhalb"}
+2646.853 s video: {"art":"video","currentTime":0.001017,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":79335,"now":2642975.900000006,"obs":false,"seite":"m2-ausserhalb"}
+2706 s: 81117 Meldungen, davon «bild» 80981
+2706.913 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":81136,"now":2703035.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2706.917 s video: {"art":"video","currentTime":0.000264,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":81137,"now":2703039.700000018,"obs":false,"seite":"m2-ausserhalb"}
+2706.917 s video: {"art":"video","currentTime":0.000839,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":81138,"now":2703040.300000012,"obs":false,"seite":"m2-ausserhalb"}
+2766 s: 82918 Meldungen, davon «bild» 82779
+2766.977 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":82939,"now":2763099.800000012,"obs":false,"seite":"m2-ausserhalb"}
+2766.982 s video: {"art":"video","currentTime":0.00021,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":82940,"now":2763103.800000012,"obs":false,"seite":"m2-ausserhalb"}
+2766.982 s video: {"art":"video","currentTime":0.000717,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":82941,"now":2763104.200000018,"obs":false,"seite":"m2-ausserhalb"}
+2826 s: 84725 Meldungen, davon «bild» 84583
+2827.041 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":84742,"now":2823163.900000006,"obs":false,"seite":"m2-ausserhalb"}
+2827.045 s video: {"art":"video","currentTime":0.000234,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":84743,"now":2823167.900000006,"obs":false,"seite":"m2-ausserhalb"}
+2827.045 s video: {"art":"video","currentTime":0.00077,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":84744,"now":2823168.5,"obs":false,"seite":"m2-ausserhalb"}
+2887 s: 86532 Meldungen, davon «bild» 86387
+2887.105 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":86545,"now":2883228,"obs":false,"seite":"m2-ausserhalb"}
+2887.109 s video: {"art":"video","currentTime":0.000227,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":86546,"now":2883232,"obs":false,"seite":"m2-ausserhalb"}
+2887.109 s video: {"art":"video","currentTime":0.000818,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":86547,"now":2883232.599999994,"obs":false,"seite":"m2-ausserhalb"}
+2947 s: 88333 Meldungen, davon «bild» 88185
+2947.169 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":88348,"now":2943292.200000018,"obs":false,"seite":"m2-ausserhalb"}
+2947.174 s video: {"art":"video","currentTime":0.000215,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":88349,"now":2943295.900000006,"obs":false,"seite":"m2-ausserhalb"}
+2947.174 s video: {"art":"video","currentTime":0.000759,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":88350,"now":2943296.5,"obs":false,"seite":"m2-ausserhalb"}
+3007 s: 90140 Meldungen, davon «bild» 89989
+3007.233 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":90151,"now":3003356,"obs":false,"seite":"m2-ausserhalb"}
+3007.238 s video: {"art":"video","currentTime":0.000224,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":90152,"now":3003360.300000012,"obs":false,"seite":"m2-ausserhalb"}
+3007.238 s video: {"art":"video","currentTime":0.000797,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":90153,"now":3003360.800000012,"obs":false,"seite":"m2-ausserhalb"}
+3067 s: 91947 Meldungen, davon «bild» 91793
+3067.298 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":91954,"now":3063420.300000012,"obs":false,"seite":"m2-ausserhalb"}
+3067.302 s video: {"art":"video","currentTime":0.000235,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":91955,"now":3063424.5,"obs":false,"seite":"m2-ausserhalb"}
+3067.302 s video: {"art":"video","currentTime":0.000851,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":91956,"now":3063425.099999994,"obs":false,"seite":"m2-ausserhalb"}
+3127 s: 93754 Meldungen, davon «bild» 93597
+3127.362 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":93757,"now":3123484.599999994,"obs":false,"seite":"m2-ausserhalb"}
+3127.366 s video: {"art":"video","currentTime":0.000181,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":93758,"now":3123488.5,"obs":false,"seite":"m2-ausserhalb"}
+3127.366 s video: {"art":"video","currentTime":0.000722,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":93759,"now":3123489.099999994,"obs":false,"seite":"m2-ausserhalb"}
+3187 s: 95560 Meldungen, davon «bild» 95400
+3187.426 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":95560,"now":3183548.800000012,"obs":false,"seite":"m2-ausserhalb"}
+3187.430 s video: {"art":"video","currentTime":0.000191,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":95561,"now":3183552.900000006,"obs":false,"seite":"m2-ausserhalb"}
+3187.431 s video: {"art":"video","currentTime":0.000742,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":95562,"now":3183553.5,"obs":false,"seite":"m2-ausserhalb"}
+3247.490 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":97363,"now":3243613,"obs":false,"seite":"m2-ausserhalb"}
+3247.494 s video: {"art":"video","currentTime":0.000235,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":97364,"now":3243617,"obs":false,"seite":"m2-ausserhalb"}
+3247.494 s video: {"art":"video","currentTime":0.000862,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":97365,"now":3243617.700000018,"obs":false,"seite":"m2-ausserhalb"}
+3248 s: 97369 Meldungen, davon «bild» 97203
+3307.554 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":99166,"now":3303677.099999994,"obs":false,"seite":"m2-ausserhalb"}
+3307.559 s video: {"art":"video","currentTime":0.000451,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":99168,"now":3303681.400000006,"obs":false,"seite":"m2-ausserhalb"}
+3307.559 s video: {"art":"video","currentTime":0.000953,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":99169,"now":3303681.800000012,"obs":false,"seite":"m2-ausserhalb"}
+3308 s: 99176 Meldungen, davon «bild» 99007
+3367.618 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":100969,"now":3363741.200000018,"obs":false,"seite":"m2-ausserhalb"}
+3367.623 s video: {"art":"video","currentTime":0.000186,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":100971,"now":3363745.099999994,"obs":false,"seite":"m2-ausserhalb"}
+3367.623 s video: {"art":"video","currentTime":0.00071,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":100972,"now":3363745.599999994,"obs":false,"seite":"m2-ausserhalb"}
+3368 s: 100984 Meldungen, davon «bild» 100812
+3427.682 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":102772,"now":3423805.200000018,"obs":false,"seite":"m2-ausserhalb"}
+3427.687 s video: {"art":"video","currentTime":0.00036,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":102774,"now":3423809.5,"obs":false,"seite":"m2-ausserhalb"}
+3427.687 s video: {"art":"video","currentTime":0.001106,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":102775,"now":3423810.300000012,"obs":false,"seite":"m2-ausserhalb"}
+3428 s: 102785 Meldungen, davon «bild» 102610
+3487.748 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":104575,"now":3483869.5,"obs":false,"seite":"m2-ausserhalb"}
+3487.751 s video: {"art":"video","currentTime":0.00024,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":104577,"now":3483874.099999994,"obs":false,"seite":"m2-ausserhalb"}
+3487.752 s video: {"art":"video","currentTime":0.000833,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":104578,"now":3483874.599999994,"obs":false,"seite":"m2-ausserhalb"}
+3488 s: 104592 Meldungen, davon «bild» 104414
+3547.811 s video: {"art":"video","currentTime":0,"datei":"blitz-piep.webm","ereignis":"waiting","lauf":1,"n":106378,"now":3543934.200000018,"obs":false,"seite":"m2-ausserhalb"}
+3547.816 s video: {"art":"video","currentTime":0.000247,"datei":"blitz-piep.webm","ereignis":"seeked","lauf":1,"n":106379,"now":3543938.700000018,"obs":false,"seite":"m2-ausserhalb"}
+3547.817 s video: {"art":"video","currentTime":0.000831,"datei":"blitz-piep.webm","ereignis":"playing","lauf":1,"n":106380,"now":3543939.200000018,"obs":false,"seite":"m2-ausserhalb"}
+3548 s: 106399 Meldungen, davon «bild» 106218
+3604.049 s sichtbarkeit: {"art":"sichtbarkeit","datei":"blitz-piep.webm","lauf":1,"n":108067,"now":3600146.300000012,"obs":false,"seite":"m2-ausserhalb","zustand":"hidden"}
+Stopping dss-p12a-m2-595840.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 3720 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40...
+QIODevice::seek (QIODevice): Cannot call seek on a sequential device
+Server-Lauf: 3606.2 s, 108068 Meldungen
+== Seite m2-ausserhalb
+Meldungen «bild»: 107886 in 3600.0 s (29.97 je s), Abschnitte (Start, Wiederholung): 60
+Ausgelassene Bilder (presentedFrames): 0, grösste Lücke 0
+Eintreffen im Prototyp (steady_clock) gegen mediaTime:
+  Gang: -38.78 ppm = -2.327 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.013 Median 0.287 p95 0.438 max 33.515 ms (Spanne 33.515 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.212 p5 58.563 Median 58.591 p95 58.621 max 75.235 ms (Spanne 50.023 ms)
+performance.now() beim Senden gegen mediaTime:
+  Gang: -38.76 ppm = -2.326 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.011 Median 0.295 p95 0.416 max 33.518 ms (Spanne 33.518 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.225 p5 58.576 Median 58.589 p95 58.604 max 75.237 ms (Spanne 50.011 ms)
+presentationTime gegen mediaTime:
+  Gang: -38.08 ppm = -2.285 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.011 Median 0.293 p95 0.418 max 34.830 ms (Spanne 34.830 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.227 p5 58.541 Median 58.549 p95 58.564 max 75.180 ms (Spanne 49.953 ms)
+expectedDisplayTime gegen mediaTime:
+  Gang: -37.17 ppm = -2.230 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=107886 min 0.000 p5 0.014 Median 0.284 p95 0.437 max 51.284 ms (Spanne 51.284 ms)
+  Sprung beim Wiederholen (Pause zwischen Ende und Anfang): n=59 min 25.171 p5 58.490 Median 58.495 p95 58.513 max 75.127 ms (Spanne 49.956 ms)
+Weg Seite → Prototyp über dem kürzesten (enthält auch den Gang): n=107886 min 0.000 p5 0.262 Median 0.377 p95 0.504 max 9.467 ms (Spanne 9.467 ms)
+Nachführen: 28181 Einträge (alle 100 ms), Sprünge > 20 ms: 86
+  |Abweichung Ton − Soll| vor dem Ausgleich: n=28095 min 0.000 p5 0.414 Median 3.833 p95 7.314 max 22.913 ms (Spanne 22.913 ms)
+  0.000 s: Ausgang dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)», Puffer 11520 Bytes
+  3.359 s: Start (start)
+Stopped dss-p12a-m2-595840.service - [systemd-run] /home/dominik/DoNs_Streaming_Studio/prototypes/ton/build/ton-messen --server --port 24990 --daten /home/dominik/DoNs_Streaming_Studio/tests/daten/ton --dauer-s 3720 --aus /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343/m2 --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40.
+dss-p12a-m2-595840.service: Consumed 1min 19.270s CPU time, 105.2M memory peak.

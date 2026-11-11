@@ -1,0 +1,14 @@
+M1 Klickmessung, Beginn (Wanduhr) 1794365402441 ms, Dauer 120 s
+Ausgang: dss_p12a_ausgabe «DSS P12a Messung Ausgabe (stumm)»
+Eingang: dss_p12a_aufnahme «DSS P12a Messung Aufnahme»
+Puffer: gewünscht 80 ms, erhalten 23040 Bytes = 60.00 ms; Aufnahmepuffer 0 Bytes
+processedUSecs 119984194, elapsedUSecs 120012155 (Differenz -28.0 ms)
+Klicks geschrieben 241, gefunden 241, fehlend 0, fremde Einsätze 0
+Startverzögerung (start() bis Klick 0 in der Aufnahme): 55.452 ms
+Erste Aufnahmedaten nach start() der Aufnahme: vor start() der Ausgabe 448.0 ms
+Verzögerung Schreiben → Aufnahme: n=241 min 23.336 p5 63.180 Median 83.503 p95 103.921 max 104.270 ms (Spanne 80.934 ms)
+  ohne geschätzten Pufferinhalt: n=241 min 6.003 p5 39.608 Median 47.926 p95 57.948 max 58.539 ms (Spanne 52.536 ms)
+Abstand der Abrufe durch QAudioSink: n=2812 min 0.070 p5 39.204 Median 40.205 p95 60.285 max 60.476 ms (Spanne 60.406 ms)
+Länge der Abrufe: n=2813 min 42.667 p5 42.667 Median 42.667 p95 42.667 max 42.667 ms (Spanne 0.000 ms)
+Zustand Ausgang: 2 Wechsel, davon «leer» 0, Fehler «Unterlauf» 0
+Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
