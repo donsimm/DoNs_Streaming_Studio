@@ -1,6 +1,6 @@
 # P12 – Ton von Videos (Plan)
 
-Plan des Projektleiter-Agenten vom 2026-11-09. Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)»). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Bau), Handtest.
+Plan des Projektleiter-Agenten vom 2026-11-09, nachgeführt am 2026-11-11 für G4 = P (Abschnitte 3 bis 8). Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)») und unten («Antworten des Nutzers»), Messbericht `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Prototyp mit `pw_stream`, Halt, dann Bau in Abschnitten), Handtest.
 
 ## Entscheide des Nutzers
 
@@ -54,10 +54,12 @@ Die Grundfrage hat vier Teile:
 | G2 | **S1: Die Seite führt.** Die Seite in OBS erkennt «aktiv», startet das Video von vorne und meldet Start und Lage an den Kern. Der Kern folgt | Empfehlung: geht auch mit verschachtelten Szenen, die Seite kennt den echten Bildstart. Rückfall für den Zustand beim Laden: `GetSourceActive` |
 | G2 | S2: Der Kern führt über `InputActiveStateChanged` und schickt per SSE «Start» an die Seite | Startverzögerung des Videos unbekannt, braucht ohnehin Rückmeldung, also S1 mit einem Umweg |
 | G2 | S3: beide starten «jetzt», ohne Rückmeldung | verworfen: Versatz und Gang nicht beherrscht |
-| G4 | **Q: `QAudioSink`/`QMediaDevices`** | zuerst messen: kein neues Paket |
-| G4 | P: PipeWire direkt (`pw_stream`, genaue Verzögerung) | nur, wenn Q die Grenzen aus P12a nicht hält; braucht `libpipewire-0.3-dev` (Nutzer installiert) |
+| G4 | Q: `QAudioSink`/`QMediaDevices` | **verworfen** (Nutzer, 2026-11-11): Abbruchbedingung von M1 ausgelöst, Sprung +42,67 ms beim Wechsel des Quantums auf 2048 (M1c). Bleibt nur Rückfallweg, falls b1 scheitert (dann zuerst Z1 messen) |
+| G4 | **P: PipeWire direkt (`pw_stream`, genaue Verzögerung)** | **entschieden** (Nutzer, 2026-11-11), mit Prototyp zuerst (P12b, Abschnitt b1). Braucht `libpipewire-0.3-dev` (Nutzer installiert) |
 
 ## 2. P12a – Messtest
+
+**Stand 2026-11-11:** M1 und M2 gemessen (Nachtlauf 11.11.), M1d nach der Zeit neu ausgewertet (Z0), alles im Messbericht `docs/archiv/messungen/P12a-bericht.md`. M2 wird nicht wiederholt. M3 macht Lotse mit dem Nutzer zusammen, vor Abschnitt b4 (b4 hängt davon ab). M4 siehe Frage 5 in Abschnitt 7.
 
 Grund für die Teilung: Ohne die Antworten zu G1 bis G4 lässt sich der Bau nicht festlegen. Ausserdem brauchen M3 und M4 Rechte und Geräte, die der bauende Agent nicht hat.
 
@@ -88,81 +90,162 @@ Grund für die Teilung: Ohne die Antworten zu G1 bis G4 lässt sich der Bau nich
 
 ## 3. P12b – Bau
 
-**Umfang (bei Empfehlung S1 und Q):**
+Nachgeführt 2026-11-11 für **S1 und P** (G4 = P, Entscheid des Nutzers 11.11.). Der frühere Umfang für Q (Commits 1–8 mit `QAudioSink`) ist ersetzt; Q bleibt nur Rückfallweg (b1, «Abbruch»).
+
+**Umfang:**
 
 | Thema | Vorgabe |
 |---|---|
 | Wann der Ton läuft | Nur für Seiten mit `window.obsstudio`, also nur in OBS. Gibt es keine Seite, die aktiv ist, gibt es keinen Ton |
 | Seite (`web/overlay.js`) | Wird sie in OBS aktiv: Video von vorne. Wird sie inaktiv: anhalten und zurück auf den Anfang. Ohne `window.obsstudio` bleibt alles wie heute |
-| Meldungen der Seite | Start, Lage etwa jede Sekunde, Ende, Sprung beim Wiederholen. Neue Adresse `…/clock` (POST, JSON, eigene Grenze je Seite) |
-| Mischer im Kern | Ein ständig offener Ausgang mit eigenem Mischer im Kern, eigener Thread |
+| Meldungen der Seite | Start, Lage etwa jede Sekunde, Ende, Sprung beim Wiederholen. Neue Adresse `…/clock` (POST, JSON, eigene Grenze je Seite). Lage aus `requestVideoFrameCallback` (`mediaTime`), wie die Messseite in M2 |
+| Ausgabe im Kern | `pw_stream` (libpipewire 0.3) in eigenem Thread (`pw_thread_loop`), ständig offen. Kern bleibt ohne Qt Gui und ohne Qt Multimedia |
+| Ausgang je Zweck | Der Kern führt Ausgänge nach Zweck (Antwort 2 des Nutzers vom 09.11.: später Chat-Bot und weitere Soundkarten). P12 baut nur den Zweck «Ton der Videos». Je Zweck ein eigener `pw_stream`, Gerät und Versatz |
+| Mischer im Kern | Je Ausgang ein Mischer, nur Logik, ohne Gerät testbar. Der Echtzeit-Abruf von PipeWire holt fertige Proben ohne Sperren und ohne Speicher anzulegen; Dekodieren läuft in einem eigenen Thread mit Vorrat |
+| Verzögerung | Der Mischer rechnet den hörbaren Zeitpunkt jeder Probe aus der Verzögerung, die `pw_stream` meldet (`pw_stream_get_time_n`, `struct pw_time`, **nicht geprüft**, b1 Schritt 0). Ändert sie sich (Quantum-Wechsel), führt er nach |
+| Puffer | gewünschte Verzögerung (`node.latency`) mindestens 40 ms (Frage 2) |
 | Nachführen | Abweichung unter 20 ms weich mit `swr_set_compensation`; darüber Sprung (Stille einfügen bzw. Proben verwerfen) |
+| Fehlender Ausgang | kein Ton und ein Hinweis, kein Ausweichen auf ein anderes Gerät (`target.object` und kein automatisches Umhängen, **nicht geprüft**, b3 prüft es mit einer virtuellen Senke) |
 | Stopp | sofort, wenn der Kern Ausgabe aus, verborgene, gelöschte oder geänderte Quelle sieht, oder wenn die SSE-Verbindung der Seite endet. Ohne Meldung nach 3 s ebenfalls Stopp |
 | Mehrere Browserquellen auf dasselbe Overlay | Ton einmal je Videoquelle, nach der ersten aktiven Seite |
 | Editor | bleibt stumm |
 
-**Commits (Regel 8):**
-1. `src/media/audiodecoder.{h,cpp}`: Ton einer Videodatei, float, 48 kHz, Stereo (libavcodec und libswresample), ohne Qt Gui. Test `tst_tondecoder` mit `tests/daten/ton/`. `libswresample` und `qt6-multimedia-dev` in `scripts/pakete.txt`.
-2. `src/audio/mixer.{h,cpp}`, nur Logik: Quellen auf Probenlage mischen, Lautstärke, Start/Stopp, Wiederholen, Nachführen nach Meldungen. Test `tst_tonmischer` mit gedachter Uhr, ohne Gerät.
-3. `src/audio/audiooutput.{h,cpp}`: dünne Schicht über `QAudioSink`/`QMediaDevices` in eigenem Thread; Liste der Ausgänge, gewählter Ausgang, fehlender Ausgang. Schalter `DSS_CORE_AUDIO` (aus = Kern ohne Ton, Stand P11). Test mit Ersatzausgang.
-4. Kern: Adresse `…/clock` im Overlay-Server, Anbindung an den Mischer, `kern.ini` `[ton] ausgang`, `[ton] versatz_ms`, Schnittstelle Version 12 (`audio_outputs`, Felder in `settings`).
-   - Tests: `tst_overlayserver` (`clock`, Grenzen), `tst_kerneinstellungen` (`[ton]`), neu `tst_kernton` (Kern mit Ersatzausgang: Start, Stopp bei Ausgabe aus / SSE-Ende / 3 s ohne Meldung, Nachführen).
-5. Seite: Verhalten in OBS und Meldungen.
-   - `tst_browserquelle` mit nachgebildetem `window.obsstudio` und `CustomEvent`: neu von vorne bei «aktiv», Anhalten bei «inaktiv», Inhalt der Meldungen, keine Meldungen ohne `obsstudio`.
-   - `tst_bildvergleich` muss unverändert bestehen.
-6. Overlay-Format 5: `video.volume` und `video.muted`, je nach Frage 3. Umwandeln 4 → 5 (`dss-core --format-pruefen`/`--umwandeln`), Tests `tst_datenformat`, `tst_overlaymodel`. K-07 gilt hier nicht: Es ändert sich nichts am Bild, die Seite bleibt stumm.
-7. Fenster:
-   - Dock «Eigenschaften», Bereich «Video»: Lautstärke und «Stumm» (Frage 3);
-   - Dialog «Einstellungen», Bereich «Ton»: Ausgang, Versatz, Hinweis bei fehlendem Ausgang (Frage 2);
-   - Test `tst_fensterbearbeiten`.
-8. Dokumente nachführen: `01`, `02` (Pakete), `03` (E-20, E-21), `04`, `06`, `08`. Dazu der Bericht `docs/archiv/berichte/P12-bericht.md`.
+Die Abschnitte b1 bis b6 sind je ein Auftrag an einen Agenten (b5 und b6 dürfen in eine Sitzung). Nach jedem Abschnitt Rückmeldung an Lotse; nach b1 ist es ein **Halt** mit Entscheid.
 
-**Prüfstufe «Baustein»** (Befehle wie in P11, Ordner `build/pruefung-p12/`):
+### b1 – Prototyp mit `pw_stream` und Messung Z3 (2 Commits), danach Halt
+
+**Voraussetzung:** `libpipewire-0.3-dev` ist installiert (Nutzer). Fehlt es: Halt und Meldung an Lotse.
+
+**Schritt 0 (Agent):** Header `/usr/include/pipewire-0.3/pipewire/stream.h` und `…/thread-loop.h` lesen und gegen https://docs.pipewire.org/group__pw__stream.html prüfen: Felder von `struct pw_time` (`now`, `rate`, `delay`, `queued`, `buffered`), Bedeutung von `delay` (Proben bis zum Gerät, Uhr von `now` = `CLOCK_MONOTONIC`?), Eigenschaften `node.latency`, `target.object`, `node.dont-reconnect`. Weicht etwas ab, das die Erfolgsbedingung trägt: Halt und Meldung an Lotse.
+
+**Commits:**
+1. `prototypes/ton/`: neues Programm `pw-messen` (eigenes Ziel in `prototypes/ton/CMakeLists.txt`, Qt Core und libpipewire, `QCoreApplication`). Ausgabe über `pw_stream`, Klick und Aufnahme wie M1 (`klickmessung`, `pw-loopback`, virtuelle Senke und Quelle), damit nur die Ausgabe anders ist. Je Klick zusätzlich in der CSV: Schreibzeit der ersten Probe (`steady_clock`), gemeldete Verzögerung (`delay`, `queued`, `buffered`, `rate`), daraus die erwartete hörbare Zeit; Unterläufe (leere Abrufe) zählen. Liste der Ausgänge über die Registry (`media.class` «Audio/Sink»). Dazu `pw-lauf.sh` (wie `nachtlauf.sh`, mit `--kurz`), räumt Knoten und `clock.force-quantum` sicher auf.
+2. Messbericht: Abschnitt «Z3» in `docs/archiv/messungen/P12a-bericht.md` mit Datum, Befehlen, Kennzahlen, Rohdaten nur bei Auffälligkeiten.
+
+**Messung** (Agent, Studio-PC, unhörbar, nachts wie M1: `clock.force-quantum` gilt für den ganzen Rechner, Frage 4; als `systemd-run --user` wie der Dienst; keine Last daneben ausser im Lastteil):
+
+| Teil | Inhalt |
+|---|---|
+| Z3a | Liste der Ausgänge im Dienst |
+| Z3b | Ruhe, `node.latency` 40 ms, 120 s |
+| Z3c | wie M1c: 40 ms, 180 s, bei 60 / 100 / 140 s `clock.force-quantum` 2048 / 256 / 0 |
+| Z3c-Q | Gegenlauf mit `ton-messen` (Q) wie M1c in derselben Nacht, damit beide Wege unter gleichen Bedingungen vorliegen |
+| Z3d | nur wenn Frage 1 mit Ja beantwortet: wie M1d, 40 ms, 2 × 5 min mit `scripts/leistung.py --video` in Schleife |
+
+Kenngrösse **«Rest»** je Klick: gemessene Einsatzzeit in der Aufnahme minus erwartete hörbare Zeit aus der gemeldeten Verzögerung. Der Rest enthält den Messweg (`pw-loopback`, Aufnahme) wie in M1.
+
+**Erfolgsbedingung b1** (alle müssen erfüllt sein, Z3b und Z3c, voller Lauf und Probelauf):
+- **E1 Sprung:** Bei jedem der drei Wechsel des Quantums ändert sich der Rest um höchstens **10 ms** (Median von 5 Klicks vor gegen 5 Klicks nach dem Wechsel). Das heisst: Entweder springt die hörbare Lage nicht, oder `pw_stream` meldet den Sprung so genau, dass der Kern ihn ausgleicht (Frage 3). Der rohe Sprung (ohne gemeldete Verzögerung) steht zusätzlich im Bericht.
+- **E2 Aussetzer:** 0 Unterläufe in Z3b und Z3c, auch beim Wechsel (Q hatte 1).
+- **E3 Dienst:** läuft als `systemd-run --user` mit `QCoreApplication`, ohne Qt Gui und Qt Multimedia in der Ausgabe; die Liste der Ausgänge enthält dieselben Geräte wie M1a.
+- **E4 Streuung:** p5–p95 des Rests in Ruhe (Z3b) höchstens 15 ms (Q in M1b bei 40 ms: 13,4 ms ohne Pufferinhalt, Messweg eingeschlossen).
+- Z3d (falls gemessen): 0 Unterläufe; Streuung nur berichtet, kein Abbruch.
+
+**Abbruch:** Ist E1, E2 oder E3 nicht erfüllt, oder E4 nicht: Halt, kein Einbau. Bericht an Lotse mit Empfehlung, dazu die Wege:
+- Q als Rückfall: zuerst Z1 messen (M1c mit Puffer ≥ 1 Quantum). Folge: Qt Gui und Qt Multimedia im Kern, Sprung bleibt für den Kern unsichtbar.
+- G1 C (Browserquelle gibt den Ton an OBS): widerspricht dem Entscheid vom 2026-11-02, nur der Nutzer entscheidet.
+
+→ **Halt:** Ergebnis an Lotse. Der Einbau (b2 ff.) beginnt erst nach dem Go des Nutzers.
+
+### b2 – Ton dekodieren und mischen, ohne Gerät (2 Commits)
+
+1. `src/media/audiodecoder.{h,cpp}`: Ton einer Videodatei, float, 48 kHz, Stereo (libavcodec und libswresample), ohne Qt Gui, eigener Thread mit Vorrat. Test `tst_tondecoder` mit `tests/daten/ton/` (MP4/AAC, WebM/Opus, Mono, 44,1 kHz, 5.1, ohne Ton). `libswresample-dev` und `libpipewire-0.3-dev` in `scripts/pakete.txt`.
+2. `src/audio/mixer.{h,cpp}`, nur Logik: Quellen auf Probenlage mischen, Lautstärke und «Stumm», Start/Stopp, Wiederholen nach der Länge, die die Seite meldet (Pause beim Wiederholen rund 58,6 ms, M2), Nachführen nach den Meldungen der Seite und nach der gemeldeten Verzögerung des Ausgangs, Abruf ohne Sperren (Ring für einen Schreiber und einen Leser). Test `tst_tonmischer` mit gedachter Uhr und gedachter Verzögerung (auch mit Sprung um 2048 Proben wie in M1c), ohne Gerät.
+
+### b3 – Ausgabe über PipeWire im Kern (2 Commits)
+
+1. `src/audio/pwoutput.{h,cpp}`: dünne Schicht über `pw_thread_loop` und `pw_stream`: Liste der Ausgänge (Registry), gewählter Ausgang über `target.object`, fehlender oder verschwundener Ausgang (kein Ausweichen), gemeldete Verzögerung an den Mischer. Schalter `DSS_CORE_AUDIO` (aus = Kern ohne Ton, Stand P11; `dss-core` linkt libpipewire nur mit Schalter). Test `tst_tonausgang`: legt im eigenen Prozess eine virtuelle Senke an (verschwindet mit dem Prozess, **nicht geprüft**), spielt unhörbar, prüft Liste, Wahl, Entfernen der Senke (kein Ton auf einem anderen Gerät) und Wiederkehr.
+2. Kern: Ausgang je Zweck in `kern.ini` (Abschnitt je Zweck, zuerst `[ton-video]` mit `ausgang` und `versatz_ms`), Schnittstelle Version 12: `audio_outputs` (Liste der Geräte, nach `hello` und bei Änderung an alle), Felder für Ausgang und Versatz je Zweck in `settings` und `update_settings`, Zustand des Ausgangs. Tests `tst_kerneinstellungen` (`[ton-video]`), `tst_protocol`, `tst_aenderungen`.
+
+### b4 – Seite und Kern verbinden (3 Commits)
+
+**Voraussetzung:** M3 erledigt (Lotse mit dem Nutzer). Kommt in OBS kein «aktiv»-Ereignis: Rückfall `InputActiveStateChanged` über den Kern planen, Halt und Meldung an Lotse.
+
+1. Overlay-Server: Adresse `…/clock` (POST, JSON, Grenzen je Seite, nur mit gültigem Token). Test `tst_overlayserver` (`clock`, Grenzen, falsche Daten).
+2. Seite `web/overlay.js`: Verhalten in OBS (von vorne bei «aktiv», anhalten und zurück bei «inaktiv») und Meldungen. Test `tst_browserquelle` mit nachgebildetem `window.obsstudio` und `CustomEvent`: Inhalt der Meldungen, keine Meldungen ohne `obsstudio`. `tst_bildvergleich` muss unverändert bestehen.
+3. Kern: Meldungen an den Mischer, Stopp-Regeln (Ausgabe aus, Quelle verborgen/gelöscht/geändert, SSE-Ende, 3 s ohne Meldung). Neu `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang ohne Gerät: Start, Stopp in allen Fällen, Nachführen, Wiederholen).
+
+### b5 – Overlay-Format und Fenster (3 Commits)
+
+1. Overlay-Format 5: `video.volume` (0–100, ganze Zahl) und `video.muted`, neue Quellen 100 und `false` (Antwort 3 des Nutzers). Umwandeln 4 → 5 (`dss-core --format-pruefen`/`--umwandeln`), Tests `tst_datenformat`, `tst_overlaymodel`. K-07 gilt hier nicht: Es ändert sich nichts am Bild, die Seite bleibt stumm.
+2. Dock «Eigenschaften», Bereich «Video»: Regler «Lautstärke» 0–100 % und Kästchen «Stumm». Test `tst_fensterbearbeiten`.
+3. Dock «Steuerung»: Zeile für den Ton der Videos mit Ausgang, Versatz und Hinweis bei fehlendem Ausgang (Antwort 2 des Nutzers, Aussehen nach Frage 6). Test `tst_fensterbearbeiten`.
+
+Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Meldungen bauen (z. B. Zeile «OBS» im Dock «Steuerung», `src/app/docks.cpp`, `src/app/theme.cpp`), und folgt dem.
+
+### b6 – Prüfung und Dokumente (2 Commits)
+
+1. `scripts/tonpruefung.py`: virtuelle Senke anlegen, Kern aus dem Entwicklungsordner starten, Meldungen nachbilden, Aufnahme über `pw-loopback`, Abweichung zu den Meldungen und zur gemeldeten Verzögerung auswerten, Senke entfernen. 20 Läufe, unhörbar.
+2. Dokumente nachführen: `01`, `02` (Pakete), `03` (E-20, E-21), `04`, `06`, `08`. Dazu der Bericht `docs/archiv/berichte/P12-bericht.md`.
+
+**Prüfstufe «Baustein»** (nach b6, Befehle wie in P11, Ordner `build/pruefung-p12/`; b2 bis b5 je Stufe «Klein»):
 - `cmake --build build -j8`
 - `ctest --test-dir build`: X11-Sitzung aktiv, 0 übersprungen
 - frischer Klon (Bau und `ctest`)
 - `python3 scripts/startpruefung.py --runs 20 --out build/pruefung-p12/start/startpruefung`
-- `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p12/dienst`
-- neu `scripts/tonpruefung.py`: Null-Senke anlegen, Kern aus dem Entwicklungsordner starten, Meldungen nachbilden, Überwachung aufnehmen, Abweichung zu den Meldungen auswerten, Senke entfernen. 20 Läufe, unhörbar.
-- **50 Wiederholungen** (Takt, Threads und Video betroffen): `tst_tonmischer`, `tst_kernton`, `tst_overlayserver`, `tst_browserquelle`, `tst_bildvergleich`. Ohne Last daneben, nie zwei Fenstertests gleichzeitig.
+- `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p12/dienst` (Watchdog mit dem Thread von PipeWire)
+- `scripts/tonpruefung.py`, 20 Läufe
+- **50 Wiederholungen** (Takt, Threads und Video betroffen): `tst_tonmischer`, `tst_tonausgang`, `tst_kernton`, `tst_overlayserver`, `tst_browserquelle`, `tst_bildvergleich`. Ohne Last daneben, nie zwei Fenstertests gleichzeitig.
 - Leistung: `scripts/leistung.py` mit 3 Videos mit Ton. Ziel: höchstens 3 Prozentpunkte eines Kerns mehr CPU, 0 Aussetzer in 30 min.
+- Bau mit `DSS_CORE_AUDIO=OFF` einmal (neuer Schalter).
 
 ## 4. Handtest (Regel 10)
 
 **Prüft Lotse** (nicht während eines Streams, vorher Prozess und Ausgabe von OBS prüfen):
 - **H1 Start und Stopp in OBS.** Warum: Nur OBS meldet «aktiv». Testquelle mit «Blitz und Piep» in «test 2». Szene 5× wechseln: Der Kern meldet im Protokoll Start und Stopp, `GetSourceScreenshot` zeigt nach dem Aktivieren den Zähler bei 0. Danach Szene zurück auf «Szene», Testquelle löschen.
-- **H2 Versatz** (nur mit Frage 4 A). Warum: genaue Zahl statt Hörurteil. Aufnahme 60 s, Auswertung wie M4. Ziel: Mittel innerhalb ±20 ms nach eingestelltem Versatz. Aufnahme löschen.
+- **H2 Versatz** (Recht zur Aufnahme seit 2026-11-09, `CLAUDE.md`). Warum: genaue Zahl statt Hörurteil. Aufnahme 60 s in «test 2», Auswertung wie M4 (30 Blitze). Ist Frage 5 mit Ja beantwortet, ersetzt H2 zugleich M4: erster Lauf mit Versatz 0 ergibt den Startwert, zweiter Lauf mit eingestelltem Versatz. Ziel: Streuung (max − min) ≤ 40 ms, Mittel innerhalb ±20 ms nach eingestelltem Versatz. Aufnahme löschen.
 - **H3 Dauerlauf**, nachts, 60 min mit wiederholtem Video in «test 2». Warum: Gang zwischen zwei Rechnern. Ziel: kein Aussetzer, Abweichung im Protokoll immer < 20 ms.
-- **H4 Bildschirmfotos** des Bereichs «Ton» im Dialog und des Bereichs «Video» in «Eigenschaften» (Ablage nur im Scratchpad).
+- **H4 Bildschirmfotos** der Zeile für den Ton im Dock «Steuerung» und des Bereichs «Video» in «Eigenschaften» (Ablage nur im Scratchpad).
 
 **Prüft der Nutzer:**
-- **N1 Anschluss.** Warum: Kabel und Gerät. USB bzw. Kabel nach Frage 1, Kanal am RØDECaster einrichten.
+- **N1 Anschluss.** Warum: Kabel und Gerät. USB an den zweiten USB-Anschluss des RØDECaster (Antwort 1), Kanal am RØDECaster einrichten. Der RØDECaster muss eingeschaltet sein (stand nachts nicht in der Geräteliste).
 - **N2 Hören.** Warum: Nur der Nutzer hört.
   - Ton sauber, ohne Brummen oder Knacken, am richtigen Regler.
   - Nicht doppelt.
   - Mit einem echten Video wirkt der Ton synchron.
 - **N3 Bedienung.** Warum: Bedienung und Gerät.
-  - Ausgang in «Einstellungen» wählen.
+  - Ausgang im Dock «Steuerung» wählen, Versatz ändern.
   - Lautstärke bzw. «Stumm» an einer Quelle.
-  - **Eigener Schritt:** USB-Kabel des Ausgangs ziehen. Erwartet: Hinweis, kein Ton aus einem anderen Gerät. Danach wieder einstecken.
+  - **Eigener Schritt:** USB-Kabel des Ausgangs ziehen. Erwartet: Hinweis, kein Ton aus einem anderen Gerät. Danach wieder einstecken; der Ton kommt ohne Neustart zurück.
 
 Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 
 ## 5. Pakete (Regel 5)
 
-- **Kein neues Paket für P12a und P12b** bei Variante Q:
-  - `qt6-multimedia-dev` 6.8.2-8, `libswresample-dev` 7:7.1.5-0+deb13u1 und `pipewire-bin` 1.4.2-1 sind installiert.
-  - Die beiden ersten kommen in `scripts/pakete.txt`.
-- Nur bei Variante P: `libpipewire-0.3-dev` (Version vor der Installation mit `apt-cache policy` lesen). Begründung: genaue Verzögerung über `pw_stream`, Kern ohne Qt Gui. `sudo` gibt der Nutzer ein.
+- **Neu für P12b (Variante P): `libpipewire-0.3-dev`**, installiert der Nutzer (`sudo` gibt der Nutzer ein), **Voraussetzung für b1**. Begründung: genaue Verzögerung über `pw_stream` (M1c: Sprung +42,67 ms mit Q, für den Kern unsichtbar), Kern ohne Qt Gui und ohne Qt Multimedia. Stand 2026-11-11 (`/var/lib/dpkg/status`): nicht installiert; die Laufzeitbibliothek `libpipewire-0.3-0t64` 1.4.2-1 und `pipewire-bin` 1.4.2-1 sind installiert. Version vor der Installation mit `LANG=C apt-cache policy libpipewire-0.3-dev` lesen; ob es `libspa-0.2-dev` mitzieht, ist nicht geprüft. Kommt mit Version in `scripts/pakete.txt` (b2).
+- `libswresample-dev` 7:7.1.5-0+deb13u1 ist installiert und kommt in `scripts/pakete.txt` (b2).
+- `qt6-multimedia-dev` 6.8.2-8 bleibt nur für den Prototyp `ton-messen` (Gegenlauf Z3c-Q) und kommt **nicht** in `scripts/pakete.txt`: Der Kern braucht Qt Multimedia mit P nicht.
+- Keine weiteren Pakete. Die Installation (`scripts/installieren.sh`) braucht zur Laufzeit nur `libpipewire-0.3-0t64` (installiert).
 
 ## 6. Schätzung
 
 | Teil | Agent | Lotse | Nutzer |
 |---|---|---|---|
-| P12a | 1 Sitzung, ~3–4 h (dazu 60 min Nachtlauf M2) | ~1 h (M3), dazu 60 min nachts | ~30 min (M4: Anschluss, Mischpult, Hören) |
-| P12b | 2 Sitzungen à ~4–5 h (Commits 1–4, 5–8), 50er-Läufe nachts ~2 h | Handtest ~1 h, dazu 60 min nachts | ~20 min |
+| P12a | erledigt (M1, M2, Z0) | M3 ~1 h mit dem Nutzer, dazu 60 min nachts | M3 dabei ~30 min |
+| b1 | 1 Sitzung ~3 h, Messung nachts ~20 min (mit Z3d ~35 min) | Prüfung und Entscheid ~20 min | Paket installieren ~5 min, Go nach b1 |
+| b2 | 1 Sitzung ~3–4 h | Prüfung ~15 min | – |
+| b3 | 1 Sitzung ~4 h | Prüfung ~15 min | – |
+| b4 | 1 Sitzung ~4–5 h | Prüfung ~15 min | – |
+| b5 + b6 | 1–2 Sitzungen ~6–7 h, Prüfstufe «Baustein» ~2 h, 50er-Läufe nachts ~2 h | Prüfung ~30 min | – |
+| Handtest | – | ~1 h (H1, H2, H4), dazu 60 min nachts (H3) | ~30 min (N1–N3, bei Ja zu Frage 5 auch der Anschluss für M4) |
+| **Summe P12b** | **5–6 Sitzungen, ~20–23 h**, dazu Nachtläufe ~2,5 h | **~3,5 h**, dazu 2 h nachts | **~1 h** |
 
-## 7. Fragen an den Nutzer (gebündelt, höchstens 4)
+## 7. Fragen an den Nutzer
+
+Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die früheren Fragen 1 bis 4 vom 09.11. sind beantwortet (unten, «Antworten des Nutzers»).
+
+**Vor b1:**
+1. **Z3 auch unter Last messen?** Empfehlung: **Ja**, 2 × 5 min mit derselben Last wie M1d (Puffer 40 ms). Grund: Unter Last war die Streuung mit Q etwa dreimal so breit wie in Ruhe (Z0); nur so zeigt sich, ob `pw_stream` sie meldet und ob unter Last Aussetzer kommen. Kostet ~15 min Nachtlauf, für den Nutzer nichts. Gegenargument: Die Last ist mässig (rund 9 % CPU), der ungünstigste Fall bleibt ungemessen.
+2. **Puffer im Kern mindestens 40 ms?** Empfehlung: **Ja**, 40 ms fest, keine Einstellung. Grund: Mit Q gab es bei 20 ms unter Last 17 Unterläufe, bei 40 ms keinen. Der feste Teil der Verzögerung wird ohnehin mit dem Versatz ausgeglichen. Gegenargument: 20 ms mehr Verzögerung bis zum Mischpult; kleiner wird er nur, wenn b1 unter Last 0 Unterläufe bei 20 ms zeigt.
+3. **Gilt der Sprung als vermieden, wenn `pw_stream` ihn meldet und der Kern ihn ausgleicht?** Empfehlung: **Ja.** Grund: Den Unterlauf beim Wechsel des Quantums verhindert auch P nicht sicher; entscheidend ist, dass der Ton danach wieder zum Bild passt (Rest ≤ 10 ms, Erfolgsbedingung E1). Gegenargument: Ein kurzer Ausgleich kann hörbar sein (weich unter 20 ms, Sprung darüber).
+4. **Messung b1 nachts mit Wechsel des Quantums?** Empfehlung: **Ja**, der Agent misst nachts wie in M1 und setzt `clock.force-quantum` danach sicher auf 0 zurück. Grund: Der Wechsel gilt für den ganzen Studio-PC und kann laufenden Ton kurz stören; der Nutzer muss nichts tun.
+
+**Vor b4:**
+5. **M4 im Handtest mit dem fertigen Kern statt vorher mit dem Prototyp?** Empfehlung: **Ja**, H2 ersetzt M4. Grund: Der Prototyp `ton-messen` spielt über Q, das verworfen ist; ein Versatz von dort gilt für P nicht. Der Nutzer schliesst den RØDECaster nur einmal an. Gegenargument: Ein Problem mit Brummen oder dem USB-Anschluss zeigt sich erst am Ende von P12b.
+6. **Zeile für den Ton im Dock «Steuerung»** (sichtbar, bedienbar). Empfehlung: Zeile «Ton Videos» mit einer Auswahlliste der Ausgänge (Namen wie im System, erster Eintrag «Kein Ausgang») und einem Feld «Versatz» in ms (−500 bis +500, Schritt 1, Startwert 0 bis H2). Fehlt der gewählte Ausgang: Hinweis «Ausgang fehlt» in der Zeile, wie die Zeile «OBS». Ein neuer Kern hat «Kein Ausgang», bis der Nutzer wählt. Grund: kein Ton aus einem falschen Gerät; weitere Zwecke (Chat-Bot) kommen später als eigene Zeilen dazu. Alternative: Ausgang des Systems vorgewählt.
+7. **Termin für M3** (Lotse mit dem Nutzer, OBS, ~1 h, dazu 60 min nachts). Empfehlung: **nach b1 und vor b4**, an einem Abend ohne Stream. Grund: b4 baut das Verhalten der Seite in OBS und braucht dafür das Ergebnis von M3 («aktiv»-Ereignis, Zustand beim Laden).
+
+### Fragen vom 2026-11-09 (beantwortet)
 
 1. **Anschluss Studio-PC → RØDECaster** (Gerät). Welches Modell ist es, und wie anschliessen?
    - A) USB an den zweiten USB-Anschluss. Empfohlen, falls vorhanden: digital, kein Brummen, eigener Kanal.
@@ -184,17 +267,23 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 
 | Risiko oder offene Frage | Gegenmassnahme oder Stand |
 |---|---|
-| Alle Aussagen zu OBS, obs-browser, obs-websocket, RØDE, Grenzwerten und Qt Multimedia unter Linux nicht gelesen (Webzugriff gesperrt) | P12a, Schritt 0 |
-| RØDECaster-Modell und ob es einen zweiten USB-Anschluss hat | `[OFFEN]`, Frage 1 |
-| Audiokarten des Studio-PCs | `[OFFEN]` (`/proc/asound/cards` nicht lesbar), liest der Agent in M1 |
-| Qt Multimedia im Kern zieht Qt Gui mit; ob `QMediaDevices` ohne `QGuiApplication` und im Dienst geht | M1; sonst Variante P |
-| `QAudioSink` meldet keine Verzögerung; ändert ein anderes Programm das Quantum von PipeWire, verschiebt sich der Ton | M1 misst es; Nachführen über die Meldungen der Seite; sonst Variante P |
-| Ob «aktiv» beim Laden einer schon aktiven Quelle gemeldet wird | M3; Rückfall `GetSourceActive` über den Kern |
+| Alle Aussagen zu OBS, obs-browser, obs-websocket, RØDE und Grenzwerten nicht gelesen (Webzugriff gesperrt) | M3 mit Lotse; Webzugriff für den Agenten von b1 und b4 |
+| **API von libpipewire nicht gegen die Dokumentation geprüft** (`struct pw_time`, Bedeutung von `delay`, Uhr von `now`, `target.object`, `node.dont-reconnect`); Header fehlen, bis das Paket installiert ist | b1, Schritt 0: Header und Dokumentation lesen, bei Abweichung Halt |
+| **b1 scheitert** (Sprung nicht erkannt, Unterlauf beim Wechsel, Streuung zu gross) | Halt vor dem Einbau; Rückfall Q mit Puffer ≥ 1 Quantum (vorher Z1) oder G1 C, Entscheid des Nutzers |
+| Echtzeit-Abruf von PipeWire: Sperren oder Speicher anlegen im Abruf erzeugen Aussetzer | Mischer mit Ring ohne Sperren, Dekodieren in eigenem Thread; `tst_tonmischer`, `tonpruefung.py`, 50 Wiederholungen, Leistung 30 min |
+| Thread von PipeWire im Dienst stört Watchdog oder sauberes Beenden | `dienstpruefung.py`, `startpruefung.py` (20 Starts); Schalter `DSS_CORE_AUDIO` |
+| Ausgang fehlt oder wird gezogen: PipeWire hängt den Strom auf das Standardgerät um | `target.object` ohne automatisches Umhängen (nicht geprüft); `tst_tonausgang` mit virtueller Senke, N3 |
+| Messweg (`pw-loopback`, Aufnahme) streut mit, sein Anteil ist nicht getrennt (P12a) | Erfolgsbedingung über den Rest, Grenze E4 mit Spielraum zum Wert von Q; Gegenlauf Z3c-Q in derselben Nacht |
+| Ob ein Programm am Studio-PC im Betrieb das Quantum ändert, ist nicht geprüft | P meldet die Verzögerung und führt nach (E1); H3 Dauerlauf |
+| Unter Last streut die Verzögerung etwa dreimal so breit (Z0, mit Q) | Z3d (Frage 1), Leistung mit 3 Videos |
+| Ob «aktiv» kommt und ob es beim Laden einer schon aktiven Quelle gemeldet wird | M3 vor b4; Rückfall `InputActiveStateChanged` bzw. `GetSourceActive` über den Kern |
 | Bildrate von OBS (Messgenauigkeit ±½ Bild) | `[OFFEN]`, Lotse liest `GetVideoSettings` in M3 |
+| RØDECaster stand nachts nicht in der Geräteliste; Name des Geräts in PipeWire unbekannt | N1 vor H2; Ausgang wird nach Namen gewählt, nie geraten |
 | Studio-Modus: Vorschau zeigt das erste Bild angehalten | Annahme, siehe unten; Nutzer kann im Handtest korrigieren |
-| Ton und Bild mit verschiedener Länge beim Wiederholen | Kern wiederholt nach der Länge des Videos, die die Seite meldet; Test in `tst_tonmischer` |
-| Gang zwischen Videouhr (Streaming-PC) und Audiouhr | laufendes Nachführen; M2, M3, H3 |
-| Brummschleife bei Variante B | M4 durch den Nutzer; dann Variante A oder Trennübertrager (Gerät, Nutzer) |
+| Ton und Bild mit verschiedener Länge beim Wiederholen (Pause rund 58,6 ms, M2) | Kern wiederholt nach der Länge des Videos, die die Seite meldet; Test in `tst_tonmischer` |
+| Gang zwischen Videouhr (Streaming-PC) und Audiouhr | laufendes Nachführen; M2 (−38,8 ppm am Studio-PC), M3, H3 |
+| Bei Ja zu Frage 5 zeigen sich Probleme am Anschluss (Brummen, USB) erst im Handtest | Variante A (USB, digital) gewählt; bei Brummen Trennübertrager (Gerät, Nutzer) |
+| Neues Paket `libpipewire-0.3-dev` fehlt | Voraussetzung für b1, Nutzer installiert; ohne Paket Halt |
 
 ## Annahmen und Interna-Entscheide
 
@@ -207,7 +296,14 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 | Ein ständig offener Ausgang mit eigenem Mischer | gleichbleibende Verzögerung und sofortiger Start; später auch für den Musikplayer |
 | Weiches Nachführen unter 20 ms, Sprung darüber | Sprünge knacken; kleine Gangunterschiede sind über `swr_set_compensation` unhörbar |
 | Stopp bei Ende der SSE-Verbindung oder 3 s ohne Meldung | OBS geschlossen oder Netz weg: kein Ton ins Leere |
-| Neuer Schalter `DSS_CORE_AUDIO` | riskanter Teil: neue Bibliothek und Thread im Dienst (Regel 8) |
+| Neuer Schalter `DSS_CORE_AUDIO` | riskanter Teil: neue Bibliothek (libpipewire) und Thread im Dienst (Regel 8) |
+| P12b beginnt mit Prototyp und Halt (b1) | Entscheid des Nutzers 11.11.: Erst wenn `pw_stream` den Sprung vermeidet, folgt der Einbau |
+| b1 misst mit demselben Aufnahmeweg wie M1 (`pw-loopback`, `QAudioSource`) | nur die Ausgabe ändert sich, die Werte sind mit M1c vergleichbar |
+| Erfolgsbedingung über den «Rest» (gemessen minus erwartet aus der gemeldeten Verzögerung) | genau das braucht der Kern: Er muss den hörbaren Zeitpunkt kennen, nicht eine feste Verzögerung haben |
+| Ausgang je Zweck, zuerst nur «Ton der Videos» (`[ton-video]` in `kern.ini`) | Antwort 2 des Nutzers: weitere Ausgänge später ohne Umbau |
+| `pw_thread_loop` statt Abruf im Qt-Ereignisfluss | PipeWire ruft in Echtzeit; der Ereignisfluss des Kerns (Server, OBS, Watchdog) darf ihn nicht bremsen |
+| Ersatzausgang ohne Gerät in `tst_kernton`, echte virtuelle Senke nur in `tst_tonausgang` und `tonpruefung.py` | Kern-Tests bleiben unabhängig vom Audiosystem; die Schicht über PipeWire wird trotzdem echt geprüft |
+| Qt Multimedia nicht im Kern, nicht in `scripts/pakete.txt` | mit P nicht nötig; zog Qt Gui in den Kern |
 | Echter Ausgang in Prüfungen nur unhörbar (Null-Senke), echtes Gerät nur mit dem Nutzer | Auftrag: «Kabel/Gerät nur mit dem Nutzer»; Messungen nachts ohne Ton im Raum |
 | P12 geteilt in P12a und P12b | Bau hängt von G1 bis G4 ab; M3 und M4 brauchen Rechte von Lotse und den Nutzer |
 
@@ -230,15 +326,29 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
   - https://tech.ebu.ch/publications/r037
   - https://rode.com/en/user-guide/rodecaster-pro-ii
   - https://docs.pipewire.org/
+- **Nachführung 2026-11-11, lokal gelesen:**
+  - `docs/archiv/messungen/P12a-bericht.md` (Kurzfassung, M1b, M1c, Z0, «G4», «Folgen von Z0 für G4 und P12b», Z1–Z3)
+  - `/var/lib/dpkg/status` (`libpipewire-0.3-0t64` 1.4.2-1 und `pipewire-bin` 1.4.2-1 installiert, `libpipewire-0.3-dev` nicht)
+  - Repo: `src/core/CMakeLists.txt`, `src/app/docks.h` (Dock «Steuerung»), `prototypes/ton/CMakeLists.txt`, `scripts/pakete.txt`, `docs/08-kern-schnittstelle.md` (Version 11)
+- **Nachführung 2026-11-11, nicht gelesen** (kein Webzugriff, b1 Schritt 0):
+  - https://docs.pipewire.org/group__pw__stream.html
+  - https://docs.pipewire.org/group__pw__thread__loop.html
+  - https://docs.pipewire.org/page_man_pipewire-props_7.html (`node.latency`, `target.object`, `node.dont-reconnect`)
 
 ---
 
-**Offen für Lotse:**
-- Die vier Fragen oben gehen an den Nutzer. Frage 1 und Frage 4 braucht es vor M4, Frage 2 und Frage 3 erst vor P12b.
-- Webzugriff für den P12a-Agenten freigeben (Schritt 0), sonst bleiben die Aussagen zu OBS und Geräten ungeprüft.
+**Offen für Lotse (Stand 2026-11-11):**
+- Fragen 1 bis 4 aus Abschnitt 7 vor b1 an den Nutzer, Fragen 5 bis 7 vor b4.
+- `libpipewire-0.3-dev` installiert der Nutzer vor b1.
+- Webzugriff für den Agenten von b1 (Dokumentation von PipeWire) und b4 (obs-browser) freigeben, sonst bleiben die Aussagen ungeprüft.
 
 ## Antworten des Nutzers (2026-11-09, in der Sitzung)
 1. Anschluss: USB an den zweiten USB-Anschluss des RØDECaster (Variante A). Modell und Anschluss im Schritt 0 von P12a bestätigen.
 2. Einstellung von Audioausgang und Versatz: **im Dock «Steuerung»**, nicht in «Werkzeuge → Einstellungen». Begründung des Nutzers: Später spielt auch der Chat-Bot weitere Töne aus, auf andere USB-Soundkarten. Darum so planen, dass mehrere Ausgänge (je Zweck/Modul eigener Ausgang) später ohne Umbau dazukommen; P12 baut nur den Ausgang für den Ton der Videos.
 3. Lautstärke je Videoquelle: Regler 0–100 % und Kästchen «Stumm», neue Quellen 100 % und nicht stumm.
 4. Messtest: Lotse darf in OBS eine Aufnahme von höchstens 60 s in der Szene «test 2» machen, nie während eines Streams, und löscht die Datei nach der Auswertung (in `CLAUDE.md`, «Umgebung», eingetragen).
+
+## Entscheide des Nutzers (2026-11-11, nach dem Messbericht P12a)
+- G4 = P (PipeWire direkt), mit Prototyp zuerst: P12b beginnt mit b1 (Z3), der Einbau folgt erst, wenn der Prototyp den Sprung vermeidet.
+- Z0 ja (ausgeführt, Messbericht). M2 wird nicht wiederholt. M3 macht Lotse mit dem Nutzer zusammen.
+- Nicht entschieden, als Fragen in Abschnitt 7: Z3 unter Last (Frage 1), Puffer mindestens 40 ms (Frage 2).
