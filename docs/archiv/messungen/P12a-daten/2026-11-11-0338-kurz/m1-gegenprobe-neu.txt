@@ -1,0 +1,12 @@
+Z0 Gegenprobe: Zuordnung nach der Zeit gegen die alte Auswertung (Zusammenfassung)
+Toleranz 0.0015 ms (CSV hat 3 Nachkommastellen je Zeit)
+
+m1-last-20.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 60/60, grösste Abweichung roh 0.0005 ms, ohne Pufferinhalt 0.0010 ms → gleich
+m1-last-40.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 60/60, grösste Abweichung roh 0.0004 ms, ohne Pufferinhalt 0.0004 ms → gleich
+m1-quantum.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 90/90, grösste Abweichung roh 0.0005 ms, ohne Pufferinhalt 0.0005 ms → gleich
+m1-ruhe-10.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 31/31, grösste Abweichung roh 0.0010 ms, ohne Pufferinhalt 0.0010 ms → gleich
+m1-ruhe-20.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 31/31, grösste Abweichung roh 0.0005 ms, ohne Pufferinhalt 0.0005 ms → gleich
+m1-ruhe-40.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 30/30, grösste Abweichung roh 0.0002 ms, ohne Pufferinhalt 0.0005 ms → gleich
+m1-ruhe-80.csv: Einsätze anders zugeordnet 0; ganzer Lauf: n 31/31, grösste Abweichung roh 0.0010 ms, ohne Pufferinhalt 0.0010 ms → gleich
+
+Ergebnis: Gegenprobe bestanden

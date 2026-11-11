@@ -1,0 +1,18 @@
+Z0: m1-last-20.csv neu ausgewertet, Zuordnung nach der Zeit (prototypes/ton/neu_auswerten.py)
+Bezugsverzögerung (Median roh, Klick 0–9): 44.129 ms; Fenster ± 250 ms; Versatz wandert dort um höchstens 1024 Proben (Grenze 12000)
+Abstand zur Bezugsverzögerung: n=60 min -24.823 p5 -13.356 Median 11.363 p95 34.366 max 47.463 ms (Spanne 72.286 ms, p5–p95 47.723 ms)
+Klicks geschrieben 61, mit Einsatz 60, ohne Einsatz 1, doppelt 0, Einsätze ausserhalb des Fensters 0
+Alte Auswertung: fehlend 1, fremde Einsätze 0
+Klicks ohne Einsatz: 0 verworfen von der alten Auswertung, 1 kurz vor dem Stopp, 0 Lücken
+  Klick 60 (geschrieben bei 30.008 s): kurz vor dem Stopp geschrieben (stop() leert den Puffer)
+Verrutsch-Stellen der alten Zuordnung (neu k − alt k): keine
+
+Verzögerung Schreiben → Aufnahme: n=60 min 19.306 p5 30.772 Median 55.492 p95 78.495 max 91.592 ms (Spanne 72.286 ms, p5–p95 47.723 ms)
+  ohne geschätzten Pufferinhalt: n=60 min 9.905 p5 15.681 Median 34.779 p95 55.549 max 58.789 ms (Spanne 48.884 ms, p5–p95 39.868 ms)
+Versatz (Lage Aufnahme − Lage Ausgabe): Klick 0 25088, Klick 59 19328 Proben → Verlust 5760 Proben = 120.0 ms
+Sprünge der Lage (> 2 Proben): 35, davon > 12000 Proben: 0; grösster Betrag 384 Proben
+Aussetzer (Unterläufe QAudioSink): 0
+
+Verlauf je 60 s (nach Sendezeit; ohne geschätzten Pufferinhalt):
+  Zeit       n   Median     p95   Spanne  p5–p95 | roh Median  p95 | Verlust Proben | Unterläufe | ohne Einsatz
+    0– 60 s   60    34.78   55.55    48.88   39.87 |      55.49  78.5 |           5760 |          0 |            1

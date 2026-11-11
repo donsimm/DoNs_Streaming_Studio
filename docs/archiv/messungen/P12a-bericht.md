@@ -1,8 +1,14 @@
 # P12a – Messbericht M1 und M2 (Nachtlauf 11.11.)
 
-Stand: 2026-11-11. Plan: `docs/archiv/prompts/P12-ton.md`, Abschnitt 2 («Messungen»). Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Qt 6.8.2, Qt WebEngine 6.8.2 mit Chromium 122.0.6261.171, PipeWire 1.4.2-1). Prototyp und Skript: `prototypes/ton/` im Stand des Commits «P12a: Skript für die Nachtläufe M1 und M2». Für diesen Bericht wurde nichts gemessen; alle Zahlen stammen aus den Dateien unter `P12a-daten/` und aus den Last-Rohdaten `build/p12a-nacht/2026-11-11-0343/` (nicht im Repo).
+Stand: 2026-11-11, nachgeführt mit Z0 (Neuauswertung von M1d, Abschnitt «Z0») und den Entscheiden des Nutzers vom 11.11. Plan: `docs/archiv/prompts/P12-ton.md`, Abschnitt 2 («Messungen»). Alle Messwerte stammen vom Studio-PC (Debian 13, Kernel 6.12.113+deb13-amd64, Qt 6.8.2, Qt WebEngine 6.8.2 mit Chromium 122.0.6261.171, PipeWire 1.4.2-1). Prototyp und Skript: `prototypes/ton/` im Stand des Commits «P12a: Skript für die Nachtläufe M1 und M2». Für diesen Bericht wurde nichts gemessen; alle Zahlen stammen aus den Dateien unter `P12a-daten/` und aus den Last-Rohdaten `build/p12a-nacht/2026-11-11-0343/` (nicht im Repo).
 
-M3 (OBS, Lotse) und M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, stehen aus.
+**Entscheide des Nutzers (2026-11-11):**
+- G4 = **P** (PipeWire direkt). P12b beginnt mit einem Prototyp mit `pw_stream` (Z3).
+- Z0 = ja (ausgeführt, siehe «Z0»).
+- M2 wird nicht wiederholt (auch nicht mit Fenster ausserhalb des Bildschirms).
+- M3 macht Lotse mit dem Nutzer zusammen.
+
+M3 (OBS, Lotse mit dem Nutzer) und M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, stehen aus.
 
 ## Kurzfassung
 
@@ -21,8 +27,8 @@ M3 (OBS, Lotse) und M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, stehen aus.
 
 Wichtigste Befunde:
 
-1. **G4:** Die Abbruchbedingung «Sprung > 10 ms beim Quantum-Wechsel» ist formal erfüllt. Nach Plan heisst das: Halt, Variante P vorschlagen. Einordnung und Empfehlung im Abschnitt «G4».
-2. **Die Sprünge von etwa +480 ms unter Last sind ein Fehler der Auswertung**, keine echten Sprünge der Verzögerung. Die Auswertung ordnet einen aufgenommenen Klick dem Nachbarklick zu, sobald die Aufnahme 12 000 Proben (250 ms) hinter die Ausgabe zurückgefallen ist. Echt sind dagegen: 17 Unterläufe von `QAudioSink` bei 20 ms Puffer unter Last und ein Probenverlust auf der Aufnahmeseite (1,92 s in 300 s bei 20 ms, 0,38 s bei 40 ms). Median, p95 und «fehlend» von M1d sind damit nicht brauchbar.
+1. **G4:** Die Abbruchbedingung «Sprung > 10 ms beim Quantum-Wechsel» ist formal erfüllt. Nach Plan heisst das: Halt, Variante P vorschlagen. Einordnung und Empfehlung im Abschnitt «G4». Der Nutzer hat am 11.11. P gewählt.
+2. **Die Sprünge von etwa +480 ms unter Last sind ein Fehler der Auswertung**, keine echten Sprünge der Verzögerung. Die Auswertung ordnet einen aufgenommenen Klick dem Nachbarklick zu, sobald die Aufnahme 12 000 Proben (250 ms) hinter die Ausgabe zurückgefallen ist. Echt sind dagegen: 17 Unterläufe von `QAudioSink` bei 20 ms Puffer unter Last und ein Probenverlust auf der Aufnahmeseite (1,92 s in 300 s bei 20 ms, 0,38 s bei 40 ms). Die alten Werte für Median, p95 und «fehlend» von M1d sind damit nicht brauchbar. **Z0** (Zuordnung nach der Zeit) liefert gültige Werte: ohne Pufferinhalt Median 35,1 / 39,1 ms, p95 55,8 / 59,9 ms, Spanne 67,7 / 59,3 ms bei 20 / 40 ms Puffer, kein Klick fehlt, kein Sprung und kein Gang der Verzögerung über 300 s.
 3. **M2** erfüllt beide Grenzen. Das Fenster lag aber auf dem Bildschirm, nicht ausserhalb.
 4. Der RØDECaster stand in der Nacht nicht in der Geräteliste; Standardausgang war «Internes Audio Digital Stereo (IEC958)».
 
@@ -132,9 +138,12 @@ Die Last war mässig: rund 8 bis 10,5 % der 8 Threads, `dss-core` 0,0 bis 0,1 % 
 | Unterläufe `QAudioSink` | **17** (Zustand «leer» je 0,04 bis 6,1 ms) | **0** |
 | Sprünge der Lage | 400, davon 4 gross: +478,67 / +484,00 / +484,00 / +497,33 ms | 65, davon 1 gross: +494,67 ms |
 | Lage-Differenz Klick 0 → letzter Klick | 26 624 → −65 536 Proben: **1920,0 ms** Verlust | 26 624 → 8448 Proben: **378,7 ms** Verlust |
-| Auswertung: fehlend / fremd | 4 / 4 | 1 / 1 |
-| Auswertung: Verzögerung Median / p95 | 1041,3 / 2036,0 ms | 80,8 / 579,3 ms |
+| alte Auswertung: fehlend / fremd | 4 / 4 | 1 / 1 |
+| alte Auswertung: Verzögerung Median / p95 (unbrauchbar) | 1041,3 / 2036,0 ms | 80,8 / 579,3 ms |
 | Verzögerung roh nach richtiger Zuordnung (Stichproben, siehe unten) | 23,7 bis 82,4 ms | 37,6 / 50,4 ms |
+| **Z0** (nach der Zeit): ohne Pufferinhalt Median / p95 / Spanne | 35,1 / 55,8 / 67,7 ms | 39,1 / 59,9 / 59,3 ms |
+
+Gültige Werte für M1d: Abschnitt «Z0» unten.
 
 #### Die grossen Sprünge sind ein Fehler der Auswertung
 
@@ -152,7 +161,7 @@ Echt sind:
 - **Probenverlust auf der Aufnahmeseite.** Die Lage-Differenz fällt in Schritten von 128 bis 1024 Proben (Summe 1,92 s bzw. 0,38 s), während die Verzögerung in der Zeit gleich bleibt. Hätte die Ausgabe Proben verloren, kämen die Klicks entsprechend früher an, und die Verzögerung wäre um bis zu 1,9 s gefallen. Folgerung: Die Proben fehlen zwischen der virtuellen Senke und `QAudioSource` (`pw-loopback` oder Aufnahme). Welcher Teil, ist nicht geprüft **[OFFEN]**. In Ruhe gibt es diese Schritte kaum (0 bis 4 je Lauf).
 - **17 Unterläufe** von `QAudioSink` bei 20 ms unter Last. Wie lang die Lücke im Ton jeweils war, ist nicht gemessen.
 
-Folge: Streuung und Aussetzer unter Last sind aus den vorhandenen Zusammenfassungen nicht ablesbar. Die CSV-Dateien enthalten alle Zeiten. Eine Auswertung mit Zuordnung nach der Zeit statt nach der Probenlage geht ohne neue Messung **[OFFEN]**.
+Folge: Streuung und Aussetzer unter Last sind aus den vorhandenen Zusammenfassungen nicht ablesbar. Die CSV-Dateien enthalten alle Zeiten. Die Auswertung mit Zuordnung nach der Zeit ist in Z0 nachgeholt (Abschnitt «Z0» unten).
 
 #### Abgleich mit den Läufen `last-*`
 
@@ -184,6 +193,50 @@ Zeit: `epoch_ms` aus der CSV, umgerechnet in MEZ (UTC+1), abgeglichen an `m1-qua
 | last-5 | 3 | +1, +3, +5 s (Übergang last-4 → last-5; Lauf M1d endet bei 04:00:16) |
 
 Ergebnis: **3 von 17 Unterläufen fallen zusammen** (Übergang last-4 → last-5), **14 fallen nicht zusammen**. Sie treten während der laufenden Last auf, nicht gehäuft am Start oder Ende eines Laufs. Bei 40 ms unter derselben Last gab es keinen Unterlauf.
+
+#### Z0: M1d nach der Zeit neu ausgewertet
+
+Ohne neue Messung, nur aus `m1-last-20.csv` und `m1-last-40.csv` (Entscheid des Nutzers 11.11.). Skript: `prototypes/ton/neu_auswerten.py`, Ausgaben `P12a-daten/<Lauf>/m1-last-20-neu.txt`, `m1-last-40-neu.txt` und `m1-gegenprobe-neu.txt`.
+
+**Zuordnung:** Ein Einsatz gehört zu dem Klick, dessen Sendezeit (`geschrieben_ms`) plus Bezugsverzögerung am nächsten an der Zeit des Einsatzes (`aufnahme_ms`) liegt. Bezugsverzögerung = Median der rohen Verzögerung von Klick 0 bis 9 (68,3 ms bei 20 ms, 66,2 ms bei 40 ms). Fenster ± 250 ms, also der halbe Klickabstand: breiter darf es nicht sein, sonst passt ein Einsatz zu zwei Klicks. Ausgenutzt wurde davon −61,7 bis +32,1 ms (20 ms) bzw. −52,9 bis +41,0 ms (40 ms); jeder Einsatz bleibt mindestens 188 ms vom Rand. 0 Einsätze ausserhalb, 0 Klicks doppelt.
+
+**Grenze der Daten:** Einsätze, die die alte Auswertung als «fremd» verworfen hat, stehen nicht in der CSV, nur ihre Anzahl in der Zusammenfassung. Die Klicks dazu bleiben ohne Zeit. Das Skript zeigt, dass es genau die Klicks an den Stellen sind, an denen die alte Zuordnung um einen weiteren Klick verrutscht (20 ms: Klick 133, 256, 443, 561; 40 ms: Klick 358), und dass ihre Zahl gleich der Zahl der fremden Einsätze ist (4 bzw. 1). Diese Klicks kamen also in der Aufnahme an; ihre Verzögerung fehlt in den Kennzahlen (n = 596 bzw. 599).
+
+| Voller Lauf, unter Last | Puffer 20 ms (15 erhalten) | Puffer 40 ms (30 erhalten) | zum Vergleich Ruhe 20 / 40 ms (M1b) |
+|---|---|---|---|
+| Klicks geschrieben / mit Zeit / verworfen (s. o.) / **fehlend** | 600 / 596 / 4 / **0** | 600 / 599 / 1 / **0** | – |
+| **ohne Pufferinhalt**: Median / p95 | **35,1 / 55,8 ms** | **39,1 / 59,9 ms** | 16,5 / 21,9 ms; 42,4 / 49,1 ms |
+| ohne Pufferinhalt: min / max, **Spanne** | 5,5 / 73,2 ms, **67,7 ms** | 10,7 / 70,0 ms, **59,3 ms** | 56,2 ms; 27,3 ms |
+| ohne Pufferinhalt: p5–p95 (Breite) | 10,0–55,8 (**45,7 ms**) | 19,2–59,9 (**40,7 ms**) | 15,5 ms; 13,4 ms |
+| roh: Median / p95 / Spanne | 54,9 / 85,6 / 93,8 ms | 60,4 / 89,9 / 93,8 ms | 35,4 / – / 92,5 ms; 63,6 / – / 65,9 ms |
+| **Aussetzer** (Unterläufe `QAudioSink`) | **17**, «leer» 0,04 bis 6,1 ms (Median 2,1 ms) | **0** | 0; 0 |
+| Sprünge der Lage > 2 Proben / grösster | 400 / 1024 Proben (21,3 ms), keiner > 12 000 | 65 / 1024 Proben, keiner > 12 000 | – |
+| Probenverlust der Aufnahme | 92 160 Proben = 1920,0 ms | 18 176 Proben = 378,7 ms | – |
+
+**Verlauf je 60 s** (ohne Pufferinhalt, nach Sendezeit; Spalten Median / p95 / Spanne, Verlust in Proben, Unterläufe):
+
+| Abschnitt | 20 ms | Verlust / Unterläufe | 40 ms | Verlust / Unterläufe |
+|---|---|---|---|---|
+| 0–60 s | 37,5 / 55,8 / 66,5 | 10 368 / 0 | 41,5 / 59,3 / 57,2 | 5632 / 0 |
+| 60–120 s | 32,5 / 53,8 / 50,7 | 22 016 / 5 | 47,2 / 60,2 / 58,1 | 2048 / 0 |
+| 120–180 s | 36,2 / 56,3 / 50,2 | 18 176 / 3 | 35,4 / 59,1 / 53,3 | 4352 / 0 |
+| 180–240 s | 35,6 / 53,8 / 54,9 | 16 128 / 3 | 47,4 / 61,8 / 55,7 | 5120 / 0 |
+| 240–300 s | 34,5 / 57,0 / 54,2 | 25 472 / 6 | 32,5 / 45,6 / 35,4 | 1024 / 0 |
+
+Befunde aus Z0:
+- **Kein Sprung und kein Gang der Verzögerung in der Zeit.** Der Median je 60 s bleibt bei 32,5 bis 37,5 ms (20 ms) bzw. 32,5 bis 47,4 ms (40 ms), obwohl die Aufnahme 1,92 s bzw. 0,38 s an Proben verliert. Das bestätigt Befund 2: Die Proben fehlen auf der Aufnahmeseite, die Ausgabe läuft in der Zeit gleichmässig weiter.
+- **Kein Klick fehlt**, auch nicht im Lauf mit den 17 Unterläufen («leer» höchstens 6,1 ms). Ob die Unterläufe hörbare Aussetzer erzeugen, misst die Klickmessung nicht (nicht geprüft).
+- **Um die Unterläufe** ändert sich der Median von je 3 Klicks davor und danach in beide Richtungen (z. B. 9,2 → 53,7 ms, 26,3 → 11,2 ms; Liste in `m1-last-20-neu.txt`). Bei einer Breite p5–p95 von 45,7 ms ist das nicht von der Streuung zu trennen. Ein bleibender Versatz nach einem Unterlauf ist im Verlauf je 60 s nicht zu sehen.
+- **Streuung unter Last etwa dreimal so breit wie in Ruhe** (p5–p95 45,7 / 40,7 ms gegen 15,5 / 13,4 ms). Welcher Teil davon aus dem Messweg kommt (Zeitstempel der Aufnahme, die unter Last selbst Proben verliert), ist nicht getrennt **[OFFEN]**, wie schon für die Ruhe. Die Werte sind eine obere Grenze für die Ausgabe allein.
+- Die alte Regel «richtige Nummer = eingetragene Nummer plus Anzahl bisheriger grosser Sprünge» (siehe «Interna-Entscheide») ist bestätigt: Die Zuordnung verrutscht genau bei den alten grossen Sprüngen (alte Nummern 133, 255, 441, 558 bei 20 ms und 358 bei 40 ms, richtig 134, 257, 444, 562 und 359).
+
+**Gegenprobe** (`m1-gegenprobe-neu.txt`, beide Läufe): Toleranz 0,0015 ms, weil die CSV jede Zeit mit 3 Nachkommastellen speichert und das Skript die Differenzen neu rechnet.
+- Ruhe 10 / 20 / 40 / 80 ms (M1b) und Quantum (M1c), voller Lauf und Probelauf: 0 Einsätze anders zugeordnet, n gleich, alle Kennzahlen (min, p5, Median, p95, max) roh und ohne Pufferinhalt gleich wie in der alten Zusammenfassung (grösste Abweichung 0,0010 ms).
+- M1d vor dem ersten Verrutschen (Klick 0–132 bei 20 ms, 0–357 bei 40 ms): n gleich (133 / 358), Kennzahlen gleich (grösste Abweichung 0,0010 ms).
+- M1d im Probelauf (30 s, kein grosser Sprung): ganzer Lauf gleich.
+- M1d ganzer voller Lauf: verschieden (463 bzw. 241 Einsätze anders zugeordnet). Das ist die erwartete Korrektur: Ab dem ersten Verrutschen zählt die alte Auswertung den Versatz von 1 bis 4 Klicks (500 bis 2000 ms) in die Verzögerung.
+- Hinweis zur Bezeichnung: Der Auftrag nannte die Ruhe-Messungen «M1a». In diesem Bericht heissen sie M1b (M1a ist die Geräteliste). Geprüft wurden die Ruhe-Messungen.
+- Der Probelauf von M1d bei 20 ms hat 1 Klick ohne Einsatz (Klick 60, geschrieben bei 30,008 s, also nach dem Ende der Messdauer von 30 s; `stop()` leert den Puffer). Die alte Auswertung zählt ihn ebenfalls als «fehlend».
 
 ### Probelauf (`--kurz`) zum Vergleich
 
@@ -226,7 +279,7 @@ Server als Benutzerdienst, Seite mit `seite-zeigen` (`--lage -1400,0`), 3600 s, 
 - Über 59,9 s ergeben −433,86 ppm rund 26 ms. Eine solche Störung kippt die Gerade über 60 s stark, über 3600 s kaum. Das passt zur Erklärung «Einschwingen in den ersten Sekunden».
 - Ob die Abweichungen im Probelauf tatsächlich am Anfang liegen, ist nicht nach Zeitfenstern geprüft **[OFFEN]**. Die Rohdaten (`2026-11-11-0338-kurz/m2-meldungen.csv.gz`) erlauben die Prüfung. Gegen eine reine Störung am Anfang spricht der hohe Median der Schwankung (3,3 ms): Mehr als die Hälfte aller Meldungen weicht über 3 ms ab.
 
-## G4: Einordnung (Entscheid beim Nutzer)
+## G4: Einordnung (entschieden: P, Nutzer 2026-11-11)
 
 **Formal:** Die Abbruchbedingung von M1 «Verzögerung springt um > 10 ms, wenn sich das Quantum von PipeWire ändert» ist erfüllt: +42,67 ms im vollen Lauf und im Probelauf. Nach dem Plan folgt: Halt, Variante P vorschlagen. Die übrigen Abbruchbedingungen von M1 und M2 sind nicht ausgelöst.
 
@@ -251,11 +304,21 @@ Gegenargumente:
 
 Wer Q ohne neues Paket bevorzugt, sollte vor dem Entscheid Z1 messen.
 
-### Zusatzmessungen, die die Frage klären könnten (nicht ausgeführt)
+**Entscheid des Nutzers (2026-11-11): P.** P12b beginnt mit einem Prototyp mit `pw_stream` (Z3).
+
+### Folgen von Z0 für G4 und P12b
+
+Z0 ändert an der Empfehlung P nichts:
+- Der Grund für P ist der Sprung beim Wechsel des Quantums (M1c). Z0 betrifft nur M1d und berührt ihn nicht.
+- Z0 nimmt die scheinbaren Sprünge von rund 480 ms unter Last weg. Sie waren kein Argument für P; unter Last gibt es weder Sprung noch Gang der Verzögerung in der Zeit. Ein zusätzliches Argument für oder gegen P entsteht daraus nicht.
+- Unter Last wird die Streuung (ohne Pufferinhalt) etwa dreimal so breit wie in Ruhe (p5–p95 rund 41 bis 46 ms). Mit Q sieht der Kern davon nichts. Ob die von `pw_stream` gemeldete Verzögerung diese Streuung abbildet, ist offen. Vorschlag für Z3 in P12b: den Prototyp mit `pw_stream` auch unter derselben Last messen, nicht nur M1c (nicht entschieden).
+- Bei 20 ms Puffer gab es unter mässiger Last 17 Unterläufe, bei 40 ms keinen. Vorschlag für P12b, unabhängig von Q oder P (nicht entschieden): Puffer nicht unter 40 ms gewünscht (30 ms erhalten) ansetzen, bis Z2 oder der Prototyp mit `pw_stream` etwas anderes zeigt.
+
+### Zusatzmessungen, die die Frage klären könnten
 
 | Nr. | Was | Klärt |
 |---|---|---|
-| Z0 | M1d aus den vorhandenen CSV-Dateien neu auswerten, Zuordnung nach der Zeit statt nach der Probenlage (keine neue Messung) | echte Streuung und Aussetzer unter Last, Verlauf der Verzögerung |
+| Z0 | **ausgeführt 2026-11-11** (Auswertung, keine Messung): M1d aus den vorhandenen CSV-Dateien neu ausgewertet, Zuordnung nach der Zeit statt nach der Probenlage. Ergebnis im Abschnitt «Z0» | echte Streuung und Aussetzer unter Last, Verlauf der Verzögerung |
 | Z1 | M1c mit Puffer 40 und 80 ms, je 180 s; Wechsel 0 → 1024 → 2048 → 0; wirksames Quantum dabei mit `pw-top` lesen | Sprung bei Puffer ≥ 1 Quantum? Sprung auch beim Wechsel auf das Standard-Quantum 1024? |
 | Z2 | M1d mit Puffer 40 und 80 ms je 10 min unter derselben Last | Unterläufe und Probenverlust der Aufnahme bei grösserem Puffer |
 | Z3 | nur bei P: Prototyp mit `pw_stream`, M1c wiederholen, gemeldete Verzögerung gegen die Klickmessung | ob P den Sprung erkennt und meldet |
@@ -273,15 +336,19 @@ Wer Q ohne neues Paket bevorzugt, sollte vor dem Entscheid Z1 messen.
 | `docs/archiv/messungen/P12a-bericht.md` | neu (dieser Bericht) |
 | `docs/archiv/messungen/P12a-daten/2026-11-11-0343/` | neu: voller Lauf, ohne `m1-quantum-pw-dump.json` |
 | `docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz/` | neu: Probelauf, ohne `m1-quantum-pw-dump.json` |
+| `prototypes/ton/neu_auswerten.py` | neu (Z0): Zuordnung nach der Zeit, Kennzahlen, Verlauf je 60 s, Gegenprobe; nur Python-Standardbibliothek |
+| `P12a-daten/<beide Läufe>/m1-last-20-neu.txt`, `m1-last-40-neu.txt`, `m1-gegenprobe-neu.txt` | neu (Z0): Ausgaben des Skripts |
+| dieser Bericht | nachgeführt (Z0): Entscheide des Nutzers 11.11., Abschnitte «Z0» und «Folgen von Z0 für G4 und P12b», offene Punkte |
 
 ## Geprüft
 
-- Stufe: keine Bau- oder Testprüfung, nur ein Bericht und Messdaten. Nichts gemessen, kein Skript gestartet, kein Code geändert.
+- Stufe: keine Bau- oder Testprüfung, nur ein Bericht und Messdaten. Nichts gemessen. Für den Messbericht kein Skript gestartet und kein Code geändert; für Z0 ein Auswertungsskript (siehe unten).
 - 2026-11-11: `git status --porcelain --ignored --untracked-files=all`: Alle 48 Dateien in `P12a-daten/` sind unversioniert und nicht durch `.gitignore` ausgeschlossen.
 - 2026-11-11: Suche (ripgrep) in Bericht und Datenordnern nach `192.168`, `ts.net` und `@`:
   - `192.168` und `ts.net`: keine Treffer.
   - `@`: nur in den beiden `m1-quantum-pw-dump.json` (je 12 Treffer, E-Mail-Adressen der Autoren von PipeWire-Modulen). Diese Dateien sind nicht im Commit.
-- Die Rechenschritte in diesem Bericht (Differenzen, Umrechnung der Zeiten, Zuordnung) sind von Hand aus den genannten Zeilen der Dateien gerechnet, ohne Skript.
+- Die Rechenschritte in diesem Bericht (Differenzen, Umrechnung der Zeiten, Zuordnung) sind von Hand aus den genannten Zeilen der Dateien gerechnet, ohne Skript. Ausnahme: Abschnitt «Z0».
+- Z0, 2026-11-11: `python3 -I prototypes/ton/neu_auswerten.py docs/archiv/messungen/P12a-daten/2026-11-11-0343 docs/archiv/messungen/P12a-daten/2026-11-11-0338-kurz` (Python 3 von Debian 13): Exit-Code 0, keine Fehlermeldung, «Gegenprobe bestanden» für beide Läufe. Summe des Verlusts je 60 s gleich dem Verlust des ganzen Laufs (92 160 bzw. 18 176 Proben). Keine Messung, nichts abgespielt, kein Dienst gestartet.
 
 ## Handtest
 
@@ -289,15 +356,16 @@ Kein Handtest nötig für diesen Commit. M3 und M4 aus dem Plan stehen aus (sieh
 
 ## Nicht erledigt, `[OFFEN]`
 
-- **[OFFEN]** M3 (Lotse, OBS): `window.obsstudio`, Ereignisse «aktiv»/«sichtbar», Gang über 60 min gegen den Studio-PC, Bildrate (`GetVideoSettings`).
+- **[OFFEN]** M3 (Lotse mit dem Nutzer zusammen, Entscheid 11.11., OBS): `window.obsstudio`, Ereignisse «aktiv»/«sichtbar», Gang über 60 min gegen den Studio-PC, Bildrate (`GetVideoSettings`).
 - **[OFFEN]** M4 (Nutzer und Lotse): ganzer Weg über den RØDECaster, Versatz und Streuung über 30 Blitze, Hörtest. Voraussetzung: RØDECaster angeschlossen (in der Nacht nicht in der Geräteliste).
-- **[OFFEN]** Entscheid G4 (Q oder P) durch den Nutzer.
-- **[OFFEN]** M1d neu auswerten (Z0): Die Zuordnung nach der Probenlage ergibt ab 250 ms aufgelaufenem Probenverlust falsche Klicks. Median, p95, Spanne und «fehlend» von M1d sind deshalb unbrauchbar.
+- Erledigt: Entscheid G4, vom Nutzer am 11.11. entschieden: P.
+- Erledigt: M1d neu auswerten (Z0), 11.11., Abschnitt «Z0». Gültige Werte für Median, p95, Spanne, «fehlend» und Aussetzer unter Last.
+- **[OFFEN]** Verzögerung der 4 bzw. 1 Klicks, deren Einsatz die alte Auswertung verworfen hat: steht nicht in der CSV, nur mit neuer Messung oder geänderter Auswertung im Prototyp zu holen. Für die Kennzahlen unerheblich (n = 596 bzw. 599).
 - **[OFFEN]** Ursache des Probenverlusts auf der Aufnahmeseite unter Last (`pw-loopback` oder `QAudioSource`).
 - **[OFFEN]** Ursache der 17 Unterläufe bei 20 ms unter mässiger Last (rund 9 % CPU).
-- **[OFFEN]** Anteil des Messwegs an der Streuung in Ruhe.
+- **[OFFEN]** Anteil des Messwegs an der Streuung in Ruhe und unter Last (Z0: unter Last etwa dreimal so breit).
 - **[OFFEN]** Abrufblöcke von 42,67 ms unabhängig vom Puffer: Bedeutung für den Mischer.
-- **[OFFEN]** M2 mit Fenster ausserhalb des Bildschirms ist nicht gemessen (Fenster lag bei 0,27).
+- M2 mit Fenster ausserhalb des Bildschirms ist nicht gemessen (Fenster lag bei 0,27). Entscheid des Nutzers 11.11.: M2 wird nicht wiederholt.
 - **[OFFEN]** Erklärung «Einschwingen» für den Probelauf nicht nach Zeitfenstern geprüft.
 - **[OFFEN]** Warum `/proc/loadavg` unter Last 0,02 zeigte.
 
@@ -308,7 +376,14 @@ Kein Handtest nötig für diesen Commit. M3 und M4 aus dem Plan stehen aus (sieh
 | Streuung als p5–p95 «ohne geschätzten Pufferinhalt», Spanne daneben | siehe «Welche Grösse für die Streuung» |
 | Zeitumrechnung `epoch_ms` → MEZ (UTC+1) | abgeglichen: `m1-quantum-zeiten.txt` 1794365583047 entspricht dem Protokolleintrag 03:53:03 |
 | «Fällt zusammen» = höchstens 5 s nach «started» oder höchstens 5 s um das App-Ende (+75 s) | «started» hat nur ganze Sekunden; der Übergang zwischen zwei Läufen (App-Ende, Start des nächsten) dauert etwa 1 s |
-| Richtige Zuordnung nach einem grossen Sprung = eingetragene Nummer plus Anzahl bisheriger grosser Sprünge | folgt aus der Rundungsregel in `klickmessung.cpp:339` und den Belegen 1 bis 3 |
+| Richtige Zuordnung nach einem grossen Sprung = eingetragene Nummer plus Anzahl bisheriger grosser Sprünge | folgt aus der Rundungsregel in `klickmessung.cpp:339` und den Belegen 1 bis 3; mit Z0 bestätigt |
+| Z0: Zuordnung zum Klick mit der nächsten erwarteten Zeit (Sendezeit + Bezugsverzögerung), Fenster ± 250 ms | halber Klickabstand: grösstes Fenster ohne Doppeldeutigkeit; genutzt wurden höchstens 62 ms, Rand nie erreicht |
+| Z0: Bezugsverzögerung = Median der rohen Verzögerung von Klick 0 bis 9 | dort wandert der Versatz um höchstens 640 Proben (Grenze 12 000), die alte Zuordnung ist also richtig; Median statt Mittel gegen Ausreisser |
+| Z0: Zuordnung nach roher Verzögerung (Sendezeit), nicht nach «ohne Pufferinhalt» | so verlangt («Sendezeit gegen Zeit des Einsatzes»); bei ± 250 ms Fenster und 94 ms Spanne macht die Wahl keinen Unterschied |
+| Z0: Toleranz der Gegenprobe 0,0015 ms | CSV speichert jede Zeit mit 3 Nachkommastellen, das Skript rechnet die Differenz neu |
+| Z0: Verlauf in Abschnitten von 60 s nach Sendezeit; Verlust je Abschnitt gegen den letzten Klick des vorigen Abschnitts | Auftrag («z. B. je 60 s»); so ergibt die Summe den Verlust des ganzen Laufs |
+| Z0: Ausgaben auch für den Probelauf | gleiche Rechnung, dient als weitere Gegenprobe (dort kein grosser Sprung) |
+| Z0: Bezeichner im Skript auf Englisch, Texte und Kommentare auf Deutsch | Regel 13 |
 | `m1-quantum-pw-dump.json` (beide Läufe) nicht im Commit, unversioniert im Datenordner gelassen | enthält Benutzer- und Rechnernamen sowie Namen und E-Mail-Adressen Dritter (Autoren der PipeWire-Module). Der Auftrag schliesst Personennamen und Adressen im Commit aus. Die benötigten Werte stehen im Bericht |
 | Rohdaten von M1 und M2 (CSV, `m2-meldungen.csv.gz`) im Commit | Auffälligkeiten (Entscheid Lotse 09.11.: Rohdaten von M2 nur bei Auffälligkeiten): Z0 und die Prüfung «Einschwingen» brauchen sie |
 | Last-Rohdaten `build/p12a-nacht/` nicht im Repo | Auftrag; im Bericht zusammengefasst |
@@ -322,6 +397,7 @@ Lokal gelesen (2026-11-11):
 - `scripts/leistung.py:43-45, 119-142`
 - `docs/archiv/messungen/P12a-daten/2026-11-11-0343/*` und `…/2026-11-11-0338-kurz/*`
 - `build/p12a-nacht/2026-11-11-0343/leistung.log`, `last-1/` bis `last-8/` (`mpstat.txt`, `ergebnis.json`)
+- Z0: `prototypes/ton/klickmessung.cpp:314-401` (Spalten der CSV, Zuordnung, Zustände), `prototypes/ton/auswertung.cpp:7-26` (Rechnung der Kennzahlen, im Skript nachgebaut)
 
 Im Code genannt, für diesen Bericht **nicht abgerufen** (kein Webzugriff in diesem Schritt):
 - https://doc.qt.io/qt-6.8/qaudiosink.html

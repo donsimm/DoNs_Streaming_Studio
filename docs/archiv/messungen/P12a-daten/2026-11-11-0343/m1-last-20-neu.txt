@@ -1,0 +1,42 @@
+Z0: m1-last-20.csv neu ausgewertet, Zuordnung nach der Zeit (prototypes/ton/neu_auswerten.py)
+Bezugsverzögerung (Median roh, Klick 0–9): 68.339 ms; Fenster ± 250 ms; Versatz wandert dort um höchstens 640 Proben (Grenze 12000)
+Abstand zur Bezugsverzögerung: n=596 min -61.705 p5 -46.706 Median -13.397 p95 17.282 max 32.096 ms (Spanne 93.801 ms, p5–p95 63.988 ms)
+Klicks geschrieben 600, mit Einsatz 596, ohne Einsatz 4, doppelt 0, Einsätze ausserhalb des Fensters 0
+Alte Auswertung: fehlend 4, fremde Einsätze 4
+Klicks ohne Einsatz: 4 verworfen von der alten Auswertung, 0 kurz vor dem Stopp, 0 Lücken
+  Klick 133 (geschrieben bei 66.517 s): Einsatz von der alten Auswertung als «fremd» verworfen (Zeit nicht in der CSV)
+  Klick 256 (geschrieben bei 128.061 s): Einsatz von der alten Auswertung als «fremd» verworfen (Zeit nicht in der CSV)
+  Klick 443 (geschrieben bei 221.553 s): Einsatz von der alten Auswertung als «fremd» verworfen (Zeit nicht in der CSV)
+  Klick 561 (geschrieben bei 280.577 s): Einsatz von der alten Auswertung als «fremd» verworfen (Zeit nicht in der CSV)
+Verrutsch-Stellen der alten Zuordnung (neu k − alt k): ab Klick 134: 0 → 1, ab Klick 257: 1 → 2, ab Klick 444: 2 → 3, ab Klick 562: 3 → 4
+
+Verzögerung Schreiben → Aufnahme: n=596 min 6.634 p5 21.632 Median 54.941 p95 85.621 max 100.435 ms (Spanne 93.801 ms, p5–p95 63.988 ms)
+  ohne geschätzten Pufferinhalt: n=596 min 5.504 p5 10.044 Median 35.094 p95 55.764 max 73.241 ms (Spanne 67.737 ms, p5–p95 45.720 ms)
+Versatz (Lage Aufnahme − Lage Ausgabe): Klick 0 26624, Klick 599 -65536 Proben → Verlust 92160 Proben = 1920.0 ms
+Sprünge der Lage (> 2 Proben): 400, davon > 12000 Proben: 0; grösster Betrag 1024 Proben
+Aussetzer (Unterläufe QAudioSink): 17, Dauer «leer» n=17 min 0.043 p5 0.045 Median 2.116 p95 4.537 max 6.126 ms (Spanne 6.083 ms, p5–p95 4.493 ms)
+  bei 72.830 s, leer 1.174 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 9.2 / 53.7 ms
+  bei 84.492 s, leer 1.119 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 13.0 / 56.7 ms
+  bei 87.497 s, leer 6.126 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 40.2 / 32.7 ms
+  bei 90.494 s, leer 0.045 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 26.3 / 11.2 ms
+  bei 98.498 s, leer 2.200 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 44.5 / 36.4 ms
+  bei 124.496 s, leer 2.131 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 19.9 / 51.3 ms
+  bei 131.495 s, leer 3.161 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 51.9 / 38.4 ms
+  bei 172.138 s, leer 2.159 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 16.4 / 54.3 ms
+  bei 187.805 s, leer 1.090 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 43.3 / 42.5 ms
+  bei 229.830 s, leer 4.140 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 46.0 / 38.2 ms
+  bei 234.493 s, leer 3.249 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 32.7 / 25.9 ms
+  bei 246.490 s, leer 0.064 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 16.9 / 50.0 ms
+  bei 253.822 s, leer 1.152 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 15.4 / 55.8 ms
+  bei 258.825 s, leer 0.043 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 31.9 / 17.0 ms
+  bei 294.162 s, leer 0.055 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 46.4 / 39.7 ms
+  bei 295.806 s, leer 3.197 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 39.7 / 17.8 ms
+  bei 297.809 s, leer 2.116 ms; ohne Pufferinhalt 1,5 s davor / danach (Median): 17.8 / 39.3 ms
+
+Verlauf je 60 s (nach Sendezeit; ohne geschätzten Pufferinhalt):
+  Zeit       n   Median     p95   Spanne  p5–p95 | roh Median  p95 | Verlust Proben | Unterläufe | ohne Einsatz
+    0– 60 s  120    37.50   55.78    66.53   45.94 |      55.67  86.2 |          10368 |          0 |            0
+   60–120 s  119    32.50   53.76    50.68   43.84 |      52.53  81.2 |          22016 |          5 |            1
+  120–180 s  119    36.22   56.28    50.21   44.85 |      56.27  86.1 |          18176 |          3 |            1
+  180–240 s  119    35.64   53.81    54.90   45.17 |      55.91  84.8 |          16128 |          3 |            1
+  240–300 s  119    34.54   56.99    54.22   44.19 |      54.66  88.4 |          25472 |          6 |            1

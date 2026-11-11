@@ -1,0 +1,22 @@
+Z0: m1-last-40.csv neu ausgewertet, Zuordnung nach der Zeit (prototypes/ton/neu_auswerten.py)
+Bezugsverzögerung (Median roh, Klick 0–9): 66.223 ms; Fenster ± 250 ms; Versatz wandert dort um höchstens 256 Proben (Grenze 12000)
+Abstand zur Bezugsverzögerung: n=599 min -52.889 p5 -34.792 Median -5.836 p95 23.640 max 40.953 ms (Spanne 93.842 ms, p5–p95 58.432 ms)
+Klicks geschrieben 600, mit Einsatz 599, ohne Einsatz 1, doppelt 0, Einsätze ausserhalb des Fensters 0
+Alte Auswertung: fehlend 1, fremde Einsätze 1
+Klicks ohne Einsatz: 1 verworfen von der alten Auswertung, 0 kurz vor dem Stopp, 0 Lücken
+  Klick 358 (geschrieben bei 179.024 s): Einsatz von der alten Auswertung als «fremd» verworfen (Zeit nicht in der CSV)
+Verrutsch-Stellen der alten Zuordnung (neu k − alt k): ab Klick 359: 0 → 1
+
+Verzögerung Schreiben → Aufnahme: n=599 min 13.334 p5 31.431 Median 60.387 p95 89.863 max 107.176 ms (Spanne 93.842 ms, p5–p95 58.432 ms)
+  ohne geschätzten Pufferinhalt: n=599 min 10.667 p5 19.198 Median 39.071 p95 59.919 max 69.962 ms (Spanne 59.295 ms, p5–p95 40.721 ms)
+Versatz (Lage Aufnahme − Lage Ausgabe): Klick 0 26624, Klick 599 8448 Proben → Verlust 18176 Proben = 378.7 ms
+Sprünge der Lage (> 2 Proben): 65, davon > 12000 Proben: 0; grösster Betrag 1024 Proben
+Aussetzer (Unterläufe QAudioSink): 0
+
+Verlauf je 60 s (nach Sendezeit; ohne geschätzten Pufferinhalt):
+  Zeit       n   Median     p95   Spanne  p5–p95 | roh Median  p95 | Verlust Proben | Unterläufe | ohne Einsatz
+    0– 60 s  120    41.46   59.26    57.15   42.20 |      60.15  90.1 |           5632 |          0 |            0
+   60–120 s  120    47.20   60.19    58.12   40.67 |      65.36  92.1 |           2048 |          0 |            0
+  120–180 s  120    35.42   59.14    53.30   39.80 |      56.31  85.7 |           4352 |          0 |            1
+  180–240 s  119    47.43   61.76    55.67   42.41 |      64.80  93.4 |           5120 |          0 |            0
+  240–300 s  120    32.48   45.57    35.41   24.04 |      53.21  74.6 |           1024 |          0 |            0
