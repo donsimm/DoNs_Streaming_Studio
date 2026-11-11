@@ -4,6 +4,8 @@
 # ton-messen: Qt Core, Network und Multimedia mit QCoreApplication (wie der Kern, M1 prüft genau
 #             das), dazu libavformat/libavcodec/libswresample für den Ton der Testdateien.
 # seite-zeigen: Qt WebEngine Widgets, zeigt die Messseite für M2 (wie tst_browserquelle).
+# pw-messen (P12b, b1): nur Qt Core und libpipewire-0.3 (pkg-config), QCoreApplication, ohne Qt Gui
+#             und ohne Qt Multimedia; Messung Z3 (pw-lauf.sh).
 cmake_minimum_required(VERSION 3.25)
 project(p12a_ton LANGUAGES CXX)
 
@@ -36,3 +38,14 @@ target_link_libraries(ton-messen PRIVATE Qt6::Core Qt6::Network Qt6::Multimedia 
 qt_add_executable(seite-zeigen seite-zeigen.cpp)
 target_compile_options(seite-zeigen PRIVATE -Wall -Wextra)
 target_link_libraries(seite-zeigen PRIVATE Qt6::WebEngineWidgets)
+
+pkg_check_modules(TON_PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+qt_add_executable(pw-messen
+  pw-messen.cpp
+  zeit.h
+  pwsitzung.h pwsitzung.cpp
+  pwklick.h pwklick.cpp
+  auswertung.h auswertung.cpp
+)
+target_compile_options(pw-messen PRIVATE -Wall -Wextra)
+target_link_libraries(pw-messen PRIVATE Qt6::Core PkgConfig::TON_PIPEWIRE)
