@@ -225,6 +225,12 @@ if(TARGET dss_audio)
   target_link_libraries(tst_tonmischer PRIVATE dss_audio)
   target_compile_definitions(tst_tonmischer PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
 endif()
+# P12b b3: Ausgabe über PipeWire mit eigenen virtuellen Senken (unhörbar, nur Stille), Liste, Wahl,
+# fehlender und verschwundener Ausgang, Wiederkehr, fremde Verbindung. Nur mit DSS_CORE_AUDIO.
+if(TARGET dss_pwoutput)
+  dss_add_test(tst_tonausgang)
+  target_link_libraries(tst_tonausgang PRIVATE dss_pwoutput PkgConfig::DSS_PIPEWIRE)
+endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
 # variable Schrift); ohne X11 übersprungen (77). Nur mit dem Zeichner (DSS_APP_RENDERER).

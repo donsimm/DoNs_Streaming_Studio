@@ -37,6 +37,9 @@ option(DSS_CORE_IMPORT_THREAD "Kern übernimmt Dateien in eigenen Threads (P10-v
 # P10 (Teil A): Overlay-Server im Kern für die Browserquelle (HTTP im Heimnetz, Seite aus web/).
 # Aus: kein Server, keine Browserquelle (wie P10-vor); Neuer Token und Ausgabe ein/aus bleiben.
 option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P10)" ON)
+# P12b b3: Ton der Videos über PipeWire im Kern (libpipewire-0.3, Thread von PipeWire im Dienst).
+# Aus: Kern ohne Ton und ohne libpipewire (Stand P11).
+option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html
@@ -68,9 +71,9 @@ add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
 add_subdirectory(src/common)
-if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER))
+if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER) OR DSS_CORE_AUDIO)
   add_subdirectory(src/media)
-  add_subdirectory(src/audio) # P12b b2: Mischer, noch von keinem Programm genutzt
+  add_subdirectory(src/audio) # P12b: Mischer (b2), Ausgabe über PipeWire mit DSS_CORE_AUDIO (b3)
 endif()
 if(DSS_CORE_OVERLAY_SERVER)
   add_subdirectory(src/server)
