@@ -211,6 +211,14 @@ if(TARGET dss_media)
     DSS_TEST_BILDVERGLEICH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/bildvergleich")
 endif()
 
+# P12b b2: Ton von Videos dekodieren in den Ring für den Mischer, mit tests/daten/ton/ (P12a).
+# Ohne Qt Gui und ohne Gerät.
+if(TARGET dss_audiodecoder)
+  dss_add_test(tst_tondecoder)
+  target_link_libraries(tst_tondecoder PRIVATE dss_audiodecoder)
+  target_compile_definitions(tst_tondecoder PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+endif()
+
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
 # variable Schrift); ohne X11 übersprungen (77). Nur mit dem Zeichner (DSS_APP_RENDERER).
 if(DSS_BUILD_APP AND DSS_APP_RENDERER)

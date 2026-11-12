@@ -18,3 +18,9 @@ qt6-svg-plugins 6.8.2-3
 # QWebSocketServer. Gemessen 2026-11-07 (installiert vom Nutzer, Begründung im Bericht P10c).
 qt6-websockets-dev 6.8.2-3
 libqt6websockets6 6.8.2-3
+# Seit P12b: Ton der Videos dekodieren und umwandeln (dss_audiodecoder, libswresample) und
+# Ausgabe über PipeWire (pw_stream, ab b3). libpipewire-0.3-dev zieht libspa-0.2-dev 1.4.2-1 mit.
+# Gemessen 2026-11-12 in /var/lib/dpkg/status (libswresample-dev schon installiert,
+# libpipewire-0.3-dev installiert vom Nutzer für P12b b1).
+libswresample-dev 7:7.1.5-0+deb13u1
+libpipewire-0.3-dev 1.4.2-1

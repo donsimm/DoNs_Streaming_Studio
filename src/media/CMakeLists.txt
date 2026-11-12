@@ -17,3 +17,14 @@ target_link_libraries(dss_media PUBLIC Qt6::Core Threads::Threads dss_common
 # P10a (Punkt 65): Drehung aus den Metadaten von Videos (Display-Matrix) beachten.
 # Aus: Videos werden gezeigt, wie sie gespeichert sind (wie bis P09b).
 target_compile_definitions(dss_media PRIVATE DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
+
+# P12b b2: Ton von Videos dekodieren (float, 48 kHz, Stereo) für den Mischer (src/audio). Eigenes
+# Ziel, damit Kern und Fenster libswresample erst binden, wenn sie den Ton nutzen (b3, b4).
+pkg_check_modules(DSS_SWRESAMPLE REQUIRED IMPORTED_TARGET libswresample)
+add_library(dss_audiodecoder STATIC
+  audioring.h
+  audiodecoder.h audiodecoder.cpp
+)
+target_include_directories(dss_audiodecoder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(dss_audiodecoder PUBLIC Qt6::Core Threads::Threads
+                                       PRIVATE dss_media PkgConfig::DSS_FFMPEG PkgConfig::DSS_SWRESAMPLE dss_warnings)
