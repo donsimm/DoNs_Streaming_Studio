@@ -70,6 +70,7 @@ target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER))
   add_subdirectory(src/media)
+  add_subdirectory(src/audio) # P12b b2: Mischer, noch von keinem Programm genutzt
 endif()
 if(DSS_CORE_OVERLAY_SERVER)
   add_subdirectory(src/server)

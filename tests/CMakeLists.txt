@@ -218,6 +218,13 @@ if(TARGET dss_audiodecoder)
   target_link_libraries(tst_tondecoder PRIVATE dss_audiodecoder)
   target_compile_definitions(tst_tondecoder PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
 endif()
+# P12b b2: Mischer mit gedachter Uhr und gedachten Werten des Ausgangs, ohne Gerät; ein Fall mit
+# echtem Decoder und tests/daten/ton/blitz-piep.mp4.
+if(TARGET dss_audio)
+  dss_add_test(tst_tonmischer)
+  target_link_libraries(tst_tonmischer PRIVATE dss_audio)
+  target_compile_definitions(tst_tonmischer PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
 # variable Schrift); ohne X11 übersprungen (77). Nur mit dem Zeichner (DSS_APP_RENDERER).
