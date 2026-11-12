@@ -1,6 +1,6 @@
 # P12 – Ton von Videos (Plan)
 
-Plan des Projektleiter-Agenten vom 2026-11-09, nachgeführt am 2026-11-11 für G4 = P (Abschnitte 3 bis 8). Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)») und unten («Antworten des Nutzers»), Messbericht `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Prototyp mit `pw_stream`, Halt, dann Bau in Abschnitten), Handtest.
+Plan des Projektleiter-Agenten vom 2026-11-09, nachgeführt am 2026-11-11 für G4 = P (Abschnitte 3 bis 8) und am 2026-11-12 für b4 Teil 1 (Entscheide vor b4, «Ergebnis b4 Teil 1»). Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)») und unten («Antworten des Nutzers»), Messbericht `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Prototyp mit `pw_stream`, Halt, dann Bau in Abschnitten), Handtest.
 
 ## Entscheide des Nutzers
 
@@ -59,7 +59,7 @@ Die Grundfrage hat vier Teile:
 
 ## 2. P12a – Messtest
 
-**Stand 2026-11-11:** M1 und M2 gemessen (Nachtlauf 11.11.), M1d nach der Zeit neu ausgewertet (Z0), alles im Messbericht `docs/archiv/messungen/P12a-bericht.md`. M2 wird nicht wiederholt. M3 macht Lotse mit dem Nutzer zusammen, vor Abschnitt b4 (b4 hängt davon ab). M4 siehe Frage 5 in Abschnitt 7.
+**Stand 2026-11-11:** M1 und M2 gemessen (Nachtlauf 11.11.), M1d nach der Zeit neu ausgewertet (Z0), alles im Messbericht `docs/archiv/messungen/P12a-bericht.md`. M2 wird nicht wiederholt. M3 macht Lotse mit dem Nutzer zusammen, vor Commit 2 von b4 (Entscheid 12.11.: b4 Teil 1 ohne M3). M4 entfällt: H2 ersetzt M4 (Frage 5, Entscheid 12.11.).
 
 Grund für die Teilung: Ohne die Antworten zu G1 bis G4 lässt sich der Bau nicht festlegen. Ausserdem brauchen M3 und M4 Rechte und Geräte, die der bauende Agent nicht hat.
 
@@ -196,17 +196,66 @@ Kenngrösse **«Rest»** je Klick: gemessene Einsatzzeit in der Aufnahme minus e
 
 ### b4 – Seite und Kern verbinden (3 Commits)
 
-**Voraussetzung:** M3 erledigt (Lotse mit dem Nutzer). Kommt in OBS kein «aktiv»-Ereignis: Rückfall `InputActiveStateChanged` über den Kern planen, Halt und Meldung an Lotse.
+**Voraussetzung:** M3 erledigt (Lotse mit dem Nutzer). Kommt in OBS kein «aktiv»-Ereignis: Rückfall `InputActiveStateChanged` über den Kern planen, Halt und Meldung an Lotse. **Entscheid des Nutzers 2026-11-12:** b4 in zwei Teilen. Teil 1 ohne M3: Commit 1 und Commit 3, das Format der Meldungen so, dass Commit 2 es nur noch senden muss. Teil 2 nach M3: Commit 2.
 
-1. Overlay-Server: Adresse `…/clock` (POST, JSON, Grenzen je Seite, nur mit gültigem Token). Test `tst_overlayserver` (`clock`, Grenzen, falsche Daten).
-2. Seite `web/overlay.js`: Verhalten in OBS (von vorne bei «aktiv», anhalten und zurück bei «inaktiv») und Meldungen. Test `tst_browserquelle` mit nachgebildetem `window.obsstudio` und `CustomEvent`: Inhalt der Meldungen, keine Meldungen ohne `obsstudio`. `tst_bildvergleich` muss unverändert bestehen.
-3. Kern: Meldungen an den Mischer, Stopp-Regeln (Ausgabe aus, Quelle verborgen/gelöscht/geändert, SSE-Ende, 3 s ohne Meldung). Neu `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang ohne Gerät: Start, Stopp in allen Fällen, Nachführen, Wiederholen).
+1. Overlay-Server: Adresse `…/clock` (POST, JSON, Grenzen je Seite, nur mit gültigem Token). Test `tst_overlayserver` (`clock`, Grenzen, falsche Daten). **Erledigt (Teil 1).**
+2. Seite `web/overlay.js`: Verhalten in OBS (von vorne bei «aktiv», anhalten und zurück bei «inaktiv») und Meldungen. Test `tst_browserquelle` mit nachgebildetem `window.obsstudio` und `CustomEvent`: Inhalt der Meldungen, keine Meldungen ohne `obsstudio`. `tst_bildvergleich` muss unverändert bestehen. **Offen (Teil 2, nach M3)**, Vorgaben unten in «Für Commit 2».
+3. Kern: Meldungen an den Mischer, Stopp-Regeln (Ausgabe aus, Quelle verborgen/gelöscht/geändert, SSE-Ende, 3 s ohne Meldung). Neu `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang ohne Gerät: Start, Stopp in allen Fällen, Nachführen, Wiederholen). **Erledigt (Teil 1).**
+
+**Ergebnis b4 Teil 1** (2026-11-12, ohne M3, Stufe «Klein»: Bau ohne Warnungen; `ctest` 48 von 48 nach Commit 1 und 49 von 49 nach Commit 3; `tst_overlayserver` 20 von 20 nach Commit 1; `tst_kernton`, `tst_tonausgang` und `tst_kernverbindung` je 20 von 20 nach Commit 3):
+
+- **Commit 1, Overlay-Server** (`src/server/clockreport.{h,cpp}`, `overlayserver.{h,cpp}`):
+  - `POST …/clock`, Inhalt JSON (Format Version 1, ein Objekt je Meldung und Video, höchstens 2048 Byte):
+
+    | Feld | Inhalt | Pflicht |
+    |---|---|---|
+    | `v` | 1 | immer |
+    | `page` | Kennung der Seite, beim Laden zufällig, `[a-z0-9]{8,32}` | immer |
+    | `seq` | laufende Nummer je Seite (ganze Zahl ≥ 0); ältere und doppelte verwirft der Kern | immer |
+    | `event` | `start` (erstes Bild nach dem Start von vorne), `frame` (Lage), `loop` (erstes Bild nach dem Wiederholen), `end` (Ende ohne Wiederholen), `stop` (Seite inaktiv) | immer |
+    | `run` | Lauf der Seite, zählt bei jedem «aktiv» hoch | immer |
+    | `now_ms` | `performance.now()` beim Absenden | immer |
+    | `source` | Kennung der Videoquelle | ausser `stop` (ohne `source`: alle Videos der Seite) |
+    | `file` | `media/…` wie die Seite es spielt | `start`, `frame`, `loop` |
+    | `loop` | Durchgang seit dem Start (0 = erster) | `start`, `frame`, `loop` |
+    | `media_s` | `mediaTime` des Bildes (requestVideoFrameCallback) | `start`, `frame`, `loop` |
+    | `display_ms` | `expectedDisplayTime` desselben Bildes | `start`, `frame`, `loop` |
+    | `duration_s` | Länge des Videos (`duration`); fehlt oder 0 = unbekannt | freiwillig |
+
+  - Antworten: 204 angenommen; 400 falsche Daten (auch Quelle, die keine Videoquelle dieses Overlays ist); 413 zu gross; 429 über der Grenze; 404 falscher Token (wie alle Adressen); 405 andere Methode.
+  - Grenze je Seite: 40 Meldungen am Stück, danach 20 je Sekunde; höchstens 64 Seiten gleichzeitig (ruhende fallen nach 60 s heraus). Abweisungen höchstens alle 10 s als eine Zeile ins Protokoll, ohne Token.
+  - Neu `…/events/<page>`: dieselben Ereignisse wie `…/events`, dazu meldet der Server dem Kern Beginn und Ende (für «SSE-Ende»). `…/events` ohne Kennung bleibt gültig (Seiten von heute).
+  - Der Server setzt je Meldung das Eintreffen in `steady_clock` (für den Abgleich der Uhr der Seite).
+- **Commit 3, Kern** (`src/core/videoaudio.{h,cpp}`, `src/audio/pageclock.{h,cpp}`, `src/audio/audiooutput.{h,cpp}`, `src/audio/nulloutput.{h,cpp}`, `coreservice`, `main.cpp`):
+  - Je Videoquelle eine Stimme (Stelle im Mischer, Decoder mit Vorrat). Vorbereitet, sobald eine Seite des Overlays über `…/events/<page>` verbunden ist; so beginnt der Ton beim Start ohne Warten auf den Decoder.
+  - Ablauf beim Stopp wie offen aus b3: `Mixer::stop` → `AudioDecoder::restart` → `Mixer::prepare`; der nächste Start spielt diesen Vorrat (`Mixer::start` mit dem neuen Durchgang). Gebaut und in `tst_kernton` mehrfach durchlaufen.
+  - Glätten (offen aus b3): Die Zeit der Seite wird mit dem kleinsten Abstand «Eintreffen − `now_ms`» der letzten 10 s auf `steady_clock` abgebildet (wie im Prototyp, M2), danach die Lage geglättet: Weicht sie um höchstens 4 ms von der Fortschreibung ab, zählt ein Achtel; mehr gilt sofort. Gemessen in `tst_kernton` (Ersatzausgang, 2026-11-12): Streuung der Lage ±3 ms und Laufzeit 0 bis 10 ms über 4 s ergeben 0 Sprünge, 0 weiche Korrekturen, Abweichung zuletzt −0,78 ms. Ohne Streuung: 5 ms Versatz führt weich nach, 45 ms mit einem Sprung.
+  - Wiederholen: Länge aus `duration_s` an Mischer und Decoder. `tst_kernton`: gemeldete Länge 1 s, Pause 58,6 ms, nach 3,4 s 3 Wiederholungen, 0 Sprünge, 0 weich, gespielt 3,23 s.
+  - Stopp-Regeln und Gründe im Protokoll («Ton: Stopp «Quelle» in «Overlay»: Grund (gespielt, Wiederholungen, Sprünge, weich, Abweichung zuletzt)»): «Seite inaktiv» (`stop`), «Ende des Videos» (`end`), «Ausgabe aus» (Ausgabe des Overlays, E-24), «Quelle verborgen», «Quelle gelöscht», «Overlay gelöscht», «Quelle geändert» (andere Datei oder Wiederholen umgeschaltet), «Seite getrennt» (Ende von `…/events/<page>`), «3 s ohne Meldung» (Prüfung alle 100 ms; im Test nach 3,0 bis 3,1 s). Alle in `tst_kernton` geprüft.
+  - Einstieg: Kommt `frame` oder `loop` für ein Video, das nicht spielt, steigt der Ton an der gemeldeten Lage ein («Ton: Einstieg …»): nach 3 s ohne Meldung, nach dem Wiederverbinden der Seite, wenn die Quelle wieder sichtbar oder die Ausgabe wieder an ist, nach einer geänderten Quelle und nach einem Neustart des Kerns. Nicht nach `end` oder `stop` desselben Laufs und nicht, solange die Ereignisse der Seite beendet sind.
+  - Mehrere Seiten auf dasselbe Overlay: Die Seite, die zuerst startet, führt; Meldungen anderer Seiten für dieselbe Quelle zählen erst, wenn sie stoppt (`tst_kernton`, «firstPageLeads»).
+  - Protokoll: «Ton: Start», «Ton: Einstieg», «Ton: Stopp», «Ton: Nachführen» (höchstens einmal je Sekunde, wenn der Mischer nachgeführt hat; Sprünge ohne den Einsatz beim Start) und alle 10 s «Ton: Lage …» mit Abweichung, Wiederholungen und Pause (für H3).
+  - Ersatzausgang ohne Gerät (`NullOutput`): ruft den Mischer alle 10 ms mit 480 Rahmen ab, wie ein Gerät mit fester Uhr, ohne PipeWire. Der Kern nimmt ihn mit der Testoption `--ersatzausgang` (Gerät `dss_ersatzausgang`). Dafür haben `PwOutput` und `NullOutput` die gemeinsame Schnittstelle `AudioOutput` (Zustände und `AudioDevice` dorthin verschoben, Verhalten von `PwOutput` unverändert).
+  - Beim Beenden beendet `CoreService::stopAudio()` die Decoder, solange Mischer und Ausgang noch leben.
+- **Warum der Kern nur 2 Ausgänge sieht (M1a: 5):** Die 5 aus M1a und Z3a sind 3 Ausgänge und 2 Eingänge (`docs/archiv/messungen/P12a-daten/2026-11-11-0343/m1-liste.txt`, `P12b-daten/2026-11-11-2304/z3a-liste.txt`). Unter den Ausgängen war die vorübergehende Null-Senke `dss_p12a_ausgabe` der Messung, unter den Eingängen `dss_p12a_aufnahme`; beide wurden nach der Messung entfernt. Es bleiben 2 echte Ausgänge (`media.class` «Audio/Sink»): HDMI der Grafikkarte und «Internes Audio Digital Stereo (IEC958)». Der Kern listet nur «Audio/Sink», also 2. Kein Fehler, nichts am System geändert. Die aktuelle Liste wurde in dieser Sitzung nicht neu gelesen (`wpctl` war nicht erlaubt); der RØDECaster ist erst mit N1 zu erwarten.
+- **Abweichungen vom Plan:**
+  - `…/events/<page>` ist neu (Plan nannte nur `…/clock`): Ohne Kennung in den Ereignissen kann der Kern das Ende der Verbindung keiner Seite zuordnen.
+  - «Ausgabe aus» ist als Ausgabe des Overlays (E-24) umgesetzt. Ein fehlender oder gezogener Ausgang (Gerät) stoppt die Stimmen nicht; kommt er wieder, führt der Mischer mit einem Sprung nach (gemeldeter Sprung des Ausgangs, b2).
+  - «Quelle geändert» heisst andere Datei oder Wiederholen umgeschaltet. Lage, Grösse, Drehung und Name ändern am Ton nichts.
+  - Einstieg mitten im Video ist dazugekommen (siehe oben). Ohne ihn bliebe der Ton nach 3 s ohne Meldung oder nach einem Neustart des Kerns bis zum nächsten «aktiv» stumm.
+  - Die Seite darf öfter als jede Sekunde melden (Grenze 20 je Sekunde); der Test meldet viermal je Sekunde.
+- **Für Commit 2 (`web/overlay.js`, nach M3):** Nur mit `window.obsstudio`. Beim Laden eine Kennung `page` wählen und die Ereignisse über `…/events/<page>` öffnen. Bei «aktiv»: `run` + 1, alle Videos von vorne; je Video beim ersten Bild (`requestVideoFrameCallback`) `start`, danach etwa jede Sekunde `frame`, beim ersten Bild nach dem Wiederholen `loop` mit `loop` + 1, bei `ended` ohne Wiederholen `end`; immer mit `duration_s`, sobald bekannt. Bei «inaktiv»: anhalten, zurück auf den Anfang, `stop` ohne `source`. Jede Meldung mit `seq` + 1 und `now_ms`, gesendet mit `fetch(…/clock, {method: 'POST', body, keepalive: true})` und `Content-Type: text/plain` (keine Vorabfrage). Commit 2 entscheidet ausserdem: Laufen verborgene Videos weiter (der Einstieg nach dem Zeigen setzt voraus, dass die Seite weiter meldet)? Startet die Seite ein Video mit neuer Datei von vorne?
+- **`[OFFEN]` nach M3** (Annahmen zu OBS, nicht geprüft): Kommt `obsSourceActiveChanged` in OBS 32.2.2? Wird eine beim Laden schon aktive Quelle gemeldet (sonst Rückfall über `GetSourceActive`/`InputActiveStateChanged`; dann braucht der Kern einen Start von sich aus)? Verhalten mit «shutdown»? Gibt CEF 146 `expectedDisplayTime` und `mediaTime` wie Chromium 122 (M2)? Laufzeit und Streuung der Meldungen über das Netz vom Streaming-PC: Die Grenzen des Glättens (10 s, 4 ms, ein Achtel) stützen sich auf M2 (derselbe PC) und Annahmen. Gang zwischen den Uhren der beiden Rechner (M3, 60 min).
+- **Weiter offen:**
+  - aus b3, in Teil 1 nicht bearbeitet: Neustart von PipeWire (Zustand `no_pipewire` bis zum Neustart des Kerns), `dss-cli einstellungen` ohne Ausgang und Versatz, `delay` an einem echten Ausgang und Vorzeichen von `versatz_ms` (H2).
+  - «Abweichung zuletzt» in der Zeile «Ton: Stopp …» ist kurz nach einem Start oder Einstieg nicht aussagekräftig: Der Mischer rechnet sie im ersten Abruf gegen die alte Lage (im Test bis −945 ms, 11 ms nach einem Einstieg). Für H3 zählen die Zeilen «Ton: Lage …». Zu entscheiden bis b6: im Mischer beim Start auf 0 setzen oder in der Zeile weglassen.
+  - `docs/08-kern-schnittstelle.md` («Overlay-Server», `…/clock`, `…/events/<page>`) wird in b6 nachgeführt, wie geplant.
 
 ### b5 – Overlay-Format und Fenster (3 Commits)
 
 1. Overlay-Format 5: `video.volume` (0–100, ganze Zahl) und `video.muted`, neue Quellen 100 und `false` (Antwort 3 des Nutzers). Umwandeln 4 → 5 (`dss-core --format-pruefen`/`--umwandeln`), Tests `tst_datenformat`, `tst_overlaymodel`. K-07 gilt hier nicht: Es ändert sich nichts am Bild, die Seite bleibt stumm.
 2. Dock «Eigenschaften», Bereich «Video»: Regler «Lautstärke» 0–100 % und Kästchen «Stumm». Test `tst_fensterbearbeiten`.
-3. Dock «Steuerung»: Zeile für den Ton der Videos mit Ausgang, Versatz und Hinweis bei fehlendem Ausgang (Antwort 2 des Nutzers, Aussehen nach Frage 6). Test `tst_fensterbearbeiten`.
+3. Dock «Steuerung»: Zeile für den Ton der Videos mit Ausgang, Versatz und Hinweis bei fehlendem Ausgang (Antwort 2 des Nutzers, Aussehen nach Entscheid 6 vom 2026-11-12: Zeile «Ton Videos», Auswahlliste der Ausgänge mit erstem Eintrag «Kein Ausgang», Feld «Versatz» in ms von −500 bis +500, Schritt 1, Start 0, Hinweis «Ausgang fehlt» wie in der Zeile «OBS», ein neuer Kern hat «Kein Ausgang»). Test `tst_fensterbearbeiten`.
 
 Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Meldungen bauen (z. B. Zeile «OBS» im Dock «Steuerung», `src/app/docks.cpp`, `src/app/theme.cpp`), und folgt dem.
 
@@ -277,7 +326,7 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
 3. **Gilt der Sprung als vermieden, wenn `pw_stream` ihn meldet und der Kern ihn ausgleicht?** Empfehlung: **Ja.** Grund: Den Unterlauf beim Wechsel des Quantums verhindert auch P nicht sicher; entscheidend ist, dass der Ton danach wieder zum Bild passt (Rest ≤ 10 ms, Erfolgsbedingung E1). Gegenargument: Ein kurzer Ausgleich kann hörbar sein (weich unter 20 ms, Sprung darüber).
 4. **Messung b1 nachts mit Wechsel des Quantums?** Empfehlung: **Ja**, der Agent misst nachts wie in M1 und setzt `clock.force-quantum` danach sicher auf 0 zurück. Grund: Der Wechsel gilt für den ganzen Studio-PC und kann laufenden Ton kurz stören; der Nutzer muss nichts tun.
 
-**Vor b4:**
+**Vor b4** (Fragen 5 und 6 beantwortet am 2026-11-12, siehe «Entscheide des Nutzers (2026-11-12, vor b4)»):
 5. **M4 im Handtest mit dem fertigen Kern statt vorher mit dem Prototyp?** Empfehlung: **Ja**, H2 ersetzt M4. Grund: Der Prototyp `ton-messen` spielt über Q, das verworfen ist; ein Versatz von dort gilt für P nicht. Der Nutzer schliesst den RØDECaster nur einmal an. Gegenargument: Ein Problem mit Brummen oder dem USB-Anschluss zeigt sich erst am Ende von P12b.
 6. **Zeile für den Ton im Dock «Steuerung»** (sichtbar, bedienbar). Empfehlung: Zeile «Ton Videos» mit einer Auswahlliste der Ausgänge (Namen wie im System, erster Eintrag «Kein Ausgang») und einem Feld «Versatz» in ms (−500 bis +500, Schritt 1, Startwert 0 bis H2). Fehlt der gewählte Ausgang: Hinweis «Ausgang fehlt» in der Zeile, wie die Zeile «OBS». Ein neuer Kern hat «Kein Ausgang», bis der Nutzer wählt. Grund: kein Ton aus einem falschen Gerät; weitere Zwecke (Chat-Bot) kommen später als eigene Zeilen dazu. Alternative: Ausgang des Systems vorgewählt.
 7. **Termin für M3** (Lotse mit dem Nutzer, OBS, ~1 h, dazu 60 min nachts). Empfehlung: **nach b1 und vor b4**, an einem Abend ohne Stream. Grund: b4 baut das Verhalten der Seite in OBS und braucht dafür das Ergebnis von M3 («aktiv»-Ereignis, Zustand beim Laden).
@@ -345,6 +394,11 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
 | Qt Multimedia nicht im Kern, nicht in `scripts/pakete.txt` | mit P nicht nötig; zog Qt Gui in den Kern |
 | Echter Ausgang in Prüfungen nur unhörbar (Null-Senke), echtes Gerät nur mit dem Nutzer | Auftrag: «Kabel/Gerät nur mit dem Nutzer»; Messungen nachts ohne Ton im Raum |
 | P12 geteilt in P12a und P12b | Bau hängt von G1 bis G4 ab; M3 und M4 brauchen Rechte von Lotse und den Nutzer |
+| b4: Uhr der Seite über den kleinsten Abstand der letzten 10 s, Glätten bis 4 ms mit einem Achtel (Agent, 2026-11-12) | Laufzeit im Netz nur nach oben gestreut; Glätten nimmt die Streuung heraus und folgt einem Gang von 40 ppm mit etwa 0,3 ms Rückstand; echte Sprünge (Video hängt) gelten sofort |
+| b4: Grenze je Seite 40 am Stück, 20 je Sekunde, 64 Seiten (Agent) | eine Seite mit mehreren Videos meldet je Video etwa einmal je Sekunde; Schutz gegen eine fehlerhafte Seite im Heimnetz |
+| b4: Kennung der Seite auch in `…/events/<page>` (Agent) | Stopp bei «SSE-Ende» braucht die Zuordnung Verbindung–Seite |
+| b4: Einstieg mitten im Video (Agent) | Ton kommt nach 3 s ohne Meldung, Wiederverbinden oder Neustart des Kerns ohne neues «aktiv» zurück |
+| b4: Ersatzausgang über die Testoption `--ersatzausgang` und die Schnittstelle `AudioOutput` (Agent) | `tst_kernton` prüft den echten Kern als Prozess ohne PipeWire; `PwOutput` bleibt unverändert |
 
 ## Quellen
 
@@ -369,6 +423,7 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
   - `docs/archiv/messungen/P12a-bericht.md` (Kurzfassung, M1b, M1c, Z0, «G4», «Folgen von Z0 für G4 und P12b», Z1–Z3)
   - `/var/lib/dpkg/status` (`libpipewire-0.3-0t64` 1.4.2-1 und `pipewire-bin` 1.4.2-1 installiert, `libpipewire-0.3-dev` nicht)
   - Repo: `src/core/CMakeLists.txt`, `src/app/docks.h` (Dock «Steuerung»), `prototypes/ton/CMakeLists.txt`, `scripts/pakete.txt`, `docs/08-kern-schnittstelle.md` (Version 11)
+- **Nachführung 2026-11-12 (b4 Teil 1), lokal gelesen:** `prototypes/ton/messseite.html`, `folgen.{h,cpp}` und `meldeserver.cpp` (Form der Meldungen, Abbilden der Uhr), `docs/archiv/messungen/P12a-daten/2026-11-11-0343/m1-liste.txt`, `docs/archiv/messungen/P12b-daten/2026-11-11-2304/z3a-liste.txt`, `docs/archiv/messungen/P12a-bericht.md` (M1a, Z3). Nicht abgerufen (kein Webzugriff): https://wicg.github.io/video-rvfc/, https://github.com/obsproject/obs-browser/blob/master/README.md.
 - **Nachführung 2026-11-11, nicht gelesen** (kein Webzugriff, b1 Schritt 0):
   - https://docs.pipewire.org/group__pw__stream.html
   - https://docs.pipewire.org/group__pw__thread__loop.html
@@ -395,3 +450,9 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
 ## Entscheide des Nutzers (2026-11-12, nach dem Messbericht Z3)
 - E1 neu auswerten und P behalten; Klick 197 dabei klären (ausgeführt, Abschnitt «b1», «Ergebnis b1»).
 - `delay` an einem echten Ausgang später mit M4 (RØDECaster) messen.
+
+## Entscheide des Nutzers (2026-11-12, vor b4)
+- b4 jetzt ohne M3: nur Commit 1 (`…/clock`) und Commit 3 (Kern, `tst_kernton`). Commit 2 (`web/overlay.js`, Verhalten in OBS) folgt nach M3. Das Format der Meldungen wird so festgelegt, dass Commit 2 es nur noch senden muss; Annahmen zu OBS sind `[OFFEN] nach M3` (ausgeführt, «Ergebnis b4 Teil 1»).
+- Frage 5: Ja, H2 ersetzt M4. Der RØDECaster wird nur einmal angeschlossen, im Handtest mit dem fertigen Kern.
+- Frage 6: Zeile «Ton Videos» im Dock «Steuerung» mit Auswahlliste der Ausgänge (erster Eintrag «Kein Ausgang»), Feld «Versatz» in ms (−500 bis +500, Schritt 1, Start 0), Hinweis «Ausgang fehlt» wie in der Zeile «OBS», ein neuer Kern hat «Kein Ausgang». Gebaut in b5.
+- Frage 7 (Termin M3): im Auftrag an den Agenten kein Termin genannt; M3 liegt jetzt vor Commit 2 von b4.
