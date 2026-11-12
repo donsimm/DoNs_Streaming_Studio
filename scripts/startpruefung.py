@@ -54,7 +54,10 @@ CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: ",
                  # P10-vor: kern.ini im eigenen XDG_CONFIG_HOME (anlegen, Adresse, Werte)
                  "Einstellungen: ",
                  # P10: Overlay-Server auf 127.0.0.1 und der Adresse im Heimnetz (Standardport)
-                 "Overlay-Server lauscht auf "]
+                 "Overlay-Server lauscht auf ",
+                 # P12b b3: Ausgang über PipeWire, ohne gewählten Ausgang kein Strom
+                 "Ton: Ton (ton-video): verbunden, libpipewire ",
+                 "Ton: Ton (ton-video): Zustand no_target"]
 
 # Programm, Signal zum Beenden, Muster der Startzeile, erwartete Protokollzeilen
 CASES = {
