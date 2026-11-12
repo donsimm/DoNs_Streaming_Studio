@@ -341,6 +341,68 @@ private slots:
         QVERIFY2(error.contains(expected), qPrintable(error));
     }
 
+    // P12b b3: Ausgang und Versatz für den Ton über update_settings (keine Änderung an Overlays,
+    // Antwort trotzdem change_result), Liste der Ausgänge über audio_outputs; je als eine Zeile.
+    void audioSettingsRoundTrip()
+    {
+        QVERIFY(!isChangeType(QStringLiteral("update_settings")));
+        SettingsUpdate u;
+        u.requestId = 4712;
+        u.audioRoutes.insert(QStringLiteral("video"),
+                             AudioRouteChange{QStringLiteral("alsa_output.test-gerät.analog-stereo"), -250});
+        const QJsonObject message = roundTrip(settingsUpdateMessage(u));
+        QCOMPARE(messageType(message), QStringLiteral("update_settings"));
+        QCOMPARE(messageRequestId(message), 4712);
+        SettingsUpdate back;
+        QString error;
+        QVERIFY2(parseSettingsUpdate(message, &back, &error), qPrintable(error));
+        QCOMPARE(back, u);
+        // Nur die geschickten Felder: kein Port, keine Adresse, kein Passwort
+        QCOMPARE(message.keys(), (QStringList{QStringLiteral("audio_routes"), QStringLiteral("request_id"),
+                                              QStringLiteral("type")}));
+
+        AudioOutputsInfo outputs;
+        outputs.enabled = true;
+        outputs.devices = {{QStringLiteral("alsa_output.test-gerät.analog-stereo"), QStringLiteral("Testgerät «A»"), false}};
+        outputs.routes.insert(QStringLiteral("video"), {QStringLiteral("error"),
+                                                        QStringLiteral("Verbindung zu einem anderen Gerät: x\ny")});
+        AudioOutputsInfo outputsBack;
+        QVERIFY2(parseAudioOutputs(roundTrip(audioOutputsMessage(outputs)), &outputsBack, &error), qPrintable(error));
+        QCOMPARE(outputsBack, outputs);
+    }
+
+    void audioSettingsInvalid_data()
+    {
+        QTest::addColumn<QString>("json");
+        QTest::addColumn<QString>("expected");
+        const auto row = [](const char *name, const char *routes, const char *expected) {
+            QTest::newRow(name) << QStringLiteral("{\"type\":\"update_settings\",\"request_id\":1,\"audio_routes\":%1}")
+                                       .arg(QString::fromUtf8(routes))
+                                << QString::fromUtf8(expected);
+        };
+        row("keine Liste", "[]", "audio_routes");
+        row("leer", "{}", "audio_routes");
+        row("Zweck kein Objekt", "{\"video\":\"x\"}", "audio_routes.video");
+        row("Zweck leer", "{\"video\":{}}", "ohne output und offset_ms");
+        row("output Zahl", "{\"video\":{\"output\":1}}", "output");
+        row("output null", "{\"video\":{\"output\":null}}", "output");
+        row("offset_ms Bruch", "{\"video\":{\"offset_ms\":0.5}}", "offset_ms");
+        row("offset_ms Text", "{\"video\":{\"offset_ms\":\"10\"}}", "offset_ms");
+    }
+    void audioSettingsInvalid()
+    {
+        QFETCH(QString, json);
+        QFETCH(QString, expected);
+        QJsonObject message;
+        QString error;
+        QVERIFY2(decodeMessage(json.toUtf8(), &message, &error), qPrintable(error));
+        SettingsUpdate u;
+        QVERIFY(!parseSettingsUpdate(message, &u, &error));
+        QVERIFY2(error.contains(expected), qPrintable(error));
+        // Die Antwort braucht die request_id (Kern schickt change_result).
+        QCOMPARE(messageRequestId(message), 1);
+    }
+
     void requestIdOfInvalidMessage()
     {
         // Die Antwort auf eine ungültige Änderung braucht die request_id, falls es eine gibt.

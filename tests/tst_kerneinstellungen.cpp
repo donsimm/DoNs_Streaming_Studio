@@ -249,6 +249,129 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("Port von OBS 70000")), qPrintable(error));
     }
 
+    // P12b b3: Abschnitt [ton-video]. Ohne Abschnitt: kein Ausgang, Versatz 0 (Dateien von vor P12b).
+    void parseAudio()
+    {
+        const CoreSettings defaults{8081, QString()};
+        const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        CoreSettings s;
+        QString error;
+        QCOMPARE(audioPurposeIds(), QStringList{video});
+        QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
+        QCOMPARE(s.audioRoutes, CoreSettings::defaultAudioRoutes());
+        QCOMPARE(s.audioRoutes.keys(), QStringList{video});
+        QCOMPARE(s.audioRoutes.value(video), AudioRoute());
+        QVERIFY2(parseCoreSettings("[ton-video]\nausgang = test_ausgang.analog-stereo \nversatz_ms=-120\n", defaults,
+                                   &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.audioRoutes.value(video), (AudioRoute{QStringLiteral("test_ausgang.analog-stereo"), -120}));
+        QCOMPARE(s.port, 8081);
+        // Fehlende Angabe gilt mit dem Standardwert
+        QVERIFY(parseCoreSettings("[ton-video]\nversatz_ms=500\n", defaults, &s, &error));
+        QCOMPARE(s.audioRoutes.value(video), (AudioRoute{QString(), 500}));
+        // Hin und zurück, auch an den Grenzen und mit Umlauten
+        for (const AudioRoute &route : {AudioRoute{}, AudioRoute{QStringLiteral("a"), kAudioOffsetMinMs},
+                                        AudioRoute{QStringLiteral("Gerät für Tests"), kAudioOffsetMaxMs},
+                                        AudioRoute{QString(kAudioOutputMaxLength, QLatin1Char('x')), 0}}) {
+            CoreSettings written{8090, QString()};
+            written.audioRoutes[video] = route;
+            QVERIFY2(parseCoreSettings(serializeCoreSettings(written), defaults, &s, &error), qPrintable(error));
+            QCOMPARE(s, written);
+        }
+        QVERIFY(serializeCoreSettings({8090, QString()}).contains("\n[ton-video]\nausgang=\nversatz_ms=0\n"));
+    }
+
+    void parseAudioInvalid_data()
+    {
+        QTest::addColumn<QByteArray>("text");
+        QTest::addColumn<QString>("message");
+        QTest::newRow("Versatz zu klein") << QByteArray("[ton-video]\nversatz_ms=-501\n")
+                                          << QStringLiteral("Zeile 2: Versatz -501 ms ungültig, erlaubt sind -500 bis 500 ms");
+        QTest::newRow("Versatz zu gross") << QByteArray("[ton-video]\nversatz_ms=501\n")
+                                          << QStringLiteral("Versatz 501 ms ungültig");
+        QTest::newRow("Versatz Text") << QByteArray("[ton-video]\nversatz_ms=zehn\n")
+                                      << QStringLiteral("Versatz «zehn» ist keine ganze Zahl");
+        QTest::newRow("Versatz Bruch") << QByteArray("[ton-video]\nversatz_ms=1.5\n")
+                                       << QStringLiteral("keine ganze Zahl");
+        QTest::newRow("Ausgang zu lang") << QByteArray("[ton-video]\nausgang=" + QByteArray(257, 'a') + "\n")
+                                         << QStringLiteral("zu lang (257 Zeichen, höchstens 256)");
+        QTest::newRow("Ausgang Steuerzeichen") << QByteArray("[ton-video]\nausgang=a\tb\n")
+                                               << QStringLiteral("Steuerzeichen");
+        QTest::newRow("doppelt") << QByteArray("[ton-video]\nausgang=a\nausgang=b\n")
+                                 << QStringLiteral("Zeile 3: «ausgang» doppelt");
+        QTest::newRow("unbekannt") << QByteArray("[ton-video]\nlautstaerke=1\n")
+                                   << QStringLiteral("unbekannte Angabe «lautstaerke»");
+        QTest::newRow("unbekannter Zweck") << QByteArray("[ton-musik]\nausgang=a\n")
+                                           << QStringLiteral("unbekannter Abschnitt [ton-musik]");
+    }
+
+    void parseAudioInvalid()
+    {
+        QFETCH(QByteArray, text);
+        QFETCH(QString, message);
+        CoreSettings s;
+        QString error;
+        QVERIFY(!parseCoreSettings(text, {8081, QString()}, &s, &error));
+        QVERIFY2(error.contains(message), qPrintable(error));
+    }
+
+    void changeAudio()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QString(), QStringLiteral("keine Route"), &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QString error;
+        // Nur der Ausgang: Versatz bleibt
+        CoreSettingsChange change;
+        change.audioRoutes.insert(video, AudioRouteChange{QStringLiteral("test_ausgang"), std::nullopt});
+        QVERIFY(!change.isEmpty());
+        QVERIFY(store.checkChange(change).isEmpty());
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().audioRoutes.value(video), (AudioRoute{QStringLiteral("test_ausgang"), 0}));
+        QVERIFY(readFile(path).contains("[ton-video]\nausgang=test_ausgang\nversatz_ms=0\n"));
+        // Nur der Versatz: Ausgang bleibt
+        change.audioRoutes[video] = AudioRouteChange{std::nullopt, -40};
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().audioRoutes.value(video), (AudioRoute{QStringLiteral("test_ausgang"), -40}));
+        QCOMPARE(readFile(path), serializeCoreSettings(store.settings()));
+        // Leerer Ausgang = kein Ausgang
+        change.audioRoutes[video] = AudioRouteChange{QString(), std::nullopt};
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().audioRoutes.value(video), (AudioRoute{QString(), -40}));
+
+        // Abweisungen: Werte und Datei unverändert
+        const CoreSettings before = store.settings();
+        const QByteArray file = readFile(path);
+        const auto audio = [](const QString &purpose, const AudioRouteChange &route, std::optional<int> port = {}) {
+            CoreSettingsChange c;
+            c.port = port;
+            c.audioRoutes.insert(purpose, route);
+            return c;
+        };
+        const QList<QPair<CoreSettingsChange, QString>> invalid = {
+            {audio(video, AudioRouteChange{std::nullopt, 501}), QStringLiteral("Versatz 501 ms ungültig")},
+            {audio(video, AudioRouteChange{QStringLiteral("a\nb"), std::nullopt}), QStringLiteral("Steuerzeichen")},
+            {audio(video, AudioRouteChange{QStringLiteral(" a"), std::nullopt}), QStringLiteral("Leerzeichen am Rand")},
+            {audio(QStringLiteral("musik"), AudioRouteChange{QStringLiteral("a"), 0}),
+             QStringLiteral("Unbekannter Zweck des Tons «musik»")},
+            {audio(video, AudioRouteChange{}), QStringLiteral("Keine Einstellung für den Ton «video»")},
+            // Gültiger Port neben ungültigem Ton: alles abgewiesen
+            {audio(video, AudioRouteChange{std::nullopt, -501}, 9000), QStringLiteral("Versatz -501 ms ungültig")},
+        };
+        for (const auto &[c, message] : invalid) {
+            QVERIFY2(store.checkChange(c).contains(message), qPrintable(store.checkChange(c)));
+            QVERIFY(!store.change(c, &error));
+            QVERIFY2(error.contains(message), qPrintable(error));
+            QCOMPARE(store.settings(), before);
+            QCOMPARE(readFile(path), file);
+        }
+    }
+
     void parseInvalid_data()
     {
         QTest::addColumn<QByteArray>("text");

@@ -69,7 +69,8 @@ target_compile_definitions(tst_kernverbindung PRIVATE DSS_CORE_BIN="$<TARGET_FIL
   DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}")
 add_dependencies(tst_kernverbindung dss-core)
 target_compile_definitions(tst_kernverbindung PRIVATE
-  DSS_CORE_OVERLAY_SERVER=$<BOOL:${DSS_CORE_OVERLAY_SERVER}>)
+  DSS_CORE_OVERLAY_SERVER=$<BOOL:${DSS_CORE_OVERLAY_SERVER}>
+  DSS_CORE_AUDIO=$<BOOL:${DSS_CORE_AUDIO}>) # P12b b3
 if(DSS_BUILD_CLI) # P10-vor: dss-cli einstellungen
   target_compile_definitions(tst_kernverbindung PRIVATE DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
   add_dependencies(tst_kernverbindung dss-cli)

@@ -190,7 +190,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 11); // seit P10b (Medien)
+        QCOMPARE(c->coreHello().protocolVersion, 12); // seit P12b b3 (Ton)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -625,6 +625,130 @@ private slots:
         QVERIFY2(!log.contains(password), qPrintable(log));
         QVERIFY2(!log.contains(server.password), qPrintable(log));
         QVERIFY2(log.contains(QStringLiteral("OBS: Passwort verschlüsselt gespeichert")), qPrintable(log));
+    }
+
+    // P12b b3: audio_outputs nach hello an jedes Fenster; Ausgang und Versatz über update_settings in
+    // kern.ini ([ton-video]), nach einem Neustart wieder gelesen. Gewählt wird nur ein Ausgang, den es
+    // nicht gibt: Der Kern legt keinen Strom an und berührt kein Gerät (Zustand «missing»). Ohne
+    // PipeWire (Zustand «no_pipewire») entfallen nur die Prüfungen des Zustands. Eigener Kern, eigener
+    // Ordner. Strom, Wiederkehr und fremde Verbindung prüft tst_tonausgang.
+    void audioOutputs()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("t.sock"));
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        const auto clientOf = [&socket]() {
+            CoreClient::Options o;
+            o.socketPath = socket;
+            o.program = QStringLiteral("tst_kernverbindung");
+            o.version = version();
+            o.reconnectIntervalMs = 200;
+            auto c = std::make_unique<CoreClient>(o);
+            c->start();
+            return c;
+        };
+        const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        const auto stateOf = [&video](const CoreClient &c) {
+            return c.audioOutputs() ? c.audioOutputs()->routes.value(video).state : QString();
+        };
+        std::unique_ptr<CoreClient> one = clientOf();
+        QTRY_VERIFY(one->audioOutputs().has_value());
+        const AudioOutputsInfo first = *one->audioOutputs();
+#if DSS_CORE_AUDIO
+        QVERIFY(first.enabled);
+        QCOMPARE(first.routes.keys(), QStringList{video});
+        const bool pipewire = stateOf(*one) != QStringLiteral("no_pipewire");
+        if (pipewire)
+            QCOMPARE(stateOf(*one), QStringLiteral("no_target"));
+        else
+            qInfo("Ohne PipeWire: %s", qPrintable(first.routes.value(video).detail));
+        // Kein Ausgang ist vorgewählt, auch nicht der Standardausgang.
+        one->requestSettings();
+        QTRY_VERIFY(one->settings().has_value());
+        QCOMPARE(one->settings()->settings.audioRoutes, CoreSettings::defaultAudioRoutes());
+        QCOMPARE(one->settings()->audioOffsetMinMs, -500);
+        QCOMPARE(one->settings()->audioOffsetMaxMs, 500);
+#else
+        QCOMPARE(first, AudioOutputsInfo());
+        Q_UNUSED(stateOf);
+#endif
+
+        // Ausgang, den es nicht gibt, und Versatz: Antwort, neue Werte an alle, Datei geschrieben
+        std::unique_ptr<CoreClient> two = clientOf();
+        QTRY_VERIFY(two->audioOutputs().has_value());
+        two->requestSettings();
+        QTRY_VERIFY(two->settings().has_value());
+        const QString missing = QStringLiteral("dss_test_fehlt_%1").arg(QCoreApplication::applicationPid());
+        QSignalSpy answered(one.get(), &CoreClient::settingsUpdateFinished);
+        SettingsUpdate update;
+        update.audioRoutes.insert(video, AudioRouteChange{missing, -120});
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(answered.size(), 1);
+        QVERIFY2(answered.first().first().value<ChangeResult>().ok,
+                 qPrintable(answered.first().first().value<ChangeResult>().message));
+        QTRY_COMPARE(two->settings()->settings.audioRoutes.value(video), (AudioRoute{missing, -120}));
+        const QString dir = config.filePath(QFileInfo(coreSettingsPath()).dir().dirName());
+        QFile ini(dir + QStringLiteral("/kern.ini"));
+        QVERIFY(ini.open(QIODevice::ReadOnly));
+        const QByteArray iniText = ini.readAll();
+        QVERIFY2(iniText.contains("[ton-video]\nausgang=" + missing.toUtf8() + "\nversatz_ms=-120\n"), iniText.constData());
+        QVERIFY(waitForLog(core.get(), QStringLiteral("Einstellungen Ton video: Ausgang %1, Versatz -120 ms").arg(missing),
+                           &log));
+#if DSS_CORE_AUDIO
+        if (pipewire) {
+            QTRY_COMPARE(stateOf(*one), QStringLiteral("missing"));
+            QTRY_COMPARE(stateOf(*two), QStringLiteral("missing"));
+            QVERIFY(waitForLog(core.get(), QStringLiteral("Ausgang gewählt: «%1»").arg(missing), &log));
+        }
+#endif
+
+        // Ungültig: abgewiesen, Werte unverändert
+        const QList<QPair<AudioRouteChange, QString>> invalid = {
+            {AudioRouteChange{std::nullopt, 501}, QStringLiteral("Versatz 501 ms ungültig")},
+            {AudioRouteChange{QStringLiteral(" a"), std::nullopt}, QStringLiteral("Leerzeichen am Rand")},
+        };
+        for (const auto &[change, text] : invalid) {
+            answered.clear();
+            update.audioRoutes = {{video, change}};
+            one->sendSettingsUpdate(update);
+            QTRY_COMPARE(answered.size(), 1);
+            const ChangeResult r = answered.first().first().value<ChangeResult>();
+            QVERIFY(!r.ok);
+            QVERIFY2(r.message.contains(text), qPrintable(r.message));
+        }
+        answered.clear();
+        update.audioRoutes = {{QStringLiteral("musik"), AudioRouteChange{QStringLiteral("a"), 0}}};
+        one->sendSettingsUpdate(update);
+        QTRY_COMPARE(answered.size(), 1);
+        QVERIFY(answered.first().first().value<ChangeResult>().message.contains(QStringLiteral("Unbekannter Zweck")));
+        QCOMPARE(one->settings()->settings.audioRoutes.value(video), (AudioRoute{missing, -120}));
+
+        // Neustart: Werte aus kern.ini, Zustand wieder «missing»
+        one.reset();
+        two.reset();
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        QCOMPARE(core->exitCode(), 0);
+        core = testhelp::startCore(data.path(), socket, config.path());
+        log.clear();
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        one = clientOf();
+        QTRY_VERIFY(one->audioOutputs().has_value());
+        one->requestSettings();
+        QTRY_VERIFY(one->settings().has_value());
+        QCOMPARE(one->settings()->settings.audioRoutes.value(video), (AudioRoute{missing, -120}));
+#if DSS_CORE_AUDIO
+        if (pipewire)
+            QCOMPARE(stateOf(*one), QStringLiteral("missing"));
+#endif
+        one.reset();
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        QCOMPARE(core->exitCode(), 0);
     }
 
     // P10c, E-29: Quelle anlegen, in weitere Szene einfügen, Stand an alle, Overlay löschen (F8). Das

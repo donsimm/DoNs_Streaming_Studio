@@ -170,6 +170,30 @@ Kenngrösse **«Rest»** je Klick: gemessene Einsatzzeit in der Aufnahme minus e
 1. `src/audio/pwoutput.{h,cpp}`: dünne Schicht über `pw_thread_loop` und `pw_stream`: Liste der Ausgänge (Registry), gewählter Ausgang über `target.object`, fehlender oder verschwundener Ausgang (kein Ausweichen), je Abruf Abrufzeit, `size`, `delay`, `queued`, `buffered` und Lage an den Mischer. Nachgeführt nach Z3 (2026-11-12): Einen abgebrochenen Zyklus (Δticks ungleich voriger Zyklusgrösse, wie beim Quantum-Wechsel in Z3c) zählt die Schicht und schreibt ihn ins Protokoll; er ist kein Fehler (Klick 197: kurzes Stück Ton kann fehlen, Lage bleibt). `delay` wird gelesen und protokolliert, die Rechnung verlässt sich bis M4 nicht auf einen Wert ungleich 0. Schalter `DSS_CORE_AUDIO` (aus = Kern ohne Ton, Stand P11; `dss-core` linkt libpipewire nur mit Schalter). Test `tst_tonausgang`: legt im eigenen Prozess eine virtuelle Senke an (verschwindet mit dem Prozess, **nicht geprüft**), spielt unhörbar, prüft Liste, Wahl, Entfernen der Senke (kein Ton auf einem anderen Gerät) und Wiederkehr.
 2. Kern: Ausgang je Zweck in `kern.ini` (Abschnitt je Zweck, zuerst `[ton-video]` mit `ausgang` und `versatz_ms`), Schnittstelle Version 12: `audio_outputs` (Liste der Geräte, nach `hello` und bei Änderung an alle), Felder für Ausgang und Versatz je Zweck in `settings` und `update_settings`, Zustand des Ausgangs. Tests `tst_kerneinstellungen` (`[ton-video]`), `tst_protocol`, `tst_aenderungen`.
 
+**Ergebnis b3** (2026-11-12, Stufe «Klein»: Bau ohne Warnungen, `ctest` 48 von 48 nach jedem Commit; `tst_tonausgang`, `tst_kerneinstellungen`, `tst_protocol`, `tst_aenderungen` und `tst_kernverbindung` je 20 von 20 einzeln):
+- **Uhr (offene Frage aus b2):** `pw_time.now` und `pw_stream_get_nsec()` laufen auf `CLOCK_MONOTONIC`, wie `std::chrono::steady_clock` unter Linux. Belege: `/usr/include/spa-0.2/spa/node/io.h:139-141` (`spa_io_clock.nsec` «against monotonic clock (CLOCK_MONOTONIC)») und `/usr/include/pipewire-0.3/pipewire/stream.h:594-596` (`pw_stream_get_nsec` vergleichbar mit `pw_time.now`). Geprüft in `tst_tonausgang`: `steady_clock` liegt zwischen zwei Ablesungen von `CLOCK_MONOTONIC`, und in jedem Abruf liegt `pw_stream_get_nsec()` zwischen zwei Ablesungen von `steady_clock` (`Stats::clockOutside` immer 0). Der Mischer darf `callNs` (steady) und `sinceNowNs` also ohne Umrechnung verbinden.
+- `src/audio/pwoutput.{h,cpp}` (Ziel `dss_pwoutput`, nur mit `DSS_CORE_AUDIO`, Standard an). Ein Strom je Zweck mit `target.object`, `node.dont-reconnect`, `node.dont-fallback`, `node.dont-move` und `node.latency` 1920/48000. Der Strom wird nur angelegt, wenn der gewählte Knoten in der Registry steht. Verschwindet der Knoten, wird der Strom entfernt (Zustand `missing`), und kommt er wieder, wird der Strom neu angelegt. Zusätzlich prüft die Schicht die Verbindungen des Stroms: Hängt er an einem fremden Knoten, gibt er Stille aus, wird entfernt und bleibt im Zustand `error`, bis der Ausgang neu gewählt wird. Bis die Verbindung bestätigt ist, gibt er Stille aus. Zustände: `no_pipewire`, `no_target`, `missing`, `connecting`, `playing`, `error`.
+- Gemessen in `tst_tonausgang` (virtuelle Senke, unhörbar): `size` 1024, `delay`, `queued` und `buffered` 0, `rate` 1/48000, `sinceNowNs` höchstens etwa 0,1 ms. Abgebrochene Zyklen, Abrufe ohne Puffer und Wechsel von `delay` und `size` schreibt die Schicht einmal je Sekunde ins Protokoll.
+- Kern: `kern.ini` mit `[ton-video]` (`ausgang` = `node.name`, leer = kein Ausgang; `versatz_ms` von −500 bis +500, Standard 0). Schnittstelle Version 12:
+  - `settings` mit `audio_routes` (`{"video": {"output", "offset_ms"}}`), `audio_offset_min_ms` und `audio_offset_max_ms`.
+  - `update_settings` mit `audio_routes` (je Zweck `output` und/oder `offset_ms`).
+  - `audio_outputs` mit `enabled`, `devices` (`name`, `description`, `default`) und `routes` (je Zweck `state`, `detail`). Der Kern schickt es nach `hello` und bei jeder Änderung an alle.
+  - `CoreClient` führt `audioOutputs()`.
+  - Der Mischer läuft in b3 ohne Quellen (Stille).
+- Abweichungen vom Plan:
+  - Zusätzliche Tests: `tst_tonausgang` prüft auch eine fremde Verbindung (Link von aussen auf eine zweite Senke) und «kein Ausgang». `tst_kernverbindung` prüft `audio_outputs` nach `hello`, einen fehlenden Ausgang über `update_settings` (Zustand `missing`), Abweisungen und das Lesen nach einem Neustart. Dabei wählt der Test nur einen Ausgang, den es nicht gibt, und legt keinen Strom an.
+  - Zwei Versionsprüfungen sind von 11 auf 12 nachgeführt (`tst_protocol`, `tst_kernverbindung`).
+  - Kennung des Zwecks in der Schnittstelle `video`, Abschnitt in `kern.ini` `[ton-video]`.
+  - Nach einem Fehler des Stroms versucht die Schicht es nach 5 s neu. Ausgänge, die erscheinen oder verschwinden, stehen im Protokoll des Kerns («Ton: …»).
+  - `docs/08` wird erst in b6 nachgeführt (wie geplant).
+- Offen für b4:
+  - Fällt PipeWire weg (Neustart von PipeWire), bleibt der Zustand `no_pipewire` bis zum Neustart des Kerns. Es gibt keine neue Verbindung, **nicht geprüft**. Entscheiden, ob b4 das braucht.
+  - `tst_kernton` (geplant in b4) mit Ersatzausgang. `tst_kernverbindung` startet jetzt Kerne mit Verbindung zu PipeWire, aber ohne Strom.
+  - Bedeutung und Vorzeichen von `versatz_ms`: Angenommen ist «Weg hinter dem Ausgang, der Kern spielt so viel früher» (`Mixer::setExtraDelayNs`). Der Bereich ±500 ms ist eine Annahme nach Frage 6. Bestätigung mit H2/M4.
+  - `delay` an einem echten Ausgang (M4).
+  - `dss-cli einstellungen` zeigt Ausgang und Versatz noch nicht.
+  - Ältere Programme lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»). Das betrifft nur das Zurückgehen auf eine Version vor P12b.
+
 ### b4 – Seite und Kern verbinden (3 Commits)
 
 **Voraussetzung:** M3 erledigt (Lotse mit dem Nutzer). Kommt in OBS kein «aktiv»-Ereignis: Rückfall `InputActiveStateChanged` über den Kern planen, Halt und Meldung an Lotse.

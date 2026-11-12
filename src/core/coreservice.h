@@ -19,7 +19,9 @@ class QLocalSocket;
 class QTimer;
 
 namespace dss {
+class Mixer;
 class OverlayServer;
+class PwOutput;
 }
 namespace dss::obs {
 class ObsConnection;
@@ -67,6 +69,14 @@ public:
     // sie danach auf dem Stand. Ohne Aufruf: OBS bleibt «off».
     void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
                           dss::obs::ObsSources *sources);
+
+#if DSS_CORE_AUDIO
+    // Ton der Videos (P12b b3, Schalter DSS_CORE_AUDIO): Ausgang und Versatz aus den Einstellungen
+    // ([ton-video]) an output und mixer, Liste der Ausgänge und Zustand als audio_outputs an alle.
+    // Vor output->start() aufrufen; beide müssen länger leben als die Hauptschleife. Ohne Aufruf:
+    // audio_outputs mit enabled false.
+    void setAudioOutput(dss::PwOutput *output, dss::Mixer *mixer);
+#endif
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -154,6 +164,11 @@ private:
     // P10c, E-29: Quellen in OBS. Antwort als change_result, sobald OBS geantwortet hat.
     QJsonObject obsSourcesMessage() const;
     void handleObsSourceRequest(QLocalSocket *socket, const QJsonObject &message, bool create);
+    // P12b b3: Ausgänge für den Ton. applyAudioSettings gibt Ausgang und Versatz aus den
+    // Einstellungen weiter; onAudioChanged schickt audio_outputs an alle, wenn sich etwas geändert hat.
+    QJsonObject audioOutputsMessage() const;
+    void applyAudioSettings();
+    void onAudioChanged();
     // Sollzustand aller Overlays an ObsSources, an denselben Stellen wie updateBrowserSources.
     void updateObsSources();
     // Einstellungen geändert: settings an alle, Adressen der Browserquellen, Server neu.
@@ -174,6 +189,9 @@ private:
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     dss::obs::ObsSources *m_obsSources = nullptr;
+    dss::PwOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
+    dss::Mixer *m_mixer = nullptr;
+    QJsonObject m_lastAudioOutputs;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;
     QTimer *m_statsTimer = nullptr;

@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QHostAddress>
 #include <QList>
+#include <QMap>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -29,8 +30,14 @@
 //   aktiv=nein
 //   adresse=192.168.1.116
 //   port=4455
+//   [ton-video]
+//   ausgang=alsa_output.usb-…
+//   versatz_ms=0
 //
 // Das Passwort von OBS steht nie hier, sondern verschlüsselt in obs-passwort.cred (P10c, Regel 12).
+// P12b b3: Ausgang je Zweck, ein Abschnitt je Zweck (kAudioPurposes); zuerst [ton-video] für den Ton
+// der Videos. ausgang: node.name des Ausgangs in PipeWire, leer = kein Ausgang (kein Ton);
+// versatz_ms: Weg des Tons hinter dem Ausgang (Mischpult, OBS), der Kern spielt so viel früher.
 //
 // Quellen:
 //   QSaveFile: https://doc.qt.io/qt-6.8/qsavefile.html
@@ -54,6 +61,38 @@ inline constexpr int kObsPortMin = 1;
 inline constexpr int kObsPortMax = 65535;
 inline constexpr int kObsDefaultPort = 4455;
 
+// P12b b3: Zwecke der Tonausgänge: Kennung in der Schnittstelle und Abschnitt in kern.ini. Weitere
+// Zwecke (Chat-Bot) kommen hier dazu, ohne Umbau (Antwort 2 des Nutzers, 2026-11-09).
+struct AudioPurpose
+{
+    const char *id;      // Schnittstelle (settings, update_settings, audio_outputs)
+    const char *section; // Abschnitt in kern.ini
+};
+inline constexpr AudioPurpose kAudioPurposes[] = {{"video", "ton-video"}};
+inline constexpr char kAudioPurposeVideo[] = "video";
+QStringList audioPurposeIds();
+// Versatz in ms (Annahme nach Frage 6 des Plans P12, Empfehlung −500 bis +500, Schritt 1)
+inline constexpr int kAudioOffsetMinMs = -500;
+inline constexpr int kAudioOffsetMaxMs = 500;
+// Längster Name eines Ausgangs (node.name)
+inline constexpr int kAudioOutputMaxLength = 256;
+
+struct AudioRoute
+{
+    QString output; // node.name, leer = kein Ausgang
+    int offsetMs = 0;
+
+    bool operator==(const AudioRoute &) const = default;
+};
+struct AudioRouteChange
+{
+    std::optional<QString> output;
+    std::optional<int> offsetMs;
+
+    bool isEmpty() const { return !output && !offsetMs; }
+    bool operator==(const AudioRouteChange &) const = default;
+};
+
 struct CoreSettings
 {
     int port = 0;
@@ -62,7 +101,11 @@ struct CoreSettings
     bool obsEnabled = false;
     QString obsHost = {};
     int obsPort = kObsDefaultPort;
+    // P12b b3: je Zweck (Kennung aus kAudioPurposes) ein Ausgang; fehlt ein Abschnitt, gilt
+    // AudioRoute() (kein Ausgang, Versatz 0). Enthält immer alle Zwecke.
+    QMap<QString, AudioRoute> audioRoutes = defaultAudioRoutes();
 
+    static QMap<QString, AudioRoute> defaultAudioRoutes();
     bool operator==(const CoreSettings &) const = default;
 };
 
@@ -74,8 +117,12 @@ struct CoreSettingsChange
     std::optional<bool> obsEnabled;
     std::optional<QString> obsHost;
     std::optional<int> obsPort;
+    QMap<QString, AudioRouteChange> audioRoutes = {}; // P12b b3, je Zweck
 
-    bool isEmpty() const { return !port && !homeAddress && !obsEnabled && !obsHost && !obsPort; }
+    bool isEmpty() const
+    {
+        return !port && !homeAddress && !obsEnabled && !obsHost && !obsPort && audioRoutes.isEmpty();
+    }
 };
 
 // Standard: Port 8080 im Einsatz, 8081 in Arbeit (Entscheid 2026-11-03), Adresse leer.
@@ -97,10 +144,14 @@ QString validateObsHost(const QString &host);
 QString validateObsPort(int port);
 // Passen die Werte zusammen? Eingeschaltet braucht es eine Adresse.
 QString validateObsCombination(bool enabled, const QString &host);
+// P12b b3: Name des Ausgangs (node.name): leer erlaubt (kein Ausgang), sonst höchstens
+// kAudioOutputMaxLength Zeichen, ohne Steuerzeichen und ohne Leerzeichen am Anfang oder Ende.
+QString validateAudioOutput(const QString &output);
+QString validateAudioOffset(int offsetMs);
 
 // Text der Datei lesen bzw. schreiben. Fehlende Angaben gelten mit dem Standardwert; eine
-// unbekannte Angabe, ein Abschnitt ausser [overlay-server] und [obs], eine doppelte Angabe oder ein
-// ungültiger Wert machen die Datei ungültig (false mit Meldung).
+// unbekannte Angabe, ein Abschnitt ausser [overlay-server], [obs] und denen aus kAudioPurposes, eine
+// doppelte Angabe oder ein ungültiger Wert machen die Datei ungültig (false mit Meldung).
 bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, CoreSettings *settings,
                        QString *error);
 QByteArray serializeCoreSettings(const CoreSettings &settings);

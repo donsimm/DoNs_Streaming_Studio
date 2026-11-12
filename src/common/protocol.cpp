@@ -1085,6 +1085,14 @@ QJsonObject settingsMessage(const SettingsInfo &info)
     o.insert(QStringLiteral("obs_host"), info.settings.obsHost);
     o.insert(QStringLiteral("obs_port"), info.settings.obsPort);
     o.insert(QStringLiteral("obs_password_set"), info.obsPasswordSet);
+    // P12b b3
+    QJsonObject routes;
+    for (auto it = info.settings.audioRoutes.constBegin(); it != info.settings.audioRoutes.constEnd(); ++it)
+        routes.insert(it.key(), QJsonObject{{QStringLiteral("output"), it.value().output},
+                                            {QStringLiteral("offset_ms"), it.value().offsetMs}});
+    o.insert(QStringLiteral("audio_routes"), routes);
+    o.insert(QStringLiteral("audio_offset_min_ms"), info.audioOffsetMinMs);
+    o.insert(QStringLiteral("audio_offset_max_ms"), info.audioOffsetMaxMs);
     return o;
 }
 
@@ -1113,6 +1121,35 @@ bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *erro
         *error = QStringLiteral("port_min grösser als port_max");
         return false;
     }
+    // P12b b3
+    constexpr int intMin = std::numeric_limits<int>::min();
+    constexpr int intMax = std::numeric_limits<int>::max();
+    if (!requireIntField(message, QStringLiteral("audio_offset_min_ms"), intMin, intMax, &i.audioOffsetMinMs, error)
+        || !requireIntField(message, QStringLiteral("audio_offset_max_ms"), intMin, intMax, &i.audioOffsetMaxMs, error))
+        return false;
+    if (i.audioOffsetMinMs > i.audioOffsetMaxMs) {
+        *error = QStringLiteral("audio_offset_min_ms grösser als audio_offset_max_ms");
+        return false;
+    }
+    const QJsonValue routes = message.value(QStringLiteral("audio_routes"));
+    if (!routes.isObject()) {
+        *error = QStringLiteral("Feld audio_routes fehlt oder ist kein Objekt");
+        return false;
+    }
+    i.settings.audioRoutes.clear();
+    const QJsonObject r = routes.toObject();
+    for (auto it = r.constBegin(); it != r.constEnd(); ++it) {
+        if (!it.value().isObject()) {
+            *error = QStringLiteral("audio_routes.%1 ist kein Objekt").arg(it.key());
+            return false;
+        }
+        AudioRoute route;
+        if (!requireString(it.value().toObject(), QStringLiteral("output"), &route.output, error)
+            || !requireIntField(it.value().toObject(), QStringLiteral("offset_ms"), intMin, intMax, &route.offsetMs,
+                                error))
+            return false;
+        i.settings.audioRoutes.insert(it.key(), route);
+    }
     *info = i;
     return true;
 }
@@ -1133,6 +1170,18 @@ QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
         o.insert(QStringLiteral("obs_port"), *update.obsPort);
     if (update.obsPassword)
         o.insert(QStringLiteral("obs_password"), *update.obsPassword);
+    if (!update.audioRoutes.isEmpty()) {
+        QJsonObject routes;
+        for (auto it = update.audioRoutes.constBegin(); it != update.audioRoutes.constEnd(); ++it) {
+            QJsonObject route;
+            if (it.value().output)
+                route.insert(QStringLiteral("output"), *it.value().output);
+            if (it.value().offsetMs)
+                route.insert(QStringLiteral("offset_ms"), *it.value().offsetMs);
+            routes.insert(it.key(), route);
+        }
+        o.insert(QStringLiteral("audio_routes"), routes);
+    }
     return o;
 }
 
@@ -1192,7 +1241,39 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
             return false;
         u.obsPassword = password;
     }
-    if (!u.port && !u.homeAddress && !u.obsEnabled && !u.obsHost && !u.obsPort && !u.obsPassword) {
+    // P12b b3: je Zweck ein Objekt mit output und/oder offset_ms (mindestens eines)
+    if (message.contains(QStringLiteral("audio_routes"))) {
+        const QJsonValue routes = message.value(QStringLiteral("audio_routes"));
+        if (!routes.isObject() || routes.toObject().isEmpty()) {
+            *error = QStringLiteral("Feld audio_routes ist kein Objekt oder leer");
+            return false;
+        }
+        const QJsonObject r = routes.toObject();
+        for (auto it = r.constBegin(); it != r.constEnd(); ++it) {
+            const QJsonObject o = it.value().toObject();
+            AudioRouteChange change;
+            if (o.contains(QStringLiteral("output"))) {
+                QString output;
+                if (!requireString(o, QStringLiteral("output"), &output, error))
+                    return false;
+                change.output = output;
+            }
+            if (o.contains(QStringLiteral("offset_ms"))) {
+                int offset = 0;
+                if (!requireIntField(o, QStringLiteral("offset_ms"), std::numeric_limits<int>::min(),
+                                     std::numeric_limits<int>::max(), &offset, error))
+                    return false;
+                change.offsetMs = offset;
+            }
+            if (!it.value().isObject() || change.isEmpty()) {
+                *error = QStringLiteral("audio_routes.%1 ohne output und offset_ms").arg(it.key());
+                return false;
+            }
+            u.audioRoutes.insert(it.key(), change);
+        }
+    }
+    if (!u.port && !u.homeAddress && !u.obsEnabled && !u.obsHost && !u.obsPort && !u.obsPassword
+        && u.audioRoutes.isEmpty()) {
         *error = QStringLiteral("update_settings ohne Wert");
         return false;
     }
@@ -1258,6 +1339,80 @@ bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *er
         if (!parseScene(v.toObject(), &scene))
             return false;
         i.scenes.append(scene);
+    }
+    *info = i;
+    return true;
+}
+
+QStringList audioRouteStates()
+{
+    return {QStringLiteral("no_pipewire"), QStringLiteral("no_target"), QStringLiteral("missing"),
+            QStringLiteral("connecting"),  QStringLiteral("playing"),   QStringLiteral("error")};
+}
+
+QJsonObject audioOutputsMessage(const AudioOutputsInfo &info)
+{
+    QJsonObject o = typed(msg::kAudioOutputs);
+    o.insert(QStringLiteral("enabled"), info.enabled);
+    QJsonArray devices;
+    for (const AudioDeviceInfo &d : info.devices)
+        devices.append(QJsonObject{{QStringLiteral("name"), d.name},
+                                   {QStringLiteral("description"), d.description},
+                                   {QStringLiteral("default"), d.isDefault}});
+    o.insert(QStringLiteral("devices"), devices);
+    QJsonObject routes;
+    for (auto it = info.routes.constBegin(); it != info.routes.constEnd(); ++it)
+        routes.insert(it.key(), QJsonObject{{QStringLiteral("state"), it.value().state},
+                                            {QStringLiteral("detail"), it.value().detail.isEmpty()
+                                                                           ? QJsonValue(QJsonValue::Null)
+                                                                           : QJsonValue(it.value().detail)}});
+    o.insert(QStringLiteral("routes"), routes);
+    return o;
+}
+
+bool parseAudioOutputs(const QJsonObject &message, AudioOutputsInfo *info, QString *error)
+{
+    AudioOutputsInfo i;
+    if (!requireBool(message, QStringLiteral("enabled"), &i.enabled, error))
+        return false;
+    if (!message.value(QStringLiteral("devices")).isArray()) {
+        *error = QStringLiteral("Feld devices fehlt oder ist keine Liste");
+        return false;
+    }
+    const QJsonArray devices = message.value(QStringLiteral("devices")).toArray();
+    for (const QJsonValue &v : devices) {
+        AudioDeviceInfo d;
+        const QJsonObject o = v.toObject();
+        if (!requireString(o, QStringLiteral("name"), &d.name, error)
+            || !requireString(o, QStringLiteral("description"), &d.description, error)
+            || !requireBool(o, QStringLiteral("default"), &d.isDefault, error))
+            return false;
+        i.devices.append(d);
+    }
+    const QJsonValue routes = message.value(QStringLiteral("routes"));
+    if (!routes.isObject()) {
+        *error = QStringLiteral("Feld routes fehlt oder ist kein Objekt");
+        return false;
+    }
+    const QStringList states = audioRouteStates();
+    const QJsonObject r = routes.toObject();
+    for (auto it = r.constBegin(); it != r.constEnd(); ++it) {
+        const QJsonObject o = it.value().toObject();
+        AudioRouteStatus status;
+        if (!requireString(o, QStringLiteral("state"), &status.state, error))
+            return false;
+        if (!states.contains(status.state)) {
+            *error = QStringLiteral("unbekannter Zustand %1").arg(status.state);
+            return false;
+        }
+        const QJsonValue detail = o.value(QStringLiteral("detail"));
+        if (detail.isString()) {
+            status.detail = detail.toString();
+        } else if (!detail.isNull()) {
+            *error = QStringLiteral("Feld detail fehlt oder ist weder Text noch null");
+            return false;
+        }
+        i.routes.insert(it.key(), status);
     }
     *info = i;
     return true;

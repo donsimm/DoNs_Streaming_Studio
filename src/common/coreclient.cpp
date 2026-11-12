@@ -500,6 +500,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_obsStatus = info;
         emit obsStatusChanged();
+    } else if (type == QLatin1String(msg::kAudioOutputs)) {
+        AudioOutputsInfo info;
+        if (!parseAudioOutputs(message, &info, &error)) {
+            qWarning("Kern: audio_outputs ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_audioOutputs = info;
+        emit audioOutputsChanged();
     } else if (type == QLatin1String(msg::kObsSources)) {
         QList<ObsSourceInfo> sources;
         if (!parseObsSources(message, &sources, &error)) {
@@ -612,6 +620,10 @@ void CoreClient::clearData()
     if (m_obsStatus) {
         m_obsStatus.reset();
         emit obsStatusChanged();
+    }
+    if (m_audioOutputs) {
+        m_audioOutputs.reset();
+        emit audioOutputsChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();

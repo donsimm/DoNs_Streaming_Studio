@@ -12,6 +12,7 @@
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
+#include <QMap>
 #include <QString>
 #include <QStringList>
 #include <QUuid>
@@ -42,8 +43,10 @@ namespace dss {
 //   mit Lage (center_x, center_y, insert_index), Codes canceled und in_use
 // 11 seit P10c: Verbindung zu OBS (obs_status, obs_sources, obs_create_source, obs_add_to_scene,
 //   settings und update_settings mit obs_*, Codes obs_*)
+// 12 seit P12b b3: Ton (audio_outputs; settings mit audio_routes, audio_offset_min_ms,
+//   audio_offset_max_ms; update_settings mit audio_routes)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 11;
+inline constexpr int kProtocolVersion = 12;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -116,6 +119,8 @@ inline constexpr char kObsStatus[] = "obs_status";
 inline constexpr char kObsSources[] = "obs_sources";
 inline constexpr char kObsCreateSource[] = "obs_create_source";
 inline constexpr char kObsAddToScene[] = "obs_add_to_scene";
+// P12b b3: Ausgänge für den Ton und ihr Zustand
+inline constexpr char kAudioOutputs[] = "audio_outputs";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -328,6 +333,9 @@ struct SettingsInfo
     QString error; // Datei ungültig (Änderungen werden abgewiesen); leer, wenn gültig
     // P10c: Das Fenster erfährt nur, ob ein Passwort gespeichert ist, nie das Passwort (Regel 12).
     bool obsPasswordSet = false;
+    // P12b b3: gültiger Bereich des Versatzes (settings.audioRoutes)
+    int audioOffsetMinMs = kAudioOffsetMinMs;
+    int audioOffsetMaxMs = kAudioOffsetMaxMs;
 
     bool operator==(const SettingsInfo &) const = default;
 };
@@ -347,6 +355,8 @@ struct SettingsUpdate
     std::optional<QString> obsHost;
     std::optional<int> obsPort;
     std::optional<QString> obsPassword;
+    // P12b b3: je Zweck (audioPurposeIds) Ausgang und/oder Versatz; Zweck und Bereich prüft der Kern.
+    QMap<QString, AudioRouteChange> audioRoutes = {};
 
     bool operator==(const SettingsUpdate &) const = default;
 };
@@ -385,6 +395,37 @@ struct ServerStatusInfo
 };
 QJsonObject serverStatusMessage(const ServerStatusInfo &info);
 bool parseServerStatus(const QJsonObject &message, ServerStatusInfo *info, QString *error);
+
+// audio_outputs (P12b b3): Ausgänge für den Ton (media.class «Audio/Sink» in PipeWire) und Zustand
+// des Ausgangs je Zweck, nach hello und nach jeder Änderung an alle. enabled false: Kern ohne Ton
+// gebaut (Schalter DSS_CORE_AUDIO), dann ohne Geräte und Zwecke.
+struct AudioDeviceInfo
+{
+    QString name;        // node.name, Wert für audio_routes.output
+    QString description; // Anzeige
+    bool isDefault = false; // Standardausgang des Systems (nur Anzeige, nie vorgewählt)
+
+    bool operator==(const AudioDeviceInfo &) const = default;
+};
+// Zustand des Ausgangs eines Zwecks
+QStringList audioRouteStates(); // no_pipewire, no_target, missing, connecting, playing, error
+struct AudioRouteStatus
+{
+    QString state;  // aus audioRouteStates()
+    QString detail; // Grund (Fehlertext, fremder Knoten); leer = keiner
+
+    bool operator==(const AudioRouteStatus &) const = default;
+};
+struct AudioOutputsInfo
+{
+    bool enabled = false;
+    QList<AudioDeviceInfo> devices;
+    QMap<QString, AudioRouteStatus> routes; // je Zweck
+
+    bool operator==(const AudioOutputsInfo &) const = default;
+};
+QJsonObject audioOutputsMessage(const AudioOutputsInfo &info);
+bool parseAudioOutputs(const QJsonObject &message, AudioOutputsInfo *info, QString *error);
 
 // obs_status (P10c, T-05): Einzelheiten der Verbindung zu OBS, nach hello und nach jeder Änderung an
 // alle. Der Zustand selbst (Farbe des Knopfes) steht in connections. Ohne Adresse und ohne Passwort.

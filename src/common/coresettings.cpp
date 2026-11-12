@@ -11,6 +11,8 @@
 #include <QSet>
 #include <QTimer>
 
+#include <algorithm>
+
 namespace dss {
 
 namespace {
@@ -25,8 +27,36 @@ constexpr char kObsHostKey[] = "adresse";
 constexpr char kObsPortKey[] = "port";
 constexpr char kYes[] = "ja";
 constexpr char kNo[] = "nein";
+// P12b b3: Abschnitt je Zweck des Tons (kAudioPurposes)
+constexpr char kAudioOutputKey[] = "ausgang";
+constexpr char kAudioOffsetKey[] = "versatz_ms";
+
+// Kennung des Zwecks zum Abschnitt; leer, wenn der Abschnitt kein Zweck ist
+QString audioPurposeOfSection(const QString &section)
+{
+    for (const AudioPurpose &p : kAudioPurposes)
+        if (section == QLatin1String(p.section))
+            return QString::fromLatin1(p.id);
+    return {};
+}
 
 } // namespace
+
+QStringList audioPurposeIds()
+{
+    QStringList ids;
+    for (const AudioPurpose &p : kAudioPurposes)
+        ids.append(QString::fromLatin1(p.id));
+    return ids;
+}
+
+QMap<QString, AudioRoute> CoreSettings::defaultAudioRoutes()
+{
+    QMap<QString, AudioRoute> routes;
+    for (const AudioPurpose &p : kAudioPurposes)
+        routes.insert(QString::fromLatin1(p.id), AudioRoute());
+    return routes;
+}
 
 CoreSettings defaultCoreSettings(Edition edition)
 {
@@ -94,6 +124,26 @@ QString validateObsCombination(bool enabled, const QString &host)
     return {};
 }
 
+QString validateAudioOutput(const QString &output)
+{
+    if (output.size() > kAudioOutputMaxLength)
+        return QStringLiteral("Name des Ausgangs zu lang (%1 Zeichen, höchstens %2).")
+            .arg(output.size()).arg(kAudioOutputMaxLength);
+    const bool control = std::any_of(output.begin(), output.end(), [](QChar c) { return c.category() == QChar::Other_Control; });
+    if (control || output != output.trimmed())
+        return QStringLiteral("Name des Ausgangs «%1» ungültig (Steuerzeichen oder Leerzeichen am Rand).")
+            .arg(QString(output).replace(QLatin1Char('\n'), QLatin1Char(' ')));
+    return {};
+}
+
+QString validateAudioOffset(int offsetMs)
+{
+    if (offsetMs < kAudioOffsetMinMs || offsetMs > kAudioOffsetMaxMs)
+        return QStringLiteral("Versatz %1 ms ungültig, erlaubt sind %2 bis %3 ms.")
+            .arg(offsetMs).arg(kAudioOffsetMinMs).arg(kAudioOffsetMaxMs);
+    return {};
+}
+
 bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, CoreSettings *settings,
                        QString *error)
 {
@@ -111,7 +161,8 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
             continue;
         if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']'))) {
             section = line.mid(1, line.size() - 2).trimmed();
-            if (section != QLatin1String(kSection) && section != QLatin1String(kObsSection))
+            if (section != QLatin1String(kSection) && section != QLatin1String(kObsSection)
+                && audioPurposeOfSection(section).isEmpty())
                 return fail(QStringLiteral("unbekannter Abschnitt [%1]").arg(section));
             continue;
         }
@@ -125,7 +176,24 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         if (seen.contains(section + QLatin1Char('/') + key))
             return fail(QStringLiteral("«%1» doppelt").arg(key));
         seen.insert(section + QLatin1Char('/') + key);
-        if (section == QLatin1String(kObsSection)) {
+        if (const QString purpose = audioPurposeOfSection(section); !purpose.isEmpty()) {
+            AudioRoute &route = s.audioRoutes[purpose];
+            if (key == QLatin1String(kAudioOutputKey)) {
+                if (const QString e = validateAudioOutput(value); !e.isEmpty())
+                    return fail(e);
+                route.output = value;
+            } else if (key == QLatin1String(kAudioOffsetKey)) {
+                bool number = false;
+                const int offset = value.toInt(&number);
+                if (!number)
+                    return fail(QStringLiteral("Versatz «%1» ist keine ganze Zahl").arg(value));
+                if (const QString e = validateAudioOffset(offset); !e.isEmpty())
+                    return fail(e);
+                route.offsetMs = offset;
+            } else {
+                return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
+            }
+        } else if (section == QLatin1String(kObsSection)) {
             if (key == QLatin1String(kObsEnabledKey)) {
                 if (value != QLatin1String(kYes) && value != QLatin1String(kNo))
                     return fail(QStringLiteral("«%1» muss ja oder nein sein, nicht «%2»").arg(key, value));
@@ -179,7 +247,10 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# adresse-im-heimnetz: IPv4-Adresse des Studio-PCs im Heimnetz; leer = beim nächsten\n"
             "# Start aus der Standardroute eintragen.\n"
             "# [obs]: aktiv ja oder nein, Adresse und Port von obs-websocket auf dem Streaming-PC. Das\n"
-            "# Passwort steht nicht hier, sondern verschlüsselt in obs-passwort.cred.\n";
+            "# Passwort steht nicht hier, sondern verschlüsselt in obs-passwort.cred.\n"
+            "# [ton-video]: Ausgang für den Ton der Videos (Name in PipeWire, leer = kein Ton) und\n"
+            "# versatz_ms (" + QByteArray::number(kAudioOffsetMinMs) + " bis "
+            + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n";
     text += '[' + QByteArray(kSection) + "]\n";
     text += QByteArray(kPortKey) + '=' + QByteArray::number(settings.port) + '\n';
     text += QByteArray(kAddressKey) + '=' + settings.homeAddress.toUtf8() + '\n';
@@ -187,6 +258,12 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
     text += QByteArray(kObsEnabledKey) + '=' + (settings.obsEnabled ? kYes : kNo) + '\n';
     text += QByteArray(kObsHostKey) + '=' + settings.obsHost.toUtf8() + '\n';
     text += QByteArray(kObsPortKey) + '=' + QByteArray::number(settings.obsPort) + '\n';
+    for (const AudioPurpose &p : kAudioPurposes) {
+        const AudioRoute route = settings.audioRoutes.value(QString::fromLatin1(p.id));
+        text += '[' + QByteArray(p.section) + "]\n";
+        text += QByteArray(kAudioOutputKey) + '=' + route.output.toUtf8() + '\n';
+        text += QByteArray(kAudioOffsetKey) + '=' + QByteArray::number(route.offsetMs) + '\n';
+    }
     return text;
 }
 
@@ -365,6 +442,23 @@ std::optional<CoreSettings> CoreSettingsStore::applied(const CoreSettingsChange 
         next.obsEnabled = *change.obsEnabled;
     if (const QString e = validateObsCombination(next.obsEnabled, next.obsHost); !e.isEmpty())
         return fail(e);
+    for (auto it = change.audioRoutes.constBegin(); it != change.audioRoutes.constEnd(); ++it) {
+        if (!next.audioRoutes.contains(it.key()))
+            return fail(QStringLiteral("Unbekannter Zweck des Tons «%1».").arg(it.key()));
+        if (it.value().isEmpty())
+            return fail(QStringLiteral("Keine Einstellung für den Ton «%1» angegeben.").arg(it.key()));
+        AudioRoute &route = next.audioRoutes[it.key()];
+        if (it.value().output) {
+            if (const QString e = validateAudioOutput(*it.value().output); !e.isEmpty())
+                return fail(e);
+            route.output = *it.value().output;
+        }
+        if (it.value().offsetMs) {
+            if (const QString e = validateAudioOffset(*it.value().offsetMs); !e.isEmpty())
+                return fail(e);
+            route.offsetMs = *it.value().offsetMs;
+        }
+    }
     return next;
 }
 

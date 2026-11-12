@@ -95,6 +95,9 @@ public:
     // Einzelheiten der Verbindung zu OBS (P10c), nach hello und bei jeder Änderung; ohne Verbindung
     // leer. Die Farbe des Knopfes steht in connectionStates().
     std::optional<ObsStatusInfo> obsStatus() const { return m_obsStatus; }
+    // Ausgänge für den Ton und Zustand je Zweck (P12b b3), nach hello und bei jeder Änderung; ohne
+    // Verbindung leer.
+    std::optional<AudioOutputsInfo> audioOutputs() const { return m_audioOutputs; }
     // Quelle in OBS zu einem Overlay (P10c, E-29); ohne Eintrag: keine.
     ObsSourceInfo obsSource(const QUuid &overlayId) const;
     // Schicken obs_create_source bzw. obs_add_to_scene; requestId wird hier vergeben. Antwort über
@@ -159,6 +162,8 @@ signals:
     // obsStatus() hat sich geändert (P10c).
     void obsStatusChanged();
     void obsSourcesChanged();
+    // audioOutputs() hat sich geändert (P12b b3).
+    void audioOutputsChanged();
     // Antwort auf sendObsCreateSource und sendObsAddToScene, nur hier (nicht in changeFinished): Das
     // Anlegen-Fenster zeigt eine Abweisung selbst und bleibt offen.
     void obsRequestFinished(const dss::ChangeResult &result);
@@ -209,6 +214,7 @@ private:
     std::optional<BrowserSourceInfo> m_browserSource;
     std::optional<ServerStatusInfo> m_serverStatus;
     std::optional<ObsStatusInfo> m_obsStatus;
+    std::optional<AudioOutputsInfo> m_audioOutputs;
     QList<ObsSourceInfo> m_obsSources;
     QSet<qint64> m_obsRequests;
     MediaListData m_mediaList;

@@ -8,6 +8,10 @@
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
 #endif
+#if DSS_CORE_AUDIO
+#include "mixer.h"
+#include "pwoutput.h"
+#endif
 
 #include <QDir>
 #include <QFile>
@@ -347,6 +351,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, serverStatusMessage());
         send(socket, obsStatusMessage());
         send(socket, obsSourcesMessage());
+        send(socket, audioOutputsMessage());
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -638,6 +643,62 @@ QJsonObject CoreService::obsStatusMessage() const
     return dss::obsStatusMessage(info);
 }
 
+#if DSS_CORE_AUDIO
+void CoreService::setAudioOutput(dss::PwOutput *output, dss::Mixer *mixer)
+{
+    m_audioOutput = output;
+    m_mixer = mixer;
+    // Beide Rückrufe laufen im Thread der Schleife von PipeWire (mit deren Sperre): nur weiterreichen.
+    output->onChange = [this] {
+        QMetaObject::invokeMethod(this, &CoreService::onAudioChanged, Qt::QueuedConnection);
+    };
+    output->onLog = [this](const QString &line) {
+        QMetaObject::invokeMethod(this, [line] { qInfo("Ton: %s", qPrintable(line)); }, Qt::QueuedConnection);
+    };
+    applyAudioSettings();
+}
+#endif
+
+void CoreService::applyAudioSettings()
+{
+#if DSS_CORE_AUDIO
+    if (!m_audioOutput || !m_settings)
+        return;
+    const dss::AudioRoute route =
+        m_settings->settings().audioRoutes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
+    m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
+    // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
+    // (neu gewählt, pwoutput.h).
+    m_audioOutput->setTarget(route.output);
+#endif
+}
+
+QJsonObject CoreService::audioOutputsMessage() const
+{
+    dss::AudioOutputsInfo info;
+#if DSS_CORE_AUDIO
+    if (m_audioOutput) {
+        info.enabled = true;
+        const QList<dss::AudioDevice> devices = m_audioOutput->devices();
+        for (const dss::AudioDevice &d : devices)
+            info.devices.append({d.name, d.description, d.isDefault});
+        info.routes.insert(QString::fromLatin1(dss::kAudioPurposeVideo),
+                           {QString::fromLatin1(dss::PwOutput::stateName(m_audioOutput->state())),
+                            m_audioOutput->stateDetail()});
+    }
+#endif
+    return dss::audioOutputsMessage(info);
+}
+
+void CoreService::onAudioChanged()
+{
+    const QJsonObject message = audioOutputsMessage();
+    if (message == m_lastAudioOutputs)
+        return;
+    m_lastAudioOutputs = message;
+    broadcast(message);
+}
+
 QJsonObject CoreService::settingsMessage() const
 {
     dss::SettingsInfo info{m_settings->settings(), dss::kPortMin, dss::kPortMax, m_settings->path(),
@@ -667,8 +728,8 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
                                                QString::fromLatin1(dss::err::kRejected), text}));
     };
     // P10c: Das Passwort wird zuerst geschrieben; eine Abweisung muss also vorher feststehen.
-    const dss::CoreSettingsChange change{update.port, update.homeAddress, update.obsEnabled, update.obsHost,
-                                         update.obsPort};
+    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
+                                         update.obsHost, update.obsPort,     update.audioRoutes};
     if (!change.isEmpty()) {
         if (const QString e = m_settings->checkChange(change); !e.isEmpty()) {
             reject(e);
@@ -718,8 +779,8 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
         if (socket)
             send(socket, dss::changeResultMessage(result));
     };
-    const dss::CoreSettingsChange change{update.port, update.homeAddress, update.obsEnabled, update.obsHost,
-                                         update.obsPort};
+    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
+                                         update.obsHost, update.obsPort,     update.audioRoutes};
     const dss::CoreSettings before = m_settings->settings();
     QString error;
     if (!change.isEmpty() && !m_settings->change(change, &error)) {
@@ -733,6 +794,9 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
         broadcast(settingsMessage()); // obs_password_set
     // Auch bei gleichen Werten: «OK» im Dialog versucht es nach 4009, 4010, 4011 wieder (Plan 1.7).
     applyObsSettings(passwordChanged);
+    // P12b b3: ebenso ein durch eine fremde Verbindung gesperrter Ausgang
+    if (!update.audioRoutes.isEmpty())
+        applyAudioSettings();
     reply({update.requestId, true, QUuid(), QString(), QString()});
 }
 
@@ -757,6 +821,7 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
         qInfo("%s", qPrintable(line));
     settingsApplied();
     applyObsSettings();
+    applyAudioSettings();
     send(socket, dss::changeResultMessage(
                      {requestId, true, QUuid(), QString(), QString(),
                       QStringLiteral("Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt %1.")
@@ -769,6 +834,9 @@ void CoreService::settingsApplied()
     qInfo("Einstellungen geändert: Port %d, Adresse im Heimnetz %s, OBS %s", after.port,
           after.homeAddress.isEmpty() ? "leer" : qPrintable(after.homeAddress),
           after.obsEnabled ? qPrintable(QStringLiteral("%1:%2").arg(after.obsHost).arg(after.obsPort)) : "aus");
+    for (auto it = after.audioRoutes.constBegin(); it != after.audioRoutes.constEnd(); ++it)
+        qInfo("Einstellungen Ton %s: Ausgang %s, Versatz %d ms", qPrintable(it.key()),
+              it.value().output.isEmpty() ? "keiner" : qPrintable(it.value().output), it.value().offsetMs);
     broadcast(settingsMessage());
     updateBrowserSources();
     updateObsSources();

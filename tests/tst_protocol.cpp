@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 11); // seit P10c (OBS)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 12); // seit P12b b3 (Ton)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -583,7 +583,9 @@ private slots:
                                 "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
                                 "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
-                                "\"type\":\"settings\"}\n"));
+                                "\"type\":\"settings\"}\n")
+                     .insert(1, QStringLiteral("\"audio_offset_max_ms\":500,\"audio_offset_min_ms\":-500,"
+                                               "\"audio_routes\":{\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
         SettingsInfo back;
         QString error;
         QVERIFY2(parseSettings(o, &back, &error), qPrintable(error));
@@ -593,6 +595,35 @@ private slots:
         QVERIFY(!parseSettings(bad, &back, &error));
         bad = o;
         bad.remove(QStringLiteral("home_address"));
+        QVERIFY(!parseSettings(bad, &back, &error));
+
+        // P12b b3: Ausgang und Versatz je Zweck, Bereich des Versatzes
+        SettingsInfo audio = info;
+        audio.settings.audioRoutes[QStringLiteral("video")] = {QStringLiteral("test_ausgang"), -120};
+        QVERIFY2(parseSettings(settingsMessage(audio), &back, &error), qPrintable(error));
+        QCOMPARE(back, audio);
+        QCOMPARE(settingsMessage(audio).value(QStringLiteral("audio_routes")).toObject(),
+                 (QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("test_ausgang")},
+                                                                    {QStringLiteral("offset_ms"), -120}}}}));
+        for (const QString &field : {QStringLiteral("audio_routes"), QStringLiteral("audio_offset_min_ms"),
+                                     QStringLiteral("audio_offset_max_ms")}) {
+            bad = o;
+            bad.remove(field);
+            QVERIFY2(!parseSettings(bad, &back, &error), qPrintable(field));
+            QVERIFY2(error.contains(field), qPrintable(error));
+        }
+        bad = o;
+        bad.insert(QStringLiteral("audio_offset_min_ms"), 501);
+        QVERIFY(!parseSettings(bad, &back, &error));
+        bad = o;
+        bad.insert(QStringLiteral("audio_routes"), QJsonObject{{QStringLiteral("video"), 3}});
+        QVERIFY(!parseSettings(bad, &back, &error));
+        bad.insert(QStringLiteral("audio_routes"),
+                   QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("a")}}}});
+        QVERIFY(!parseSettings(bad, &back, &error)); // offset_ms fehlt
+        bad.insert(QStringLiteral("audio_routes"),
+                   QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), 1},
+                                                                     {QStringLiteral("offset_ms"), 0}}}});
         QVERIFY(!parseSettings(bad, &back, &error));
 
         SettingsUpdate update;
@@ -621,6 +652,104 @@ private slots:
         QVERIFY(parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
                                                 {QStringLiteral("port"), 80}},
                                     &parsed, &error));
+
+        // P12b b3: audio_routes, je Zweck output und/oder offset_ms
+        SettingsUpdate audioUpdate;
+        audioUpdate.requestId = 8;
+        audioUpdate.audioRoutes.insert(QStringLiteral("video"), AudioRouteChange{QStringLiteral("test_ausgang"), std::nullopt});
+        QCOMPARE(QString::fromUtf8(encodeMessage(settingsUpdateMessage(audioUpdate))),
+                 QStringLiteral("{\"audio_routes\":{\"video\":{\"output\":\"test_ausgang\"}},\"request_id\":8,"
+                                "\"type\":\"update_settings\"}\n"));
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(audioUpdate), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, audioUpdate);
+        audioUpdate.audioRoutes[QStringLiteral("video")] = AudioRouteChange{std::nullopt, -500};
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(audioUpdate), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, audioUpdate);
+        audioUpdate.audioRoutes[QStringLiteral("video")] = AudioRouteChange{QString(), 0};
+        audioUpdate.port = 9000;
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(audioUpdate), &parsed, &error), qPrintable(error));
+        QCOMPARE(parsed, audioUpdate);
+        // Unbekannte Zwecke und Bereich prüft erst der Kern
+        QVERIFY(parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                {QStringLiteral("audio_routes"),
+                                                 QJsonObject{{QStringLiteral("musik"),
+                                                              QJsonObject{{QStringLiteral("offset_ms"), 9999}}}}}},
+                                    &parsed, &error));
+        const QList<QJsonValue> badRoutes = {
+            QJsonValue(3),
+            QJsonValue(QJsonObject()), // leer
+            QJsonObject{{QStringLiteral("video"), 3}},
+            QJsonObject{{QStringLiteral("video"), QJsonObject()}}, // ohne output und offset_ms
+            QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), 1}}}},
+            QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("offset_ms"), 1.5}}}},
+            QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("offset_ms"), QStringLiteral("1")}}}},
+        };
+        for (const QJsonValue &routes : badRoutes) {
+            QVERIFY2(!parseSettingsUpdate(QJsonObject{{QStringLiteral("request_id"), 1},
+                                                      {QStringLiteral("audio_routes"), routes}},
+                                          &parsed, &error),
+                     QJsonDocument(QJsonObject{{QStringLiteral("r"), routes}}).toJson(QJsonDocument::Compact).constData());
+        }
+    }
+
+    // P12b b3: Ausgänge für den Ton und Zustand je Zweck
+    void audioOutputsMessages()
+    {
+        AudioOutputsInfo info;
+        info.enabled = true;
+        info.devices = {{QStringLiteral("test_ausgang.analog-stereo"), QStringLiteral("Testausgang"), true},
+                        {QStringLiteral("test_pult"), QStringLiteral("Pult für Tests"), false}};
+        info.routes.insert(QStringLiteral("video"), {QStringLiteral("missing"), QString()});
+        const QJsonObject o = audioOutputsMessage(info);
+        QCOMPARE(QString::fromUtf8(encodeMessage(o)),
+                 QStringLiteral("{\"devices\":[{\"default\":true,\"description\":\"Testausgang\","
+                                "\"name\":\"test_ausgang.analog-stereo\"},{\"default\":false,"
+                                "\"description\":\"Pult für Tests\",\"name\":\"test_pult\"}],\"enabled\":true,"
+                                "\"routes\":{\"video\":{\"detail\":null,\"state\":\"missing\"}},"
+                                "\"type\":\"audio_outputs\"}\n"));
+        AudioOutputsInfo back;
+        QString error;
+        QVERIFY2(parseAudioOutputs(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        // Jeder Zustand hin und zurück, mit Grund
+        QCOMPARE(audioRouteStates(), (QStringList{QStringLiteral("no_pipewire"), QStringLiteral("no_target"),
+                                                  QStringLiteral("missing"), QStringLiteral("connecting"),
+                                                  QStringLiteral("playing"), QStringLiteral("error")}));
+        for (const QString &state : audioRouteStates()) {
+            info.routes[QStringLiteral("video")] = {state, QStringLiteral("Grund %1").arg(state)};
+            QVERIFY2(parseAudioOutputs(audioOutputsMessage(info), &back, &error), qPrintable(error));
+            QCOMPARE(back, info);
+        }
+        // Kern ohne Ton (DSS_CORE_AUDIO aus)
+        QCOMPARE(QString::fromUtf8(encodeMessage(audioOutputsMessage({}))),
+                 QStringLiteral("{\"devices\":[],\"enabled\":false,\"routes\":{},\"type\":\"audio_outputs\"}\n"));
+        QVERIFY(parseAudioOutputs(audioOutputsMessage({}), &back, &error));
+        QCOMPARE(back, AudioOutputsInfo());
+
+        const auto rejected = [&](const char *field, const QJsonValue &value) {
+            QJsonObject bad = o;
+            bad.insert(QLatin1String(field), value);
+            return !parseAudioOutputs(bad, &back, &error);
+        };
+        QVERIFY(rejected("enabled", 1));
+        QVERIFY(rejected("devices", QJsonObject()));
+        QVERIFY(rejected("devices", QJsonArray{3}));
+        QVERIFY(rejected("devices", QJsonArray{QJsonObject{{QStringLiteral("name"), QStringLiteral("a")},
+                                                           {QStringLiteral("description"), QStringLiteral("b")}}}));
+        QVERIFY(rejected("routes", QJsonArray()));
+        QVERIFY(rejected("routes", QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("state"),
+                                                                                     QStringLiteral("laut")},
+                                                                                    {QStringLiteral("detail"), QJsonValue::Null}}}}));
+        QVERIFY(error.contains(QStringLiteral("laut")));
+        QVERIFY(rejected("routes", QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("state"),
+                                                                                     QStringLiteral("playing")}}}}));
+        QVERIFY(rejected("routes", QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("state"),
+                                                                                     QStringLiteral("playing")},
+                                                                                    {QStringLiteral("detail"), 1}}}}));
+        QVERIFY(rejected("routes", QJsonObject{{QStringLiteral("video"), 1}}));
+        QJsonObject missing = o;
+        missing.remove(QStringLiteral("routes"));
+        QVERIFY(!parseAudioOutputs(missing, &back, &error));
     }
 
     // P10: Adresse der Browserquelle

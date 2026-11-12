@@ -20,6 +20,10 @@
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
 #endif
+#if DSS_CORE_AUDIO
+#include "mixer.h"
+#include "pwoutput.h"
+#endif
 #include "systemdnotify.h"
 #include "unixsignals.h"
 #include "version.h"
@@ -270,6 +274,22 @@ int main(int argc, char *argv[])
     });
     dss::obs::ObsSources obsSources(&obsConnection, dataDir + QStringLiteral("/obs-quellen.json"));
     service.setObsConnection(&obsConnection, &obsSecrets, &obsSources);
+
+#if DSS_CORE_AUDIO
+    // Ton der Videos über PipeWire (P12b b3): eigener Strom mit dem Ausgang aus kern.ini
+    // ([ton-video]), standardmässig «kein Ausgang». Ohne PipeWire läuft der Kern ohne Ton weiter.
+    // Nach service angelegt, also vor ihm zerstört; danach läuft keine Hauptschleife mehr.
+    const bool installed = dss::buildEdition() == dss::Edition::Installed;
+    dss::Mixer audioMixer;
+    dss::PwOutput audioOutput(&audioMixer, QStringLiteral("ton-video"),
+                              installed ? QStringLiteral("dss_core_ton_video")
+                                        : QStringLiteral("dss_core_entwicklung_ton_video"),
+                              QStringLiteral("DoNs Streaming Studio (%1): Ton der Videos")
+                                  .arg(dss::editionLabel()));
+    service.setAudioOutput(&audioOutput, &audioMixer);
+    if (!audioOutput.start(&error))
+        qWarning("Ton: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
+#endif
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,
                      [](int signalNumber) {

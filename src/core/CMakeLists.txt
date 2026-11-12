@@ -13,6 +13,13 @@ endif()
 if(DSS_INSTALLED_EDITION)
   install(TARGETS dss-core RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+# Ton der Videos über PipeWire (P12b b3, Schalter DSS_CORE_AUDIO)
+if(DSS_CORE_AUDIO)
+  target_link_libraries(dss-core PRIVATE dss_pwoutput)
+  target_compile_definitions(dss-core PRIVATE DSS_CORE_AUDIO=1)
+else()
+  target_compile_definitions(dss-core PRIVATE DSS_CORE_AUDIO=0)
+endif()
 # Overlay-Server (P10, Schalter DSS_CORE_OVERLAY_SERVER). Die Seite (web/) liegt in Arbeit im
 # Repo, im Einsatz im Installationsordner (wie Symbole und Schriften, P10a).
 if(DSS_CORE_OVERLAY_SERVER)
