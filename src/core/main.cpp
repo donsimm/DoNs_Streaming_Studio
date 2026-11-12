@@ -22,6 +22,7 @@
 #endif
 #if DSS_CORE_AUDIO
 #include "mixer.h"
+#include "nulloutput.h"
 #include "pwoutput.h"
 #endif
 #include "systemdnotify.h"
@@ -38,6 +39,7 @@
 
 #include <algorithm>
 #include <csignal>
+#include <memory>
 
 namespace {
 
@@ -140,6 +142,14 @@ int main(int argc, char *argv[])
         QStringLiteral("Port, der beim Anlegen oder Zurücksetzen von kern.ini gilt (Standard: %1; "
                        "für Tests).").arg(dss::defaultCoreSettings().port),
         QStringLiteral("PORT"));
+#if DSS_CORE_AUDIO
+    // P12b b4: tst_kernton prüft den Ton der Videos ohne Gerät und ohne PipeWire.
+    const QCommandLineOption substituteOutputOption(
+        QStringLiteral("ersatzausgang"),
+        QStringLiteral("Ton der Videos an einen Ersatzausgang ohne Gerät statt an PipeWire (Gerät «%1»; "
+                       "für Tests).").arg(QLatin1String(dss::NullOutput::kDeviceName)));
+    parser.addOption(substituteOutputOption);
+#endif
     parser.addOption(versionOption);
     parser.addOption(defaultPortOption);
     parser.addOption(dataDirOption);
@@ -278,16 +288,23 @@ int main(int argc, char *argv[])
 #if DSS_CORE_AUDIO
     // Ton der Videos über PipeWire (P12b b3): eigener Strom mit dem Ausgang aus kern.ini
     // ([ton-video]), standardmässig «kein Ausgang». Ohne PipeWire läuft der Kern ohne Ton weiter.
-    // Nach service angelegt, also vor ihm zerstört; danach läuft keine Hauptschleife mehr.
+    // Nach service angelegt, also vor ihm zerstört; danach läuft keine Hauptschleife mehr. Die
+    // Decoder des Tons beendet service.stopAudio() nach der Hauptschleife, solange beide leben.
     const bool installed = dss::buildEdition() == dss::Edition::Installed;
     dss::Mixer audioMixer;
-    dss::PwOutput audioOutput(&audioMixer, QStringLiteral("ton-video"),
-                              installed ? QStringLiteral("dss_core_ton_video")
-                                        : QStringLiteral("dss_core_entwicklung_ton_video"),
-                              QStringLiteral("DoNs Streaming Studio (%1): Ton der Videos")
-                                  .arg(dss::editionLabel()));
-    service.setAudioOutput(&audioOutput, &audioMixer);
-    if (!audioOutput.start(&error))
+    std::unique_ptr<dss::AudioOutput> audioOutput;
+    if (parser.isSet(substituteOutputOption)) {
+        audioOutput = std::make_unique<dss::NullOutput>(&audioMixer);
+        qInfo("Ton: Ersatzausgang ohne Gerät (--ersatzausgang)");
+    } else {
+        audioOutput = std::make_unique<dss::PwOutput>(&audioMixer, QStringLiteral("ton-video"),
+                                                      installed ? QStringLiteral("dss_core_ton_video")
+                                                                : QStringLiteral("dss_core_entwicklung_ton_video"),
+                                                      QStringLiteral("DoNs Streaming Studio (%1): Ton der Videos")
+                                                          .arg(dss::editionLabel()));
+    }
+    service.setAudioOutput(audioOutput.get(), &audioMixer);
+    if (!audioOutput->start(&error))
         qWarning("Ton: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
 #endif
 
@@ -340,6 +357,8 @@ int main(int argc, char *argv[])
 #endif
     const int rc = app.exec();
     dss::notifySystemd("STOPPING=1");
+    // P12b b4: Decoder des Tons beenden, solange Mischer und Ausgang noch leben
+    service.stopAudio();
     // Laufende Übernahmen abbrechen (P10-vor, Punkt 67): QSaveFile verwirft die vorläufigen
     // Dateien, unter dem endgültigen Namen entsteht nichts.
     QElapsedTimer stopping;

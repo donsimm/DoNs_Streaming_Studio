@@ -9,8 +9,11 @@
 #include "overlayserver.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "audiooutput.h"
 #include "mixer.h"
-#include "pwoutput.h"
+#endif
+#if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
+#include "videoaudio.h"
 #endif
 
 #include <QDir>
@@ -216,6 +219,11 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
     const QJsonObject listAfter = listMessage();
     if (listAfter != listBefore)
         broadcast(listAfter);
+#if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
+    // P12b b4: Stopp-Regeln (Ausgabe aus, Quelle verborgen, gelöscht oder geändert)
+    if (m_videoAudio && (changed > 0 || removed > 0))
+        m_videoAudio->overlaysChanged();
+#endif
     return {changed, removed};
 }
 
@@ -465,6 +473,7 @@ void CoreService::setOverlayServer(dss::OverlayServer *server)
     m_overlayServer = server;
     connect(server, &dss::OverlayServer::statusChanged, this,
             [this] { broadcast(serverStatusMessage()); });
+    connectVideoAudio();
     const dss::CoreSettings s = m_settings ? m_settings->settings() : dss::defaultCoreSettings();
     server->configure(s.port, s.homeAddress);
     broadcast(serverStatusMessage());
@@ -644,10 +653,14 @@ QJsonObject CoreService::obsStatusMessage() const
 }
 
 #if DSS_CORE_AUDIO
-void CoreService::setAudioOutput(dss::PwOutput *output, dss::Mixer *mixer)
+void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
 {
     m_audioOutput = output;
     m_mixer = mixer;
+#if DSS_CORE_OVERLAY_SERVER
+    m_videoAudio = new dss::VideoAudio(m_store, mixer, this);
+    connectVideoAudio();
+#endif
     // Beide Rückrufe laufen im Thread der Schleife von PipeWire (mit deren Sperre): nur weiterreichen.
     output->onChange = [this] {
         QMetaObject::invokeMethod(this, &CoreService::onAudioChanged, Qt::QueuedConnection);
@@ -658,6 +671,26 @@ void CoreService::setAudioOutput(dss::PwOutput *output, dss::Mixer *mixer)
     applyAudioSettings();
 }
 #endif
+
+void CoreService::connectVideoAudio()
+{
+#if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
+    // Erst wenn beide da sind (setOverlayServer und setAudioOutput, in beliebiger Reihenfolge)
+    if (!m_videoAudio || !m_overlayServer)
+        return;
+    connect(m_overlayServer, &dss::OverlayServer::clockReported, m_videoAudio, &dss::VideoAudio::clockReported);
+    connect(m_overlayServer, &dss::OverlayServer::pageOpened, m_videoAudio, &dss::VideoAudio::pageOpened);
+    connect(m_overlayServer, &dss::OverlayServer::pageClosed, m_videoAudio, &dss::VideoAudio::pageClosed);
+#endif
+}
+
+void CoreService::stopAudio()
+{
+#if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
+    if (m_videoAudio)
+        m_videoAudio->shutdown();
+#endif
+}
 
 void CoreService::applyAudioSettings()
 {
@@ -683,7 +716,7 @@ QJsonObject CoreService::audioOutputsMessage() const
         for (const dss::AudioDevice &d : devices)
             info.devices.append({d.name, d.description, d.isDefault});
         info.routes.insert(QString::fromLatin1(dss::kAudioPurposeVideo),
-                           {QString::fromLatin1(dss::PwOutput::stateName(m_audioOutput->state())),
+                           {QString::fromLatin1(dss::AudioOutput::stateName(m_audioOutput->state())),
                             m_audioOutput->stateDetail()});
     }
 #endif

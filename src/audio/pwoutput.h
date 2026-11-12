@@ -1,5 +1,7 @@
 #pragma once
 
+#include "audiooutput.h"
+
 #include <QList>
 #include <QString>
 
@@ -52,28 +54,10 @@ namespace dss {
 
 class Mixer;
 
-struct AudioDevice
-{
-    QString name;        // node.name (target.object, kern.ini)
-    QString description; // node.description, sonst node.name
-    bool isDefault = false;
-
-    bool operator==(const AudioDevice &) const = default;
-};
-
-class PwOutput
+// Zustände, AudioDevice, onChange und onLog: audiooutput.h (seit b4 gemeinsam mit dem Ersatzausgang)
+class PwOutput : public AudioOutput
 {
 public:
-    enum class State {
-        NoPipeWire, // keine Verbindung zu PipeWire
-        NoTarget,   // kein Ausgang gewählt
-        Missing,    // gewählter Ausgang fehlt (kein Ton, kein Ausweichen)
-        Connecting, // Strom angelegt, Verbindung zum Ausgang noch nicht bestätigt (Stille)
-        Playing,    // Strom läuft und hängt nur am gewählten Ausgang
-        Error,      // Fehler des Stroms oder fremde Verbindung (Stille, Strom entfernt)
-    };
-    static const char *stateName(State state); // "no_pipewire", "no_target", … (Protokoll, Schnittstelle)
-
     // Gewünschte Verzögerung node.latency: 40 ms (Frage 2 des Nutzers, 2026-11-11)
     static constexpr int kLatencyFrames = 1920;
 
@@ -98,30 +82,25 @@ public:
     // purpose: Zweck in Protokoll und Namen des Stroms (z. B. "ton-video"); nodeName: node.name des
     // Stroms; mixer: liefert die Proben (muss länger leben als dieses Objekt).
     PwOutput(Mixer *mixer, const QString &purpose, const QString &nodeName, const QString &description);
-    ~PwOutput();
+    ~PwOutput() override;
     PwOutput(const PwOutput &) = delete;
     PwOutput &operator=(const PwOutput &) = delete;
 
     // Startet den Thread, verbindet mit PipeWire und wartet die erste Runde der Registry ab
     // (höchstens 5 s). false: kein PipeWire (Zustand NoPipeWire), Grund in error.
-    bool start(QString *error);
+    bool start(QString *error) override;
 
     // Gewählter Ausgang (node.name); leer = kein Ausgang.
-    void setTarget(const QString &nodeName);
-    QString target() const;
+    void setTarget(const QString &nodeName) override;
+    QString target() const override;
 
-    QList<AudioDevice> devices() const;
-    State state() const;
+    QList<AudioDevice> devices() const override;
+    State state() const override;
     // Kurzer Grund zum Zustand (Fehlertext von PipeWire, fremder Knoten); sonst leer.
-    QString stateDetail() const;
+    QString stateDetail() const override;
     Stats stats() const;
     // node.id des Stroms, SPA_ID_INVALID (UINT32_MAX) ohne Strom
     uint32_t streamNodeId() const;
-
-    // Liste der Ausgänge oder Zustand haben sich geändert (Thread der Schleife).
-    std::function<void()> onChange;
-    // Zeile fürs Protokoll (Thread der Schleife).
-    std::function<void(const QString &)> onLog;
 
 private:
     struct Node

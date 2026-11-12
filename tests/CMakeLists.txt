@@ -232,6 +232,15 @@ if(TARGET dss_pwoutput)
   dss_add_test(tst_tonausgang)
   target_link_libraries(tst_tonausgang PRIVATE dss_pwoutput PkgConfig::DSS_PIPEWIRE)
 endif()
+# P12b b4: Kern als eigener Prozess mit Ersatzausgang ohne Gerät (--ersatzausgang): Meldungen der
+# Seite an den Mischer, Stopp-Regeln, Nachführen, Wiederholen. Braucht Ton und Overlay-Server.
+if(DSS_CORE_AUDIO AND DSS_CORE_OVERLAY_SERVER)
+  dss_add_test(tst_kernton)
+  target_link_libraries(tst_kernton PRIVATE dss_audio Qt6::Network)
+  target_compile_definitions(tst_kernton PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+  add_dependencies(tst_kernton dss-core)
+endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
 # variable Schrift); ohne X11 übersprungen (77). Nur mit dem Zeichner (DSS_APP_RENDERER).

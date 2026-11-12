@@ -35,3 +35,7 @@ if(DSS_CORE_OVERLAY_SERVER)
 else()
   target_compile_definitions(dss-core PRIVATE DSS_CORE_OVERLAY_SERVER=0)
 endif()
+# P12b b4: Meldungen der Seiten (…/clock) an den Mischer; braucht Ton und Overlay-Server
+if(DSS_CORE_AUDIO AND DSS_CORE_OVERLAY_SERVER)
+  target_sources(dss-core PRIVATE videoaudio.h videoaudio.cpp)
+endif()

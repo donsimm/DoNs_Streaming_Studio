@@ -19,9 +19,10 @@ class QLocalSocket;
 class QTimer;
 
 namespace dss {
+class AudioOutput;
 class Mixer;
 class OverlayServer;
-class PwOutput;
+class VideoAudio;
 }
 namespace dss::obs {
 class ObsConnection;
@@ -74,9 +75,13 @@ public:
     // Ton der Videos (P12b b3, Schalter DSS_CORE_AUDIO): Ausgang und Versatz aus den Einstellungen
     // ([ton-video]) an output und mixer, Liste der Ausgänge und Zustand als audio_outputs an alle.
     // Vor output->start() aufrufen; beide müssen länger leben als die Hauptschleife. Ohne Aufruf:
-    // audio_outputs mit enabled false.
-    void setAudioOutput(dss::PwOutput *output, dss::Mixer *mixer);
+    // audio_outputs mit enabled false. P12b b4: Mit Overlay-Server gehen die Meldungen der Seiten
+    // (…/clock) über VideoAudio an den Mischer; vor dem Ende von mixer stopAudio() aufrufen.
+    void setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer);
 #endif
+    // P12b b4: Ton der Videos beenden (Decoder, Stellen im Mischer), solange Mischer und Ausgang
+    // noch leben; nach der Hauptschleife. Ohne Ton nichts.
+    void stopAudio();
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -189,8 +194,11 @@ private:
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     dss::obs::ObsSources *m_obsSources = nullptr;
-    dss::PwOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
+    dss::AudioOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
     dss::Mixer *m_mixer = nullptr;
+    // P12b b4: Meldungen der Seiten an den Mischer; nullptr ohne Ton oder ohne Overlay-Server
+    dss::VideoAudio *m_videoAudio = nullptr;
+    void connectVideoAudio();
     QJsonObject m_lastAudioOutputs;
     QLocalServer *m_server = nullptr;
     QHash<QLocalSocket *, Client> m_clients;

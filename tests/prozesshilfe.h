@@ -79,9 +79,10 @@ inline QString testConfigHome()
 // Startet dss-core mit eigenem Datenordner, eigener Verbindung und eigenem Ordner der
 // Einstellungen; Protokoll auf stderr wird gesammelt (readAllStandardError). Der Kern bekommt
 // den Port des Ordners auch als --standardport (Punkt 83): Eine fehlende, ungültige oder
-// zurückgesetzte kern.ini bekommt so nie 8081.
+// zurückgesetzte kern.ini bekommt so nie 8081. extraArgs: weitere Optionen (P12b b4: --ersatzausgang).
 inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString &socketPath,
-                                           const QString &configHome = testConfigHome())
+                                           const QString &configHome = testConfigHome(),
+                                           const QStringList &extraArgs = {})
 {
     auto p = std::make_unique<QProcess>();
     p->setProcessChannelMode(QProcess::SeparateChannels);
@@ -91,8 +92,9 @@ inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString
     if (testPort(configHome) == 0)
         testPorts().insert(configHome, nextTestPort());
     p->start(QStringLiteral(DSS_CORE_BIN),
-             {QStringLiteral("--datenordner"), dataDir, QStringLiteral("--verbindung"), socketPath,
-              QStringLiteral("--standardport"), QString::number(testPort(configHome))});
+             QStringList{QStringLiteral("--datenordner"), dataDir, QStringLiteral("--verbindung"), socketPath,
+                         QStringLiteral("--standardport"), QString::number(testPort(configHome))}
+                 + extraArgs);
     return p;
 }
 
