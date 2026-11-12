@@ -17,6 +17,9 @@
 #include <QTcpSocket>
 #include <QTimer>
 
+#include <algorithm>
+#include <chrono>
+
 namespace dss {
 
 namespace {
@@ -28,6 +31,14 @@ constexpr qint64 kLowWater = 512 * 1024;
 constexpr int kMaxReportsPerMinute = 20;
 constexpr qsizetype kMaxReportChars = 300;
 constexpr qint64 kInvalidLogIntervalMs = 60 * 1000;
+constexpr qint64 kClockRejectLogIntervalMs = 10 * 1000;
+
+// steady_clock (CLOCK_MONOTONIC), dieselbe Uhr wie der Mischer (src/audio/mixer.h)
+qint64 steadyNowNs()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 // Leere, durchsichtige Seite für unbekannte Adressen (Teil A 5). Neu laden alle 10 s, damit das
 // Fenster den Hinweis zeigt, solange die Browserquelle die alte Adresse benutzt.
@@ -58,6 +69,7 @@ struct OverlayServer::Connection
 {
     QByteArray buffer;
     QString peer;
+    qint64 arrivalNs = 0; // letzte Daten eingetroffen (steady_clock), für …/clock
     bool keepAlive = true;
     bool closing = false;
     // Datei wird geschickt
@@ -70,6 +82,7 @@ struct OverlayServer::Connection
     QUuid overlayId;
     QString address;
     QString token;
+    QString page; // Kennung der Seite aus …/events/<page> (P12b b4), sonst leer
     QByteArray lastData;
 };
 
@@ -115,7 +128,16 @@ void OverlayServer::configure(int port, const QString &homeAddress)
 {
     if (port == m_port && homeAddress == m_homeAddress && !m_servers.isEmpty())
         return;
+    // Seiten mit Kennung verlieren ihre Ereignisse (P12b b4: Stopp des Tons). Nicht in stop(), das
+    // auch der Destruktor ruft.
+    QList<std::pair<QUuid, QString>> closed;
+    for (const auto &c : std::as_const(m_connections)) {
+        if (!c->page.isEmpty())
+            closed.append({c->overlayId, c->page});
+    }
     stop();
+    for (const auto &[overlayId, page] : std::as_const(closed))
+        emit pageClosed(overlayId, page);
     m_port = port;
     m_homeAddress = homeAddress;
     m_listenProblems.clear();
@@ -221,6 +243,9 @@ void OverlayServer::onDisconnected(QTcpSocket *socket)
               qPrintable(c->peer));
         updateStatus();
     }
+    // Auch nach «gone» (events dann schon false)
+    if (c && !c->page.isEmpty())
+        emit pageClosed(c->overlayId, c->page);
 }
 
 void OverlayServer::onReadyRead(QTcpSocket *socket)
@@ -228,6 +253,7 @@ void OverlayServer::onReadyRead(QTcpSocket *socket)
     const std::shared_ptr<Connection> c = m_connections.value(socket);
     if (!c)
         return;
+    c->arrivalNs = steadyNowNs();
     c->buffer.append(socket->readAll());
     // Eine Antwort nach der anderen: Während eine Datei läuft oder Ereignisse fliessen, warten
     // weitere Anfragen im Puffer.
@@ -317,6 +343,10 @@ void OverlayServer::handleOverlay(QTcpSocket *socket, Connection &c, const HttpR
                                   const QUuid &overlayId, const QString &rest)
 {
     if (request.method == "POST") {
+        if (rest == QLatin1String("clock")) {
+            handleClock(socket, c, request, overlayId);
+            return;
+        }
         if (rest != QLatin1String("report")) {
             respond(socket, c, request, 405, "text/plain; charset=utf-8", "", kNoStore);
             return;
@@ -336,17 +366,27 @@ void OverlayServer::handleOverlay(QTcpSocket *socket, Connection &c, const HttpR
         respond(socket, c, request, 204, "", "", kNoStore);
         return;
     }
+    if (rest == QLatin1String("clock")) {
+        respond(socket, c, request, 405, "text/plain; charset=utf-8", "", kNoStore);
+        return;
+    }
     if (rest.isEmpty() || rest == QLatin1String("overlay.js")) {
         const QString name = rest.isEmpty() ? QStringLiteral("overlay.html") : rest;
         sendFile(socket, c, request, m_options.webDir + QLatin1Char('/') + name, {}, false);
         return;
     }
-    if (rest == QLatin1String("events")) {
+    if (rest == QLatin1String("events") || rest.startsWith(QLatin1String("events/"))) {
+        // P12b b4: …/events/<page> mit Kennung der Seite (clockreport.h)
+        const QString page = rest.mid(7);
+        if (!page.isEmpty() && !validClockPage(page)) {
+            respond(socket, c, request, 404, "text/plain; charset=utf-8", "", kNoStore);
+            return;
+        }
         if (request.method != "GET") {
             respond(socket, c, request, 405, "text/plain; charset=utf-8", "", kNoStore);
             return;
         }
-        startEvents(socket, c, overlayId);
+        startEvents(socket, c, overlayId, page);
         return;
     }
     if (rest.startsWith(QLatin1String("media/"))) {
@@ -461,13 +501,60 @@ void OverlayServer::continueFile(QTcpSocket *socket, Connection &c)
     }
 }
 
-void OverlayServer::startEvents(QTcpSocket *socket, Connection &c, const QUuid &overlayId)
+void OverlayServer::handleClock(QTcpSocket *socket, Connection &c, const HttpRequest &request,
+                                const QUuid &overlayId)
+{
+    const Overlay *o = m_store->overlay(overlayId);
+    if (request.body.size() > kMaxClockBytes) {
+        noteClockRejected(o->address, QStringLiteral("Meldung zu gross"));
+        respond(socket, c, request, 413, "text/plain; charset=utf-8", "", kNoStore);
+        return;
+    }
+    ClockReport report;
+    QString error;
+    bool valid = parseClockReport(request.body, &report, &error);
+    if (valid && !report.source.isNull()) {
+        // Nur Videoquellen dieses Overlays
+        const auto source = std::find_if(o->sources.cbegin(), o->sources.cend(),
+                                         [&report](const Source &s) { return s.id == report.source; });
+        valid = source != o->sources.cend() && source->kind == SourceKind::Video;
+        if (!valid)
+            error = QStringLiteral("keine Videoquelle dieses Overlays");
+    }
+    if (!valid) {
+        noteClockRejected(o->address, error);
+        respond(socket, c, request, 400, "text/plain; charset=utf-8", "", kNoStore);
+        return;
+    }
+    if (!m_clockLimiter.allow(report.page, c.arrivalNs)) {
+        noteClockRejected(o->address, QStringLiteral("zu viele Meldungen der Seite %1").arg(report.page));
+        respond(socket, c, request, 429, "text/plain; charset=utf-8", "", kNoStore);
+        return;
+    }
+    report.arrivalNs = c.arrivalNs;
+    emit clockReported(overlayId, report);
+    respond(socket, c, request, 204, "", "", kNoStore);
+}
+
+void OverlayServer::noteClockRejected(const QString &address, const QString &reason)
+{
+    ++m_clockRejected;
+    if (m_clockRejectLog.isValid() && m_clockRejectLog.elapsed() < kClockRejectLogIntervalMs)
+        return;
+    qWarning("Browserquelle %s: Meldung der Uhr abgewiesen: %s (%d seit der letzten Zeile)",
+             qPrintable(browserSourceLogPath(address)), qPrintable(reason), m_clockRejected);
+    m_clockRejected = 0;
+    m_clockRejectLog.start();
+}
+
+void OverlayServer::startEvents(QTcpSocket *socket, Connection &c, const QUuid &overlayId, const QString &page)
 {
     const Overlay *o = m_store->overlay(overlayId);
     c.events = true;
     c.overlayId = overlayId;
     c.address = o->address;
     c.token = m_store->token(overlayId);
+    c.page = page;
     socket->write(responseHead(200, "text/event-stream; charset=utf-8", -1, kNoStore));
     // Wiederverbinden nach 1 s (EventSource, «retry»)
     socket->write("retry: 1000\n\n");
@@ -475,6 +562,8 @@ void OverlayServer::startEvents(QTcpSocket *socket, Connection &c, const QUuid &
     qInfo("Browserquelle verbunden: %s von %s", qPrintable(browserSourceLogPath(c.address)),
           qPrintable(c.peer));
     updateStatus();
+    if (!page.isEmpty())
+        emit pageOpened(overlayId, page);
 }
 
 void OverlayServer::sendGone(QTcpSocket *socket)

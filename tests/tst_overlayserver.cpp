@@ -30,6 +30,8 @@
 #include <QTest>
 #include <QtEndian>
 
+#include <chrono>
+
 #include <unistd.h>
 
 using namespace dss;
@@ -139,6 +141,12 @@ private:
     QByteArray m_buffer;
 };
 
+qint64 steadyNs()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 // Freier Port im erlaubten Bereich.
 quint16 freePort()
 {
@@ -171,6 +179,26 @@ private:
         return browserSourcePath(o->address, m_store->token(m_id)).toUtf8();
     }
     QString token() const { return m_store->token(m_id); }
+
+    // P12b b4: Videoquelle des Overlays und eine gültige Meldung der Uhr (clockreport.h)
+    Source videoSource() const { return m_store->overlay(m_id)->sources.at(2); }
+    QJsonObject clockMessage(const char *page, qint64 seq, const char *event = "frame") const
+    {
+        const Source video = videoSource();
+        return {{QStringLiteral("v"), 1},
+                {QStringLiteral("page"), QLatin1String(page)},
+                {QStringLiteral("seq"), seq},
+                {QStringLiteral("event"), QLatin1String(event)},
+                {QStringLiteral("run"), 2},
+                {QStringLiteral("source"), video.id.toString(QUuid::WithoutBraces)},
+                {QStringLiteral("file"), video.file},
+                {QStringLiteral("loop"), 1},
+                {QStringLiteral("media_s"), 1.25},
+                {QStringLiteral("display_ms"), 81234.5},
+                {QStringLiteral("now_ms"), 81236.25},
+                {QStringLiteral("duration_s"), 3.0}};
+    }
+    static QByteArray clockBody(const QJsonObject &o) { return QJsonDocument(o).toJson(QJsonDocument::Compact); }
     bool logHasToken() const
     {
         for (const QString &line : g_log) {
@@ -558,6 +586,194 @@ private slots:
         QCOMPARE(request(m_port, "POST", base() + "events").status, 405);
         QCOMPARE(request(m_port, "PUT", base()).status, 405);
         QVERIFY(!logHasToken());
+    }
+
+    // P12b b4: Meldungen der Uhr (…/clock), Format clockreport.h
+    void clockFromPage()
+    {
+        QList<std::pair<QUuid, ClockReport>> reports;
+        const QMetaObject::Connection connection = connect(
+            m_server.get(), &OverlayServer::clockReported, this,
+            [&reports](const QUuid &id, const ClockReport &r) { reports.append({id, r}); });
+        const Source video = videoSource();
+        const qint64 before = steadyNs();
+        Response r = request(m_port, "POST", base() + "clock", {}, clockBody(clockMessage("seitea01", 7)));
+        const qint64 after = steadyNs();
+        QCOMPARE(r.status, 204);
+        QCOMPARE(reports.size(), 1);
+        QCOMPARE(reports.at(0).first, m_id);
+        const ClockReport &c = reports.at(0).second;
+        QCOMPARE(c.page, QStringLiteral("seitea01"));
+        QCOMPARE(c.seq, 7);
+        QCOMPARE(c.event, ClockReport::Event::Frame);
+        QCOMPARE(c.run, 2);
+        QCOMPARE(c.source, video.id);
+        QCOMPARE(c.file, video.file);
+        QCOMPARE(c.loop, 1);
+        QCOMPARE(c.mediaNs, 1'250'000'000);
+        QCOMPARE(c.displayMs, 81234.5);
+        QCOMPARE(c.nowMs, 81236.25);
+        QCOMPARE(c.durationNs, 3'000'000'000);
+        QVERIFY2(c.arrivalNs >= before && c.arrivalNs <= after, "Eintreffen in steady_clock");
+
+        // Alle Ereignisse; stop ohne Quelle, end ohne Lage, duration_s darf fehlen
+        for (const char *event : {"start", "loop", "end", "stop"}) {
+            QJsonObject m = clockMessage("seitea01", 8, event);
+            m.remove(QStringLiteral("duration_s"));
+            if (QByteArray(event) == "stop")
+                m.remove(QStringLiteral("source"));
+            if (QByteArray(event) == "end" || QByteArray(event) == "stop") {
+                m.remove(QStringLiteral("file"));
+                m.remove(QStringLiteral("loop"));
+                m.remove(QStringLiteral("media_s"));
+                m.remove(QStringLiteral("display_ms"));
+            }
+            QCOMPARE(request(m_port, "POST", base() + "clock", {}, clockBody(m)).status, 204);
+            QCOMPARE(QByteArray(clockEventName(reports.last().second.event)), QByteArray(event));
+            QCOMPARE(reports.last().second.durationNs, 0);
+        }
+        QVERIFY(reports.last().second.source.isNull());
+        QCOMPARE(reports.size(), 5);
+
+        // Nur mit gültigem Token, nur POST
+        const QByteArray wrong = browserSourcePath(m_store->overlay(m_id)->address, QString(43, QLatin1Char('x'))).toUtf8();
+        QCOMPARE(request(m_port, "POST", wrong + "clock", {}, clockBody(clockMessage("seitea01", 9))).status, 404);
+        QCOMPARE(request(m_port, "GET", base() + "clock").status, 405);
+        QCOMPARE(reports.size(), 5);
+        disconnect(connection);
+        QVERIFY(!logHasToken());
+    }
+
+    void clockRejectsWrongData_data()
+    {
+        QTest::addColumn<QByteArray>("body");
+        QTest::addColumn<int>("status");
+        const auto without = [this](const char *key) {
+            QJsonObject m = clockMessage("seiteb01", 1);
+            m.remove(QLatin1String(key));
+            return clockBody(m);
+        };
+        const auto with = [this](const char *key, const QJsonValue &value) {
+            QJsonObject m = clockMessage("seiteb01", 1);
+            m.insert(QLatin1String(key), value);
+            return clockBody(m);
+        };
+        QTest::newRow("kein JSON") << QByteArray("kaputt") << 400;
+        QTest::newRow("Liste") << QByteArray("[]") << 400;
+        QTest::newRow("ohne Version") << without("v") << 400;
+        QTest::newRow("Version 2") << with("v", 2) << 400;
+        QTest::newRow("Seite zu kurz") << with("page", QStringLiteral("abc")) << 400;
+        QTest::newRow("Seite gross") << with("page", QStringLiteral("SEITEB01")) << 400;
+        QTest::newRow("Ereignis unbekannt") << with("event", QStringLiteral("pause")) << 400;
+        QTest::newRow("seq negativ") << with("seq", -1) << 400;
+        QTest::newRow("seq gebrochen") << with("seq", 1.5) << 400;
+        QTest::newRow("seq Text") << with("seq", QStringLiteral("1")) << 400;
+        QTest::newRow("ohne run") << without("run") << 400;
+        QTest::newRow("ohne now_ms") << without("now_ms") << 400;
+        QTest::newRow("now_ms negativ") << with("now_ms", -5.0) << 400;
+        QTest::newRow("ohne Quelle") << without("source") << 400;
+        QTest::newRow("Quelle keine Kennung") << with("source", QStringLiteral("x")) << 400;
+        QTest::newRow("Quelle unbekannt") << with("source", QUuid::createUuid().toString(QUuid::WithoutBraces)) << 400;
+        QTest::newRow("Quelle Bild") << with("source", m_store->overlay(m_id)->sources.at(0).id.toString(QUuid::WithoutBraces)) << 400;
+        QTest::newRow("ohne Datei") << without("file") << 400;
+        QTest::newRow("Datei ausserhalb") << with("file", QStringLiteral("../kern.ini")) << 400;
+        QTest::newRow("ohne loop") << without("loop") << 400;
+        QTest::newRow("ohne media_s") << without("media_s") << 400;
+        QTest::newRow("media_s negativ") << with("media_s", -0.1) << 400;
+        QTest::newRow("ohne display_ms") << without("display_ms") << 400;
+        QTest::newRow("duration_s negativ") << with("duration_s", -1.0) << 400;
+        QTest::newRow("zu gross") << with("pad", QString(kMaxClockBytes, QLatin1Char('a'))) << 413;
+    }
+
+    void clockRejectsWrongData()
+    {
+        QFETCH(QByteArray, body);
+        QFETCH(int, status);
+        int reports = 0;
+        const QMetaObject::Connection connection =
+            connect(m_server.get(), &OverlayServer::clockReported, this, [&reports] { ++reports; });
+        QCOMPARE(request(m_port, "POST", base() + "clock", {}, body).status, status);
+        disconnect(connection);
+        QCOMPARE(reports, 0);
+        QVERIFY(!logHasToken());
+    }
+
+    // Grenze je Seite: 60 Meldungen in einem Paket (gleiches Eintreffen), davon 40 angenommen;
+    // eine andere Seite ist davon nicht betroffen.
+    void clockLimitPerPage()
+    {
+        int reports = 0;
+        const QMetaObject::Connection connection =
+            connect(m_server.get(), &OverlayServer::clockReported, this, [&reports] { ++reports; });
+        QTcpSocket s;
+        s.connectToHost(QStringLiteral("127.0.0.1"), m_port);
+        QVERIFY(QTest::qWaitFor([&] { return s.state() == QAbstractSocket::ConnectedState; }, 3000));
+        QByteArray all;
+        constexpr int kCount = 60;
+        for (int i = 0; i < kCount; ++i) {
+            const QByteArray body = clockBody(clockMessage("seitec01", i + 1));
+            all += "POST " + base() + "clock HTTP/1.1\r\nHost: test\r\n"
+                   + (i == kCount - 1 ? "Connection: close\r\n" : "") + "Content-Length: "
+                   + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+        }
+        s.write(all);
+        QByteArray answers;
+        QVERIFY(QTest::qWaitFor([&] {
+            answers += s.readAll();
+            return s.state() == QAbstractSocket::UnconnectedState;
+        }, 5000));
+        answers += s.readAll();
+        const int accepted = int(answers.count("HTTP/1.1 204"));
+        const int limited = int(answers.count("HTTP/1.1 429"));
+        QCOMPARE(accepted + limited, kCount);
+        // Eimer mit 40 Marken; kommt das Paket in Teilen, höchstens eine Marke dazu
+        QVERIFY2(accepted >= ClockLimiter::kBurst && accepted <= ClockLimiter::kBurst + 1, qPrintable(QString::number(accepted)));
+        QCOMPARE(reports, accepted);
+        QCOMPARE(request(m_port, "POST", base() + "clock", {}, clockBody(clockMessage("seitec02", 1))).status, 204);
+        QCOMPARE(reports, accepted + 1);
+        disconnect(connection);
+
+        // Eimer füllt sich wieder: 20 Marken je Sekunde
+        ClockLimiter limiter;
+        for (int i = 0; i < ClockLimiter::kBurst; ++i)
+            QVERIFY(limiter.allow(QStringLiteral("seited01"), 1000));
+        QVERIFY(!limiter.allow(QStringLiteral("seited01"), 1000));
+        QVERIFY(limiter.allow(QStringLiteral("seited01"), 1000 + 50'000'000));
+        QVERIFY(!limiter.allow(QStringLiteral("seited01"), 1000 + 50'000'000));
+        // Höchstens kMaxPages Seiten; ruhende fallen nach kIdleNs heraus
+        for (int i = 1; i < ClockLimiter::kMaxPages; ++i)
+            QVERIFY(limiter.allow(QStringLiteral("seite%1").arg(i, 3, 10, QLatin1Char('0')), 2000));
+        QVERIFY(!limiter.allow(QStringLiteral("seitevoll"), 3000));
+        QVERIFY(limiter.allow(QStringLiteral("seitevoll"), 3000 + ClockLimiter::kIdleNs + 1));
+    }
+
+    // Ereignisse mit Kennung der Seite: pageOpened beim Verbinden, pageClosed beim Trennen.
+    void eventsWithPage()
+    {
+        QList<std::pair<QUuid, QString>> opened;
+        QList<std::pair<QUuid, QString>> closed;
+        const auto c1 = connect(m_server.get(), &OverlayServer::pageOpened, this,
+                                [&opened](const QUuid &id, const QString &page) { opened.append({id, page}); });
+        const auto c2 = connect(m_server.get(), &OverlayServer::pageClosed, this,
+                                [&closed](const QUuid &id, const QString &page) { closed.append({id, page}); });
+        {
+            EventClient events(m_port, base() + "events/seitee01");
+            QCOMPARE(events.next().first, QByteArray("overlay"));
+            QCOMPARE(opened, (QList<std::pair<QUuid, QString>>{{m_id, QStringLiteral("seitee01")}}));
+            QVERIFY(closed.isEmpty());
+        }
+        QTRY_COMPARE_WITH_TIMEOUT(closed, (QList<std::pair<QUuid, QString>>{{m_id, QStringLiteral("seitee01")}}), 2000);
+        // Ohne Kennung kein Signal; ungültige Kennung: 404
+        {
+            EventClient events(m_port, base() + "events");
+            QCOMPARE(events.next().first, QByteArray("overlay"));
+        }
+        QCOMPARE(request(m_port, "GET", base() + "events/SEITE").status, 404);
+        QTest::qWait(200);
+        QCOMPARE(opened.size(), 1);
+        QCOMPARE(closed.size(), 1);
+        disconnect(c1);
+        disconnect(c2);
     }
 
     // Nur IPv4: ss zeigt 127.0.0.1 und 127.0.0.2, kein [::] und kein *.

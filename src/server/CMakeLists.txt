@@ -5,6 +5,7 @@ add_library(dss_server STATIC
   mediapatch.h mediapatch.cpp
   portowner.h portowner.cpp
   overlayserver.h overlayserver.cpp
+  clockreport.h clockreport.cpp
 )
 target_include_directories(dss_server PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_server PUBLIC dss_common Qt6::Core Qt6::Network PRIVATE dss_warnings)

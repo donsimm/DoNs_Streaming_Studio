@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clockreport.h"
 #include "mediapatch.h"
 
 #include <QDateTime>
@@ -42,6 +43,8 @@ struct HttpRequest;
 // …/media/<sha256>.<endung> (nur Dateien dieses Overlays), …/report (Meldungen der Seite).
 // Unbekannte Adresse oder falscher Token: leere, durchsichtige Seite (Ereignisse: «gone»),
 // Protokoll ohne Token. docs/08-kern-schnittstelle.md, «Overlay-Server».
+// P12b b4: …/clock (POST, JSON, Lage der Videos für den Ton, Format in clockreport.h, Grenze je
+// Seite) und …/events/<page> (Ereignisse mit Kennung der Seite: pageOpened, pageClosed).
 // Server-Sent Events: https://html.spec.whatwg.org/multipage/server-sent-events.html
 class OverlayServer : public QObject
 {
@@ -96,6 +99,12 @@ public:
 
 signals:
     void statusChanged();
+    // P12b b4: Meldung der Seite über …/clock, geprüft und innerhalb der Grenze; arrivalNs gesetzt.
+    void clockReported(const QUuid &overlayId, const dss::ClockReport &report);
+    // Ereignisse mit Kennung der Seite (…/events/<page>) beginnen bzw. enden (Verbindung zu,
+    // «gone», Server neu gestartet). Ohne Kennung (…/events) kein Signal.
+    void pageOpened(const QUuid &overlayId, const QString &page);
+    void pageClosed(const QUuid &overlayId, const QString &page);
 
 private:
     struct Connection;
@@ -119,7 +128,9 @@ private:
                   const BytePatches &patches, bool immutable);
     void continueFile(QTcpSocket *socket, Connection &c);
     void finishResponse(QTcpSocket *socket, Connection &c);
-    void startEvents(QTcpSocket *socket, Connection &c, const QUuid &overlayId);
+    void handleClock(QTcpSocket *socket, Connection &c, const HttpRequest &request, const QUuid &overlayId);
+    void noteClockRejected(const QString &address, const QString &reason);
+    void startEvents(QTcpSocket *socket, Connection &c, const QUuid &overlayId, const QString &page);
     void sendGone(QTcpSocket *socket);
     void sendOverlayEvent(QTcpSocket *socket, Connection &c);
     void checkStreams(const QUuid &overlayId);
@@ -148,6 +159,10 @@ private:
     QHash<QString, QElapsedTimer> m_invalidLogged;
     QElapsedTimer m_reportWindow;
     int m_reportsInWindow = 0;
+    // P12b b4: Grenze je Seite für …/clock; abgewiesene Meldungen höchstens alle 10 s ins Protokoll
+    ClockLimiter m_clockLimiter;
+    QElapsedTimer m_clockRejectLog;
+    int m_clockRejected = 0;
     QHash<QString, int> m_orientations; // nach Verweis media/…
     QHash<QString, BytePatches> m_patches;
 };

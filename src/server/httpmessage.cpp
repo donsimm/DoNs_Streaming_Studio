@@ -93,7 +93,9 @@ QByteArray statusLine(int status)
     case 400: return "400 Bad Request";
     case 404: return "404 Not Found";
     case 405: return "405 Method Not Allowed";
+    case 413: return "413 Content Too Large";
     case 416: return "416 Range Not Satisfiable";
+    case 429: return "429 Too Many Requests";
     default: return QByteArray::number(status) + " Fehler";
     }
 }
