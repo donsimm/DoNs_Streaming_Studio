@@ -1,0 +1,75 @@
+Z3 neu ausgewertet: 2026-11-11-2300-kurz (prototypes/ton/z3_neu_auswerten.py)
+Rate 48000/s, Grenze E1 10 ms je Wechsel
+
+== E1 neu: Z3c (pw-messen), Median von 5 Klicks vor gegen 5 nach jeder Marke
+   (a) Lage = versatz_proben in ms; (b) Rest + Quantum = rest_ms + size/Rate; alt = rest_ms
+
+Marke «clock.force-quantum 2048» bei 14.500 s; Klicks vor 23–27, nach 28–32; size vor [1024], nach [2048]
+  ACHTUNG: Klick [28] liegt ≤ 1 ms an der Marke (Wanduhr in der CSV ganzzahlig)
+  (a) Lage:             521.333 →   521.333 ms, Änderung   +0.000 ms (25024 → 25024 Proben) → erfüllt
+  (b) Rest + Quantum:   500.112 →   500.125 ms, Änderung   +0.012 ms → erfüllt
+  alt Rest:             478.779 →   457.458 ms, Änderung  -21.321 ms → nicht erfüllt
+  Gegenprobe alt (Zusammenfassung): 478.779 → 457.458 ms, Änderung -21.321 ms → gleich
+
+Marke «clock.force-quantum 256» bei 24.690 s; Klicks vor 44–48, nach 49–53; size vor [2048], nach [256]
+  (a) Lage:             521.333 →   521.333 ms, Änderung   +0.000 ms (25024 → 25024 Proben) → erfüllt
+  (b) Rest + Quantum:   500.140 →   500.102 ms, Änderung   -0.037 ms → erfüllt
+  alt Rest:             457.473 →   494.769 ms, Änderung  +37.296 ms → nicht erfüllt
+  Gegenprobe alt (Zusammenfassung): 457.473 → 494.769 ms, Änderung +37.296 ms → gleich
+
+Marke «clock.force-quantum 0» bei 34.647 s; Klicks vor 64–68, nach 69–73; size vor [256], nach [1024]
+  (a) Lage:             521.333 →   521.333 ms, Änderung   +0.000 ms (25024 → 25024 Proben) → erfüllt
+  (b) Rest + Quantum:   500.102 →   500.121 ms, Änderung   +0.019 ms → erfüllt
+  alt Rest:             494.769 →   478.788 ms, Änderung  -15.981 ms → nicht erfüllt
+  Gegenprobe alt (Zusammenfassung): 494.769 → 478.788 ms, Änderung -15.981 ms → gleich
+
+E1 (a) Lage in Proben:   erfüllt (grösste Änderung 0.000 ms)
+E1 (b) Rest + Quantum:   erfüllt (grösste Änderung 0.037 ms)
+E1 alt (Rest):           NICHT erfüllt (grösste Änderung 37.296 ms)
+Gegenprobe alte Rechnung gegen Zusammenfassung: bestanden
+Versatz aller gefundenen Klicks (n=89): [25024] Proben
+
+== Fehlende Klicks (Z3c)
+Lage in der Aufnahme = Lage Ausgabe + 25024 Proben (Median Versatz); Aufnahme endet bei Lage 2211328
+Wechsel der Zyklusgrösse (Aufnahme): 14.501 s 1024 → 2048 (Δticks 1212, Lage 695296), 24.694 s 2048 → 256 (Δticks 1800, Lage 1184768), 34.645 s 256 → 1024 (Δticks 256, Lage 1662464)
+Aufnahme «streaming → paused» bei: 14.498 s, 24.688 s, 46.078 s
+Klick 89: geschrieben bei 45.013 s, Lage Ausgabe 2160000, index 896 im Abruf, size 1024, erwartet hörbar 45.032 s
+  Ausgabe: Abruf bei 45.013 s, Lage 2159104+1024, leer 0, kurz 0
+  Aufnahme: Lage 2185024 im Abruf bei 45.525 s, Lage 2184704+1024 (size 1024), 320 Proben nach Beginn des Abrufs; Lage ±3 Abrufe zusammenhängend, leere Abrufe 0
+  fremde Einsätze ± 12000 Proben um diese Lage: 0 (fremde Einsätze im ganzen Lauf: 1, Lagen [25024])
+  nächster Wechsel: 256 → 1024 bei 34.645 s (Δticks 256); Lage +522560 Proben = +10886.667 ms zum ersten Abruf danach
+  Ankunft in der Aufnahme bei gleichem Rest wie die übrigen Klicks mit size 1024: 45.511 s; Aufnahme «paused» bei 46.078 s (-567.2 ms)
+
+Klick, dessen Lage in der Aufnahme am nächsten am ersten Abruf nach jedem Wechsel liegt:
+  1024 → 2048 bei 14.501 s (Δticks 1212): Klick 27, Lage +1728 Proben = +36.000 ms, gefunden
+  2048 → 256 bei 24.694 s (Δticks 1800): Klick 47, Lage -7744 Proben = -161.333 ms, gefunden
+  256 → 1024 bei 34.645 s (Δticks 256): Klick 67, Lage -5440 Proben = -113.333 ms, gefunden
+
+== Z3c-Q zum Vergleich (ton-messen, Q): Lage in Proben und alte Grösse «ohne Pufferinhalt»
+Marke «clock.force-quantum 2048»: Klicks vor 22–26, nach 27–31
+  Lage: 533.333 → 576.000 ms, Änderung +42.667 ms → nicht erfüllt
+  ohne Pufferinhalt: 59.428 → 72.655 ms, Änderung +13.227 ms
+Marke «clock.force-quantum 256»: Klicks vor 42–46, nach 47–51
+  Lage: 576.000 → 576.000 ms, Änderung +0.000 ms → erfüllt
+  ohne Pufferinhalt: 73.622 → 92.672 ms, Änderung +19.050 ms
+Marke «clock.force-quantum 0»: Klicks vor 62–66, nach 67–71
+  Lage: 576.000 → 576.000 ms, Änderung +0.000 ms → erfüllt
+  ohne Pufferinhalt: 92.104 → 94.102 ms, Änderung +1.998 ms
+Klicks ohne Einsatz: [90]
+
+== Z3b, Z3d (ohne Marken): Versatz in Proben
+z3b: Versatz [25024] Proben, Klicks ohne Einsatz [29] (von 30)
+z3d-1: Versatz [25024] Proben, Klicks ohne Einsatz [59] (von 60)
+z3d-2: Versatz [25024] Proben, Klicks ohne Einsatz [59] (von 60)
+
+== E2 bis E4 übernommen (nicht neu gerechnet), aus den Zusammenfassungen
+z3b: p5–p95 des Rests: 0.058 ms (E4 in Ruhe ≤ 15 ms)
+z3b: Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+z3c: p5–p95 des Rests: 37.314 ms (E4 in Ruhe ≤ 15 ms)
+z3c: Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+z3d-1: p5–p95 des Rests: 0.229 ms (E4 in Ruhe ≤ 15 ms)
+z3d-1: Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+z3d-2: p5–p95 des Rests: 0.103 ms (E4 in Ruhe ≤ 15 ms)
+z3d-2: Unterläufe Ausgabe: leere Abrufe 0, zu kurze Abrufe 0 (E2: beide 0)
+z3a-bibliotheken.txt: libQt6Core.so.6; libpipewire-0.3.so.0
+z3a-vergleich-m1a.txt: gleich wie M1a: alsa_output.pci-0000_01_00.1.hdmi-stereo; gleich wie M1a: alsa_output.pci-0000_00_1b.0.iec958-stereo; gleich wie M1a: dss_p12a_ausgabe; gleich wie M1a: alsa_input.pci-0000_00_1b.0.analog-stereo; gleich wie M1a: dss_p12a_aufnahme

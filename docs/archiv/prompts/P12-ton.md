@@ -102,7 +102,7 @@ Nachgeführt 2026-11-11 für **S1 und P** (G4 = P, Entscheid des Nutzers 11.11.)
 | Ausgabe im Kern | `pw_stream` (libpipewire 0.3) in eigenem Thread (`pw_thread_loop`), ständig offen. Kern bleibt ohne Qt Gui und ohne Qt Multimedia |
 | Ausgang je Zweck | Der Kern führt Ausgänge nach Zweck (Antwort 2 des Nutzers vom 09.11.: später Chat-Bot und weitere Soundkarten). P12 baut nur den Zweck «Ton der Videos». Je Zweck ein eigener `pw_stream`, Gerät und Versatz |
 | Mischer im Kern | Je Ausgang ein Mischer, nur Logik, ohne Gerät testbar. Der Echtzeit-Abruf von PipeWire holt fertige Proben ohne Sperren und ohne Speicher anzulegen; Dekodieren läuft in einem eigenen Thread mit Vorrat |
-| Verzögerung | Der Mischer rechnet den hörbaren Zeitpunkt jeder Probe aus der Verzögerung, die `pw_stream` meldet (`pw_stream_get_time_n`, `struct pw_time`, **nicht geprüft**, b1 Schritt 0). Ändert sie sich (Quantum-Wechsel), führt er nach |
+| Verzögerung | Nachgeführt 2026-11-12 nach Z3: Der Mischer führt die Lage in Proben (eigener Zähler der übergebenen Proben) und rechnet den hörbaren Zeitpunkt aus Abrufzeit, Lage und Zyklusgrösse `size` (`struct pw_time`), dazu `delay`, `queued` und `buffered`. `delay` war in Z3 an der virtuellen Senke immer 0; ob es an einem echten Ausgang einen Wert hat, bestätigt erst M4. Ändert sich `size` (Quantum-Wechsel), führt er nach |
 | Puffer | gewünschte Verzögerung (`node.latency`) mindestens 40 ms (Frage 2) |
 | Nachführen | Abweichung unter 20 ms weich mit `swr_set_compensation`; darüber Sprung (Stille einfügen bzw. Proben verwerfen) |
 | Fehlender Ausgang | kein Ton und ein Hinweis, kein Ausweichen auf ein anderes Gerät (`target.object` und kein automatisches Umhängen, **nicht geprüft**, b3 prüft es mit einer virtuellen Senke) |
@@ -147,14 +147,21 @@ Kenngrösse **«Rest»** je Klick: gemessene Einsatzzeit in der Aufnahme minus e
 
 → **Halt:** Ergebnis an Lotse. Der Einbau (b2 ff.) beginnt erst nach dem Go des Nutzers.
 
+**Ergebnis b1** (Nachtlauf 2026-11-11, Neuauswertung 2026-11-12; Messbericht `docs/archiv/messungen/P12a-bericht.md`, Abschnitt «Z3», Unterabschnitt «Neuauswertung (12.11.)»):
+- Nach der vereinbarten Rechnung (Rest in ms) war E1 nicht erfüllt (−21,3 / +37,3 / −16,0 ms). Grund: `pw_time.delay`, `queued` und `buffered` sind an der virtuellen Senke immer 0; beim Wechsel ändert sich nur `size`, und der Rest verschiebt sich genau um die Änderung des Quantums.
+- Entscheid des Nutzers 2026-11-12: E1 neu auswerten, P behalten, `delay` an einem echten Ausgang später mit M4 (RØDECaster) messen.
+- Neu ausgewertet (`prototypes/ton/z3_neu_auswerten.py`): E1 in Lesart «Lage in Proben» erfüllt (Änderung 0 Proben bei allen 6 Wechseln, Versatz in allen Z3-Läufen fest 25 024 Proben; Q dagegen +2048 Proben) und in Lesart «Rest + Quantum aus `size`» erfüllt (grösste Änderung 0,068 ms). E2 bis E4 erfüllt.
+- Klick 197 (voller Lauf, Wechsel auf 256): vollständig übergeben, Lage in der Aufnahme lückenlos, aber kein Einsatz. Er war im Weg Senke → Aufnahme, als PipeWire den laufenden Zyklus abbrach (Δticks 318 statt 2048). Welcher Knoten und ob hörbar: offen. Folge: Beim Wechsel des Quantums kann ein kurzes Stück Ton fehlen, ohne Lageverschiebung und ohne gemeldeten Unterlauf.
+- Offen bis M4: `delay` und der hörbare Zeitpunkt an einem echten Ausgang. b2 und b3 hängen nicht davon ab (Lage in Proben und `size` reichen für den Bau); der Startwert «Versatz» und die Bestätigung von `delay` kommen aus M4.
+
 ### b2 – Ton dekodieren und mischen, ohne Gerät (2 Commits)
 
 1. `src/media/audiodecoder.{h,cpp}`: Ton einer Videodatei, float, 48 kHz, Stereo (libavcodec und libswresample), ohne Qt Gui, eigener Thread mit Vorrat. Test `tst_tondecoder` mit `tests/daten/ton/` (MP4/AAC, WebM/Opus, Mono, 44,1 kHz, 5.1, ohne Ton). `libswresample-dev` und `libpipewire-0.3-dev` in `scripts/pakete.txt`.
-2. `src/audio/mixer.{h,cpp}`, nur Logik: Quellen auf Probenlage mischen, Lautstärke und «Stumm», Start/Stopp, Wiederholen nach der Länge, die die Seite meldet (Pause beim Wiederholen rund 58,6 ms, M2), Nachführen nach den Meldungen der Seite und nach der gemeldeten Verzögerung des Ausgangs, Abruf ohne Sperren (Ring für einen Schreiber und einen Leser). Test `tst_tonmischer` mit gedachter Uhr und gedachter Verzögerung (auch mit Sprung um 2048 Proben wie in M1c), ohne Gerät.
+2. `src/audio/mixer.{h,cpp}`, nur Logik: Quellen auf Probenlage mischen, Lautstärke und «Stumm», Start/Stopp, Wiederholen nach der Länge, die die Seite meldet (Pause beim Wiederholen rund 58,6 ms, M2), Nachführen nach den Meldungen der Seite und nach dem hörbaren Zeitpunkt des Ausgangs, Abruf ohne Sperren (Ring für einen Schreiber und einen Leser). Nachgeführt nach Z3 (2026-11-12): Der Mischer führt die Lage in Proben selbst; den hörbaren Zeitpunkt rechnet er aus Abrufzeit, Lage, `size`, `delay`, `queued` und `buffered`, die der Ausgang je Abruf übergibt (Bedeutung von `delay` erst mit M4 bestätigt). Test `tst_tonmischer` mit gedachter Uhr und gedachten Werten des Ausgangs, ohne Gerät: Wechsel von `size` 1024 → 2048 → 256 → 1024 bei `delay` 0 (wie Z3c, hörbarer Zeitpunkt bleibt in Lesart «Rest + Quantum» innerhalb 10 ms), dazu `delay` ungleich 0 und ein Sprung der Lage um 2048 Proben wie in M1c (Q).
 
 ### b3 – Ausgabe über PipeWire im Kern (2 Commits)
 
-1. `src/audio/pwoutput.{h,cpp}`: dünne Schicht über `pw_thread_loop` und `pw_stream`: Liste der Ausgänge (Registry), gewählter Ausgang über `target.object`, fehlender oder verschwundener Ausgang (kein Ausweichen), gemeldete Verzögerung an den Mischer. Schalter `DSS_CORE_AUDIO` (aus = Kern ohne Ton, Stand P11; `dss-core` linkt libpipewire nur mit Schalter). Test `tst_tonausgang`: legt im eigenen Prozess eine virtuelle Senke an (verschwindet mit dem Prozess, **nicht geprüft**), spielt unhörbar, prüft Liste, Wahl, Entfernen der Senke (kein Ton auf einem anderen Gerät) und Wiederkehr.
+1. `src/audio/pwoutput.{h,cpp}`: dünne Schicht über `pw_thread_loop` und `pw_stream`: Liste der Ausgänge (Registry), gewählter Ausgang über `target.object`, fehlender oder verschwundener Ausgang (kein Ausweichen), je Abruf Abrufzeit, `size`, `delay`, `queued`, `buffered` und Lage an den Mischer. Nachgeführt nach Z3 (2026-11-12): Einen abgebrochenen Zyklus (Δticks ungleich voriger Zyklusgrösse, wie beim Quantum-Wechsel in Z3c) zählt die Schicht und schreibt ihn ins Protokoll; er ist kein Fehler (Klick 197: kurzes Stück Ton kann fehlen, Lage bleibt). `delay` wird gelesen und protokolliert, die Rechnung verlässt sich bis M4 nicht auf einen Wert ungleich 0. Schalter `DSS_CORE_AUDIO` (aus = Kern ohne Ton, Stand P11; `dss-core` linkt libpipewire nur mit Schalter). Test `tst_tonausgang`: legt im eigenen Prozess eine virtuelle Senke an (verschwindet mit dem Prozess, **nicht geprüft**), spielt unhörbar, prüft Liste, Wahl, Entfernen der Senke (kein Ton auf einem anderen Gerät) und Wiederkehr.
 2. Kern: Ausgang je Zweck in `kern.ini` (Abschnitt je Zweck, zuerst `[ton-video]` mit `ausgang` und `versatz_ms`), Schnittstelle Version 12: `audio_outputs` (Liste der Geräte, nach `hello` und bei Änderung an alle), Felder für Ausgang und Versatz je Zweck in `settings` und `update_settings`, Zustand des Ausgangs. Tests `tst_kerneinstellungen` (`[ton-video]`), `tst_protocol`, `tst_aenderungen`.
 
 ### b4 – Seite und Kern verbinden (3 Commits)
@@ -269,12 +276,14 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
 |---|---|
 | Alle Aussagen zu OBS, obs-browser, obs-websocket, RØDE und Grenzwerten nicht gelesen (Webzugriff gesperrt) | M3 mit Lotse; Webzugriff für den Agenten von b1 und b4 |
 | **API von libpipewire nicht gegen die Dokumentation geprüft** (`struct pw_time`, Bedeutung von `delay`, Uhr von `now`, `target.object`, `node.dont-reconnect`); Header fehlen, bis das Paket installiert ist | b1, Schritt 0: Header und Dokumentation lesen, bei Abweichung Halt |
-| **b1 scheitert** (Sprung nicht erkannt, Unterlauf beim Wechsel, Streuung zu gross) | Halt vor dem Einbau; Rückfall Q mit Puffer ≥ 1 Quantum (vorher Z1) oder G1 C, Entscheid des Nutzers |
+| **b1 scheitert** (Sprung nicht erkannt, Unterlauf beim Wechsel, Streuung zu gross) | Halt vor dem Einbau; Rückfall Q mit Puffer ≥ 1 Quantum (vorher Z1) oder G1 C, Entscheid des Nutzers. Stand 2026-11-12: nach Neuauswertung erfüllt, P bleibt (Entscheid des Nutzers) |
+| `pw_time.delay` an der virtuellen Senke immer 0; Wert und Bedeutung an einem echten Ausgang unbekannt | Kern rechnet aus Lage in Proben und `size`, liest `delay` mit; M4 (RØDECaster) misst `delay` und hörbaren Zeitpunkt (Entscheid des Nutzers 12.11.) |
+| Beim Quantum-Wechsel fehlt ein kurzes Stück Ton (Klick 197, Z3c), ohne Lageverschiebung und ohne Unterlauf; Knoten und Hörbarkeit offen | Wechsel kommen im Betrieb selten vor (nicht geprüft); `pwoutput` protokolliert abgebrochene Zyklen; Protokoll von H3 darauf prüfen |
 | Echtzeit-Abruf von PipeWire: Sperren oder Speicher anlegen im Abruf erzeugen Aussetzer | Mischer mit Ring ohne Sperren, Dekodieren in eigenem Thread; `tst_tonmischer`, `tonpruefung.py`, 50 Wiederholungen, Leistung 30 min |
 | Thread von PipeWire im Dienst stört Watchdog oder sauberes Beenden | `dienstpruefung.py`, `startpruefung.py` (20 Starts); Schalter `DSS_CORE_AUDIO` |
 | Ausgang fehlt oder wird gezogen: PipeWire hängt den Strom auf das Standardgerät um | `target.object` ohne automatisches Umhängen (nicht geprüft); `tst_tonausgang` mit virtueller Senke, N3 |
 | Messweg (`pw-loopback`, Aufnahme) streut mit, sein Anteil ist nicht getrennt (P12a) | Erfolgsbedingung über den Rest, Grenze E4 mit Spielraum zum Wert von Q; Gegenlauf Z3c-Q in derselben Nacht |
-| Ob ein Programm am Studio-PC im Betrieb das Quantum ändert, ist nicht geprüft | P meldet die Verzögerung und führt nach (E1); H3 Dauerlauf |
+| Ob ein Programm am Studio-PC im Betrieb das Quantum ändert, ist nicht geprüft | P meldet die neue Zyklusgrösse `size`, der Kern führt danach nach (E1, Neuauswertung 12.11.); H3 Dauerlauf |
 | Unter Last streut die Verzögerung etwa dreimal so breit (Z0, mit Q) | Z3d (Frage 1), Leistung mit 3 Videos |
 | Ob «aktiv» kommt und ob es beim Laden einer schon aktiven Quelle gemeldet wird | M3 vor b4; Rückfall `InputActiveStateChanged` bzw. `GetSourceActive` über den Kern |
 | Bildrate von OBS (Messgenauigkeit ±½ Bild) | `[OFFEN]`, Lotse liest `GetVideoSettings` in M3 |
@@ -352,3 +361,7 @@ Fragen 1 bis 4 vor b1 (ein Dialog), Fragen 5 bis 7 vor b4 (zweiter Dialog). Die 
 - G4 = P (PipeWire direkt), mit Prototyp zuerst: P12b beginnt mit b1 (Z3), der Einbau folgt erst, wenn der Prototyp den Sprung vermeidet.
 - Z0 ja (ausgeführt, Messbericht). M2 wird nicht wiederholt. M3 macht Lotse mit dem Nutzer zusammen.
 - Nicht entschieden, als Fragen in Abschnitt 7: Z3 unter Last (Frage 1), Puffer mindestens 40 ms (Frage 2).
+
+## Entscheide des Nutzers (2026-11-12, nach dem Messbericht Z3)
+- E1 neu auswerten und P behalten; Klick 197 dabei klären (ausgeführt, Abschnitt «b1», «Ergebnis b1»).
+- `delay` an einem echten Ausgang später mit M4 (RØDECaster) messen.
