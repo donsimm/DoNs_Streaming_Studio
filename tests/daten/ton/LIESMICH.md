@@ -7,7 +7,7 @@ des Zählers: Be Vietnam Pro Regular aus `src/common/schriften/`.
 
 ## Inhalt
 
-Alle Dateien: 60 s, 1280x720, **30 Bilder/s (Annahme)**. Alle 2 s (bei 0, 2, … 58 s, also 30-mal)
+Alle Dateien: 60 s, 1280x720, **30 Bilder/s** (wie OBS, M3). Alle 2 s (bei 0, 2, … 58 s, also 30-mal)
 ist ein Bild ganz weiss («Blitz»), gleichzeitig läuft ein Sinus von 1 kHz mit halber Vollaussteuerung
 genau ein Bild lang («Piep», 33,3 ms). Sonst ist das Bild schwarz mit grauem Zähler in der Mitte
 (Bildnummer, Zeit, Nummer des Blitzes, Bildrate), der Ton still. Vorbild ist das Messsignal «flash»
@@ -27,9 +27,9 @@ ist niedrig gewählt (H.264 `-crf 32`, VP9 `-crf 50`), der Zähler bleibt lesbar
 
 ## Bildrate
 
-Die Bildrate soll der von OBS entsprechen (Messgenauigkeit ±½ Bild). Sie ist noch nicht gelesen
-(`[OFFEN]`, Lotse liest sie in M3 mit `GetVideoSettings`, `fpsNumerator/fpsDenominator`). Bis dahin
-gilt **30 Bilder/s als Annahme**. Weicht OBS ab, die Dateien mit der Bildrate von OBS neu erzeugen,
+Die Bildrate soll der von OBS entsprechen (Messgenauigkeit ±½ Bild). In M3 (2026-11-13) hat Lotse
+sie mit `GetVideoSettings` gelesen: **30/1**, die Dateien bleiben (Messbericht P12a, «M3
+(2026-11-13)»). Weicht OBS später ab, die Dateien mit der Bildrate von OBS neu erzeugen,
 z. B. `sh tests/daten/ton/erzeugen.sh 60` oder `… 30000/1001`, und diese Datei nachführen.
 Bei einer Bildrate, die 2 s nicht in ganze Bilder teilt, ist der Blitz das erste Bild, das in einem
 neuen 2-s-Abschnitt beginnt; der Piep folgt diesem Bild auf die Probe genau.

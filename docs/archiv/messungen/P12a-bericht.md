@@ -8,7 +8,7 @@ Stand: 2026-11-11, nachgeführt mit Z0 (Neuauswertung von M1d, Abschnitt «Z0»)
 - M2 wird nicht wiederholt (auch nicht mit Fenster ausserhalb des Bildschirms).
 - M3 macht Lotse mit dem Nutzer zusammen.
 
-M3 (OBS, Lotse mit dem Nutzer) und M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, stehen aus.
+M3 (OBS, Lotse): gemacht am 2026-11-13, Abschnitt «M3 (2026-11-13)». M4 (ganzer Weg, Nutzer und Lotse): **[OFFEN]**, steht aus.
 
 Nachgeführt 2026-11-11 (spät) mit **Z3** (P12b b1, Prototyp `pw-messen` mit `pw_stream`): Abschnitt «Z3» unten. Ergebnis: E2, E3, E4 erfüllt, **E1 nicht erfüllt** → Halt nach Plan.
 
@@ -450,6 +450,30 @@ E2 bis E4 nicht neu gerechnet, aus den Zusammenfassungen übernommen (in `z3-neu
 
 **Ergebnis b1 nach Neuauswertung:** E1 in beiden Lesarten erfüllt, E2 bis E4 erfüllt. P bleibt (Entscheid des Nutzers). Offen bleibt: `delay` an einem echten Ausgang, gemessen mit M4 (RØDECaster) **[OFFEN]**.
 
+## M3 (2026-11-13)
+
+Gemessen von Lotse am 2026-11-13, 11:32 bis 11:35, OBS 32.2.2 mit obs-browser 2.26.9 auf dem Streaming-PC, Szene «test 2», Messseite des Prototyps (`prototypes/ton/messseite.html`, Ablauf in `prototypes/ton/LIESMICH.md`, «M3»), Empfang und Auswertung im Prototyp auf dem Studio-PC. Zusammenfassung: `P12a-daten/2026-11-13-m3/m3-zusammenfassung.txt` (unverändert aus `build/p12a-m3/`). Die Rohdaten `m3-meldungen.csv` sind nicht im Repo (keine Auffälligkeit, die sie braucht). Für diesen Nachtrag wurde nichts gemessen; die Befunde zu den Ereignissen stammen aus der Meldung von Lotse.
+
+| Frage | Befund |
+|---|---|
+| `window.obsstudio` | vorhanden: «hallo» mit `obs: true` und `pluginVersion`, «stufe» (Zugriffsstufe) gemeldet |
+| «aktiv»/«sichtbar» beim Wechsel | 5 Wechsel auf «test 2» und zurück: je «aktiv» true/false, «sichtbar», «start»/«stop» in der erwarteten Folge |
+| Laden einer schon aktiven Quelle | Neuladen der Quelle, während «test 2» im Programm war: neues «hallo», **kein «aktiv»**. `GetSourceActive` meldete zur selben Zeit `videoActive: true`. Der Rückfall über den Kern bleibt nötig |
+| Bildrate von OBS | 30/1 (`GetVideoSettings`). Die Testdaten `tests/daten/ton/` (30 Bilder/s) bleiben |
+| Aufrufe von `requestVideoFrameCallback` | 2157 Meldungen «bild» in 109,0 s (19,79 je s) bei einem Video mit 30 Bildern/s; `presentedFrames` zählt 399 ausgelassene Bilder, grösste Lücke 1 Bild. **Auffällig**, Ursache nicht geprüft |
+| `presentationTime` gegen `mediaTime` | Gang −10,27 ppm (−0,616 ms/min), Schwankung p95 0,510 ms, grösste 0,743 ms |
+| `expectedDisplayTime` gegen `mediaTime` | Gang −9,80 ppm (−0,588 ms/min), Schwankung p95 0,392 ms, grösste 0,432 ms |
+| Eintreffen am Studio-PC (`steady_clock`) gegen `mediaTime` | Gang −86,79 ppm (−5,207 ms/min), Schwankung p95 24,892 ms, grösste 29,119 ms. Enthält zwei Uhren und das Netz |
+| `performance.now()` beim Senden gegen `mediaTime` | Gang −95,38 ppm (−5,723 ms/min), Schwankung p95 24,589 ms |
+
+Einordnung:
+
+- **Uhr der Seite:** `expectedDisplayTime` und `presentationTime` folgen der Medienzeit in OBS so eng wie in M2 (p95 0,4 bis 0,5 ms gegen 0,44 ms in M2). Der Kern rechnet mit `display_ms` (= `expectedDisplayTime`), nicht mit dem Sendezeitpunkt.
+- **Sendezeitpunkt streut:** `performance.now()` beim Senden streut gegen die Medienzeit schon in der Seite um p95 24,6 ms. Die Streuung des Eintreffens (p95 24,9 ms) kommt also zum grössten Teil aus dem Zeitpunkt, an dem die Seite sendet, nicht aus dem Netz. Der Kern bildet die Uhr der Seite mit dem kleinsten Abstand «Eintreffen − `now_ms`» der letzten 10 s ab (`src/audio/pageclock.h`); der Weg über dem kürzesten liegt bei p95 4,0 ms (Zeile «Weg Seite → Prototyp»). Ob die Grenzen des Glättens (4 ms, ein Achtel) damit passen, zeigt erst der Betrieb mit dem Kern (H3), **nicht geprüft**.
+- **Gang zwischen den Rechnern:** −5,2 ms/min gegen die Medienzeit (Eintreffen am Studio-PC). Der Lauf dauerte rund 3 min, nicht 60 min wie im Plan; ein Gang über 60 min ist **nicht gemessen**.
+- **Ausreisser:** Die Zeile «Weg Seite → Prototyp» hat als grössten Wert 120 775 ms. Vermutlich ein Wechsel der Uhr der Seite beim Neuladen (neues `performance.now()` ab 0); **nicht geprüft**, die CSV ist nicht ausgewertet.
+- **Rund 20 statt 30 Aufrufe je Sekunde:** Für die Meldungen an den Kern genügt das. «frame» braucht einen Aufruf je Sekunde, und jede Meldung trägt `mediaTime` und `expectedDisplayTime` desselben Bildes; fällt das erste Bild nach dem Start oder Wiederholen aus, meldet die Seite das nächste mit seiner Lage (höchstens 1 Bild = 33 ms später, Lage richtig). Für Blitz und Piep im Bild (M4) heisst es nur, dass nicht jedes Bild gemeldet wird.
+
 ## Weitere Befunde
 
 - **Kein RØDECaster in der Nacht:** `m1-liste.txt` enthält nur HDMI, «Internes Audio Digital Stereo (IEC958)» (Standard) und die Messknoten. Laut Übergabe war am 09.11. «RØDECaster Pro II Analog Stereo» der Standardausgang. Für M4 muss der RØDECaster angeschlossen und eingeschaltet sein.
@@ -471,6 +495,8 @@ E2 bis E4 nicht neu gerechnet, aus den Zusammenfassungen übernommen (in `z3-neu
 | `prototypes/ton/z3_neu_auswerten.py` | neu (Neuauswertung Z3, 12.11.): E1 in den Lesarten Lage und Rest + Quantum, fehlende Klicks, Vergleich Z3c-Q; nur Python-Standardbibliothek |
 | `P12b-daten/<beide Läufe>/z3-neu.txt` | neu (12.11.): Ausgaben des Skripts |
 | dieser Bericht | nachgeführt (12.11.): «Neuauswertung (12.11.)», offene Punkte, Interna, Quellen |
+| `P12a-daten/2026-11-13-m3/m3-zusammenfassung.txt` | neu (M3): Auswertung des Prototyps, ohne `m3-meldungen.csv` |
+| dieser Bericht | nachgeführt (13.11.): «M3 (2026-11-13)», offene Punkte |
 
 ## Geprüft
 
@@ -484,6 +510,7 @@ E2 bis E4 nicht neu gerechnet, aus den Zusammenfassungen übernommen (in `z3-neu
 
 - Z3, 2026-11-11: Probelauf und voller Lauf mit den Befehlen im Abschnitt «Z3», beide Exit-Code 0, Aufräumen geprüft. Sonst nichts ausgeführt (kein Bau, kein `ctest`). Suche (ripgrep) in `P12b-daten/` ohne `*.json` nach `192.168`, `ts.net` und `@`: keine Treffer. Rechnungen in «E1, Befunde» von Hand aus den Medianen der Zusammenfassungen.
 - Neuauswertung Z3, 2026-11-12: Befehl im Abschnitt «Neuauswertung (12.11.)», Exit-Code 0, Gegenprobe der alten Rechnung bestanden (6 von 6 Wechseln gleich). Sonst nichts ausgeführt (keine Messung, kein PipeWire, kein Bau, kein `ctest`).
+- M3, 2026-11-13: Messung durch Lotse (siehe «M3 (2026-11-13)»). Für den Nachtrag: `cmp build/p12a-m3/m3-zusammenfassung.txt docs/archiv/messungen/P12a-daten/2026-11-13-m3/m3-zusammenfassung.txt` ohne Unterschied. Rechnungen in der Einordnung von Hand aus der Zusammenfassung.
 
 ## Handtest
 
@@ -491,7 +518,8 @@ Kein Handtest nötig für diesen Commit. M3 und M4 aus dem Plan stehen aus (sieh
 
 ## Nicht erledigt, `[OFFEN]`
 
-- **[OFFEN]** M3 (Lotse mit dem Nutzer zusammen, Entscheid 11.11., OBS): `window.obsstudio`, Ereignisse «aktiv»/«sichtbar», Gang über 60 min gegen den Studio-PC, Bildrate (`GetVideoSettings`).
+- Erledigt: M3 (2026-11-13, Abschnitt «M3 (2026-11-13)»): `window.obsstudio`, Ereignisse «aktiv»/«sichtbar», Bildrate 30/1.
+- **[OFFEN]** M3: Gang zwischen den Rechnern über 60 min (gemessen rund 3 min); Ursache der rund 20 Aufrufe je Sekunde bei 30 Bildern/s; Ausreisser 120 775 ms im «Weg Seite → Prototyp».
 - **[OFFEN]** M4 (Nutzer und Lotse): ganzer Weg über den RØDECaster, Versatz und Streuung über 30 Blitze, Hörtest. Voraussetzung: RØDECaster angeschlossen (in der Nacht nicht in der Geräteliste).
 - Erledigt: Entscheid G4, vom Nutzer am 11.11. entschieden: P.
 - Erledigt: M1d neu auswerten (Z0), 11.11., Abschnitt «Z0». Gültige Werte für Median, p95, Spanne, «fehlend» und Aussetzer unter Last.

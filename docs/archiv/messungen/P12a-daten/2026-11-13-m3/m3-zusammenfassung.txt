@@ -1,0 +1,23 @@
+Server-Lauf: 170.9 s, 2239 Meldungen
+
+== Seite obs
+Meldungen «bild»: 2157 in 109.0 s (19.79 je s), Abschnitte (Start, Wiederholung): 12
+Ausgelassene Bilder (presentedFrames): 399, grösste Lücke 1
+
+Eintreffen im Prototyp (steady_clock) gegen mediaTime:
+  Gang: -86.79 ppm = -5.207 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=2151 min 1.950 p5 5.913 Median 10.588 p95 24.892 max 29.119 ms (Spanne 27.169 ms)
+
+performance.now() beim Senden gegen mediaTime:
+  Gang: -95.38 ppm = -5.723 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=2151 min 5.103 p5 5.972 Median 10.422 p95 24.589 max 28.078 ms (Spanne 22.975 ms)
+
+presentationTime gegen mediaTime:
+  Gang: -10.27 ppm = -0.616 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=2151 min 0.000 p5 0.022 Median 0.256 p95 0.510 max 0.743 ms (Spanne 0.743 ms)
+
+expectedDisplayTime gegen mediaTime:
+  Gang: -9.80 ppm = -0.588 ms/min (Uhr läuft gegen die Medienzeit langsamer)
+  Schwankung |Abweichung von der Geraden|: n=2151 min 0.000 p5 0.010 Median 0.306 p95 0.392 max 0.432 ms (Spanne 0.432 ms)
+
+Weg Seite → Prototyp über dem kürzesten (enthält auch den Gang): n=2157 min 0.000 p5 2.052 Median 2.944 p95 4.040 max 120775.154 ms (Spanne 120775.154 ms)
