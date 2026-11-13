@@ -324,8 +324,9 @@ void OverlayServer::handleInvalid(QTcpSocket *socket, Connection &c, const HttpR
                                   const QString &address, const QString &rest)
 {
     noteInvalid(socket, address);
-    if (rest == QLatin1String("events")) {
-        // Die Seite der alten Adresse lädt neu und bekommt die leere Seite.
+    if (rest == QLatin1String("events") || rest.startsWith(QLatin1String("events/"))) {
+        // Die Seite der alten Adresse lädt neu und bekommt die leere Seite (auch mit Kennung der
+        // Seite, P12b b4).
         socket->write(responseHead(200, "text/event-stream", -1,
                                    {{"Cache-Control", "no-store"}, {"Connection", "close"}}));
         sendGone(socket);

@@ -549,6 +549,11 @@ private slots:
             EventClient events(m_port, oldBase + "events");
             QCOMPARE(events.next().first, QByteArray("gone"));
         }
+        // dasselbe mit Kennung der Seite (Seite in OBS, P12b b4)
+        {
+            EventClient events(m_port, oldBase + "events/seitealt1");
+            QCOMPARE(events.next().first, QByteArray("gone"));
+        }
         // Neue Adresse beim Umbenennen
         const QByteArray beforeRename = base();
         {

@@ -337,7 +337,8 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RE
       DSS_TEST_LARGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/gross-daten"
       DSS_TEST_BUILTIN_FONT_DIR="${PROJECT_SOURCE_DIR}/src/common/schriften/be-vietnam-pro"
       DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
-      DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung")
+      DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
+      DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
     add_dependencies(tst_browserquelle dss-core)
     add_test(NAME tst_browserquelle COMMAND tst_browserquelle)
     set_tests_properties(tst_browserquelle PROPERTIES SKIP_RETURN_CODE 77 FIXTURES_REQUIRED dss_media)

@@ -23,11 +23,30 @@
 //     loop = wieder von vorne, hold_at_end = letztes Bild bleibt, sonst leer.
 //   - Ausgabe aus (E-24): nichts zeigen, verbunden bleiben.
 //
+// Ton der Videos (P12b b4, Plan docs/archiv/prompts/P12-ton.md): Nur in OBS (window.obsstudio)
+// meldet die Seite dem Kern Start und Lage jedes Videos (POST «clock», Format in
+// src/server/clockreport.h) und öffnet die Ereignisse als «events/<Kennung der Seite>». Ohne
+// window.obsstudio bleibt alles wie oben, ohne Meldungen.
+//   - «aktiv» (obsSourceActiveChanged mit detail.active, Quelle im Programm): Lauf + 1, alle Videos
+//     von vorne; je Video beim ersten Bild «start», danach etwa jede Sekunde «frame», beim ersten
+//     Bild nach dem Wiederholen «loop», am Ende ohne Wiederholen «end».
+//   - «inaktiv»: alle Videos anhalten und zurück auf den Anfang, «stop» (Entscheid des Nutzers
+//     2026-11-13: verborgene Videos laufen nicht weiter). Neue Videos warten dann am Anfang.
+//   - Neue Datei (oder Wiederholen/Anhalten geändert): neues Element, von vorne, mit «start»
+//     (Entscheid des Nutzers 2026-11-13).
+//   - Bis zum ersten Ereignis ist der Zustand unbekannt: Videos laufen wie ohne OBS, ohne Meldungen.
+//     Beim Laden einer schon aktiven Quelle meldet OBS kein «aktiv» (M3, 2026-11-13); den Rückfall
+//     über den Kern (GetSourceActive) gibt es noch nicht.
+//
 // Quellen:
 //   EventSource: https://html.spec.whatwg.org/multipage/server-sent-events.html
 //   FontFace: https://drafts.csswg.org/css-font-loading/
 //   HTMLMediaElement (muted, loop, ended, error): https://html.spec.whatwg.org/multipage/media.html
 //   SVG text, text-anchor: https://www.w3.org/TR/SVG2/text.html
+//   window.obsstudio, obsSourceActiveChanged: https://github.com/obsproject/obs-browser/blob/master/README.md
+//   requestVideoFrameCallback (mediaTime, expectedDisplayTime): https://wicg.github.io/video-rvfc/
+//   fetch mit keepalive, Content-Type text/plain ohne Vorabfrage: https://fetch.spec.whatwg.org/
+//   Crypto.getRandomValues: https://w3c.github.io/webcrypto/#Crypto-method-getRandomValues
 'use strict';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -43,6 +62,108 @@ function report(text) {
   window.dssState.reports.push(text);
   fetch('report', { method: 'POST', body: text }).catch(() => {});
 }
+
+// Ton der Videos, nur in OBS. active: null = unbekannt, true = aktiv, false = inaktiv.
+const obs = typeof window.obsstudio !== 'undefined';
+const clock = { page: obs ? newPageId() : '', seq: 0, run: 0, active: null };
+window.dssState.page = clock.page;
+window.dssState.active = null;
+
+// Kennung der Seite, [a-z0-9]{12} (validClockPage im Server)
+function newPageId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+}
+
+function sendClock(fields) {
+  const body = Object.assign({ v: 1, page: clock.page, seq: clock.seq, run: clock.run }, fields,
+                             { now_ms: performance.now() });
+  clock.seq += 1;
+  // text/plain: keine Vorabfrage (CORS-safelisted); keepalive: kommt auch beim Schliessen an
+  fetch('clock', { method: 'POST', body: JSON.stringify(body), keepalive: true,
+                   headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
+}
+
+function videoFields(v, event) {
+  const fields = { event, source: v.dssSource };
+  if (Number.isFinite(v.duration) && v.duration > 0)
+    fields.duration_s = v.duration;
+  return fields;
+}
+
+// Zähler eines Videos für den laufenden Lauf. Mit seek: zurück auf den Anfang und erst nach
+// «seeked» zählen (sonst kommt noch ein Bild von vor dem Zurückspulen als «start»).
+function resetClock(v, seek) {
+  const c = { run: clock.run, started: false, loop: 0, lastMedia: 0, lastReportMs: 0, ready: true };
+  v.dssClock = c;
+  if (!seek)
+    return;
+  // Ohne geladene Daten (HAVE_NOTHING) gibt es kein Zurückspulen und kein «seeked».
+  c.ready = v.readyState === HTMLMediaElement.HAVE_NOTHING;
+  v.addEventListener('seeked', () => { c.ready = true; }, { once: true });
+  v.currentTime = 0;
+}
+
+// Bild für Bild (requestVideoFrameCallback): mediaTime und expectedDisplayTime gehören zum selben
+// Bild. In OBS kommen nur etwa 20 Aufrufe je Sekunde bei 30 Bildern/s (M3); «frame» braucht einen
+// je Sekunde, und «start»/«loop» tragen die Lage des gemeldeten Bildes, auch wenn es nicht das
+// allererste ist.
+function onFrame(v, meta) {
+  if (!v.isConnected)
+    return; // entfernt: keine weiteren Aufrufe
+  v.requestVideoFrameCallback((now, m) => onFrame(v, m));
+  const c = v.dssClock;
+  if (clock.active !== true || v.paused || v.seeking || !c.ready || c.run !== clock.run)
+    return;
+  let event = null;
+  if (!c.started) {
+    c.started = true;
+    event = 'start';
+  } else if (meta.mediaTime < c.lastMedia) {
+    c.loop += 1;
+    event = 'loop';
+  } else if (meta.expectedDisplayTime - c.lastReportMs >= 1000) {
+    event = 'frame';
+  }
+  c.lastMedia = meta.mediaTime;
+  if (!event)
+    return;
+  c.lastReportMs = meta.expectedDisplayTime;
+  sendClock(Object.assign(videoFields(v, event), { file: v.dssFile, loop: c.loop, media_s: meta.mediaTime,
+                                                   display_ms: meta.expectedDisplayTime }));
+}
+
+function playVideo(v) {
+  const p = v.play();
+  if (p)
+    p.catch(() => {});
+}
+
+// «aktiv»/«inaktiv» aus OBS: alle Videos zurück auf den Anfang, bei «aktiv» abspielen.
+function setActive(active) {
+  if (active === clock.active)
+    return;
+  clock.active = active;
+  window.dssState.active = active;
+  if (active)
+    clock.run += 1;
+  for (const e of shown.values()) {
+    if (e.kind !== 'video' || e.inner.dssFailed)
+      continue;
+    const v = e.inner;
+    v.pause();
+    resetClock(v, true);
+    v.style.visibility = '';
+    if (active)
+      playVideo(v);
+  }
+  if (!active)
+    sendClock({ event: 'stop' });
+}
+
+if (obs)
+  window.addEventListener('obsSourceActiveChanged', (event) => setActive(!!event.detail.active));
 
 // Wie dss::fontMetricPixels (QFixed, gerundete Division).
 function metricPixels(units, px, unitsPerEm) {
@@ -120,11 +241,15 @@ function createVideo(s) {
   v.playsInline = true;
   v.preload = 'auto';
   v.loop = s.video.loop;
-  v.autoplay = true;
+  // In OBS und inaktiv: am Anfang warten bis «aktiv»
+  const wait = obs && clock.active === false;
+  v.autoplay = !wait;
   v.addEventListener('ended', () => {
     // Ohne «Am Ende anhalten» wird die Quelle leer; mit bleibt das letzte Bild.
     if (!v.loop && !v.dssHoldAtEnd)
       v.style.visibility = 'hidden';
+    if (obs && clock.active === true && v.dssClock.started && v.dssClock.run === clock.run)
+      sendClock(videoFields(v, 'end'));
   });
   v.addEventListener('error', () => {
     v.style.visibility = 'hidden';
@@ -133,10 +258,15 @@ function createVideo(s) {
     report('Video nicht abspielbar: «' + s.name + '» (' + s.video.file + ')' + (e ? ' (Fehler ' + e.code + ' ' + e.message + ')' : ''));
   });
   v.dssHoldAtEnd = s.video.hold_at_end;
+  v.dssSource = s.id;
+  v.dssFile = s.video.file;
+  if (obs) {
+    resetClock(v, false);
+    v.requestVideoFrameCallback((now, m) => onFrame(v, m));
+  }
   v.src = s.video.file;
-  const p = v.play();
-  if (p)
-    p.catch(() => {});
+  if (!wait)
+    playVideo(v);
   return v;
 }
 
@@ -249,11 +379,8 @@ function apply(data) {
     const v = ordered[i].kind === 'video' ? ordered[i].inner : null;
     const playing = v && !v.paused && !v.ended;
     root.insertBefore(ordered[i].box, root.children[i] || null);
-    if (playing) {
-      const p = v.play();
-      if (p)
-        p.catch(() => {});
-    }
+    if (playing)
+      playVideo(v);
   }
   window.dssState.applied += 1;
   window.dssState.lastApplyMs = performance.now();
@@ -263,7 +390,7 @@ function apply(data) {
 // vom Server); ist sie endgültig zu (readyState CLOSED), baut die Seite eine neue auf. Bis dahin
 // bleibt das letzte Bild stehen.
 function connect() {
-  const source = new EventSource('events');
+  const source = new EventSource(obs ? 'events/' + clock.page : 'events');
   source.addEventListener('open', () => { window.dssState.connected = true; });
   source.addEventListener('overlay', (event) => apply(JSON.parse(event.data)));
   source.addEventListener('gone', () => {

@@ -6,6 +6,9 @@
 // Testdaten tests/daten/exif/ und tests/daten/video-drehung/, Text, Spiegeln, Drehung.
 // Weiter: Änderung ohne Neuladen (Zeit), Ausgabe aus/ein, Video beginnt beim Einblenden von vorne,
 // neuer Token (alte Adresse leer, Hinweis), Wiederverbinden nach Neustart des Kerns.
+// P12b b4: Seite in OBS mit nachgebildetem window.obsstudio und CustomEvent
+// «obsSourceActiveChanged»: Meldungen an …/clock (Inhalt, Folge, Antwort des Kerns), anhalten und
+// zurück bei «inaktiv», neue Datei von vorne; ohne window.obsstudio keine Meldungen.
 // Mit DSS_BROWSERQUELLE_LAST=1 zusätzlich die Last: 10 Quellen mit 2 Videos 1080p30, CPU und
 // Speicher von Kern und Testprogramm (mit den Prozessen von Chromium).
 // Abweichungen werden mit Zahlen ausgegeben (feste Grenze erst mit P11); geprüft wird hier, dass
@@ -16,6 +19,9 @@
 // Quellen: QWebEngineView https://doc.qt.io/qt-6.8/qwebengineview.html,
 // QWebEnginePage::setBackgroundColor https://doc.qt.io/qt-6.8/qwebenginepage.html#backgroundColor-prop,
 // QQuickWidget::grabFramebuffer https://doc.qt.io/qt-6.8/qquickwidget.html#grabFramebuffer,
+// QWebEngineScript (DocumentCreation, MainWorld) https://doc.qt.io/qt-6.8/qwebenginescript.html,
+// obs-browser (window.obsstudio, obsSourceActiveChanged auf window, event.detail.active)
+// https://github.com/obsproject/obs-browser/blob/master/README.md,
 // /proc/<pid>/stat und statm: https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html
 
 #include "bildvergleich.h"
@@ -33,12 +39,18 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QProcess>
 #include <QQuickWidget>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QRegularExpression>
 #include <QWebEnginePage>
+#include <QWebEngineScript>
+#include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 
@@ -131,6 +143,34 @@ QList<qint64> descendants(qint64 pid)
     return result;
 }
 
+// Vor den Skripten der Seite: Meldungen an «clock» aufzeichnen (Inhalt, keepalive, Content-Type,
+// Antwort des Kerns) und mit obs window.obsstudio nachbilden (pluginVersion wie in M3).
+void addClockRecorder(QWebEngineView *view, bool obs)
+{
+    QWebEngineScript script;
+    script.setName(QStringLiteral("dss-clock-recorder"));
+    script.setInjectionPoint(QWebEngineScript::DocumentCreation);
+    script.setWorldId(QWebEngineScript::MainWorld);
+    script.setRunsOnSubFrames(false);
+    script.setSourceCode(QStringLiteral(
+        "(() => {"
+        " window.dssClock = [];"
+        " const original = window.fetch.bind(window);"
+        " window.fetch = (url, init) => {"
+        "  const result = original(url, init);"
+        "  if (String(url) === 'clock') {"
+        "   const e = { body: JSON.parse(init.body), keepalive: init.keepalive === true,"
+        "               type: init.headers ? init.headers['Content-Type'] : '', status: 0 };"
+        "   window.dssClock.push(e);"
+        "   result.then((r) => { e.status = r.status; }, () => { e.status = -1; });"
+        "  }"
+        "  return result;"
+        " };"
+        " %1"
+        "})();").arg(obs ? QStringLiteral("window.obsstudio = { pluginVersion: '2.26.9' };") : QString()));
+    view->page()->scripts().insert(script);
+}
+
 } // namespace
 
 class TestBrowserquelle : public QObject
@@ -159,6 +199,9 @@ private:
     std::unique_ptr<QWebEngineView> m_view;
     QString m_saveDir;
     QString m_oldToken;
+    QUuid m_obsId;    // Overlay für die Seite in OBS (P12b b4)
+    QUuid m_obsVideo; // tests/daten/ton/blitz-piep.mp4, 60 s, ohne Wiederholen
+    QUuid m_obsLoop;  // drehung-0.mp4, 10 Bilder, wiederholt
 
     bool startCore()
     {
@@ -170,16 +213,35 @@ private:
                           &m_coreLog, 8000);
     }
 
-    QVariant js(const QString &code)
+    QVariant js(const QString &code) { return js(m_view.get(), code); }
+
+    QVariant js(QWebEngineView *view, const QString &code)
     {
         QVariant result;
         bool done = false;
-        m_view->page()->runJavaScript(code, [&](const QVariant &v) {
+        view->page()->runJavaScript(code, [&](const QVariant &v) {
             result = v;
             done = true;
         });
         static_cast<void>(QTest::qWaitFor([&] { return done; }, 5000));
         return result;
+    }
+
+    // Aufgezeichnete Meldungen an «clock» (addClockRecorder), bis vor die erste ohne Antwort (die
+    // Seite meldet weiter, während der Test liest)
+    QJsonArray clockReports(QWebEngineView *view)
+    {
+        return QJsonDocument::fromJson(js(view, QStringLiteral("(() => { const i = window.dssClock.findIndex(e => e.status === 0);"
+                                                               " return JSON.stringify(i < 0 ? window.dssClock : window.dssClock.slice(0, i)); })()"))
+                                           .toString()
+                                           .toUtf8())
+            .array();
+    }
+
+    void setObsActive(QWebEngineView *view, bool active)
+    {
+        js(view, QStringLiteral("window.dispatchEvent(new CustomEvent('obsSourceActiveChanged', {detail: {active: %1}}))")
+                     .arg(active ? QStringLiteral("true") : QStringLiteral("false")));
     }
 
     QImage grab()
@@ -352,6 +414,26 @@ private slots:
         m_videoTurned = QRect(440, 320, 160, 80);
         place(store.addVideoSource(m_id, kVideos + QStringLiteral("/drehung-90.mp4"), true, &error), m_videoTurned, 300, false, true);
 
+        // Overlay für die Seite in OBS (P12b b4): ein langes Video mit Ton, ein kurzes wiederholtes
+        m_obsId = store.createOverlay(QStringLiteral("Prüfung Seite in OBS"), 640, 360, &error);
+        QVERIFY2(!m_obsId.isNull(), qPrintable(error));
+        m_obsVideo = store.addVideoSource(m_obsId, QStringLiteral(DSS_TEST_TON_DIR "/blitz-piep.mp4"), false, &error);
+        QVERIFY2(!m_obsVideo.isNull(), qPrintable(error));
+        m_obsLoop = store.addVideoSource(m_obsId, kVideos + QStringLiteral("/drehung-0.mp4"), true, &error);
+        QVERIFY2(!m_obsLoop.isNull(), qPrintable(error));
+        {
+            SourceChanges c;
+            c.x = 0;
+            c.y = 0;
+            c.width = 320;
+            c.height = 180;
+            QVERIFY2(store.updateSource(m_obsId, m_obsVideo, c, &error), qPrintable(error));
+            c.x = 400;
+            c.width = 160;
+            c.height = 90;
+            QVERIFY2(store.updateSource(m_obsId, m_obsLoop, c, &error), qPrintable(error));
+        }
+
         QVERIFY2(startCore(), qPrintable(m_coreLog));
         CoreClient::Options o;
         o.socketPath = m_socket;
@@ -369,6 +451,7 @@ private slots:
         m_view = std::make_unique<QWebEngineView>();
         m_view->page()->setBackgroundColor(Qt::transparent);
         m_view->page()->settings()->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
+        addClockRecorder(m_view.get(), false); // ohne window.obsstudio: keine Meldungen (obsPage)
         m_view->resize(kWidth, kHeight);
         m_view->show();
         QVERIFY(QTest::qWaitForWindowExposed(m_view.get()));
@@ -556,6 +639,212 @@ private slots:
         QTest::qWait(500);
         QCOMPARE(js(QStringLiteral("window.dssState.applied")).toInt(), applied);
         QCOMPARE(js(QStringLiteral("[...document.querySelectorAll('video')].filter(v => v.dssMark === 1).length")).toInt(), 5);
+    }
+
+    // P12b b4: Seite in OBS (window.obsstudio und «obsSourceActiveChanged» nachgebildet). Meldungen
+    // an …/clock: Inhalt, Folge, Antwort 204; «inaktiv» hält an und setzt zurück; neue Datei von
+    // vorne. Ohne window.obsstudio (m_view) keine Meldungen. Zum Schluss neuer Token: auch die Seite
+    // mit …/events/<page> lädt neu und ist leer.
+    void obsPage()
+    {
+        const QString mainUrl = url();
+        m_client->requestBrowserSource(m_obsId);
+        QTRY_VERIFY_WITH_TIMEOUT(!url().isEmpty() && url() != mainUrl, 3000);
+        const QString obsUrl = url();
+        m_client->requestBrowserSource(m_id);
+        QTRY_VERIFY_WITH_TIMEOUT(url() == mainUrl, 3000);
+
+        auto view = std::make_unique<QWebEngineView>();
+        view->page()->setBackgroundColor(Qt::transparent);
+        view->page()->settings()->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
+        addClockRecorder(view.get(), true);
+        view->resize(640, 360);
+        view->show();
+        QVERIFY(QTest::qWaitForWindowExposed(view.get()));
+        view->load(QUrl(obsUrl));
+        QVERIFY(QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("window.dssState ? window.dssState.applied : 0")).toInt() >= 1; }, 15000));
+        const QString videos = QStringLiteral("[...document.querySelectorAll('video')]");
+        QVERIFY(QTest::qWaitFor([&] {
+            return js(view.get(), videos + QStringLiteral(".filter(v => v.readyState >= 2).length")).toInt() == 2;
+        }, 15000));
+        const QString page = js(view.get(), QStringLiteral("window.dssState.page")).toString();
+        QVERIFY2(QRegularExpression(QStringLiteral("^[a-z0-9]{8,32}$")).match(page).hasMatch(), qPrintable(page));
+        const QString longFile = js(view.get(), videos + QStringLiteral("[0].dssFile")).toString();
+        const QString loopFile = js(view.get(), videos + QStringLiteral("[1].dssFile")).toString();
+        QVERIFY(longFile.startsWith(QStringLiteral("media/")) && loopFile.startsWith(QStringLiteral("media/")));
+
+        // Zustand unbekannt (wie nach dem Laden einer schon aktiven Quelle, M3): Videos laufen, keine Meldungen
+        QTest::qWait(1200);
+        QCOMPARE(js(view.get(), QStringLiteral("window.dssClock.length")).toInt(), 0);
+        QVERIFY(js(view.get(), videos + QStringLiteral("[0].currentTime")).toDouble() > 0.5);
+
+        // Folge einer Quelle: Ereignisse mit Lauf, Wiederholung und Lage
+        const auto bySource = [](const QJsonArray &all, const QUuid &source, int from = 0) {
+            QList<QJsonObject> out;
+            for (int i = from; i < all.size(); ++i) {
+                const QJsonObject b = all.at(i).toObject().value(QStringLiteral("body")).toObject();
+                if (QUuid::fromString(b.value(QStringLiteral("source")).toString()) == source)
+                    out.append(b);
+            }
+            return out;
+        };
+        const auto ev = [](const QJsonObject &b) { return b.value(QStringLiteral("event")).toString(); };
+        const auto num = [](const QJsonObject &b, const char *key) { return b.value(QLatin1String(key)).toDouble(-1); };
+        const auto allAnswered = [&] {
+            if (QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("window.dssClock.every(e => e.status !== 0)")).toBool(); }, 3000))
+                return true;
+            // Diagnose: Meldungen ohne Antwort und Zeilen des Kerns zum Ton
+            m_coreLog += QString::fromUtf8(m_core->readAllStandardError());
+            qWarning("ohne Antwort: %s", qPrintable(js(view.get(), QStringLiteral("JSON.stringify(window.dssClock.filter(e => e.status === 0))")).toString()));
+            for (const QString &line : m_coreLog.split(QLatin1Char('\n')))
+                if (line.contains(QStringLiteral("Ton")) || line.contains(QStringLiteral("Uhr")))
+                    qWarning("Kern: %s", qPrintable(line));
+            return false;
+        };
+        // Für alle Meldungen: Version, Seite, laufende Nummer ohne Lücke, keepalive, text/plain, 204
+        const auto checkAll = [&](const QJsonArray &all) {
+            double lastNow = -1;
+            for (int i = 0; i < all.size(); ++i) {
+                const QJsonObject e = all.at(i).toObject();
+                const QJsonObject b = e.value(QStringLiteral("body")).toObject();
+                const QString what = QString::fromUtf8(QJsonDocument(e).toJson(QJsonDocument::Compact));
+                QVERIFY2(b.value(QStringLiteral("v")).toInt() == 1 && b.value(QStringLiteral("page")).toString() == page
+                             && b.value(QStringLiteral("seq")).toInt(-1) == i,
+                         qPrintable(what));
+                QVERIFY2(e.value(QStringLiteral("keepalive")).toBool() && e.value(QStringLiteral("type")).toString() == QStringLiteral("text/plain"),
+                         qPrintable(what));
+                QVERIFY2(e.value(QStringLiteral("status")).toInt() == 204, qPrintable(what));
+                QVERIFY2(num(b, "now_ms") >= lastNow, qPrintable(what));
+                lastNow = num(b, "now_ms");
+                if (ev(b) != QStringLiteral("stop") && ev(b) != QStringLiteral("end"))
+                    QVERIFY2(std::abs(num(b, "now_ms") - num(b, "display_ms")) < 200, qPrintable(what));
+            }
+        };
+
+        // «aktiv»: Lauf 1, beide Videos von vorne
+        setObsActive(view.get(), true);
+        QTest::qWait(2600);
+        QVERIFY(allAnswered());
+        QJsonArray all = clockReports(view.get());
+        checkAll(all);
+        if (QTest::currentTestFailed())
+            return;
+        const QList<QJsonObject> longRun = bySource(all, m_obsVideo);
+        const QList<QJsonObject> loopRun = bySource(all, m_obsLoop);
+        QCOMPARE(int(longRun.size() + loopRun.size()), int(all.size()));
+        // Langes Video: start bei 0, dann etwa jede Sekunde frame, Länge 60 s
+        QVERIFY(longRun.size() >= 3);
+        QCOMPARE(ev(longRun.first()), QStringLiteral("start"));
+        for (int i = 0; i < longRun.size(); ++i) {
+            const QJsonObject &b = longRun.at(i);
+            QCOMPARE(b.value(QStringLiteral("run")).toInt(), 1);
+            QCOMPARE(b.value(QStringLiteral("loop")).toInt(-1), 0);
+            QCOMPARE(b.value(QStringLiteral("file")).toString(), longFile);
+            QVERIFY(std::abs(num(b, "duration_s") - 60.0) < 0.1);
+            if (i == 0) {
+                QVERIFY2(num(b, "media_s") >= 0 && num(b, "media_s") < 0.2, qPrintable(QString::number(num(b, "media_s"))));
+                continue;
+            }
+            QCOMPARE(ev(b), QStringLiteral("frame"));
+            const double gap = num(b, "display_ms") - num(longRun.at(i - 1), "display_ms");
+            const double media = num(b, "media_s") - num(longRun.at(i - 1), "media_s");
+            qInfo("frame nach %.1f ms, Lage + %.3f s", gap, media);
+            QVERIFY(gap >= 1000 && gap < 1500);
+            QVERIFY(media > 0.9 && media < 1.6);
+        }
+        // Kurzes Video (0,33 s, wiederholt): start, danach loop mit Durchgang 1, 2, 3 …
+        QVERIFY(loopRun.size() >= 5);
+        QCOMPARE(ev(loopRun.first()), QStringLiteral("start"));
+        int loops = 0;
+        for (const QJsonObject &b : loopRun) {
+            QCOMPARE(b.value(QStringLiteral("run")).toInt(), 1);
+            QCOMPARE(b.value(QStringLiteral("file")).toString(), loopFile);
+            QVERIFY(num(b, "duration_s") > 0.2 && num(b, "duration_s") < 0.5);
+            if (ev(b) == QStringLiteral("loop")) {
+                QCOMPARE(b.value(QStringLiteral("loop")).toInt(), ++loops);
+                QVERIFY2(num(b, "media_s") < 0.2, qPrintable(QString::number(num(b, "media_s"))));
+            } else {
+                QCOMPARE(b.value(QStringLiteral("loop")).toInt(), loops);
+            }
+        }
+        qInfo("Lauf 1: %d Meldungen, langes Video %d, kurzes %d (Wiederholungen %d)", int(all.size()),
+              int(longRun.size()), int(loopRun.size()), loops);
+        QVERIFY(loops >= 4);
+
+        // «inaktiv»: stop ohne Quelle, Videos angehalten am Anfang, danach keine Meldungen
+        setObsActive(view.get(), false);
+        QTRY_VERIFY_WITH_TIMEOUT(js(view.get(), videos + QStringLiteral(".every(v => v.paused && v.currentTime === 0 && !v.seeking)")).toBool(), 3000);
+        QTest::qWait(1200);
+        QVERIFY(allAnswered());
+        all = clockReports(view.get());
+        checkAll(all);
+        if (QTest::currentTestFailed())
+            return;
+        const QJsonObject stop =all.last().toObject().value(QStringLiteral("body")).toObject();
+        QCOMPARE(ev(stop), QStringLiteral("stop"));
+        QVERIFY(!stop.contains(QStringLiteral("source")));
+        QCOMPARE(stop.value(QStringLiteral("run")).toInt(), 1);
+        QVERIFY(js(view.get(), videos + QStringLiteral(".every(v => v.paused && v.currentTime === 0)")).toBool());
+        const int afterStop = int(all.size());
+        QCOMPARE(js(view.get(), QStringLiteral("window.dssClock.length")).toInt(), afterStop);
+
+        // wieder «aktiv»: Lauf 2, beide von vorne mit start
+        setObsActive(view.get(), true);
+        QTest::qWait(600);
+        QVERIFY(allAnswered());
+        all = clockReports(view.get());
+        checkAll(all);
+        if (QTest::currentTestFailed())
+            return;
+        for (const QUuid &s : {m_obsVideo, m_obsLoop}) {
+            const QList<QJsonObject> run2 = bySource(all, s, afterStop);
+            QVERIFY(!run2.isEmpty());
+            QCOMPARE(ev(run2.first()), QStringLiteral("start"));
+            QCOMPARE(run2.first().value(QStringLiteral("run")).toInt(), 2);
+            QCOMPARE(run2.first().value(QStringLiteral("loop")).toInt(-1), 0);
+            QVERIFY(num(run2.first(), "media_s") < 0.2);
+        }
+
+        // Neue Datei (nachgebildet, der Kern ändert die Datei eines Videos heute nicht): das lange
+        // Video bekommt die Datei des kurzen → neues Element von vorne, start; ohne Wiederholen
+        // danach end.
+        const int beforeFile = int(clockReports(view.get()).size());
+        js(view.get(), QStringLiteral("(() => { const d = JSON.parse(JSON.stringify(lastData));"
+                                      " const s = d.overlay.sources.find(x => x.kind === 'video' && !x.video.loop);"
+                                      " s.video.file = '%1'; apply(d); })()").arg(loopFile));
+        QVERIFY(QTest::qWaitFor([&] {
+            const QList<QJsonObject> r = bySource(clockReports(view.get()), m_obsVideo, beforeFile);
+            return std::any_of(r.cbegin(), r.cend(), [&](const QJsonObject &b) { return ev(b) == QStringLiteral("end"); });
+        }, 5000));
+        QVERIFY(allAnswered());
+        all = clockReports(view.get());
+        checkAll(all);
+        if (QTest::currentTestFailed())
+            return;
+        const QList<QJsonObject> newFile = bySource(all, m_obsVideo, beforeFile);
+        QCOMPARE(ev(newFile.first()), QStringLiteral("start"));
+        QCOMPARE(newFile.first().value(QStringLiteral("file")).toString(), loopFile);
+        QCOMPARE(newFile.first().value(QStringLiteral("run")).toInt(), 2);
+        QCOMPARE(newFile.first().value(QStringLiteral("loop")).toInt(-1), 0);
+        QVERIFY(num(newFile.first(), "media_s") < 0.2);
+        QCOMPARE(ev(newFile.last()), QStringLiteral("end"));
+        QCOMPARE(newFile.last().value(QStringLiteral("run")).toInt(), 2);
+        QVERIFY(!newFile.last().contains(QStringLiteral("file")));
+
+        // Kern hat nichts abgewiesen; die Seite ohne window.obsstudio hat nichts gemeldet
+        m_coreLog += QString::fromUtf8(m_core->readAllStandardError());
+        QVERIFY(!m_coreLog.contains(QStringLiteral("Meldung der Uhr abgewiesen")));
+        QCOMPARE(js(QStringLiteral("window.dssClock.length")).toInt(), 0);
+        QCOMPARE(js(QStringLiteral("window.dssState.page")).toString(), QString());
+
+        // Neuer Token: Die Seite mit …/events/<page> bekommt «gone», lädt neu und ist leer
+        ChangeRequest r;
+        r.type = QString::fromLatin1(msg::kNewToken);
+        r.overlayId = m_obsId;
+        QVERIFY(change(r).ok);
+        QVERIFY(QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("document.getElementById('overlay') === null")).toBool(); }, 8000));
+        m_client->requestBrowserSource(m_id);
+        QTRY_VERIFY_WITH_TIMEOUT(url() == mainUrl, 3000);
     }
 
     // Neuer Token: alte Adresse leer und durchsichtig, Hinweis im Fenster; neue Adresse geht
