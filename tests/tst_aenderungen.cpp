@@ -328,6 +328,14 @@ private slots:
         row("changes.x Bruch",
             QStringLiteral("{\"type\":\"update_source\",\"request_id\":1,%1,%2,\"changes\":{\"x\":1.5}}").arg(o, s),
             "x");
+        row("changes.video.volume Bruch",
+            QStringLiteral("{\"type\":\"update_source\",\"request_id\":1,%1,%2,"
+                           "\"changes\":{\"video\":{\"volume\":50.5}}}").arg(o, s),
+            "volume");
+        row("changes.video.muted Zahl",
+            QStringLiteral("{\"type\":\"update_source\",\"request_id\":1,%1,%2,"
+                           "\"changes\":{\"video\":{\"muted\":1}}}").arg(o, s),
+            "muted");
     }
     void invalidRequests()
     {
@@ -429,6 +437,8 @@ private slots:
         c.visible = false;
         c.loop = true;
         c.holdAtEnd = true; // P09
+        c.volume = 35;      // P12b b5
+        c.muted = true;     // P12b b5
         c.content = QStringLiteral("a\nb");
         c.fontSize = 72;
         c.color = QStringLiteral("#11223344");
@@ -436,6 +446,8 @@ private slots:
         const QJsonObject o = sourceChangesToJson(c);
         QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("loop")).toBool(), true);
         QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("hold_at_end")).toBool(), true);
+        QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("volume")), QJsonValue(35));
+        QCOMPARE(o.value(QStringLiteral("video")).toObject().value(QStringLiteral("muted")), QJsonValue(true));
         QCOMPARE(o.value(QStringLiteral("flip_horizontal")), QJsonValue(true));
         QCOMPARE(o.value(QStringLiteral("flip_vertical")), QJsonValue(false));
         QCOMPARE(o.value(QStringLiteral("text")).toObject().value(QStringLiteral("font_size")).toInt(), 72);

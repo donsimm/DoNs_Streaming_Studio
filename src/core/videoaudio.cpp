@@ -51,6 +51,8 @@ struct VideoAudio::Voice
     int run = -1;
     PageClockSmoother smoother;
     qint64 lengthNs = 0;
+    int volume = kVolumeMax; // zuletzt an den Mischer gegeben
+    bool muted = false;
     qint64 lastReportNs = 0;
     qint64 stoppedNs = 0;
     qint64 lastStatusNs = 0;
@@ -159,9 +161,22 @@ VideoAudio::Voice *VideoAudio::ensureVoice(const Overlay &overlay, const Source 
     v->pass = v->decoder->firstPass();
     m_mixer->prepare(slot, v->pass);
     m_mixer->setLength(slot, 0, source.loop);
+    v->volume = source.volume;
+    v->muted = source.muted;
+    m_mixer->setVolume(slot, float(source.volume) / kVolumeMax, source.muted);
     v->stoppedNs = steadyNs();
     m_voices.insert(k, v);
     return v.get();
+}
+
+void VideoAudio::applyVolume(Voice &v, const Source &source)
+{
+    if (source.volume == v.volume && source.muted == v.muted)
+        return;
+    v.volume = source.volume;
+    v.muted = source.muted;
+    m_mixer->setVolume(v.slot, float(source.volume) / kVolumeMax, source.muted);
+    qInfo("Ton: Lautstärke %s: %d %%%s", qPrintable(label(v)), source.volume, source.muted ? ", stumm" : "");
 }
 
 void VideoAudio::setLength(Voice &v, qint64 durationNs)
@@ -353,6 +368,7 @@ void VideoAudio::overlaysChanged()
         }
         v.name = s->name;
         v.overlayName = o->name;
+        applyVolume(v, *s);
         if (!o->output)
             stopVoice(v, QStringLiteral("Ausgabe aus"));
         else if (!s->visible)

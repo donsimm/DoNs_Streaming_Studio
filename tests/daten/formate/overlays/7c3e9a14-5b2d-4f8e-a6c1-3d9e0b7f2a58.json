@@ -1,0 +1,31 @@
+{
+    "address": "format-fuenf",
+    "format_version": 5,
+    "height": 720,
+    "id": "7c3e9a14-5b2d-4f8e-a6c1-3d9e0b7f2a58",
+    "name": "Format fünf",
+    "output": true,
+    "sources": [
+        {
+            "flip_horizontal": false,
+            "flip_vertical": false,
+            "height": 32,
+            "id": "1e8b4d62-a9f3-4c07-8d25-6f0a3b9c1e74",
+            "kind": "video",
+            "name": "drehung-0.mp4",
+            "rotation": 0,
+            "video": {
+                "file": "media/50419e73048d008d6852b951f6e82e929f2aa1c985ac18c2133ed196062dedae.mp4",
+                "hold_at_end": false,
+                "loop": true,
+                "muted": true,
+                "volume": 35
+            },
+            "visible": true,
+            "width": 64,
+            "x": 0,
+            "y": 0
+        }
+    ],
+    "width": 1280
+}

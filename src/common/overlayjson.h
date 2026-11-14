@@ -11,10 +11,11 @@ namespace dss {
 
 // Version des Dateiformats, die dieses Programm schreibt. 2 seit P09: Feld video.hold_at_end
 // (Entscheid 9). 3 seit P09b: Felder flip_horizontal und flip_vertical je Quelle (Entscheid 4).
-// 4 seit P10: Feld output (Ausgabe ein/aus, E-24).
-// Gelesen werden 1 bis 4; fehlt ein Feld in einer älteren Version, gilt es als false (output:
-// true). Begründung: docs/06-overlay-format.md, Feld format_version.
-inline constexpr int kOverlayFormatVersion = 4;
+// 4 seit P10: Feld output (Ausgabe ein/aus, E-24). 5 seit P12b: Felder video.volume und
+// video.muted (Ton der Videos).
+// Gelesen werden 1 bis 5; fehlt ein Feld in einer älteren Version, gilt es als false (output:
+// true, volume: 100). Begründung: docs/06-overlay-format.md, Feld format_version.
+inline constexpr int kOverlayFormatVersion = 5;
 inline constexpr int kOverlayFormatVersionMin = 1;
 
 QJsonObject overlayToJson(const Overlay &overlay);

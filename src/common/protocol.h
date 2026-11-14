@@ -45,8 +45,10 @@ namespace dss {
 //   settings und update_settings mit obs_*, Codes obs_*)
 // 12 seit P12b b3: Ton (audio_outputs; settings mit audio_routes, audio_offset_min_ms,
 //   audio_offset_max_ms; update_settings mit audio_routes)
+// 13 seit P12b b5: Overlays im Format 5 (video.volume, video.muted), changes.video.volume und
+//   changes.video.muted
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 12;
+inline constexpr int kProtocolVersion = 13;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 

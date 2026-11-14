@@ -89,6 +89,8 @@ private:
     void stopVoice(Voice &v, const QString &reason);
     void removeVoice(const QString &key, const QString &reason);
     void setLength(Voice &v, qint64 durationNs);
+    // Lautstärke und Stumm der Quelle an den Mischer (Format 5, P12b b5), bei Änderung ins Protokoll
+    void applyVolume(Voice &v, const Source &source);
     void prepareVoices(const QUuid &overlayId);
     bool overlayConnected(const QUuid &overlayId) const;
     QString label(const Voice &v) const;

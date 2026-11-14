@@ -279,6 +279,16 @@ private:
         r.changes.loop = loop;
         return change(r);
     }
+    bool setVolume(const QUuid &source, int volume, bool muted)
+    {
+        ChangeRequest r;
+        r.type = QString::fromLatin1(msg::kUpdateSource);
+        r.overlayId = m_overlayId;
+        r.sourceId = source;
+        r.changes.volume = volume;
+        r.changes.muted = muted;
+        return change(r);
+    }
     bool setOutput(bool output)
     {
         ChangeRequest r;
@@ -464,6 +474,28 @@ private slots:
         QCOMPARE(number(line, QStringLiteral("weich")), 0);
         // Gespielt: Ton nur innerhalb der Länge, ohne die Pausen
         QVERIFY2(played(line) >= 3.0 && played(line) <= 3.6, qPrintable(line));
+    }
+
+    // Lautstärke und Stumm (Format 5, P12b b5): gehen an den Mischer, der Ton läuft weiter.
+    void volumeKeepsPlaying()
+    {
+        auto p = page("seiteg01");
+        p->openEvents();
+        QTest::qWait(300);
+        p->start(1, 60.0, true);
+        QVERIFY2(expectLog(started("seiteg01", 1), 3000), qPrintable(logTail()));
+        const qsizetype from = m_logPos;
+        QVERIFY(setVolume(m_videoId, 40, true));
+        QVERIFY2(expectLog(QStringLiteral("Ton: Lautstärke %1: 40 %, stumm").arg(m_videoLabel), 2000),
+                 qPrintable(logTail()));
+        QVERIFY(setVolume(m_videoId, 100, false));
+        QString line;
+        QVERIFY2(expectLog(QStringLiteral("Ton: Lautstärke %1: 100 %").arg(m_videoLabel), 2000, &line),
+                 qPrintable(logTail()));
+        QVERIFY2(!line.contains(QStringLiteral("stumm")), qPrintable(line));
+        QVERIFY2(!m_log.mid(from, m_logPos - from).contains(QStringLiteral("Ton: Stopp")), qPrintable(logTail()));
+        p->stop();
+        QVERIFY2(expectLog(stopped(QStringLiteral("Seite inaktiv")), 2000), qPrintable(logTail()));
     }
 
     // Stopp in allen Fällen; nach verborgen, Ausgabe aus, 3 s ohne Meldung und Ende der Ereignisse

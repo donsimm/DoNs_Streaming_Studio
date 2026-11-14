@@ -650,6 +650,10 @@ QJsonObject sourceChangesToJson(const SourceChanges &c)
         v.insert(QStringLiteral("loop"), *c.loop);
     if (c.holdAtEnd)
         v.insert(QStringLiteral("hold_at_end"), *c.holdAtEnd);
+    if (c.volume)
+        v.insert(QStringLiteral("volume"), *c.volume);
+    if (c.muted)
+        v.insert(QStringLiteral("muted"), *c.muted);
     if (!v.isEmpty())
         o.insert(QStringLiteral("video"), v);
     QJsonObject t;
@@ -747,10 +751,13 @@ bool sourceChangesFromJson(const QJsonObject &o, SourceChanges *changes, QString
             return false;
         }
         const QJsonObject v = o.value(QStringLiteral("video")).toObject();
-        if (!onlyKnownKeys(v, {QStringLiteral("loop"), QStringLiteral("hold_at_end")},
+        if (!onlyKnownKeys(v, {QStringLiteral("loop"), QStringLiteral("hold_at_end"),
+                               QStringLiteral("volume"), QStringLiteral("muted")},
                            QStringLiteral("changes.video."), error)
             || !optionalBoolChange(v, QStringLiteral("loop"), &c.loop, error)
-            || !optionalBoolChange(v, QStringLiteral("hold_at_end"), &c.holdAtEnd, error))
+            || !optionalBoolChange(v, QStringLiteral("hold_at_end"), &c.holdAtEnd, error)
+            || !optionalIntChange(v, QStringLiteral("volume"), &c.volume, error)
+            || !optionalBoolChange(v, QStringLiteral("muted"), &c.muted, error))
             return false;
     }
     if (o.contains(QStringLiteral("text"))) {

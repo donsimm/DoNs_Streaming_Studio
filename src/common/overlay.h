@@ -25,6 +25,8 @@ inline constexpr int kRotationMax = 3599; // Zehntelgrad, also 359.9 °
 inline constexpr int kFontWeightMin = 100;
 inline constexpr int kFontWeightMax = 900;
 inline constexpr int kFontSizeMin = 1;
+inline constexpr int kVolumeMin = 0;   // Prozent
+inline constexpr int kVolumeMax = 100; // Prozent
 
 enum class SourceKind { Text, Image, Video };
 enum class TextAlign { Left, Center, Right };
@@ -71,6 +73,11 @@ struct Source
     // Nur bei Video (P09, Entscheid 9): am Ende das letzte Bild stehen lassen. Ohne beides wird
     // die Quelle am Ende leer (durchsichtig). Mit loop hat holdAtEnd keine Wirkung.
     bool holdAtEnd = false;
+    // Nur bei Video (P12b, Antwort 3 des Nutzers): Lautstärke des Tons in Prozent (0 bis 100) und
+    // stumm. Den Ton spielt nur der Kern, die Browserquelle bleibt stumm. Neue Quellen: 100, nicht
+    // stumm.
+    int volume = 100;
+    bool muted = false;
 
     bool operator==(const Source &) const = default;
 };
@@ -135,6 +142,8 @@ struct SourceChanges
     std::optional<bool> visible;
     std::optional<bool> loop;        // nur Video
     std::optional<bool> holdAtEnd;   // nur Video (P09)
+    std::optional<int> volume;       // nur Video (P12b), Prozent
+    std::optional<bool> muted;       // nur Video (P12b)
     std::optional<QString> content;  // nur Text
     std::optional<int> fontSize;     // nur Text
     std::optional<QString> color;    // nur Text, #RRGGBBAA

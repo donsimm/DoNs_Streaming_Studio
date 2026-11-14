@@ -51,6 +51,8 @@ QJsonObject sourceToJson(const Source &source)
         if (source.kind == SourceKind::Video) {
             f.insert(QStringLiteral("loop"), source.loop);
             f.insert(QStringLiteral("hold_at_end"), source.holdAtEnd);
+            f.insert(QStringLiteral("volume"), source.volume);
+            f.insert(QStringLiteral("muted"), source.muted);
         }
         o.insert(sourceKindName(source.kind), f);
         break;
@@ -233,16 +235,25 @@ bool sourceFromJson(const QJsonObject &object, const QString &path, int version,
         if (p.ok())
             p.check(QString(), validateTextProperties(t));
     } else if (source->kind == SourceKind::Video) {
-        // hold_at_end gibt es erst ab Version 2 (P09); in Version 1 gilt false.
-        if (version >= 2) {
-            p.allowOnly({QStringLiteral("file"), QStringLiteral("loop"), QStringLiteral("hold_at_end")});
-        } else {
-            p.allowOnly({QStringLiteral("file"), QStringLiteral("loop")});
-        }
+        // hold_at_end gibt es erst ab Version 2 (P09); in Version 1 gilt false. volume und muted
+        // gibt es erst ab Version 5 (P12b); vorher gilt 100 und false.
+        QStringList videoKeys{QStringLiteral("file"), QStringLiteral("loop")};
+        if (version >= 2)
+            videoKeys << QStringLiteral("hold_at_end");
+        if (version >= 5)
+            videoKeys << QStringLiteral("volume") << QStringLiteral("muted");
+        p.allowOnly(videoKeys);
         source->file = p.string(QStringLiteral("file"));
         source->loop = p.boolean(QStringLiteral("loop"));
         if (version >= 2)
             source->holdAtEnd = p.boolean(QStringLiteral("hold_at_end"));
+        if (version >= 5) {
+            source->volume = p.integer(QStringLiteral("volume"));
+            source->muted = p.boolean(QStringLiteral("muted"));
+            if (p.ok() && (source->volume < kVolumeMin || source->volume > kVolumeMax))
+                p.fail(QStringLiteral("volume"), QStringLiteral("muss %1 bis %2 sein")
+                                                     .arg(kVolumeMin).arg(kVolumeMax));
+        }
         if (p.ok())
             p.check(QStringLiteral("file"), validateMediaReference(source->file));
     } else {

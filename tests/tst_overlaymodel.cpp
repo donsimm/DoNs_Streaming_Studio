@@ -103,6 +103,23 @@ void removeHoldAtEnd(QJsonObject &o)
     o.insert(QStringLiteral("sources"), sources);
 }
 
+// Entfernt volume und muted aus allen Videoquellen (Format vor Version 5, P12b).
+void removeVolumeFields(QJsonObject &o)
+{
+    QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
+    for (qsizetype i = 0; i < sources.size(); ++i) {
+        QJsonObject s = sources.at(i).toObject();
+        if (s.contains(QStringLiteral("video"))) {
+            QJsonObject video = s.value(QStringLiteral("video")).toObject();
+            video.remove(QStringLiteral("volume"));
+            video.remove(QStringLiteral("muted"));
+            s.insert(QStringLiteral("video"), video);
+        }
+        sources[i] = s;
+    }
+    o.insert(QStringLiteral("sources"), sources);
+}
+
 // Ändert in der JSON-Darstellung eines Overlays einen Wert und liest wieder ein.
 QString parseError(const std::function<void(QJsonObject &)> &change)
 {
@@ -243,6 +260,10 @@ private slots:
         QTest::newRow("Wiederholen bei Text") << 20 << QStringLiteral("nur bei Quellen der Art Video");
         QTest::newRow("Am Ende anhalten bei Bild") << 21 << QStringLiteral("Am Ende anhalten gibt es nur");
         QTest::newRow("Am Ende anhalten bei Text") << 22 << QStringLiteral("Am Ende anhalten gibt es nur");
+        QTest::newRow("Lautstärke bei Bild") << 23 << QStringLiteral("Lautstärke und Stumm gibt es nur");
+        QTest::newRow("Stumm bei Text") << 24 << QStringLiteral("Lautstärke und Stumm gibt es nur");
+        QTest::newRow("Lautstärke 101") << 25 << QStringLiteral("Lautstärke 101");
+        QTest::newRow("Lautstärke -1") << 26 << QStringLiteral("Lautstärke -1");
     }
 
     void invalidValuesRejected()
@@ -273,6 +294,10 @@ private slots:
         case 20: o.sources[2].loop = true; break;
         case 21: o.sources[0].holdAtEnd = true; break;
         case 22: o.sources[2].holdAtEnd = true; break;
+        case 23: o.sources[0].volume = 50; break;
+        case 24: o.sources[2].muted = true; break;
+        case 25: o.sources[1].volume = 101; break;
+        case 26: o.sources[1].volume = -1; break;
         }
         const QString error = validateOverlay(o);
         QVERIFY2(error.contains(expectedPart), qPrintable(error));
@@ -340,7 +365,96 @@ private slots:
         QVERIFY2(parseOverlay(serializeOverlay(original), &loaded, &error), qPrintable(error));
         QCOMPARE(loaded, original);
         QCOMPARE(loaded.sources[1].loop, true);
-        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 4); // seit P10
+        QCOMPARE(overlayToJson(original).value(QStringLiteral("format_version")).toInt(), 5); // seit P12b
+    }
+
+    // P12b b5 (Antwort 3 des Nutzers): Lautstärke und Stumm je Videoquelle, Format 5.
+    void volumeFields()
+    {
+        Overlay original = makeOverlay();
+        QCOMPARE(original.sources[1].volume, 100); // neue Quellen: 100 %, nicht stumm
+        QCOMPARE(original.sources[1].muted, false);
+        original.sources[1].volume = 0;
+        original.sources[1].muted = true;
+        const QJsonObject o = overlayToJson(original);
+        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 5);
+        const QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
+        const QJsonObject video = sources.at(1).toObject().value(QStringLiteral("video")).toObject();
+        QCOMPARE(video.value(QStringLiteral("volume")), QJsonValue(0));
+        QCOMPARE(video.value(QStringLiteral("muted")), QJsonValue(true));
+        // Bild und Text haben keine Felder volume und muted.
+        QVERIFY(!sources.at(0).toObject().value(QStringLiteral("image")).toObject().contains(QStringLiteral("volume")));
+        QVERIFY(!sources.at(2).toObject().value(QStringLiteral("text")).toObject().contains(QStringLiteral("muted")));
+        Overlay loaded;
+        QString error;
+        QVERIFY2(parseOverlay(QJsonDocument(o).toJson(), &loaded, &error), qPrintable(error));
+        QCOMPARE(loaded, original);
+
+        // Version 5: beide Pflicht; volume ganze Zahl 0 bis 100, muted true/false
+        const auto rejected = [&](const QString &key, const QJsonValue &value) {
+            QJsonObject changed = o;
+            setInKind(changed, 1, QStringLiteral("video"), key, value);
+            Overlay result;
+            QString e;
+            if (parseOverlay(QJsonDocument(changed).toJson(), &result, &e))
+                return QStringLiteral("(gelesen)");
+            return e;
+        };
+        QVERIFY(rejected(QStringLiteral("volume"), QJsonValue::Undefined).contains(QStringLiteral("sources[1].video.volume»: fehlt")));
+        QVERIFY(rejected(QStringLiteral("muted"), QJsonValue::Undefined).contains(QStringLiteral("sources[1].video.muted»: fehlt")));
+        QVERIFY(rejected(QStringLiteral("volume"), 101).contains(QStringLiteral("sources[1].video.volume»: muss 0 bis 100")));
+        QVERIFY(rejected(QStringLiteral("volume"), -1).contains(QStringLiteral("sources[1].video.volume»: muss 0 bis 100")));
+        QVERIFY(rejected(QStringLiteral("volume"), 50.5).contains(QStringLiteral("ganze Zahl")));
+        QVERIFY(rejected(QStringLiteral("muted"), 1).contains(QStringLiteral("sources[1].video.muted»: muss true oder false")));
+        for (int value : {0, 100}) {
+            QJsonObject edge = o;
+            setInKind(edge, 1, QStringLiteral("video"), QStringLiteral("volume"), value);
+            QVERIFY2(parseOverlay(QJsonDocument(edge).toJson(), &loaded, &error), qPrintable(error));
+            QCOMPARE(loaded.sources[1].volume, value);
+        }
+
+        // Version 1 bis 4: ohne die Felder 100 und nicht stumm; mit ihnen ungültig (unbekanntes Feld).
+        for (int version : {1, 2, 3, 4}) {
+            QJsonObject old = overlayToJson(makeOverlay());
+            old.insert(QStringLiteral("format_version"), version);
+            removeVolumeFields(old);
+            if (version < 4)
+                old.remove(QStringLiteral("output"));
+            if (version < 3)
+                removeFlipFields(old);
+            if (version < 2)
+                removeHoldAtEnd(old);
+            QVERIFY2(parseOverlay(QJsonDocument(old).toJson(), &loaded, &error), qPrintable(error));
+            QCOMPARE(loaded.sources[1].volume, 100);
+            QCOMPARE(loaded.sources[1].muted, false);
+            setInKind(old, 1, QStringLiteral("video"), QStringLiteral("volume"), 100);
+            QVERIFY(!parseOverlay(QJsonDocument(old).toJson(), &loaded, &error));
+            QVERIFY2(error.contains(QStringLiteral("sources[1].video.volume»: unbekanntes Feld")), qPrintable(error));
+        }
+
+        // Ändern über SourceChanges; bei Bild und Text abgewiesen, ohne Änderung
+        Overlay edited = makeOverlay();
+        SourceChanges c;
+        c.volume = 40;
+        QCOMPARE(updateSource(&edited, edited.sources[1].id, c), QString());
+        QCOMPARE(edited.sources[1].volume, 40);
+        QCOMPARE(edited.sources[1].muted, false);
+        c = SourceChanges();
+        c.muted = true;
+        QVERIFY(!c.isEmpty());
+        QCOMPARE(updateSource(&edited, edited.sources[1].id, c), QString());
+        QCOMPARE(edited.sources[1].volume, 40);
+        QCOMPARE(edited.sources[1].muted, true);
+        const Overlay before = edited;
+        c = SourceChanges();
+        c.volume = 101;
+        QVERIFY(updateSource(&edited, edited.sources[1].id, c).contains(QStringLiteral("Lautstärke 101")));
+        c.volume = 50;
+        QVERIFY(updateSource(&edited, edited.sources[0].id, c).contains(QStringLiteral("Lautstärke und Stumm")));
+        c = SourceChanges();
+        c.muted = false;
+        QVERIFY(updateSource(&edited, edited.sources[2].id, c).contains(QStringLiteral("Lautstärke und Stumm")));
+        QCOMPARE(edited, before);
     }
 
     // P10 (E-24): Ausgabe ein/aus im Overlay, Format 4.
@@ -350,7 +464,7 @@ private slots:
         QCOMPARE(original.output, true); // neue Overlays: Ausgabe ein
         original.output = false;
         const QJsonObject o = overlayToJson(original);
-        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 4);
+        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 5);
         QCOMPARE(o.value(QStringLiteral("output")), QJsonValue(false));
         Overlay loaded;
         QString error;
@@ -372,6 +486,7 @@ private slots:
             QJsonObject old = overlayToJson(makeOverlay());
             old.insert(QStringLiteral("format_version"), version);
             old.remove(QStringLiteral("output"));
+            removeVolumeFields(old);
             if (version < 3)
                 removeFlipFields(old);
             if (version < 2)
@@ -421,6 +536,7 @@ private slots:
         QJsonObject o = overlayToJson(original);
         o.insert(QStringLiteral("format_version"), 1);
         o.remove(QStringLiteral("output")); // erst ab Format 4 (P10)
+        removeVolumeFields(o);              // erst ab Format 5 (P12b)
         removeFlipFields(o);
         QJsonArray sources = o.value(QStringLiteral("sources")).toArray();
         QJsonObject s = sources.at(1).toObject();
@@ -445,6 +561,7 @@ private slots:
         QJsonObject v2 = overlayToJson(original);
         v2.insert(QStringLiteral("format_version"), 2);
         v2.remove(QStringLiteral("output")); // erst ab Format 4 (P10)
+        removeVolumeFields(v2);
         removeFlipFields(v2);
         QJsonArray sources2 = v2.value(QStringLiteral("sources")).toArray();
         QJsonObject s2 = sources2.at(1).toObject();
@@ -466,7 +583,7 @@ private slots:
         original.sources[1].flipHorizontal = true;
         original.sources[1].flipVertical = true;
         const QJsonObject o = overlayToJson(original);
-        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 4);
+        QCOMPARE(o.value(QStringLiteral("format_version")).toInt(), 5);
         const QJsonObject first = o.value(QStringLiteral("sources")).toArray().at(0).toObject();
         QCOMPARE(first.value(QStringLiteral("flip_horizontal")), QJsonValue(true));
         QCOMPARE(first.value(QStringLiteral("flip_vertical")), QJsonValue(false));
@@ -497,6 +614,7 @@ private slots:
         QJsonObject v2 = overlayToJson(makeOverlay());
         v2.insert(QStringLiteral("format_version"), 2);
         v2.remove(QStringLiteral("output"));
+        removeVolumeFields(v2);
         removeFlipFields(v2);
         QVERIFY2(parseOverlay(QJsonDocument(v2).toJson(), &loaded, &error), qPrintable(error));
         for (const Source &source : loaded.sources) {
@@ -506,10 +624,11 @@ private slots:
         QJsonObject v2flip = o;
         v2flip.insert(QStringLiteral("format_version"), 2);
         v2flip.remove(QStringLiteral("output"));
+        removeVolumeFields(v2flip);
         QVERIFY(!parseOverlay(QJsonDocument(v2flip).toJson(), &loaded, &error));
         QVERIFY2(error.contains(QStringLiteral("flip_")), qPrintable(error));
-        // Gespeichert wird die neueste Version (4, P10) mit beiden Feldern.
-        QCOMPARE(overlayToJson(loaded).value(QStringLiteral("format_version")).toInt(), 4);
+        // Gespeichert wird die neueste Version (5, P12b) mit beiden Feldern.
+        QCOMPARE(overlayToJson(loaded).value(QStringLiteral("format_version")).toInt(), 5);
 
         // Ändern über SourceChanges, auch bei Text; Breite und Höhe bleiben positiv.
         Overlay edited = makeOverlay();
@@ -552,7 +671,7 @@ private slots:
         QTest::newRow("Kommazahl") << 4 << QStringLiteral("sources[0].x");
         QTest::newRow("unbekanntes Feld") << 5 << QStringLiteral("unbekanntes Feld");
         QTest::newRow("fehlendes Feld") << 6 << QStringLiteral("«width»: fehlt");
-        QTest::newRow("format_version 5") << 7 << QStringLiteral("neuer");
+        QTest::newRow("format_version 6") << 7 << QStringLiteral("neuer");
         QTest::newRow("format_version 0") << 8 << QStringLiteral("unbekannt");
         QTest::newRow("format_version fehlt") << 9 << QStringLiteral("format_version");
         QTest::newRow("Ausrichtung") << 10 << QStringLiteral("justify");
@@ -579,7 +698,7 @@ private slots:
             case 4: setInSource(o, 0, QStringLiteral("x"), 1.5); break;
             case 5: o.insert(QStringLiteral("token"), QStringLiteral("x")); break;
             case 6: o.remove(QStringLiteral("width")); break;
-            case 7: o.insert(QStringLiteral("format_version"), 5); break;
+            case 7: o.insert(QStringLiteral("format_version"), 6); break;
             case 8: o.insert(QStringLiteral("format_version"), 0); break;
             case 9: o.remove(QStringLiteral("format_version")); break;
             case 10: setInText(o, QStringLiteral("align"), QStringLiteral("justify")); break;

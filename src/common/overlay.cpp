@@ -140,6 +140,11 @@ QString validateSource(const Source &source)
         return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
     if (source.holdAtEnd && source.kind != SourceKind::Video)
         return QStringLiteral("Am Ende anhalten gibt es nur bei Quellen der Art Video.");
+    if ((source.volume != kVolumeMax || source.muted) && source.kind != SourceKind::Video)
+        return QStringLiteral("Lautstärke und Stumm gibt es nur bei Quellen der Art Video.");
+    if (source.volume < kVolumeMin || source.volume > kVolumeMax)
+        return QStringLiteral("Lautstärke %1 ungültig, erlaubt sind %2 bis %3 %.")
+            .arg(source.volume).arg(kVolumeMin).arg(kVolumeMax);
     switch (source.kind) {
     case SourceKind::Text:
         return validateTextProperties(source.text);
@@ -293,6 +298,8 @@ QString applySourceChanges(Source *source, const SourceChanges &changes)
         return QStringLiteral("Wiederholen gibt es nur bei Quellen der Art Video.");
     if (changes.holdAtEnd && source->kind != SourceKind::Video)
         return QStringLiteral("Am Ende anhalten gibt es nur bei Quellen der Art Video.");
+    if ((changes.volume || changes.muted) && source->kind != SourceKind::Video)
+        return QStringLiteral("Lautstärke und Stumm gibt es nur bei Quellen der Art Video.");
     Source changed = *source;
     if (changes.name)
         changed.name = *changes.name;
@@ -316,6 +323,10 @@ QString applySourceChanges(Source *source, const SourceChanges &changes)
         changed.loop = *changes.loop;
     if (changes.holdAtEnd)
         changed.holdAtEnd = *changes.holdAtEnd;
+    if (changes.volume)
+        changed.volume = *changes.volume;
+    if (changes.muted)
+        changed.muted = *changes.muted;
     if (changes.content)
         changed.text.content = *changes.content;
     if (changes.fontSize)
