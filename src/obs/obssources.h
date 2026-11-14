@@ -9,6 +9,7 @@
 #include <QUuid>
 
 #include <functional>
+#include <optional>
 
 class QTimer;
 
@@ -20,7 +21,7 @@ class QTimer;
 // Quellen:
 //   Protokoll: siehe obsprotocol.h
 //   CreateInput, GetInputList, GetInputSettings (ohne Standardwerte), SetInputSettings (overlay),
-//   CreateSceneItem, Ereignisse InputCreated, InputRemoved, InputNameChanged, SceneListChanged,
+//   CreateSceneItem, GetSourceActive (sourceUuid → videoActive, videoShowing), Ereignisse InputCreated, InputRemoved, InputNameChanged, SceneListChanged,
 //   SceneNameChanged, CurrentSceneCollectionChanging, CurrentSceneCollectionChanged:
 //     https://raw.githubusercontent.com/obsproject/obs-websocket/master/docs/generated/protocol.md
 //   Felder der Listen: https://raw.githubusercontent.com/obsproject/obs-websocket/master/src/utils/Obs_ArrayHelper.cpp
@@ -71,6 +72,15 @@ public:
         QString message; // auf Deutsch
     };
     using Done = std::function<void(const Result &)>;
+    // P12b: Ist die Browserquelle eines Overlays im Programm? active leer: unbekannt, detail sagt
+    // warum (auf Deutsch, ohne Adresse und Token).
+    struct ActiveResult
+    {
+        std::optional<bool> active;
+        int sources = 0; // gefragte Quellen
+        QString detail;
+    };
+    using ActiveDone = std::function<void(const ActiveResult &)>;
 
     // filePath: <Datenordner>/obs-quellen.json. Liest sie gleich; eine ungültige Datei wird umbenannt
     // (der Abgleich baut die Zuordnung über die Übernahme nach F10 wieder auf).
@@ -91,6 +101,13 @@ public:
 
     void createSource(const QUuid &overlayId, const QString &sceneUuid, const QString &name, const Done &done);
     void addToScene(const QUuid &overlayId, const QString &sceneUuid, const Done &done);
+
+    // P12b (Rückfall beim Laden einer schon aktiven Quelle, M3): fragt mit GetSourceActive
+    // (videoActive) die zugeordnete Quelle und alle anderen Browserquellen mit derselben Adresse.
+    // Aktiv, wenn eine davon aktiv ist; inaktiv, wenn alle antworten und keine aktiv ist; sonst
+    // unbekannt (nicht verbunden, noch kein Abgleich, keine Quelle, keine Antwort). videoActive gilt
+    // für die Quelle als Ganzes, auch in verschachtelten Szenen. done kommt immer, auch sofort.
+    void queryActive(const QUuid &overlayId, const ActiveDone &done);
 
 signals:
     void scenesChanged();

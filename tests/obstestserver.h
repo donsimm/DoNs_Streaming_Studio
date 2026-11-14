@@ -178,6 +178,7 @@ public:
     bool collectionChanging = false;
     int requestsDuringCollectionChange = 0;
     QByteArray screenshotPng;          // Antwort auf GetSourceScreenshot (P11)
+    QSet<QString> activeInputs;        // GetSourceActive: diese Quellen sind im Programm (P12b)
 
 private:
     void send(QWebSocket *socket, dss::obs::OpCode op, const QJsonObject &data)
@@ -369,6 +370,14 @@ private:
             }
             *response = {{QStringLiteral("imageData"),
                           QStringLiteral("data:image/png;base64,") + QString::fromLatin1(screenshotPng.toBase64())}};
+        } else if (type == QLatin1String("GetSourceActive")) { // P12b: aktiv nach activeInputs
+            const QString sourceUuid = fields.value(QStringLiteral("sourceUuid")).toString();
+            if (!input(sourceUuid)) {
+                *code = dss::obs::kStatusResourceNotFound;
+                return;
+            }
+            const bool active = activeInputs.contains(sourceUuid);
+            *response = {{QStringLiteral("videoActive"), active}, {QStringLiteral("videoShowing"), active}};
         } else {
             *code = 204; // UnknownRequestType
         }

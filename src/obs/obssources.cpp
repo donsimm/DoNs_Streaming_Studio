@@ -486,4 +486,64 @@ void ObsSources::addToScene(const QUuid &overlayId, const QString &sceneUuid, co
     });
 }
 
+void ObsSources::queryActive(const QUuid &overlayId, const ActiveDone &done)
+{
+    if (!m_connection->isReady()) {
+        done({std::nullopt, 0, QStringLiteral("OBS nicht verbunden")});
+        return;
+    }
+    if (!m_synced) {
+        done({std::nullopt, 0, QStringLiteral("Quellen in OBS noch nicht abgeglichen")});
+        return;
+    }
+    // Zugeordnete Quelle und alle anderen mit derselben ganzen Adresse (von Hand kopiert oder in
+    // einer anderen Szenensammlung angelegt und hierher übernommen)
+    QStringList uuids;
+    const auto mapping = m_mappings.constFind(overlayId);
+    if (mapping != m_mappings.cend() && m_known.contains(mapping->inputUuid))
+        uuids.append(mapping->inputUuid);
+    const Desired *desired = desiredOf(overlayId);
+    if (desired && !desired->url.isEmpty()) {
+        for (auto it = m_known.cbegin(); it != m_known.cend(); ++it) {
+            if (it->url == desired->url && !uuids.contains(it.key()))
+                uuids.append(it.key());
+        }
+    }
+    if (uuids.isEmpty()) {
+        done({std::nullopt, 0, QStringLiteral("keine Browserquelle in OBS")});
+        return;
+    }
+    struct Tally
+    {
+        qsizetype remaining = 0;
+        int active = 0;
+        int failed = 0;
+    };
+    auto tally = std::make_shared<Tally>();
+    tally->remaining = uuids.size();
+    const int count = int(uuids.size());
+    const QPointer<ObsSources> self(this);
+    for (const QString &uuid : std::as_const(uuids)) {
+        const QJsonObject fields{{QStringLiteral("sourceUuid"), uuid}};
+        m_connection->request(QStringLiteral("GetSourceActive"), fields,
+                              [self, tally, count, done](const Response &r, RequestFailure failure) {
+            if (!self)
+                return;
+            if (failure != RequestFailure::None || !r.ok)
+                ++tally->failed;
+            else if (r.data.value(QStringLiteral("videoActive")).toBool())
+                ++tally->active;
+            if (--tally->remaining > 0)
+                return;
+            if (tally->active > 0)
+                done({true, count, QString()});
+            else if (tally->failed == 0)
+                done({false, count, QString()});
+            else
+                done({std::nullopt, count, QStringLiteral("OBS hat zu %1 von %2 Quellen nicht geantwortet")
+                                               .arg(tally->failed).arg(count)});
+        });
+    }
+}
+
 } // namespace dss::obs

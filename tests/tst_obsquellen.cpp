@@ -513,6 +513,96 @@ private slots:
         QTRY_COMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
         QVERIFY(fileText().contains("Von Hand"));
     }
+
+    // P12b: Ist die Quelle im Programm (GetSourceActive)? Zugeordnete Quelle und alle mit derselben
+    // Adresse; aktiv, wenn eine aktiv ist; ohne Verbindung, Quelle oder Antwort unbekannt.
+    void queryActive()
+    {
+        struct Query
+        {
+            bool arrived = false;
+            ObsSources::ActiveResult result;
+        };
+        const auto ask = [this](const QUuid &id) {
+            auto q = std::make_shared<Query>();
+            m_sources->queryActive(id, [q](const ObsSources::ActiveResult &r) {
+                q->arrived = true;
+                q->result = r;
+            });
+            return q;
+        };
+
+        // Nicht verbunden: sofort unbekannt, keine Anfrage
+        m_connection = std::make_unique<ObsConnection>(
+            [](const ObsConnection::PasswordDone &done) { done(QString()); }, shortTiming());
+        m_sources = std::make_unique<ObsSources>(m_connection.get(), filePath());
+        m_sources->setDesired({{kOverlayA, kUrlA, 1920, 1080}, {kOverlayB, kUrlB, 1920, 1080}});
+        auto off = ask(kOverlayA);
+        QVERIFY(off->arrived);
+        QVERIFY(!off->result.active.has_value());
+        QCOMPARE(off->result.detail, QStringLiteral("OBS nicht verbunden"));
+
+        const QString mapped = m_server->addInput(QStringLiteral("Overlay A"), settingsOf(kUrlA));
+        m_server->addInput(QStringLiteral("Anderes"), settingsOf(kUrlB));
+        m_connection->configure(config());
+        waitSynced();
+        QTRY_COMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
+
+        // Inaktiv
+        auto inactive = ask(kOverlayA);
+        QTRY_VERIFY(inactive->arrived);
+        QCOMPARE(inactive->result.active, std::optional<bool>(false));
+        QCOMPARE(inactive->result.sources, 1);
+        const QList<testhelp::ObsTestRequest> requests = m_server->requestsOf(QStringLiteral("GetSourceActive"));
+        QCOMPARE(requests.size(), 1);
+        QCOMPARE(requests.first().data, QJsonObject({{QStringLiteral("sourceUuid"), mapped}}));
+
+        // Aktiv
+        m_server->activeInputs.insert(mapped);
+        auto active = ask(kOverlayA);
+        QTRY_VERIFY(active->arrived);
+        QCOMPARE(active->result.active, std::optional<bool>(true));
+
+        // Zweite Quelle mit derselben Adresse (von Hand kopiert): gefragt; aktiv, wenn eine aktiv ist
+        m_server->activeInputs.clear();
+        const QString copy = m_server->addInput(QStringLiteral("Overlay A Kopie"), settingsOf(kUrlA));
+        m_server->sendEvent(QStringLiteral("InputCreated"), {{QStringLiteral("inputKind"), QStringLiteral("browser_source")}});
+        // Abgleich nach InputCreated (200 ms später): Einstellungen der Kopie gelesen
+        const QJsonObject copyFields{{QStringLiteral("inputUuid"), copy}};
+        QTRY_VERIFY(std::any_of(m_server->log.cbegin(), m_server->log.cend(), [&copyFields](const testhelp::ObsTestRequest &r) {
+            return r.type == QLatin1String("GetInputSettings") && r.data == copyFields;
+        }));
+        QTest::qWait(60);
+        auto both = ask(kOverlayA);
+        QTRY_VERIFY(both->arrived);
+        QCOMPARE(both->result.sources, 2);
+        QCOMPARE(both->result.active, std::optional<bool>(false));
+        m_server->activeInputs.insert(copy);
+        auto copyActive = ask(kOverlayA);
+        QTRY_VERIFY(copyActive->arrived);
+        QCOMPARE(copyActive->result.active, std::optional<bool>(true));
+        QCOMPARE(entryOf(*m_sources, kOverlayA).inputName, QStringLiteral("Overlay A")); // Zuordnung bleibt
+
+        // Keine Antwort zu einer Quelle, keine aktiv: unbekannt
+        m_server->activeInputs.clear();
+        m_server->silentRequests.insert(QStringLiteral("GetSourceActive"));
+        auto silent = ask(kOverlayA);
+        QTRY_VERIFY(silent->arrived);
+        QVERIFY(!silent->result.active.has_value());
+        QVERIFY2(silent->result.detail.contains(QStringLiteral("nicht geantwortet")), qPrintable(silent->result.detail));
+        m_server->silentRequests.clear();
+
+        // Ohne Quelle in OBS: unbekannt, keine Anfrage
+        const QUuid other = QUuid::fromString(QStringLiteral("cccccccc-0000-4000-8000-000000000003"));
+        m_sources->setDesired({{kOverlayA, kUrlA, 1920, 1080}, {kOverlayB, kUrlB, 1920, 1080},
+                               {other, QStringLiteral("http://192.168.1.9:8081/o/c/?token=x"), 1920, 1080}});
+        const int before = m_server->requestCount(QStringLiteral("GetSourceActive"));
+        auto none = ask(other);
+        QVERIFY(none->arrived);
+        QVERIFY(!none->result.active.has_value());
+        QCOMPARE(none->result.detail, QStringLiteral("keine Browserquelle in OBS"));
+        QCOMPARE(m_server->requestCount(QStringLiteral("GetSourceActive")), before);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestObsSources)
