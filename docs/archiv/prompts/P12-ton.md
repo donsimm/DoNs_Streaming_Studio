@@ -1,6 +1,6 @@
 # P12 – Ton von Videos (Plan)
 
-Plan des Projektleiter-Agenten vom 2026-11-09, nachgeführt am 2026-11-11 für G4 = P (Abschnitte 3 bis 8) und am 2026-11-12 für b4 Teil 1 (Entscheide vor b4, «Ergebnis b4 Teil 1»), am 2026-11-14 für den Rückfall beim Laden einer aktiven Quelle (Abschnitt b4, «Ergebnis Rückfall …»). Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)») und unten («Antworten des Nutzers»), Messbericht `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Prototyp mit `pw_stream`, Halt, dann Bau in Abschnitten), Handtest.
+Plan des Projektleiter-Agenten vom 2026-11-09, nachgeführt am 2026-11-11 für G4 = P (Abschnitte 3 bis 8) und am 2026-11-12 für b4 Teil 1 (Entscheide vor b4, «Ergebnis b4 Teil 1»), am 2026-11-14 für den Rückfall beim Laden einer aktiven Quelle (Abschnitt b4, «Ergebnis Rückfall …») sowie für b5 und b6 («Ergebnis b5», «Ergebnis b6»; Bericht `docs/archiv/berichte/P12-bericht.md`). Grundlage: Bauplan P12 (E-20, E-21), `docs/01-festlegungen.md` («Ton von Videos», 2026-11-02), Antworten des Nutzers in `docs/archiv/uebergabe-2026-11-08.md` («Antworten Ton (P12)») und unten («Antworten des Nutzers»), Messbericht `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0). Ausführung in Teilen: P12a (Messtest), Halt mit Ergebnis an Lotse, P12b (Prototyp mit `pw_stream`, Halt, dann Bau in Abschnitten), Handtest.
 
 ## Entscheide des Nutzers
 
@@ -300,10 +300,26 @@ Kenngrösse **«Rest»** je Klick: gemessene Einsatzzeit in der Aufnahme minus e
 
 Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Meldungen bauen (z. B. Zeile «OBS» im Dock «Steuerung», `src/app/docks.cpp`, `src/app/theme.cpp`), und folgt dem.
 
+**Ergebnis b5** (2026-11-14, Agent; Lotse geprüft: Bau ohne Warnungen, `ctest` 49 von 49; nach der Übergabe):
+
+- **Commit 1:** Overlay-Format 5 mit `video.volume` und `video.muted`, Schnittstelle 13 (`changes.video.volume`/`muted`), Umwandeln 4 → 5.
+- **Commit 2:** Dock «Eigenschaften», Bereich «Video»: Regler «Lautstärke» 0–100 % und Kästchen «Stumm».
+- **Commit 3:** Dock «Steuerung», Zeile «Ton Videos» mit Ausgang («Kein Ausgang» zuerst), Versatz −500 bis +500 ms und Zustand («Ausgang fehlt»).
+- **Für b6 und später** (aufgenommen in `docs/04-offene-punkte.md`, Punkte 103 bis 109): `[OFFEN]` Nutzer, Ausgang und Versatz sind auch in «nur Anzeige» bedienbar (wie die Einstellungen; Punkt 103); Regler ohne eigenen Stil im Thema (104); `dss-cli` zeigt Lautstärke, Ausgang und Versatz nicht (Lautstärke und Stumm in b6 ergänzt, Ausgang und Versatz Punkt 108); Lautstärke linear, nach Gehör nicht geprüft (109). Handtest des Nutzers (Regler, Stumm, Ausgang, «Ausgang fehlt», Versatz) nach der Installation des Teststands.
+
 ### b6 – Prüfung und Dokumente (2 Commits)
 
 1. `scripts/tonpruefung.py`: virtuelle Senke anlegen, Kern aus dem Entwicklungsordner starten, Meldungen nachbilden, Aufnahme über `pw-loopback`, Abweichung zu den Meldungen und zur gemeldeten Verzögerung auswerten, Senke entfernen. 20 Läufe, unhörbar.
 2. Dokumente nachführen: `01`, `02` (Pakete), `03` (E-20, E-21), `04`, `06`, `08`. Dazu der Bericht `docs/archiv/berichte/P12-bericht.md`.
+
+**Ergebnis b6** (2026-11-14, Agent, Stufe «Klein»: Bau ohne Warnungen, `ctest` 49 von 49, keiner übersprungen; Einzelheiten im Bericht P12):
+
+- **`scripts/tonpruefung.py`:** `pw-loopback` mit Senke `dss_tonpruefung_ausgabe` und Quelle `dss_tonpruefung_aufnahme`; Kern aus `build/` mit Daten-, Konfig- und Laufzeitordner im Temp-Ordner, Ausgang über `[ton-video] ausgang=` in der eigenen `kern.ini`; Overlay mit `blitz-piep.mp4` über `dss-cli`; Seite nachgebildet (`…/events/<page>`, `…/clock` mit `start`, `frame` jede Sekunde, `stop` 0,5 s nach der letzten vollen Sekunde); Aufnahme mit `pw-cat --raw` über stdout. Sicherung vor jedem Lauf: Abbruch, wenn ein virtueller Knoten anders verbunden ist als Kern → Senke und Quelle → `pw-cat` oder wenn sich Standardausgang oder -eingang ändern. Aufräumen auch bei Abbruch, danach nachgeprüft. Exit-Code 0 bestanden, 1 nicht bestanden, 2 Abbruch, 3 Aufräumen unvollständig.
+- **Lauf** `python3 scripts/tonpruefung.py --out build/tonpruefung/b6-20` (20 Läufe zu 12 s, 18:31–18:36): bestanden. 280 Meldungen mit 204; 120 von 120 Piepen ab k = 1, keiner zusätzlich; Abweichung zu den Meldungen Median −21,03 ms, p5 −21,07, p95 −20,93, min −21,11, max −20,76 (Streuung p5–p95 0,14 ms, max − min 0,35 ms); Abweichung + `size`/rate (21,33 ms) Median 0,30 ms; Gang −0,013 ms/min; Piepe 33,31 ms. Kern: 20 Starts und 20 Stopps, 0 «Nachführen», 0 Abrufe ohne Puffer, 0 abgebrochene Zyklen, `delay` 0, Exit-Code 0. Danach `wpctl status` ohne `dss_tonpruefung…`, `pgrep -a pw-loopback` ohne Treffer.
+- **Lesart:** −21 ms ist ein Zyklus von PipeWire. Der Kern rechnet den hörbaren Zeitpunkt einen Zyklus nach dem Abruf (Gerät), die virtuelle Senke gibt die Proben im selben Zyklus weiter. Am echten Ausgang misst das H2.
+- **`dss-cli quelle-liste`:** neue Spalten «Lautstärke» und «Stumm» (eigener Commit, Test `tst_medien` «cliHoldAtEnd»).
+- **Dokumente:** `docs/01`, `02`, `03`, `04` (Punkte 103 bis 112), `06` (Format 5), `08` (Version 12 und 13, `…/clock`, `obs_active`, Abschnitt «Ton der Videos»), Bericht P12.
+- **Offen:** Prüfstufe «Baustein» (oben) und Handtest (Abschnitt 4).
 
 **Prüfstufe «Baustein»** (nach b6, Befehle wie in P11, Ordner `build/pruefung-p12/`; b2 bis b5 je Stufe «Klein»):
 - `cmake --build build -j8`

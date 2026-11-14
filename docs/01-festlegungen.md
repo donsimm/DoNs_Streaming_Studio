@@ -1,6 +1,6 @@
 # 01 – Festlegungen
 
-Stand: 2026-11-07. «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
+Stand: 2026-11-14 (Ton von Videos, P12). «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
 
 ## Ziel
 
@@ -102,7 +102,14 @@ Entschieden (2026-11-02, vom Nutzer bestätigt):
 - Adresse: «ß» wird «ss», «æ» wird «ae», «ø» wird «oe», «ł» wird «l» (entschieden 2026-11-02), zum Beispiel «Straße» → `strasse`. Umgesetzt in P05.
 - Video: Wiederholen am Ende ist pro Quelle wählbar, Standard «nicht wiederholen» (entschieden 2026-11-02, vom Nutzer korrigiert). Umgesetzt in P05 (Feld `video.loop`, `docs/06-overlay-format.md`).
 - Ton von Videos (entschieden 2026-11-02): Der Studio-PC spielt den Ton über eine Audiokarte des Systems ab; von dort geht er über das externe Mischpult zum Streaming-PC. Alle Quellen des Editors nutzen denselben Audioausgang; dieser soll wählbar sein. Später werden mehrere Audiokarten bespielt (andere Module, zum Beispiel Musikplayer). Die Browserquelle in OBS spielt Videos immer stumm ab, sonst käme der Ton doppelt an (entschieden 2026-11-02).
-- Risiko (Einschätzung, nicht gemessen): Bild (über das Netz als Browserquelle) und Ton (über das Mischpult) kommen auf verschiedenen Wegen beim Streaming-PC an und können gegeneinander verschoben sein. Prüfbar erst mit T-04.
+- Risiko (Einschätzung, nicht gemessen): Bild (über das Netz als Browserquelle) und Ton (über das Mischpult) kommen auf verschiedenen Wegen beim Streaming-PC an und können gegeneinander verschoben sein. Prüfbar erst mit T-04. Seit P12b: Der Kern führt den Ton nach den Meldungen der Seite in OBS nach; den festen Versatz gleicht `versatz_ms` aus, gemessen wird er im Handtest H2 (Plan P12, Abschnitt 4).
+- Ton von Videos, Umsetzung (P12, Entscheide des Nutzers; Plan `docs/archiv/prompts/P12-ton.md`, Bericht `docs/archiv/berichte/P12-bericht.md`):
+  - 2026-11-07 (Bündel `ton-1`): Der Kern spielt den Ton. Wird eine Szene mit Video in OBS aktiv, beginnen Video und Ton von vorne. Im Editor gibt es keinen Ton (Vorhören vielleicht später). Der RØDECaster hängt per USB am Streaming-PC; ein eigener Kanal für den Studio-PC ist möglich.
+  - 2026-11-09: Anschluss Studio-PC → RØDECaster über USB an den zweiten USB-Anschluss (Variante A). Ausgang und Versatz im Dock «Steuerung», nicht in «Einstellungen»; je Zweck ein eigener Ausgang, damit später Chat-Bot und Musikplayer eigene Soundkarten bekommen. Lautstärke je Videoquelle: Regler 0–100 % und «Stumm», neue Quellen 100 % und nicht stumm. Lotse darf für Messungen in OBS eine Aufnahme von höchstens 60 s in «test 2» machen.
+  - 2026-11-11: Ausgabe über PipeWire direkt (`pw_stream`, G4 = P) statt `QAudioSink`, zuerst als Prototyp mit Halt (b1). Puffer 40 ms fest. Ein Sprung beim Wechsel des Quantums gilt als gelöst, wenn er gemeldet und ausgeglichen wird.
+  - 2026-11-12: Lage in Proben und Zyklusgrösse statt `delay` (an der virtuellen Senke immer 0); `delay` am echten Ausgang misst H2. Der Handtest H2 ersetzt M4. Zeile «Ton Videos» im Dock «Steuerung»: Auswahlliste mit erstem Eintrag «Kein Ausgang», Feld «Versatz» −500 bis +500 ms, Hinweis «Ausgang fehlt» wie in der Zeile «OBS»; ein neuer Kern hat «Kein Ausgang».
+  - 2026-11-13 (nach M3): Wird eine Quelle in OBS inaktiv, hält das Video an und springt auf den Anfang. Bekommt ein Video eine neue Datei, beginnt es von vorne.
+  - Fehlt der gewählte Ausgang, gibt es keinen Ton und einen Hinweis, nie Ton aus einem anderen Gerät (Vorgabe im Plan P12, Abschnitt 3, mit Entscheid 6 vom 2026-11-12 bestätigt).
 
 - Der Token pro Overlay steht nicht in der Overlay-Datei, sondern in einer eigenen Datei `tokens.json`, die nur der Benutzer lesen kann (Dateirechte 0600).
 - Reihenfolge: zuerst P04 (Overlay-Modell), dann P05 (Fenster-Gerüst ohne Daten).
@@ -231,6 +238,7 @@ Umgesetzt mit P10a (2026-11-03), Wahl von Claude Code mit Begründung im Bericht
 | Fenster-Einstellungen | `~/.config/dons-streaming-studio/fenster.ini` | `~/.config/dons-streaming-studio-entwicklung/fenster.ini` |
 | Einstellungen des Kerns (seit P10-vor) | `~/.config/dons-streaming-studio/kern.ini` | `~/.config/dons-streaming-studio-entwicklung/kern.ini` |
 | Port des Overlay-Servers (Standard, in `kern.ini`, wirkt ab P10) | 8080 | 8081 |
+| Strom in PipeWire für den Ton der Videos (`node.name`, seit P12b) | `dss_core_ton_video` | `dss_core_entwicklung_ton_video` |
 | Fenstertitel | «DoNs Streaming Studio» | «DoNs Streaming Studio – Entwicklung» |
 | Symbole, Schriften, Übersetzung | `~/.local/opt/dons-streaming-studio/share/dons-streaming-studio/` | aus dem Repo bzw. `build/` |
 | Eigene Symbole des Nutzers | `~/.config/dons-streaming-studio/symbole/` (beide lesen nur) | ebenso |

@@ -1,8 +1,16 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-07 (P10c). Version der Schnittstelle: **11**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`. Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c).
+Stand: 2026-11-14 (P12b). Version der Schnittstelle: **13**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 13 (P12b b5)
+
+`overlay` und `overlay_changed` tragen Overlays im Dateiformat 5 (Pflichtfelder `video.volume` und `video.muted`, `docs/06-overlay-format.md`), die ein Fenster der Version 12 als ungültig verwerfen würde. Dazu kommen die Felder `changes.video.volume` und `changes.video.muted` in `update_source` (ein Kern der Version 12 weist sie als unbekannt ab).
+
+### Version 12 (P12b b3)
+
+Neu ist der Ton der Videos (E-20, E-21): `audio_outputs` (Ausgänge von PipeWire und Zustand je Zweck, nach `hello` und bei jeder Änderung an alle), in `settings` die Felder `audio_routes`, `audio_offset_min_ms` und `audio_offset_max_ms`, in `update_settings` das Feld `audio_routes` (Abschnitt «Einstellungen»). Dem `settings` eines Kerns der Version 11 fehlten die neuen Pflichtfelder. Darum stieg die Version. Der Overlay-Server hat seit P12b b4 die Pfade `…/clock` und `…/events/<page>` und seit dem Rückfall nach M3 das Ereignis `obs_active` (Abschnitt «Overlay-Server»); das betrifft die Seite, nicht die Schnittstelle zum Fenster.
 
 ### Version 11 (P10c)
 
@@ -80,6 +88,7 @@ Fenster                                 Kern
    | <--- server_status ------------------ |   seit Version 8 (P10)
    | <--- obs_status --------------------- |   seit Version 11 (P10c)
    | <--- obs_sources -------------------- |   seit Version 11 (P10c)
+   | <--- audio_outputs ------------------ |   seit Version 12 (P12b)
    | <--- stats (letzte Messung) --------- |
    | <--- stats ------------------------- |   einmal pro Sekunde
    | ---- get_overlay {id} --------------> |
@@ -121,9 +130,9 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 11 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 11».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 13 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 13».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
-4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11) und, falls schon gemessen, die letzte `stats`.
+4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
@@ -153,11 +162,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `11` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `13` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":11,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":13,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -407,6 +416,22 @@ Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder
 {"sources":[{"input_name":"Handtest P10c","overlay_id":"db7f47a9-dee3-4de5-b056-40b5b3507607","state":"present"}],"type":"obs_sources"}
 ```
 
+### `audio_outputs` (seit Version 12, P12b)
+
+Ausgänge für den Ton und Zustand je Zweck (heute nur `video`, Ton der Videos). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle (Ausgang erschienen oder verschwunden, Zustand geändert). Das Dock «Steuerung» zeigt daraus die Zeile «Ton Videos» (Auswahlliste, Hinweis «Ausgang fehlt»).
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `enabled` | true/false | Der Kern ist mit Ton gebaut (Schalter `DSS_CORE_AUDIO`); `false`: Liste leer, keine Zwecke |
+| `devices` | Liste von Objekten | Ausgänge von PipeWire (`media.class` «Audio/Sink»): `name` (`node.name`, Wert für `audio_routes.*.output`), `description` (Name wie im System), `default` (Standardausgang) |
+| `routes` | Objekt | je Zweck `state` (`no_pipewire`, `no_target` = kein Ausgang gewählt, `missing` = gewählter Ausgang fehlt, `connecting`, `playing`, `error`) und `detail` (Text oder `null`) |
+
+```json
+{"devices":[{"default":true,"description":"Gerät Analog Stereo","name":"alsa_output.<gerät>.analog-stereo"}],"enabled":true,"routes":{"video":{"detail":null,"state":"no_target"}},"type":"audio_outputs"}
+```
+
+Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann nichts und weicht auf kein anderes Gerät aus (`target.object`, `node.dont-reconnect`, `node.dont-fallback`, `node.dont-move`); kommt der Ausgang wieder, spielt er ohne Neustart weiter. Hängt der Strom an einem fremden Knoten, gibt er Stille aus und bleibt auf `error`, bis der Ausgang neu gewählt wird. Code: `src/audio/pwoutput.cpp`.
+
 ### `quit_reply`
 
 | Feld | Typ | Inhalt |
@@ -434,7 +459,7 @@ Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `11`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `13`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -449,7 +474,7 @@ Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":11,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":13,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -513,6 +538,8 @@ Objekt `changes` (nur angegebene Felder ändern sich, mindestens eines; unbekann
 | `visible` | true/false | sichtbar |
 | `video.loop` | true/false | nur Video: wiederholen |
 | `video.hold_at_end` | true/false | nur Video, seit Version 3: am Ende anhalten |
+| `video.volume` | ganze Zahl | nur Video, seit Version 13: Lautstärke in Prozent, 0 bis 100 |
+| `video.muted` | true/false | nur Video, seit Version 13: Ton stumm |
 | `text.content` | Text | nur Text: Inhalt, mehrzeilig |
 | `text.font_size` | ganze Zahl | nur Text: Schriftgrösse in Pixeln, ab 1 |
 | `text.color` | Text | nur Text: `#RRGGBBAA` |
@@ -528,6 +555,7 @@ Grenzen und Meldungen kommen aus dem Modell (`docs/06-overlay-format.md`). Eine 
 {"type":"update_source","request_id":5,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","changes":{"x":40,"y":900,"text":{"content":"Willkommen","font_size":72}}}
 {"type":"set_overlay_size","request_id":9,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","width":1280,"height":720}
 {"type":"update_source","request_id":10,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"b814d820-5d53-42a8-9683-ef3419cf4d7e","changes":{"video":{"hold_at_end":true}}}
+{"type":"update_source","request_id":11,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"b814d820-5d53-42a8-9683-ef3419cf4d7e","changes":{"video":{"volume":35,"muted":true}}}
 {"type":"set_overlay_output","request_id":1,"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618","output":false}
 {"type":"new_token","request_id":3,"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618"}
 {"type":"set_text_font","request_id":8,"overlay_id":"9adf79a8-1420-4d18-94b1-d780afba49d8","source_id":"c520a200-5230-438f-8a5e-72685bc804aa","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","weight":700,"italic":false}
@@ -552,7 +580,7 @@ Seit Version 10 (aufgezeichnet am 2026-11-04 mit einem Kern auf einer Kopie der 
 
 Die neue Quelle aus `request_id` 6 (256x256) liegt danach an 832/412 mit dem Namen «Bild vom 2026-11-02» und ist die erste der Zeichenreihenfolge (`overlay_changed` vor `change_result`).
 
-(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`. Die Zeilen mit `request_id` 9 und 10 sind in P09 von Hand ergänzt, Form wie `tst_aenderungen` sie prüft. `set_overlay_output` und `new_token` aufgezeichnet am 2026-11-04, Antwort jeweils `change_result` `ok: true`.)
+(aufgezeichnet am 2026-11-03 mit einem Kern mit eigenem Datenordner; die Antworten stehen oben unter `change_result`. Die Zeilen mit `request_id` 9 und 10 sind in P09 von Hand ergänzt, die mit `request_id` 11 in P12b b6, Form wie `tst_aenderungen` sie prüft. `set_overlay_output` und `new_token` aufgezeichnet am 2026-11-04, Antwort jeweils `change_result` `ok: true`.)
 
 Ungültige Änderung (Pflichtfeld fehlt, falscher Typ): Hat sie eine gültige `request_id`, antwortet der Kern mit `change_result` `ok: false`, `code: invalid_message`; sonst mit `error` `invalid_message`.
 
@@ -600,6 +628,9 @@ adresse-im-heimnetz=192.168.1.9
 aktiv=nein
 adresse=
 port=4455
+[ton-video]
+ausgang=
+versatz_ms=0
 ```
 
 | Wert | Festlegung |
@@ -609,6 +640,10 @@ port=4455
 | `[obs] aktiv` | `ja` oder `nein`, Standard `nein`. «Mit OBS verbinden» im Dialog; braucht eine Adresse (P10c) |
 | `[obs] adresse` | Adresse von obs-websocket auf dem Streaming-PC: Buchstaben, Ziffern, `.` und `-`, leer erlaubt. Nicht auf Adressen dieses PCs beschränkt, die Tests nutzen `127.0.0.1` |
 | `[obs] port` | Port von obs-websocket, 1 bis 65535, Standard 4455 |
+| `[ton-video] ausgang` | seit P12b b3: Ausgang für den Ton der Videos, `node.name` in PipeWire (wie `audio_outputs.devices[].name`); leer = kein Ausgang, kein Ton (Standard, ein neuer Kern hat «Kein Ausgang», Entscheid 6 vom 2026-11-12). Höchstens so lang wie im Code (`kAudioOutputMaxLength`), ohne Steuerzeichen und ohne Leerzeichen am Rand. Ein Name, den es gerade nicht gibt, ist erlaubt (Zustand `missing`) |
+| `[ton-video] versatz_ms` | seit P12b b3: Versatz in ms, −500 bis +500, Standard 0. Bedeutung: Weg des Tons hinter dem Ausgang (Mischpult, Streaming-PC); so viel früher spielt der Kern. Vorzeichen und Bereich sind eine Annahme bis zum Handtest H2 |
+
+Ein Abschnitt je Zweck; heute nur `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`). Weitere Zwecke (Chat-Bot, Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
 
 Das Passwort von OBS steht nicht in `kern.ini` (Regel 12), sondern verschlüsselt in `obs-passwort.cred` neben ihr, Rechte 0600, je Version getrennt (`src/obs/obssecretstore.h`, `systemd-creds --user`, Entscheid F1). Der Kern ruft `systemd-creds` über `QProcess` mit stdin und stdout auf, das Passwort steht nie in der Befehlszeile. Quelle: https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html. Grenze: Andere Programme desselben Benutzers könnten es ebenfalls entschlüsseln, und der Host-Schlüssel liegt auf derselben Platte.
 
@@ -627,18 +662,21 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `settings_error` | Text oder `null` | Meldung, wenn die Datei ungültig ist |
 | `obs_enabled`, `obs_host`, `obs_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[obs]`, seit Version 11 |
 | `obs_password_set` | wahr/falsch | Ein Passwort ist gespeichert. Der Wert selbst geht nie an ein Fenster (Regel 12), seit Version 11 |
+| `audio_routes` | Objekt | seit Version 12: je Zweck (`video`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` |
+| `audio_offset_min_ms`, `audio_offset_max_ms` | ganze Zahlen | seit Version 12: gültiger Bereich des Versatzes (−500, 500); das Fenster stellt sein Feld «Versatz» danach ein |
 
 ```json
-{"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"192.168.1.9","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
 
-Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen). Nur angegebene Werte ändern sich. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
+Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen), seit Version 12 `audio_routes` (je Zweck ein Objekt mit `output` und/oder `offset_ms`, mindestens eines; unbekannter Zweck: `rejected` «Unbekannter Zweck des Tons «x».»). Nur angegebene Werte ändern sich. Ein neuer Ausgang oder Versatz wirkt sofort, ohne Neustart. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
 
 ```json
 {"type":"update_settings","request_id":9,"port":8090}
 {"type":"update_settings","request_id":10,"home_address":"192.168.1.9"}
+{"type":"update_settings","request_id":11,"audio_routes":{"video":{"output":"alsa_output.<gerät>.analog-stereo","offset_ms":-40}}}
 ```
 
 ### `reset_settings` (Fenster → Kern, seit Version 9)
@@ -649,7 +687,7 @@ Punkt 77 (Entscheid 2026-11-03): Knopf «Auf Standardwerte zurücksetzen» im Di
 {"type":"reset_settings","request_id":4}
 ```
 
-`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4). Das Passwort von OBS lässt sich über `dss-cli` nicht setzen.
+`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4). Das Passwort von OBS lässt sich über `dss-cli` nicht setzen. Ausgang und Versatz des Tons zeigt `dss-cli einstellungen` noch nicht (offen, `docs/04-offene-punkte.md`); Lautstärke und Stumm der Videos zeigt `dss-cli quelle-liste` seit P12b b6.
 
 ## Anbindung an OBS (P10c, T-05, E-29)
 
@@ -683,6 +721,8 @@ Alles liegt unter `/o/<adresse>/<token>/` (`<adresse>` aus der Overlay-Datei, `<
 | `…/overlay.js` | GET, HEAD | Zeichner der Seite |
 | `…/events` | GET | Server-Sent Events: zuerst `retry: 1000`, dann `event: overlay` mit `data: {"overlay": <Overlay im Dateiformat ohne Token>, "media": {"media/…": {"orientation": 1 bis 8}}, "fonts": {"media/….ttf": {"units_per_em", "ascent", "descent", "leading"}}}` bei jeder Änderung (immer das ganze Overlay, K-02), ein neues `overlay` nur, wenn sich die Daten geändert haben; alle 15 s eine Kommentarzeile `:` (tote Verbindungen erkennen) |
 | `…/media/<sha256>.<endung>` | GET, HEAD | nur Dateien, die das Overlay benutzt; `Range` (206, 416), `Cache-Control: max-age=31536000, immutable` (Dateien heissen nach ihrem Inhalt). Bei JPEG/PNG steht die EXIF-Ausrichtung in den gelieferten Bytes auf 1 (PNG mit neuer CRC des Blocks `eXIf`), bei MP4/MOV die Matrix in `mvhd` und `tkhd` auf der Einheitsmatrix, bei WebM (Matroska) `ProjectionPoseYaw` und `ProjectionPoseRoll` jeder Videospur auf 0.0 (nur Projektion «rechteckig», gleiche Länge, seit P11, Punkt 80): Die Seite dreht selbst nach `media[…].orientation`, unabhängig davon, ob die Chromium-Version es selbst täte. Die Datei im Datenordner bleibt unverändert |
+| `…/events/<page>` | GET | seit P12b b4: wie `…/events`, dazu kennt der Server die Seite (`<page>` = `[a-z0-9]{8,32}`, von der Seite beim Laden gewählt). Beginn und Ende der Verbindung gehen an den Kern (Stopp «Seite getrennt», Rückfall `obs_active`). Ungültige Adresse: `event: gone` wie `…/events`. Nur dorthin schickt der Kern `event: obs_active` mit `data: {"active": true|false}` (unten, «Ton der Videos») |
+| `…/clock` | POST | seit P12b b4: Meldungen der Uhr der Seite in OBS (unten, «Ton der Videos»). Antworten: 204 angenommen, 400 falsche Daten (auch eine Quelle, die keine Videoquelle dieses Overlays ist), 413 zu gross (über 2048 Byte), 429 über der Grenze, 404 falscher Token, 405 andere Methode |
 | `…/report` | POST | Meldung der Seite (zum Beispiel «Video nicht abspielbar: «name» (media/…) (Fehler 4 …)»), höchstens 20 pro Minute, 300 Zeichen, Steuerzeichen ersetzt; Protokoll «Browserquelle /o/<adresse>/… meldet: …»; Antwort 204 |
 | `/` | GET | leere, durchsichtige Seite |
 | alles andere | – | 404 ohne Inhalt; andere Methoden 405 |
@@ -696,6 +736,49 @@ Der Token wird mit gleichbleibender Laufzeit verglichen (`constantTimeEquals` in
 ### Seite (zweiter Zeichner)
 
 `web/overlay.js` zeichnet aus dem Overlay dasselbe wie der Editor (K-07): Kästen als `div` mit `rotate(θ) scale(±1, ±1)` um die Mitte, darin Bild bzw. Video gestreckt mit der Ausrichtung aus `media` (zuerst spiegeln, dann drehen, bei 5 bis 8 Breite und Höhe getauscht), Text als SVG mit derselben Schriftdatei (`FontFace`), Grundlinien aus `fonts` wie Qt 6.8 (`fontMetricPixels`, `src/render/sourcegeometry.h`), abgeschnitten am Kasten, waagrecht ausgerichtet. Videos stumm, beginnen immer von vorne (Einblenden, Laden, Ausgabe ein, andere Datei), Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Ausgabe aus: nichts gezeichnet, Verbindung bleibt. Bricht die Verbindung ab, bleibt das letzte Bild stehen, und `EventSource` verbindet sich nach 1 s wieder. Für Prüfungen steht der Zustand in `window.dssState` (`applied`, `output`, `connected`, `reports`). Abweichungen zum Editor in Zahlen: Bericht P10.
+
+### Ton der Videos (P12b)
+
+Den Ton spielt der Kern, die Seite bleibt stumm (E-20). Die Seite führt (S1): Nur in OBS (`window.obsstudio` vorhanden) meldet sie, wann und wo ein Video läuft, und der Kern spielt den Ton passend dazu über den Ausgang aus `[ton-video]`. Ohne `window.obsstudio` (anderer Browser, Qt WebEngine in den Tests) bleibt alles wie vor P12b: `…/events` ohne Kennung, keine Meldungen, kein Ton. Bericht und Messungen: `docs/archiv/berichte/P12-bericht.md`, Plan `docs/archiv/prompts/P12-ton.md`.
+
+Seite in OBS (`web/overlay.js`, seit P12b b4):
+
+- Beim Laden Kennung `page` (12 Zeichen `[a-z0-9]`), Ereignisse über `…/events/<page>`. Bis zum ersten Ereignis von OBS ist der Zustand unbekannt: Videos laufen wie ohne OBS, ohne Meldungen.
+- «aktiv» (`obsSourceActiveChanged`, im Programm): `run` + 1, alle Videos von vorne; je Video `start` beim ersten Bild, `frame` etwa jede Sekunde, `loop` beim ersten Bild nach dem Wiederholen, `end` am Ende ohne Wiederholen.
+- «inaktiv»: alle Videos anhalten, zurück auf den Anfang (erstes Bild bleibt stehen), `stop` ohne `source`.
+- `obs_active` vom Kern (Rückfall, weil OBS beim Laden einer schon aktiven Quelle kein «aktiv» meldet, M3): Beginnt `…/events/<page>`, fragt der Kern OBS mit `GetSourceActive` nach der Browserquelle des Overlays und allen Browserquellen mit genau derselben Adresse (`videoActive`, also im Programm; aktiv, wenn eine aktiv ist). Die Seite übernimmt die Antwort nur, solange ihr Zustand unbekannt ist; ein Ereignis von OBS hat immer Vorrang. Ohne Verbindung zu OBS, ohne Abgleich oder ohne vollständige Antwort schickt der Kern nichts (Protokoll «OBS: Seite … Zustand im Programm unbekannt (…), kein obs_active»).
+
+Meldung an `…/clock` (POST, JSON, `Content-Type: text/plain`, `fetch` mit `keepalive`; ein Objekt je Meldung und Video, Code `src/server/clockreport.h`):
+
+| Feld | Inhalt | Pflicht |
+|---|---|---|
+| `v` | 1 | immer |
+| `page` | Kennung der Seite | immer |
+| `seq` | laufende Nummer je Seite (ganze Zahl ab 0); ältere und doppelte verwirft der Kern | immer |
+| `event` | `start`, `frame`, `loop`, `end`, `stop` | immer |
+| `run` | Lauf der Seite, zählt bei jedem «aktiv» hoch | immer |
+| `now_ms` | `performance.now()` beim Absenden | immer |
+| `source` | Kennung der Videoquelle | ausser `stop` (ohne `source`: alle Videos der Seite) |
+| `file` | `media/…` wie die Seite es spielt | `start`, `frame`, `loop` |
+| `loop` | Durchgang seit dem Start (0 = erster) | `start`, `frame`, `loop` |
+| `media_s` | `mediaTime` des Bildes (`requestVideoFrameCallback`) | `start`, `frame`, `loop` |
+| `display_ms` | `expectedDisplayTime` desselben Bildes | `start`, `frame`, `loop` |
+| `duration_s` | Länge des Videos; fehlt oder 0 = unbekannt | freiwillig |
+
+```json
+{"display_ms":81234.5,"duration_s":60,"event":"frame","file":"media/1d6c3beb22e34fcacde631ecf55bb1cb9d57445e8cc1f412551eb229f83ae0d4.mp4","loop":0,"media_s":4.0,"now_ms":81230.1,"page":"k3v9q0b2x7mz","run":1,"seq":7,"source":"b814d820-5d53-42a8-9683-ef3419cf4d7e","v":1}
+```
+
+Grenzen je Seite: 40 Meldungen am Stück, danach 20 je Sekunde; höchstens 64 Seiten gleichzeitig (ruhende fallen nach 60 s heraus). Abweisungen höchstens alle 10 s als eine Zeile ins Protokoll, ohne Token.
+
+Kern (`src/core/videoaudio.cpp`, Mischer `src/audio/mixer.cpp`, Ausgang `src/audio/pwoutput.cpp`):
+
+- Je Videoquelle eine Stimme im Mischer mit Decoder (`src/media/audiodecoder.cpp`, float, 48 kHz, Stereo, eigener Thread mit Vorrat), vorbereitet, sobald eine Seite des Overlays über `…/events/<page>` verbunden ist. Lautstärke und Stumm aus `video.volume`/`video.muted` (Protokoll «Ton: Lautstärke …»).
+- Ausgang über PipeWire (`pw_stream` in `pw_thread_loop`, `node.latency` 1920/48000 = 40 ms), ein Strom je Zweck, ständig offen. Die Zeit der Seite bildet der Kern mit dem kleinsten Abstand «Eintreffen − `now_ms`» der letzten 10 s auf `steady_clock` ab und glättet die Lage (bis 4 ms ein Achtel, darüber sofort). Den hörbaren Zeitpunkt rechnet der Mischer aus Abrufzeit, Lage in Proben und der Zyklusgrösse `size` von PipeWire (dazu `delay`, `queued`, `buffered`), abzüglich `versatz_ms`. Abweichungen unter 20 ms führt er weich nach (0,2 % schneller oder langsamer), darüber springt er.
+- Mehrere Seiten auf dasselbe Overlay: Die Seite, die zuerst startet, führt; der Ton kommt einmal je Videoquelle.
+- Stopp sofort bei `stop` (Seite inaktiv), `end`, Ausgabe des Overlays aus, Quelle verborgen, gelöscht oder geändert (andere Datei, Wiederholen umgeschaltet), Overlay gelöscht, Ende von `…/events/<page>`, 3 s ohne Meldung. Kommt danach wieder `frame` oder `loop` (zum Beispiel nach einem Neustart des Kerns), steigt der Ton an der gemeldeten Lage ein («Ton: Einstieg …»).
+- Protokoll: «Ton: Start», «Ton: Einstieg», «Ton: Stopp … (gespielt, Wiederholungen, Sprünge, weich, Abweichung zuletzt)», «Ton: Nachführen» (höchstens einmal je Sekunde), alle 10 s «Ton: Lage …» mit Abweichung; Ausgang «Ton (ton-video): …» (Zustand, Ausgänge erschienen oder verschwunden, abgebrochene Zyklen, Abrufe ohne Puffer, Wechsel von `delay` und `size`).
+- Testoption `dss-core --ersatzausgang`: Ersatzausgang ohne Gerät und ohne PipeWire (für `tst_kernton`). Schalter `DSS_CORE_AUDIO` (Standard ON; OFF = Kern ohne Ton, ohne libpipewire).
 
 ## Fehlerfälle
 

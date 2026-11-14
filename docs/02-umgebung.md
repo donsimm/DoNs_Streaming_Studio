@@ -1,6 +1,6 @@
 # 02 – Umgebung (Zielsystem)
 
-Stand: 2026-11-08 (Streaming-PC und Netz nachgeführt; Studio-PC und Pakete Stand 2026-11-02). Die Werte des Studio-PCs wurden dort gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben. Systemangaben beider Rechner führt `~/projekte/privat/it-system/SYSTEM.md`; hier steht, was das Studio braucht.
+Stand: 2026-11-14 (Pakete für den Ton, P12b; Streaming-PC und Netz Stand 2026-11-08; Studio-PC Stand 2026-11-02). Die Werte des Studio-PCs wurden dort gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben. Systemangaben beider Rechner führt `~/projekte/privat/it-system/SYSTEM.md`; hier steht, was das Studio braucht.
 
 ## Studio-PC
 
@@ -49,6 +49,12 @@ Liste und Einrichtung: `scripts/pakete.txt`, `scripts/einrichten.sh`. Gemessen a
 | libavcodec-dev | 7:7.1.5-0+deb13u1 | P02 |
 | libavutil-dev | 7:7.1.5-0+deb13u1 | P02 |
 | libswscale-dev | 7:7.1.5-0+deb13u1 | P02 |
+| qt6-svg-plugins | 6.8.2-3 | war schon installiert, in der Liste seit P05 |
+| qt6-websockets-dev, libqt6websockets6 | 6.8.2-3 | P10c, installiert vom Nutzer |
+| libswresample-dev | 7:7.1.5-0+deb13u1 | war schon installiert, in der Liste seit P12b (Ton der Videos dekodieren und auf 48 kHz Stereo umwandeln) |
+| libpipewire-0.3-dev | 1.4.2-1 | P12b b1, installiert vom Nutzer (Ausgabe über `pw_stream`); zieht `libspa-0.2-dev` 1.4.2-1 mit |
+
+Gemessen für P12b am 2026-11-12 in `/var/lib/dpkg/status` (Kommentar in `scripts/pakete.txt`). Zur Laufzeit braucht der Kern `libpipewire-0.3-0t64` 1.4.2-1 (installiert). Audio auf dem Studio-PC: PipeWire 1.4.2-1 mit `pipewire-pulse`, `pipewire-alsa` und `wireplumber`, Standard-Rate 48000, Quantum 1024 (21,3 ms), nicht verändert (Plan P12, «Wichtigste Befunde»). `scripts/tonpruefung.py` nutzt dazu die Werkzeuge aus `pipewire-bin` 1.4.2-1 (`pw-loopback`, `pw-cat`, `pw-dump`, `pw-cli`; installiert, nicht in der Liste).
 
 Ebenfalls vorhanden, aber nicht in der Liste: `qt6-base-dev-tools` 6.8.2+dfsg-9+deb13u2 und `libqt6test6` 6.8.2+dfsg-9+deb13u2 (Abhängigkeiten von `qt6-base-dev`), `pkgconf` 1.8.1-4, `x11-utils` 7.7+7 (`xwininfo`, genutzt von der Startprüfung). Nicht weiterverfolgt, aber weiterhin installiert: `qt6-webengine-dev`, `qt6-multimedia-dev`, PyQt6. Nicht installiert: `xdotool`, `wmctrl`, `shellcheck`.
 

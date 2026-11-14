@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-09 (Punkt 102 erledigt und ins Archiv verschoben; davor P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 103 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-14 (P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 113 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -11,6 +11,12 @@ Stand: 2026-11-09 (Punkt 102 erledigt und ins Archiv verschoben; davor P11: Punk
 88. Aus P10b: Erlaubte Endungen für Videos sind weiterhin nur `.webm` und `.mp4` (`docs/06-overlay-format.md`, «media/»). Eine `.mov` (das Beispiel im Entscheid zu Punkt 81 nennt «zaehler.mov (ProRes)») weist der Kern beim Hinzufügen ab («Endung «mov» nicht erlaubt …»); der Hinweis zu ProRes kommt also nur bei ProRes in `.mp4` (so geprüft). Nicht im Auftrag; zu entscheiden, ob `.mov` (und `.mkv`) erlaubt werden.
 89. Aus P10b: Schriften im Dock «Medien» lassen sich nicht auf die Leinwand oder in die Liste «Quellen» ziehen (Ziehen gibt nur Bild- und Videodateien weiter, Entscheid E-28 nennt «neue Quelle»; eine Schrift ist keine Quelle). Zu entscheiden, ob Ziehen einer Schrift eine Textquelle mit dieser Schrift anlegen soll.
 - Ohne Nummer, aus «Entschieden nach P09»: Zuschneiden von Quellen später als eigenen Punkt besprechen (E-25 enthält es nicht).
+103. Aus P12b b5 `[OFFEN]`, Frage an den Nutzer: Ausgang und Versatz in der Zeile «Ton Videos» (Dock «Steuerung») lassen sich auch in der Anzeige «nur Anzeige» ändern, wie die Einstellungen. So lassen oder sperren?
+104. Aus P12b b5: Der Regler «Lautstärke» (Dock «Eigenschaften», Bereich «Video») hat keinen eigenen Stil im Thema (`src/app/theme.cpp`). Zu entscheiden mit dem Handtest (H4, Bildschirmfoto).
+105. Aus P12b (Rückfall nach M3): Startet OBS mit der Szene im Programm, lädt die Browserquelle womöglich, bevor OBS mit dem Kern verbunden ist; dann meldet der Kern «OBS nicht verbunden», schickt kein `obs_active`, und die Seite bleibt bis zum nächsten Szenenwechsel stumm. Nicht geprüft. Möglicher Ausbau: beim Verbinden mit OBS die offenen Seiten mit unbekanntem Zustand noch einmal fragen.
+106. Aus P12b b4: «Abweichung zuletzt» in der Zeile «Ton: Stopp …» ist kurz nach einem Start oder Einstieg nicht aussagekräftig (der Mischer rechnet sie im ersten Abruf gegen die alte Lage, im Test bis −945 ms). Für H3 zählen die Zeilen «Ton: Lage …». Zu entscheiden: im Mischer beim Start auf 0 setzen oder in der Zeile weglassen.
+107. Aus P12b b3: Fällt PipeWire weg (Neustart von PipeWire), bleibt der Ausgang im Zustand `no_pipewire` bis zum Neustart des Kerns, ohne neue Verbindung. Nicht geprüft. Zu entscheiden, ob der Kern sich neu verbinden soll.
+108. Aus P12b b3: `dss-cli einstellungen` zeigt Ausgang und Versatz des Tons (`[ton-video]`) nicht. Lautstärke und Stumm zeigt `dss-cli quelle-liste` seit P12b b6.
 
 ## Entschieden, Umsetzung steht aus
 
@@ -43,6 +49,10 @@ Stand: 2026-11-09 (Punkt 102 erledigt und ins Archiv verschoben; davor P11: Punk
 99. Aus P11: Videos mit nicht quadratischen Pixeln: Chromium wählt die Matrix ohne Farbangabe nach `natural_size` (mit Seitenverhältnis der Pixel), der Editor nach der Höhe des Bildes. Nicht geprüft.
 100. Aus P11: Videos mit Angabe der Grundfarben oder der Übertragung, aber ohne Matrix: Der Editor nimmt die Höhenregel; ob Chromium gleich wählt, ist nicht geprüft.
 - Rest aus Punkt 85: Der echte Fall (Kabel ziehen, Kern starten, Kabel einstecken) ist nicht geprüft.
+109. Aus P12b b5: Die Lautstärke wirkt linear (`volume` / 100 als Faktor im Mischer). Ob das nach Gehör passt, ist nicht geprüft; Handtest N2/N3.
+110. Aus P12b: Am echten Ausgang nicht gemessen: `pw_time.delay` (an der virtuellen Senke immer 0), der hörbare Zeitpunkt und damit Startwert, Vorzeichen und Bereich (±500 ms) von `versatz_ms`. Kommt mit H2 (ersetzt M4).
+111. Aus P12b: In OBS nicht geprüft: verschachtelte Szenen (Rückfall `GetSourceActive`, `videoActive`), Verhalten mit «shutdown», Gang zwischen den Rechnern über 60 min (H3, M3 nur rund 3 min mit −5,2 ms/min), Ruhe des Glättens bei der Streuung aus M3 (p95 24,9 ms), Ursache der rund 20 Bildaufrufe je Sekunde bei 30 Bildern/s.
+112. Aus P12b b1 (Klick 197, Z3c): Beim Wechsel des Quantums von PipeWire kann ein kurzes Stück Ton fehlen, ohne Lageverschiebung und ohne gemeldeten Unterlauf. Knoten und Hörbarkeit nicht geklärt; der Kern schreibt abgebrochene Zyklen ins Protokoll. Ob im Betrieb ein Programm das Quantum ändert, ist nicht geprüft.
 
 ## Machbarkeitstests
 

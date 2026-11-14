@@ -1,6 +1,6 @@
 # 03 – Funktionen je Modul (Entwurf)
 
-Stand: 2026-11-03 (E-22 ergänzt nach Entscheid vor P08, E-28 nach P10a). Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
+Stand: 2026-11-14 (E-22 ergänzt nach Entscheid vor P08, E-28 nach P10a, E-20 und E-21 nach P12b). Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
 
 ## Editor (Hauptfokus)
 
@@ -27,8 +27,8 @@ Prioritäten entschieden (2026-11-02, vom Nutzer bestätigt). MUSS: gehört in d
 | E-17 | Spezialquellen: Chat-Box, Alert-Box, Ereignisliste, Zielbalken | KANN | Brauchen die Twitch-Anbindung, kommen mit dem Chat-Bot |
 | E-18 | Quellen an die aktive OBS-Szene koppeln | KANN | Braucht obs-websocket, wartet auf T-05 |
 | E-19 | NDI, höchstens 2 Ausgänge | KANN | Bereits als «später» entschieden, wartet auf T-03 und das NDI-SDK |
-| E-20 | Ton von Videos über eine Audiokarte des Studio-PCs (über das Mischpult zum Streaming-PC) | MUSS | Entscheid des Nutzers 2026-11-02, gehört zu E-05 |
-| E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte» |
+| E-20 | Ton von Videos über eine Audiokarte des Studio-PCs (über das Mischpult zum Streaming-PC) | MUSS | Entscheid des Nutzers 2026-11-02, gehört zu E-05. Gebaut mit P12b (2026-11-14, Handtest steht aus): Der Kern spielt den Ton über PipeWire nach den Meldungen der Seite in OBS, von vorne beim Aktivieren der Szene; Lautstärke 0–100 % und «Stumm» je Videoquelle im Dock «Eigenschaften», Bereich «Video»; Editor und Browserquelle bleiben stumm |
+| E-21 | Audioausgang des Editors wählbar (ein Ausgang für alle Quellen) | SOLL | Nutzer: «schön wäre, wenn man den wählen könnte». Gebaut mit P12b (2026-11-14, Handtest steht aus): Zeile «Ton Videos» im Dock «Steuerung» mit Ausgang («Kein Ausgang» zuerst), Versatz −500 bis +500 ms und Hinweis «Ausgang fehlt»; Ausgang je Zweck (Antwort des Nutzers 2026-11-09), heute nur «Ton der Videos» |
 | E-22 | Rückgängig und Wiederholen | SOLL | Entscheid des Nutzers 2026-11-02 (vor P08): Änderungen wirken sofort, Rückgängig kommt später |
 | E-23 | Kopfbereich fest über die ganze Fensterbreite, Docks immer darunter | MUSS | Wunsch des Nutzers 2026-11-03 (Handtest P08), Umsetzung P09 |
 | E-25 | Transformieren wie OBS: kopieren, einfügen (auch in ein anderes Overlay), zurücksetzen (Lage 0/0, Originalgrösse, Drehung 0°, nicht gespiegelt; bei Text bleibt die Grösse), 90° im und gegen den Uhrzeigersinn, 180°, waagrecht und senkrecht spiegeln, auf Leinwand einpassen, auf Leinwand strecken, zentrieren, senkrecht und waagrecht zentrieren. Per Rechtsklick auf die Quelle (Leinwand und Dock «Quellen») und im Menü «Bearbeiten». Zuschneiden nicht enthalten | MUSS | Wunsch des Nutzers 2026-11-03, nach Menü «Transform» von OBS (`frontend/data/locale/en-US.ini`) |

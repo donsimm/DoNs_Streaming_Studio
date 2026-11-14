@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-04 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-14 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -85,7 +85,7 @@ Beispiel: «Überblick Start» oben, darunter der Ordner «Szenen» mit einem Ov
 
 | Feld | Typ | Bereich | Bedeutung |
 |---|---|---|---|
-| `format_version` | ganze Zahl | `1` bis `4` | Version des Formats. Geschrieben wird immer `4`. Eine höhere Zahl wird abgewiesen, nicht geraten. Versionen 1 (P04 bis P08), 2 (P09) und 3 (P09b bis P10-vor) werden weiter gelesen, siehe «Versionen». |
+| `format_version` | ganze Zahl | `1` bis `5` | Version des Formats. Geschrieben wird immer `5`. Eine höhere Zahl wird abgewiesen, nicht geraten. Versionen 1 (P04 bis P08), 2 (P09), 3 (P09b bis P10-vor) und 4 (P10 bis P12b b4) werden weiter gelesen, siehe «Versionen». |
 | `id` | Text | UUID, Kleinbuchstaben, ohne Klammern | Kennung, ändert sich nie. Bestimmt den Dateinamen. |
 | `name` | Text | nicht leer (nicht nur Leerzeichen) | frei wählbarer Name |
 | `address` | Text | `a-z`, `0-9`, einzelne `-` dazwischen | Adresse für die Browserquelle, siehe «Adresse» |
@@ -142,8 +142,12 @@ EXIF-Ausrichtung (Entscheid 7, P09b): Ein Bild wird so gezeigt, wie seine EXIF-A
 | `file` | Text | Verweis `media/<SHA-256>.<Endung>` | Videodatei, auch WebM (VP9) mit Alpha |
 | `loop` | true/false | | am Ende wieder von vorne; beim Hinzufügen `false` (nicht wiederholen) |
 | `hold_at_end` | true/false | | seit Version 2 (P09): am Ende das letzte Bild stehen lassen; beim Hinzufügen `false` |
+| `volume` | ganze Zahl | 0 bis 100 | seit Version 5 (P12b): Lautstärke des Tons in Prozent; beim Hinzufügen `100` (Antwort 3 des Nutzers, 2026-11-09) |
+| `muted` | true/false | | seit Version 5 (P12b): Ton stumm; beim Hinzufügen `false` |
 
-`loop` und `hold_at_end` gibt es nur bei `video`; bei `image` sind sie unbekannte Felder. Am Ende eines Videos (Entscheid 9, P09): mit `loop` wieder von vorne, sonst mit `hold_at_end` das letzte Bild, sonst wird die Quelle leer (durchsichtig). Mit `loop` hat `hold_at_end` keine Wirkung, der Wert bleibt aber gespeichert (im Editor ist «Am Ende anhalten» dann ausgegraut). Ein Video läuft im Editor ab der Wahl des Overlays (Entscheid 10). Zum Ton speichert das Format nichts: Der Studio-PC spielt ihn über eine Audiokarte ab, die Browserquelle ist immer stumm (`docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»).
+`loop`, `hold_at_end`, `volume` und `muted` gibt es nur bei `video`; bei `image` sind sie unbekannte Felder. Am Ende eines Videos (Entscheid 9, P09): mit `loop` wieder von vorne, sonst mit `hold_at_end` das letzte Bild, sonst wird die Quelle leer (durchsichtig). Mit `loop` hat `hold_at_end` keine Wirkung, der Wert bleibt aber gespeichert (im Editor ist «Am Ende anhalten» dann ausgegraut). Ein Video läuft im Editor ab der Wahl des Overlays (Entscheid 10).
+
+Ton (P12b, `docs/01-festlegungen.md`, Abschnitt «Overlay-Daten»): Den Ton spielt nur der Kern über den Ausgang aus `kern.ini` (`[ton-video]`, `docs/08-kern-schnittstelle.md`, «Einstellungen»), mit `volume` linear als Faktor (`volume` / 100, nach Gehör nicht geprüft) und `muted`. Die Browserquelle und der Editor bleiben immer stumm. K-07 gilt hier nicht: Am Bild ändern die beiden Felder nichts.
 
 Bild und Video füllen ihren Kasten gestreckt (Entscheid 6, P09). Neue Bild- und Videoquellen bekommen beim Hinzufügen die Grösse der Datei (Bild: Pixel des Bildes; Video: Grösse des ersten Bildes), Lage (0, 0), Drehung 0. Lässt sich die Grösse nicht lesen, bekommt die Quelle die Grösse des Overlays, und Kern bzw. dss-cli melden das als Warnung. Text wird ab der oberen Kante gesetzt, Zeilen nur an den Zeilenwechseln des Inhalts; was über den Kasten hinausgeht, wird im Editor abgeschnitten (Annahme P09, nicht entschieden).
 
@@ -230,8 +234,9 @@ Beispiel: ein Ordner «Logos» mit dem Unterordner «Alt», darin eine Datei; ei
 | 2 | P09 | neues Pflichtfeld `video.hold_at_end`. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 1 gibt (geprüft 2026-11-03, Bericht P09) |
 | 3 | P09b | neue Pflichtfelder `flip_horizontal` und `flip_vertical` je Quelle. Neue Version, weil es auf dem Studio-PC eine echte Overlay-Datei mit `format_version` 2 gibt (geprüft 2026-11-03, Bericht P09b) |
 | 4 | P10 | neues Pflichtfeld `output` (Ausgabe ein/aus, E-24). Neue Version, weil es im Einsatz eine echte Overlay-Datei gibt (Installation des Nutzers 2026-11-03, P10a); `scripts/installieren.sh` wandelt sie beim nächsten Installieren um (mit Sicherung). Begründung des Orts im Bericht P10 |
+| 5 | P12b | neue Pflichtfelder `video.volume` und `video.muted` (Ton der Videos, E-20). Neue Version aus demselben Grund wie 4: Im Einsatz gibt es Dateien in Version 4; `scripts/installieren.sh` wandelt sie beim nächsten Installieren um (`dss-core --umwandeln`, mit Sicherung). Testdaten `tests/daten/formate/` (Fall «format-fuenf») |
 
-Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. In Version 1 bis 3 ist `output` ein unbekanntes Feld, die Ausgabe ist dann ein; ab Version 4 ist es Pflicht. Beim nächsten Speichern wird die Datei als Version 4 geschrieben. Seit P10a wandelt `scripts/installieren.sh` beim Installieren alle Dateien in älterem Format um (`dss-core --umwandeln`, nach einer Sicherung des ganzen Datenordners); eine Datei in neuerem Format, als die neue Version lesen kann, bricht die Installation ab (`dss-core --format-pruefen`, Exit-Code 5).
+Eine Datei mit Version 1 wird gelesen wie bisher, `hold_at_end` ist dann `false`; in Version 1 ist `hold_at_end` ein unbekanntes Feld, ab Version 2 Pflicht. In Version 1 und 2 sind `flip_horizontal` und `flip_vertical` unbekannte Felder, die Quellen sind dann nicht gespiegelt; ab Version 3 sind sie Pflicht. In Version 1 bis 3 ist `output` ein unbekanntes Feld, die Ausgabe ist dann ein; ab Version 4 ist es Pflicht. In Version 1 bis 4 sind `volume` und `muted` unbekannte Felder, Videos haben dann 100 % und sind nicht stumm; ab Version 5 sind sie Pflicht. Beim nächsten Speichern wird die Datei als Version 5 geschrieben. Seit P10a wandelt `scripts/installieren.sh` beim Installieren alle Dateien in älterem Format um (`dss-core --umwandeln`, nach einer Sicherung des ganzen Datenordners); eine Datei in neuerem Format, als die neue Version lesen kann, bricht die Installation ab (`dss-core --format-pruefen`, Exit-Code 5).
 
 ## Regeln beim Lesen
 
@@ -265,7 +270,7 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
 <!-- beispiel-anfang -->
 ```json
 {
-    "format_version": 4,
+    "format_version": 5,
     "id": "db7f47a9-dee3-4de5-b056-40b5b3507607",
     "name": "Überblick Start",
     "address": "ueberblick-start",
@@ -304,7 +309,9 @@ Overlay «Überblick Start» mit je einer Quelle `image` (hinten), `video` und `
             "video": {
                 "file": "media/09445b269e30ac5f3eddf936bc7a19a960ea82dbcd9ebfcc17ff5acace4c7bdf.webm",
                 "loop": false,
-                "hold_at_end": true
+                "hold_at_end": true,
+                "volume": 80,
+                "muted": false
             }
         },
         {
