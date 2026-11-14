@@ -454,15 +454,18 @@ private:
                                     QStringLiteral("Y"), QStringLiteral("Breite"),
                                     QStringLiteral("Höhe"), QStringLiteral("Drehung"),
                                     QStringLiteral("Gespiegelt"), QStringLiteral("Wiederholen"), QStringLiteral("Am Ende anhalten"),
-                                    QStringLiteral("Name")}};
+                                    QStringLiteral("Lautstärke"), QStringLiteral("Stumm"), QStringLiteral("Name")}};
         for (qsizetype i = 0; i < o->sources.size(); ++i) {
             const dss::Source &s = o->sources.at(i);
+            const bool video = s.kind == dss::SourceKind::Video;
+            // P12b b6: Lautstärke und Stumm (Format 5), nur bei Video
             rows.append({QString::number(i + 1), dss::sourceKindName(s.kind), yesNo(s.visible),
                          QString::number(s.x), QString::number(s.y), QString::number(s.width),
                          QString::number(s.height), dss::rotationDisplay(s.rotation),
-                         flipText(s), s.kind == dss::SourceKind::Video ? yesNo(s.loop) : QStringLiteral("–"),
-                         s.kind == dss::SourceKind::Video ? yesNo(s.holdAtEnd) : QStringLiteral("–"),
-                         s.name});
+                         flipText(s), video ? yesNo(s.loop) : QStringLiteral("–"),
+                         video ? yesNo(s.holdAtEnd) : QStringLiteral("–"),
+                         video ? QStringLiteral("%1 %").arg(s.volume) : QStringLiteral("–"),
+                         video ? yesNo(s.muted) : QStringLiteral("–"), s.name});
         }
         printTable(rows);
         return kExitOk;

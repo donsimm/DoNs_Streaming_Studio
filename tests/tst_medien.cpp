@@ -4,7 +4,8 @@
 // - dss::VideoPlayer: Decoder (libvpx-vp9 für VP9 mit Alpha), Alpha im ersten Bild als Zahl wie
 //   P02 (Gegenprobe mit ffmpeg … alphaextract,signalstats), Takt, Ende ohne Einstellung (leer),
 //   «Am Ende anhalten» (letztes Bild bleibt) und «Wiederholen»
-// - dss-cli quelle-video --am-ende-anhalten und die Spalte in quelle-liste
+// - dss-cli quelle-video --am-ende-anhalten und die Spalte in quelle-liste (seit P12b b6 auch
+//   Lautstärke und Stumm)
 // - P10a: Toleranz der Zeitpunkte (Punkt 66), Drehung aus der Display-Matrix von Videos (Punkt 65)
 // - P10b, Punkt 81: Format der Videos (readVideoCodec), Hinweis beim Hinzufügen und in der
 //   Medienliste, wenn die Browserquelle es nicht abspielt (HEVC, MPEG-4 Part 2, ProRes); neue
@@ -908,6 +909,10 @@ private slots:
         r = runCli(data.path(), {QStringLiteral("quelle-liste"), QStringLiteral("video-test")});
         QCOMPARE(r.exitCode, 0);
         QVERIFY2(r.out.contains(QStringLiteral("Am Ende anhalten")), qPrintable(r.out));
+        // P12b b6: Spalten Lautstärke und Stumm, neue Quelle 100 % und nicht stumm
+        QVERIFY2(r.out.contains(QStringLiteral("Lautstärke")) && r.out.contains(QStringLiteral("Stumm"))
+                     && r.out.contains(QStringLiteral("100 %")),
+                 qPrintable(r.out));
         // Beides zusammen geht (Wiederholen hat Vorrang), ohne Datei nicht
         r = runCli(data.path(), {QStringLiteral("quelle-video"), QStringLiteral("video-test"), media("alpha.webm"),
                                  QStringLiteral("--wiederholen"), QStringLiteral("--am-ende-anhalten")});
