@@ -20,6 +20,11 @@ parse_pidstat, parse_mpstat).
 (tests/daten/bildvergleich/h264-1920x1080-bt709.mp4 und -bt601.mp4). Die Bilder sind gleich, das
 Dekodieren ist billig; ins Gewicht fällt die Umrechnung YUV → RGB in voller Grösse.
 
+--ton (P12b): Leistung des Kerns mit Ton von 3 Videos, ohne Fenster, zwei Durchgänge (A ohne
+Tonausgang, B mit virtueller Senke), Vorgabe 30 min je Durchgang; Ablauf und weitere Optionen in
+scripts/tonleistung.py:
+  python3 scripts/leistung.py --ton [--dauer-min 30] [--build build] [--out DIR]
+
 Quellen: pidstat(1), mpstat(1): https://sysstat.github.io/ (sysstat 12.7.5),
 nvidia-smi --help-query-gpu.
 """
@@ -92,11 +97,16 @@ def prepare_video(build, data):
 
 
 def main():
+    if "--ton" in sys.argv[1:]:
+        import tonleistung
+        return tonleistung.main([a for a in sys.argv[1:] if a != "--ton"])
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", default=os.path.join(ROOT, "build"))
     ap.add_argument("--out", default=os.path.join(ROOT, "build", "leistung"))
     ap.add_argument("--video", action="store_true",
                     help="zwei Videos 1080p30 (BT.709, SMPTE170M) statt der 10 Quellen")
+    ap.add_argument("--ton", action="store_true",
+                    help="Kern mit Ton von 3 Videos, ohne Fenster (scripts/tonleistung.py, eigene Optionen)")
     args = ap.parse_args()
     build = os.path.realpath(args.build)
     os.makedirs(args.out, exist_ok=True)
