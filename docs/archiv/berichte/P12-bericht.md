@@ -1,6 +1,6 @@
 # P12 – Bericht Ton von Videos (E-20, E-21)
 
-Stand: 2026-11-14, nach b6. Plan: `docs/archiv/prompts/P12-ton.md`. Messungen: `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0, Z3, M3). Ausgeführt in Teilen: P12a (Messtest), P12b b1 (Prototyp mit `pw_stream`, Halt), b2 bis b6 (Bau), dazu der Rückfall beim Laden einer aktiven Quelle. **Die Prüfstufe «Baustein» und der Handtest stehen aus** (eigene Aufträge); bis hier ist jeder Abschnitt in Stufe «Klein» geprüft.
+Stand: 2026-11-14, nach b6. Plan: `docs/archiv/prompts/P12-ton.md`. Messungen: `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0, Z3, M3). Ausgeführt in Teilen: P12a (Messtest), P12b b1 (Prototyp mit `pw_stream`, Halt), b2 bis b6 (Bau), dazu der Rückfall beim Laden einer aktiven Quelle. Bis b6 ist jeder Abschnitt in Stufe «Klein» geprüft; die Prüfstufe «Baustein» ist am 2026-11-14 gelaufen (Abschnitt «Prüfstufe Baustein (2026-11-14)», Leistung offen). **Der Handtest steht aus.**
 
 ## Ablauf
 
@@ -81,7 +81,43 @@ Einordnung: Die Abweichung von −21 ms ist genau ein Zyklus von PipeWire (1024 
 
 Am Rand: Beim Lauf stand «RØDECaster Pro II Analog Stereo» als Standardausgang in der Liste von PipeWire (`wpctl status`, 18:36); der Ton der Prüfung ging nur in die virtuelle Senke.
 
-**Nicht geprüft** in b6: Prüfstufe «Baustein» (frischer Klon, `startpruefung.py`, `dienstpruefung.py`, 50 Wiederholungen, Leistung, Bau mit `DSS_CORE_AUDIO=OFF`), alles am echten Ausgang und in OBS ausser dem Rückfall.
+**Nicht geprüft** in b6: Prüfstufe «Baustein» (Abschnitt unten), alles am echten Ausgang und in OBS ausser dem Rückfall.
+
+## Prüfstufe Baustein (2026-11-14)
+
+Stand `lotse/p12` nach dem Entscheid zu Punkt 103 (b1 bis b6, Rückfall), ohne diesen Nachtrag. Studio-PC, X11-Sitzung aktiv (`/sys/class/tty/tty0/active` = tty7 vor den Fensterläufen; `wiederholen.sh` prüft vor jedem Lauf `Active` und `LockedHint`), Last vor dem Beginn 0,30/0,46/0,38. Daneben keine Bauten oder Tests; die Läufe nacheinander, nie zwei Fenstertests gleichzeitig. Rohdaten unter `build/pruefung-p12/` (nicht im Repo).
+
+| Stufe | Befehl | Ergebnis |
+|---|---|---|
+| Bau | `cmake --build build -j8` | Exit 0, keine Warnung (schon gebaut) |
+| Tests | `ctest --test-dir build` | **49 von 49**, keiner übersprungen, 250 s |
+| Frischer Klon | `/var/tmp/dss-klon-p12b6` (von Lotse angelegt): `cmake -S … -B …/build`, `cmake --build …/build -j8`, `ctest --test-dir …/build` | Bau Exit 0, keine Warnung; **49 von 49**, keiner übersprungen, 267 s |
+| Startprüfung | `python3 scripts/startpruefung.py --runs 20 --out build/pruefung-p12/start/startpruefung` (19:09–19:11) | je **20 von 20** sauber: `core-sigterm` (Start Median 46,2 ms, Ende 6,0 ms), `core-sigint` (46,5 / 5,9 ms), `app-sigterm` (246,0 / 17,9 ms), `app-kern-sigterm` (246,1 / 23,6 ms); keine Restprozesse, keine unerwarteten Zeilen |
+| Dienstprüfung | `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p12/dienst` | **bestanden**. Neustart nach `kill -9` 1,101 bis 1,169 s, Fenster wieder verbunden 1,901 bis 2,944 s; Fenster startet den Kern in 0,304 s |
+| Ton-Prüfung | `python3 scripts/tonpruefung.py --out build/pruefung-p12/ton` (19:12–19:17, Last vorher 0,59/1,28/1,19) | **bestanden**, Werte unten |
+| 50 Wiederholungen | `bash scripts/wiederholen.sh build <Test> 50 <Ordner>`, nacheinander 19:17 bis 20:33 | je **50 von 50**: `tst_tonmischer` (Ende 19:21:54), `tst_tonausgang` (19:28:10), `tst_kernton` (19:45:32), `tst_overlayserver` (19:53:09), `tst_browserquelle` (20:09:47), `tst_bildvergleich` (20:33:32) |
+| Bau ohne Ton | `cmake -S /var/tmp/dss-klon-p12b6 -B /var/tmp/dss-klon-p12b6/build-ohne-ton -DDSS_CORE_AUDIO=OFF`, `cmake --build … -j8` | Exit 0, keine Warnung; libpipewire wird nicht gesucht, `dss_pwoutput` und `tst_tonausgang` werden nicht gebaut. `ctest` dort nicht verlangt, nicht gelaufen |
+| Leistung mit 3 Videos mit Ton, 30 min | – | **nicht geprüft**, siehe unten |
+
+**Ton-Prüfung** (`build/pruefung-p12/ton/ergebnis.txt`), 20 Läufe zu 12 s, gleiche Grenzen wie in b6:
+
+| Grösse | Wert | Grenze |
+|---|---|---|
+| Meldungen der Seite | 280, alle mit 204 | alle 204 |
+| Piepe ab k = 1 | 120 von 120, 0 fehlen, 0 zusätzlich | alle, keiner zusätzlich |
+| Abweichung zu den Meldungen | Mittel −21,03 ms, Median −21,04, p5 −21,09, p95 −20,94, min −21,09, max −20,86 | – |
+| Streuung p5–p95 / max − min | 0,14 ms / 0,23 ms | ≤ 15 ms / ≤ 40 ms |
+| Abweichung + `size`/rate | Median 0,30 ms | – |
+| Gang | −0,008 ms/min | – |
+| Länge der Piepe | 33,31 ms | 30 bis 36 ms |
+| Kern | Start und Stopp in 20 von 20; «Ton: Lage» −0,07 bis 0,02 ms; 0 «Nachführen», 0 Abrufe ohne Puffer, 0 abgebrochene Zyklen; Exit-Code 0 | – |
+| Aufräumen | keine Knoten `dss_tonpruefung…`, Standardausgang und -eingang unverändert | – |
+
+**Leistung nicht geprüft** `[OFFEN]`: `scripts/leistung.py` misst nur das Fenster `dss-app` (Zeichner) mit 60 s Messfenster und kennt nur `--video` (zwei Videos 1080p30, Vergleichswert P11: 90,8 % eines Kerns). Es setzt keinen Tonausgang und bildet die Seite nicht nach (`…/events/<page>`, `…/clock`); ohne diese Meldungen spielt der Kern keinen Ton. Die verlangte Messung (3 Videos mit Ton, CPU des Kerns mit und ohne Ton, Aussetzer über 30 min) braucht eine Erweiterung des Skripts, etwa mit der Senke und der nachgebildeten Seite aus `tonpruefung.py`. Das ist neuer Code und nicht Teil des Auftrags; Entscheid bei Lotse.
+
+**Auffällig, kein Fehler der Software:** Der erste Aufruf von `wiederholen.sh` für `tst_tonmischer` mit relativem Ausgabeordner meldete «0 von 50» in je 2 ms: Das Skript wechselt vor `ctest` nach `build/`, ein relativer Ordner zeigt dann ins Leere, `ctest` lief nie. Mit absolutem Ordner wiederholt; gewertet ist nur dieser Lauf.
+
+**Dienste:** `systemctl --user is-active` war in dieser Sitzung nicht freigegeben, der Zustand von `dss-core.service` und `dss-core-entwicklung.service` vor dem Beginn ist darum nicht geprüft. Am Ende läuft kein Prozess `dss-core` (`pgrep -a dss-core`, Exit-Code 1). Die Dienstprüfung nutzt die eigene Einheit `dss-core-pruefung.service` und entfernt sie wieder.
 
 ## Handtest
 
@@ -102,7 +138,7 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 
 ## Nicht erledigt, `[OFFEN]`
 
-- Prüfstufe «Baustein» (eigener Auftrag, Befehle im Plan, Abschnitt 3, «Prüfstufe «Baustein»»).
+- Prüfstufe «Baustein»: gelaufen 2026-11-14 (Abschnitt oben), alles bestanden ausser der Leistung mit 3 Videos mit Ton über 30 min, die mit `scripts/leistung.py` nicht messbar ist (Skript erweitern, Entscheid Lotse).
 - Handtest H1 bis H4, N1 bis N3.
 - `[OFFEN]` Nutzer: Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
 - Offene Punkte 103 bis 112 in `docs/04-offene-punkte.md`: Regler ohne eigenen Stil, OBS-Start mit Szene im Programm, «Abweichung zuletzt», Neustart von PipeWire, `dss-cli einstellungen` ohne Ausgang und Versatz, Lautstärke linear, `delay` und `versatz_ms` am echten Ausgang, OBS-Fälle (verschachtelte Szenen, «shutdown», 60 min), Klick 197.

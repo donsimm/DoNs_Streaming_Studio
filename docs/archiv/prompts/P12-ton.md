@@ -319,7 +319,8 @@ Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Mel
 - **Lesart:** −21 ms ist ein Zyklus von PipeWire. Der Kern rechnet den hörbaren Zeitpunkt einen Zyklus nach dem Abruf (Gerät), die virtuelle Senke gibt die Proben im selben Zyklus weiter. Am echten Ausgang misst das H2.
 - **`dss-cli quelle-liste`:** neue Spalten «Lautstärke» und «Stumm» (eigener Commit, Test `tst_medien` «cliHoldAtEnd»).
 - **Dokumente:** `docs/01`, `02`, `03`, `04` (Punkte 103 bis 112), `06` (Format 5), `08` (Version 12 und 13, `…/clock`, `obs_active`, Abschnitt «Ton der Videos»), Bericht P12.
-- **Offen:** Prüfstufe «Baustein» (oben) und Handtest (Abschnitt 4).
+- **Offen:** Handtest (Abschnitt 4). Leistung mit 3 Videos mit Ton (unten) `[OFFEN]`.
+- **Prüfstufe «Baustein»** gelaufen 2026-11-14, Ergebnis im Bericht P12, Abschnitt «Prüfstufe Baustein (2026-11-14)»: Bau, `ctest` 49 von 49, frischer Klon 49 von 49, Startprüfung je 20 von 20, Dienstprüfung bestanden, Ton-Prüfung bestanden (Streuung p5–p95 0,14 ms), 50 Wiederholungen je 50 von 50, Bau mit `DSS_CORE_AUDIO=OFF` ohne Warnung. Leistung nicht geprüft: `scripts/leistung.py` misst nur `dss-app` und spielt keinen Ton; braucht eine Erweiterung (Entscheid Lotse).
 
 **Prüfstufe «Baustein»** (nach b6, Befehle wie in P11, Ordner `build/pruefung-p12/`; b2 bis b5 je Stufe «Klein»):
 - `cmake --build build -j8`
