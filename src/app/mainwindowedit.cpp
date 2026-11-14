@@ -23,6 +23,8 @@
 #include <QMenu>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QLabel>
+#include <QSlider>
 #include <QSpinBox>
 #include <QToolButton>
 
@@ -193,6 +195,19 @@ void MainWindow::connectEditing()
         dss::SourceChanges c;
         c.holdAtEnd = checked;
         updateSelectedSource(c, QStringLiteral("holdAtEnd"));
+    });
+    // P12b b5: Der Regler meldet beim Ziehen jeden Wert; der Schlüssel hält höchstens eine
+    // Änderung unterwegs, der letzte Wert kommt an (CoreClient::sendChange).
+    connect(d.volume, &QSlider::valueChanged, this, [this](int value) {
+        m_propertiesDock.volumeValue->setText(QStringLiteral("%1 %").arg(value));
+        dss::SourceChanges c;
+        c.volume = value;
+        updateSelectedSource(c, QStringLiteral("volume"));
+    });
+    connect(d.muted, &QCheckBox::clicked, this, [this](bool checked) {
+        dss::SourceChanges c;
+        c.muted = checked;
+        updateSelectedSource(c, QStringLiteral("muted"));
     });
 
     // Auflösung des Overlays im Dock «Steuerung» (P09, Entscheid 5)

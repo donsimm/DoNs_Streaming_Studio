@@ -46,6 +46,7 @@
 #include <QFrame>
 #include <QInputDialog>
 #include <QLabel>
+#include <QSlider>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
@@ -649,6 +650,53 @@ private slots:
         QTest::mouseClick(hold, Qt::LeftButton, {}, QPoint(8, hold->height() / 2));
         QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).holdAtEnd, true, 3000);
         QVERIFY(hold->isChecked());
+    }
+
+    // P12b b5 (Antwort 3 des Nutzers): Regler «Lautstärke» 0 bis 100 % und «Stumm» kommen beim
+    // Kern an; der Wert steht neben dem Regler.
+    void videoVolume()
+    {
+        if (!DSS_APP_EDITING)
+            QSKIP("Schalter DSS_APP_EDITING ist aus");
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(1); // Video
+        auto *volume = child<QSlider>("videoVolume");
+        auto *value = child<QLabel>("videoVolumeValue");
+        auto *muted = child<QCheckBox>("videoMuted");
+        QTRY_VERIFY_WITH_TIMEOUT(volume->isEnabled() && muted->isEnabled(), 3000);
+        QCOMPARE(volume->minimum(), 0);
+        QCOMPARE(volume->maximum(), 100);
+        // Testdaten im Format 4: 100 % und nicht stumm
+        QCOMPARE(sourceAtRow(1).volume, 100);
+        QCOMPARE(volume->value(), 100);
+        QCOMPARE(value->text(), QStringLiteral("100 %"));
+        QVERIFY(!muted->isChecked());
+        const QRect valueBefore = value->geometry();
+
+        volume->setFocus();
+        QTest::keyClick(volume, Qt::Key_PageDown); // eine Seite: 10 %
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).volume, 90, 3000);
+        QCOMPARE(value->text(), QStringLiteral("90 %"));
+        QTest::keyClick(volume, Qt::Key_Home);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).volume, 0, 3000);
+        QCOMPARE(value->text(), QStringLiteral("0 %"));
+        QCOMPARE(value->geometry(), valueBefore); // keine Änderung der Anordnung
+        QCOMPARE(sourceAtRow(1).muted, false);
+
+        QTest::mouseClick(muted, Qt::LeftButton, {}, QPoint(8, muted->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).muted, true, 3000);
+        QCOMPARE(sourceAtRow(1).volume, 0);
+
+        // Zurück auf den Stand der Testdaten (für die folgenden Tests)
+        QTest::keyClick(volume, Qt::Key_End);
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).volume, 100, 3000);
+        QTest::mouseClick(muted, Qt::LeftButton, {}, QPoint(8, muted->height() / 2));
+        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(1).muted, false, 3000);
+        QCOMPARE(value->text(), QStringLiteral("100 %"));
+
+        // Bei einem Bild ist der Bereich «Video» nicht zu sehen
+        selectSourceRow(2);
+        QTRY_VERIFY_WITH_TIMEOUT(!volume->isVisible(), 3000);
     }
 
     // P09 Entscheid 5: Auflösung im Dock «Steuerung»; Quellen behalten ihre Pixelwerte.

@@ -13,6 +13,7 @@ class QLineEdit;
 class QPlainTextEdit;
 class QPushButton;
 class QScrollArea;
+class QSlider;
 class QSpinBox;
 class QStackedWidget;
 class QToolButton;
@@ -74,6 +75,10 @@ struct PropertiesDock
     // Video
     QCheckBox *loop = nullptr;
     QCheckBox *holdAtEnd = nullptr; // P09: am Ende anhalten, ausgegraut mit «Wiederholen»
+    // P12b b5: Ton der Videoquelle (spielt der Kern), Regler 0 bis 100 % mit Anzeige des Wertes
+    QSlider *volume = nullptr;
+    QLabel *volumeValue = nullptr;
+    QCheckBox *muted = nullptr;
     // Text
     QPlainTextEdit *content = nullptr;
     QComboBox *family = nullptr;

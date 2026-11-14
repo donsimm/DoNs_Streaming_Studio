@@ -17,6 +17,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSlider>
 #include <QStackedWidget>
 #include <QSpinBox>
 #include <QToolButton>
@@ -314,13 +315,30 @@ PropertiesDock createPropertiesDock(QWidget *parent)
 
     QWidget *videoPage = section(QStringLiteral("Video"), r.kindPages, &g);
     r.loop = new QCheckBox(QStringLiteral("Wiederholen"), videoPage);
-    g->addWidget(r.loop, 0, 0);
+    // Kästchen über alle Spalten: Ihre Breite bestimmt nicht die Spalte der Beschriftungen.
+    g->addWidget(r.loop, 0, 0, 1, 3);
     r.holdAtEnd = new QCheckBox(QStringLiteral("Am Ende anhalten"), videoPage);
     r.holdAtEnd->setToolTip(QStringLiteral("Letztes Bild bleibt stehen. Ohne beides wird die Quelle "
                                            "am Ende leer."));
-    g->addWidget(r.holdAtEnd, 1, 0);
+    g->addWidget(r.holdAtEnd, 1, 0, 1, 3);
+    // P12b b5 (Antwort 3 des Nutzers): Lautstärke und Stumm; den Ton spielt der Kern.
+    r.volume = new QSlider(Qt::Horizontal, videoPage);
+    r.volume->setRange(dss::kVolumeMin, dss::kVolumeMax);
+    r.volume->setValue(dss::kVolumeMax);
+    r.volume->setPageStep(10);
+    r.volume->setAccessibleName(QStringLiteral("Lautstärke"));
+    r.volumeValue = new QLabel(videoPage);
+    // Breite für «100 %»: Der Wechsel des Wertes ändert die Anordnung nicht (Regel 9).
+    r.volumeValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    r.volumeValue->setText(QStringLiteral("%1 %").arg(dss::kVolumeMax));
+    r.volumeValue->setMinimumWidth(r.volumeValue->sizeHint().width());
+    r.muted = new QCheckBox(QStringLiteral("Stumm"), videoPage);
+    g->addWidget(new QLabel(QStringLiteral("Lautstärke"), videoPage), 2, 0);
+    g->addWidget(r.volume, 2, 1);
+    g->addWidget(r.volumeValue, 2, 2);
+    g->addWidget(r.muted, 3, 0, 1, 3);
     g->setColumnStretch(1, 1);
-    g->setRowStretch(2, 1);
+    g->setRowStretch(4, 1);
     r.kindPages->addWidget(videoPage);
 
     QWidget *textPage = section(QStringLiteral("Text"), r.kindPages, &g);
@@ -399,12 +417,13 @@ PropertiesDock createPropertiesDock(QWidget *parent)
                  {r.flipHorizontal, "propertyFlipHorizontal"},
                  {r.flipVertical, "propertyFlipVertical"},
                  {r.replaceImage, "imageReplace"}, {r.loop, "videoLoop"},
-                 {r.holdAtEnd, "videoHoldAtEnd"},
+                 {r.holdAtEnd, "videoHoldAtEnd"}, {r.volume, "videoVolume"},
+                 {r.volumeValue, "videoVolumeValue"}, {r.muted, "videoMuted"},
                  {r.content, "textContent"}, {r.family, "textFamily"}, {r.weight, "textWeight"},
                  {r.italic, "textItalic"}, {r.fontSize, "textSize"}, {r.align, "textAlign"}});
     for (QWidget *w : std::initializer_list<QWidget *>{
              r.name, r.x, r.y, r.width, r.height, r.rotation, r.flipHorizontal, r.flipVertical,
-             r.replaceImage, r.loop, r.holdAtEnd,
+             r.replaceImage, r.loop, r.holdAtEnd, r.volume, r.volumeValue, r.muted,
              r.content,
              r.family, r.weight, r.italic, r.fontSize, r.color, r.align})
         w->setEnabled(false);

@@ -39,6 +39,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSlider>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -776,6 +777,15 @@ void MainWindow::refreshProperties()
         d.loop->setChecked(source->loop);
         const QSignalBlocker blockHold(d.holdAtEnd);
         d.holdAtEnd->setChecked(source->holdAtEnd);
+        // P12b b5: Regler bleibt, solange seine Änderung unterwegs ist (wie die Zahlenfelder)
+        if (!pending(QStringLiteral("volume"))) {
+            const QSignalBlocker blockVolume(d.volume);
+            d.volume->setValue(source->volume);
+            d.volumeValue->setText(QStringLiteral("%1 %").arg(source->volume));
+        }
+        const QSignalBlocker blockMuted(d.muted);
+        if (!pending(QStringLiteral("muted")))
+            d.muted->setChecked(source->muted);
     }
     if (source && source->kind == dss::SourceKind::Text) {
         const dss::TextProperties &t = source->text;
@@ -853,6 +863,7 @@ void MainWindow::refreshActions()
     for (QWidget *w : std::initializer_list<QWidget *>{d.name, d.x, d.y, d.width, d.height,
                                                        d.rotation, d.flipHorizontal,
                                                        d.flipVertical, d.replaceImage, d.loop,
+                                                       d.volume, d.volumeValue, d.muted,
                                                        d.content, d.family, d.weight,
                                                        d.fontSize, d.color, d.align})
         w->setEnabled(edit && source);
