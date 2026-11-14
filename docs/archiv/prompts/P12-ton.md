@@ -319,8 +319,8 @@ Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Mel
 - **Lesart:** −21 ms ist ein Zyklus von PipeWire. Der Kern rechnet den hörbaren Zeitpunkt einen Zyklus nach dem Abruf (Gerät), die virtuelle Senke gibt die Proben im selben Zyklus weiter. Am echten Ausgang misst das H2.
 - **`dss-cli quelle-liste`:** neue Spalten «Lautstärke» und «Stumm» (eigener Commit, Test `tst_medien` «cliHoldAtEnd»).
 - **Dokumente:** `docs/01`, `02`, `03`, `04` (Punkte 103 bis 112), `06` (Format 5), `08` (Version 12 und 13, `…/clock`, `obs_active`, Abschnitt «Ton der Videos»), Bericht P12.
-- **Offen:** Handtest (Abschnitt 4). Leistung mit 3 Videos mit Ton (unten) `[OFFEN]`.
-- **Prüfstufe «Baustein»** gelaufen 2026-11-14, Ergebnis im Bericht P12, Abschnitt «Prüfstufe Baustein (2026-11-14)»: Bau, `ctest` 49 von 49, frischer Klon 49 von 49, Startprüfung je 20 von 20, Dienstprüfung bestanden, Ton-Prüfung bestanden (Streuung p5–p95 0,14 ms), 50 Wiederholungen je 50 von 50, Bau mit `DSS_CORE_AUDIO=OFF` ohne Warnung. Leistung nicht geprüft: `scripts/leistung.py` misst nur `dss-app` und spielt keinen Ton; braucht eine Erweiterung (Entscheid Lotse).
+- **Offen:** Handtest (Abschnitt 4).
+- **Prüfstufe «Baustein»** gelaufen 2026-11-14, Ergebnis im Bericht P12, Abschnitt «Prüfstufe Baustein (2026-11-14)»: Bau, `ctest` 49 von 49, frischer Klon 49 von 49, Startprüfung je 20 von 20, Dienstprüfung bestanden, Ton-Prüfung bestanden (Streuung p5–p95 0,14 ms), 50 Wiederholungen je 50 von 50, Bau mit `DSS_CORE_AUDIO=OFF` ohne Warnung. Leistung als Nachtrag am selben Abend mit dem neuen `scripts/leistung.py --ton` (`scripts/tonleistung.py`, gemeinsame Teile mit `tonpruefung.py` in `scripts/tonwerkzeug.py`), 30 min je Durchgang: Mehrlast des Kerns 2,75 Prozentpunkte eines Kerns (A ohne Ausgang 0,66 %, B virtuelle Senke 3,41 %), 0 Aussetzer, 2714 von 2714 Piepen, **bestanden** (Bericht P12, «Leistung mit Ton»).
 
 **Prüfstufe «Baustein»** (nach b6, Befehle wie in P11, Ordner `build/pruefung-p12/`; b2 bis b5 je Stufe «Klein»):
 - `cmake --build build -j8`
@@ -330,7 +330,7 @@ Vor Commit 2 erfasst der Agent, wie die bestehenden Docks Zeilen, Felder und Mel
 - `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p12/dienst` (Watchdog mit dem Thread von PipeWire)
 - `scripts/tonpruefung.py`, 20 Läufe
 - **50 Wiederholungen** (Takt, Threads und Video betroffen): `tst_tonmischer`, `tst_tonausgang`, `tst_kernton`, `tst_overlayserver`, `tst_browserquelle`, `tst_bildvergleich`. Ohne Last daneben, nie zwei Fenstertests gleichzeitig.
-- Leistung: `scripts/leistung.py` mit 3 Videos mit Ton. Ziel: höchstens 3 Prozentpunkte eines Kerns mehr CPU, 0 Aussetzer in 30 min.
+- Leistung: `scripts/leistung.py --ton` mit 3 Videos mit Ton (Vorgabe 30 min je Durchgang). Ziel: höchstens 3 Prozentpunkte eines Kerns mehr CPU, 0 Aussetzer in 30 min.
 - Bau mit `DSS_CORE_AUDIO=OFF` einmal (neuer Schalter).
 
 ## 4. Handtest (Regel 10)

@@ -1,6 +1,6 @@
 # P12 – Bericht Ton von Videos (E-20, E-21)
 
-Stand: 2026-11-14, nach b6. Plan: `docs/archiv/prompts/P12-ton.md`. Messungen: `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0, Z3, M3). Ausgeführt in Teilen: P12a (Messtest), P12b b1 (Prototyp mit `pw_stream`, Halt), b2 bis b6 (Bau), dazu der Rückfall beim Laden einer aktiven Quelle. Bis b6 ist jeder Abschnitt in Stufe «Klein» geprüft; die Prüfstufe «Baustein» ist am 2026-11-14 gelaufen (Abschnitt «Prüfstufe Baustein (2026-11-14)», Leistung offen). **Der Handtest steht aus.**
+Stand: 2026-11-14, nach b6. Plan: `docs/archiv/prompts/P12-ton.md`. Messungen: `docs/archiv/messungen/P12a-bericht.md` (M1, M2, Z0, Z3, M3). Ausgeführt in Teilen: P12a (Messtest), P12b b1 (Prototyp mit `pw_stream`, Halt), b2 bis b6 (Bau), dazu der Rückfall beim Laden einer aktiven Quelle. Bis b6 ist jeder Abschnitt in Stufe «Klein» geprüft; die Prüfstufe «Baustein» ist am 2026-11-14 gelaufen (Abschnitt «Prüfstufe Baustein (2026-11-14)»; die Leistung mit Ton ist am selben Abend mit `scripts/leistung.py --ton` nachgeholt, bestanden). **Der Handtest steht aus.**
 
 ## Ablauf
 
@@ -97,7 +97,7 @@ Stand `lotse/p12` nach dem Entscheid zu Punkt 103 (b1 bis b6, Rückfall), ohne d
 | Ton-Prüfung | `python3 scripts/tonpruefung.py --out build/pruefung-p12/ton` (19:12–19:17, Last vorher 0,59/1,28/1,19) | **bestanden**, Werte unten |
 | 50 Wiederholungen | `bash scripts/wiederholen.sh build <Test> 50 <Ordner>`, nacheinander 19:17 bis 20:33 | je **50 von 50**: `tst_tonmischer` (Ende 19:21:54), `tst_tonausgang` (19:28:10), `tst_kernton` (19:45:32), `tst_overlayserver` (19:53:09), `tst_browserquelle` (20:09:47), `tst_bildvergleich` (20:33:32) |
 | Bau ohne Ton | `cmake -S /var/tmp/dss-klon-p12b6 -B /var/tmp/dss-klon-p12b6/build-ohne-ton -DDSS_CORE_AUDIO=OFF`, `cmake --build … -j8` | Exit 0, keine Warnung; libpipewire wird nicht gesucht, `dss_pwoutput` und `tst_tonausgang` werden nicht gebaut. `ctest` dort nicht verlangt, nicht gelaufen |
-| Leistung mit 3 Videos mit Ton, 30 min | – | **nicht geprüft**, siehe unten |
+| Leistung mit 3 Videos mit Ton, 30 min | `python3 scripts/leistung.py --ton --dauer-min 30 --out build/pruefung-p12/leistung-ton/lauf-30min-2` (22:27–23:28, Nachtrag) | **bestanden**: Mehrlast 2,75 Prozentpunkte eines Kerns (Grenze 3), 0 Aussetzer; Werte unten |
 
 **Ton-Prüfung** (`build/pruefung-p12/ton/ergebnis.txt`), 20 Läufe zu 12 s, gleiche Grenzen wie in b6:
 
@@ -113,7 +113,23 @@ Stand `lotse/p12` nach dem Entscheid zu Punkt 103 (b1 bis b6, Rückfall), ohne d
 | Kern | Start und Stopp in 20 von 20; «Ton: Lage» −0,07 bis 0,02 ms; 0 «Nachführen», 0 Abrufe ohne Puffer, 0 abgebrochene Zyklen; Exit-Code 0 | – |
 | Aufräumen | keine Knoten `dss_tonpruefung…`, Standardausgang und -eingang unverändert | – |
 
-**Leistung nicht geprüft** `[OFFEN]`: `scripts/leistung.py` misst nur das Fenster `dss-app` (Zeichner) mit 60 s Messfenster und kennt nur `--video` (zwei Videos 1080p30, Vergleichswert P11: 90,8 % eines Kerns). Es setzt keinen Tonausgang und bildet die Seite nicht nach (`…/events/<page>`, `…/clock`); ohne diese Meldungen spielt der Kern keinen Ton. Die verlangte Messung (3 Videos mit Ton, CPU des Kerns mit und ohne Ton, Aussetzer über 30 min) braucht eine Erweiterung des Skripts, etwa mit der Senke und der nachgebildeten Seite aus `tonpruefung.py`. Das ist neuer Code und nicht Teil des Auftrags; Entscheid bei Lotse.
+**Leistung mit Ton** (Nachtrag 2026-11-14, Auftrag Lotse): Beim ersten Lauf der Stufe misst `scripts/leistung.py` nur das Fenster `dss-app` ohne Ton; ohne Meldungen der Seite spielt der Kern keinen Ton. Neu: `scripts/leistung.py --ton` (Code in `scripts/tonleistung.py`, gemeinsame Teile mit `tonpruefung.py` in `scripts/tonwerkzeug.py`). Ablauf: virtuelle Senke `dss_tonleistung_ausgabe` → Quelle `dss_tonleistung_aufnahme` (`pw-loopback`, Sicherung wie `tonpruefung.py`, jede Minute geprüft); eigener Temp-Ordner; Overlay mit 3 Videos «Wiederholen» (`tests/daten/ton/blitz-piep.mp4` AAC 48 kHz, `blitz-piep.webm` Opus, `blitz-piep-44100.mp4` AAC 44,1 kHz); Seite nachgebildet (`…/events/<page>`, je Video `start`, `frame` jede Sekunde, `loop` nach 60 s plus 58,6 ms Pause wie M2, Videos um 0,6 s versetzt). Zwei Durchgänge mit je eigenem Kern aus `build/`: A mit `ausgang=` leer («Kein Ausgang», Zustand `no_target`, nichts gemischt), B mit Ausgang auf die virtuelle Senke. Nach 10 s Anlauf je 1800 s `LC_ALL=C pidstat -h -u -r -p <dss-core> 1 1800` und `LC_ALL=C mpstat 1 1800`. Studio-PC, ohne Fenster, Last vorher 0,12/0,08/0,02, daneben nichts.
+
+| Grösse | A (kein Ausgang) | B (virtuelle Senke) |
+|---|---|---|
+| Messung | 22:28:14, 1800 s | 22:58:33, 1800 s |
+| CPU `dss-core`, % eines Kerns | Mittel 0,66, Median 1, p95 2, max 2 | Mittel 3,41, Median 3, p95 4, max 6 |
+| RSS max | 74,5 MiB | 77,1 MiB |
+| Meldungen der Seite | 5431, alle 204 | 5431, alle 204 |
+| Kern | 3 Starts, 3 Stopps «Seite inaktiv», gespielt 0 s, Exit-Code 0 | 3 Starts, 3 Stopps «Seite inaktiv», je 30 Wiederholungen, gespielt 1809,7 bis 1810,9 s, Exit-Code 0 |
+| Aussetzer laut Kern | – | 0 Abrufe ohne Puffer, 0 abgebrochene Zyklen, 0 Sprünge nach dem Start, 0 weich, 0 «Nachführen», 0 «3 s ohne Meldung»; «Ton: Lage» (540 Zeilen) −0,63 bis 0,01 ms; `delay` 0, `size` 1024 |
+| Aufnahme | 0 Einsätze | 2714 von 2714 Piepen, 0 fehlen, 0 zusätzlich (3 am Rand nicht gewertet); Länge 33,29 bis 33,31 ms; Abweichung Median −20,47 ms, p5 −20,79, p95 −20,20 |
+
+**Mehrlast B − A: 2,75 Prozentpunkte eines Kerns** (Grenze 3), **0 Aussetzer in 30 min: bestanden.** Danach `wpctl status` ohne `dss_tonleistung…`, `pgrep -a pw-loopback` und `pgrep -a dss-core` ohne Treffer (Exit-Code 1). Rohdaten `build/pruefung-p12/leistung-ton/lauf-30min-2/` (nicht im Repo).
+
+Einordnung: Die Mehrlast liegt nahe an der Grenze; `pidstat` misst in ganzen Prozent je Sekunde, das Mittel über 1800 Werte ist trotzdem genauer. Die Abweichung um −20,5 ms ist wie in der Ton-Prüfung ein Zyklus von PipeWire an der virtuellen Senke. Was die Aufnahme nicht sieht: Lücken in stillen Teilen (leerer Ring zählt der Mischer, das Protokoll nennt ihn nicht); Piepe mit voller Länge an allen 2714 Stellen und 0 Sprünge sprechen gegen Aussetzer. Am echten Ausgang und in OBS ist das nicht geprüft (H3).
+
+Vorläufe (nicht gewertet, gleicher Ordner): Probe 2 min ohne Pause beim Wiederholen: je Video 1 Sprung beim ersten Wiederholen, weil der Mischer mit der Pause aus M2 rechnet (`kLoopGapStartNs`) und die nachgebildete Seite ohne Pause wiederholte; danach Seite mit Pause, Proben 2 min und 1 min bestanden (Mehrlast 2,60 und 2,67 Prozentpunkte). Erster Lauf 30 min (21:53) nach Durchgang A abgebrochen: `pidstat` schrieb in eine Pipe, die erst am Ende gelesen wurde, und blieb bei vollem Puffer stehen; seither schreibt das Skript direkt in Dateien. Kurzlauf `tonpruefung.py --laeufe 2 --dauer-s 6` nach dem Auslagern der gemeinsamen Teile: bestanden (6 von 6 Piepen, Streuung 0,17 ms).
 
 **Auffällig, kein Fehler der Software:** Der erste Aufruf von `wiederholen.sh` für `tst_tonmischer` mit relativem Ausgabeordner meldete «0 von 50» in je 2 ms: Das Skript wechselt vor `ctest` nach `build/`, ein relativer Ordner zeigt dann ins Leere, `ctest` lief nie. Mit absolutem Ordner wiederholt; gewertet ist nur dieser Lauf.
 
@@ -138,7 +154,7 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 
 ## Nicht erledigt, `[OFFEN]`
 
-- Prüfstufe «Baustein»: gelaufen 2026-11-14 (Abschnitt oben), alles bestanden ausser der Leistung mit 3 Videos mit Ton über 30 min, die mit `scripts/leistung.py` nicht messbar ist (Skript erweitern, Entscheid Lotse).
+- Prüfstufe «Baustein»: gelaufen 2026-11-14 (Abschnitt oben), alles bestanden, die Leistung mit 3 Videos mit Ton als Nachtrag mit `scripts/leistung.py --ton`.
 - Handtest H1 bis H4, N1 bis N3.
 - `[OFFEN]` Nutzer: Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
 - Offene Punkte 103 bis 112 in `docs/04-offene-punkte.md`: Regler ohne eigenen Stil, OBS-Start mit Szene im Programm, «Abweichung zuletzt», Neustart von PipeWire, `dss-cli einstellungen` ohne Ausgang und Versatz, Lautstärke linear, `delay` und `versatz_ms` am echten Ausgang, OBS-Fälle (verschachtelte Szenen, «shutdown», 60 min), Klick 197.
@@ -160,10 +176,27 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 | Port 32000 bis 32767 von oben, frei geprüft | nie 8080/8081, nicht der Bereich der Tests (24000 bis 31999) |
 | Ergebnis unter `build/tonpruefung/<Datum-Zeit>/` | nicht im Repo; Protokoll des Kerns enthält die Adresse im Heimnetz |
 
+## Annahmen, Interna-Entscheide (Leistung mit Ton)
+
+| Entscheid | Begründung |
+|---|---|
+| Eigenes Skript `scripts/tonleistung.py`, aufgerufen über `scripts/leistung.py --ton` | die Messung braucht kein Fenster, zwei Durchgänge, Senke und Seite; in `leistung.py` (Fenster, 60 s) hätte das den Ablauf verdoppelt. Der Aufruf bleibt beim Plan (`leistung.py`) |
+| Gemeinsame Teile aus `tonpruefung.py` nach `scripts/tonwerkzeug.py` statt Kopie | Senke, Sicherung, Aufnahme, Seite, Kern und Aufräumen nur an einer Stelle; `tonpruefung.py` danach kurz nachgeprüft |
+| A = `ausgang=` leer statt «Stumm» | ohne Ausgang mischt der Kern nichts und dekodiert nur den Vorrat; «Stumm» liesse Decoder und Mischer laufen und misst die Mehrlast nicht ganz. Die Meldungen der Seite sind in A und B gleich |
+| Je Durchgang ein eigener Kern, Senke und Aufnahme in beiden | gleiche Bedingungen; `pidstat` misst nur den Kern, `pw-loopback` und `pw-cat` zählen nicht mit |
+| 3 Videos mit verschiedenen Tonspuren (AAC 48 kHz, Opus, AAC 44,1 kHz) | eher ungünstig: zwei Decoder-Arten und eine Umrechnung der Rate |
+| Videos um 0,6 s versetzt | die Piepe liegen getrennt in der Aufnahme; jeder Piep ist einem Video zugeordnet |
+| Pause beim Wiederholen 58,6 ms in der nachgebildeten Seite | wie M2 und `Mixer::kLoopGapStartNs`; ohne Pause rechnet der Mischer beim ersten Wiederholen mit der Pause und springt (Probelauf), was die echte Seite nicht auslöst |
+| Aussetzer = Abrufe ohne Puffer, abgebrochene Zyklen, Sprünge nach dem Start, «3 s ohne Meldung», fehlende, zusätzliche oder verkürzte Piepe | was Protokoll und Aufnahme hergeben; weiches Nachführen zählt nicht als Aussetzer (war 0) |
+| Mehrlast = Mittel %CPU B − Mittel %CPU A | wie T-02 mit `pidstat`, 10 s Anlauf, dann `--dauer-min` (Vorgabe 30) |
+| Ausgaben von `pidstat` und `mpstat` direkt in Dateien | 1800 Zeilen passen nicht in den Puffer einer Pipe (erster Lauf abgebrochen) |
+
 ## Quellen
 
 - https://docs.pipewire.org/page_man_pw-loopback_1.html, https://docs.pipewire.org/page_man_pw-cat_1.html, https://docs.pipewire.org/page_man_pw-dump_1.html, https://docs.pipewire.org/page_man_pw-cli_1.html (nicht abgerufen, kein Webzugang; Aufrufe wie in `prototypes/ton/pw-lauf.sh`, `--raw` und «-» in b6 auf dem Studio-PC erprobt)
 - https://docs.python.org/3/library/time.html#time.monotonic_ns (nicht abgerufen)
 - https://html.spec.whatwg.org/multipage/server-sent-events.html (nicht abgerufen)
 - Lokal gelesen: `docs/archiv/prompts/P12-ton.md`, `docs/archiv/messungen/P12a-bericht.md`, `tests/tst_kernton.cpp`, `tests/prozesshilfe.h`, `src/core/main.cpp`, `src/core/videoaudio.cpp`, `src/audio/pwoutput.cpp`, `src/common/protocol.cpp`, `src/common/coresettings.cpp`, `src/cli/main.cpp`, `scripts/pakete.txt`, `tests/daten/ton/LIESMICH.md`
+- pidstat(1), mpstat(1): https://sysstat.github.io/ (sysstat 12.7.5, nicht abgerufen; Aufrufe wie `scripts/leistung.py`)
+- Lokal gelesen (Leistung mit Ton): `scripts/leistung.py`, `prototypes/messung/t02.py`, `src/audio/mixer.h`, `src/audio/mixer.cpp`, `src/media/audiodecoder.cpp`, `docs/08-kern-schnittstelle.md` («Ton der Videos»)
 - Quellen der früheren Abschnitte: Plan, Abschnitt «Quellen», und Messbericht P12a
