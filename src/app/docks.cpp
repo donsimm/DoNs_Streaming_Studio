@@ -1,5 +1,6 @@
 #include "docks.h"
 
+#include "coresettings.h"
 #include "dockviews.h"
 #include "overlay.h"
 #include "symbols.h"
@@ -459,6 +460,36 @@ ControlDock createControlDock(QWidget *parent)
     nameWidgets({{obsState, "obsSourceState"}, {obsButton, "obsSourceButton"}});
     result.obsSourceState = obsState;
     result.obsSourceButton = obsButton;
+    // P12b b5 (Entscheid 6 vom 2026-11-12): Zeile «Ton Videos». Liste, Versatz und Zustand setzt
+    // MainWindow::refreshAudioRoute; der Zustand wie die Zeile «OBS» mit Platz für zwei Zeilen.
+    auto *audioOutput = new QComboBox(content);
+    audioOutput->setAccessibleName(QStringLiteral("Ausgang für den Ton der Videos"));
+    audioOutput->setToolTip(QStringLiteral("Ausgang für den Ton der Videos"));
+    // Lange Gerätenamen machen das Dock nicht breiter (die Spalte dehnt sich bei Platz); der ganze
+    // Name steht in der offenen Liste und im Tooltip.
+    audioOutput->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    audioOutput->setMinimumContentsLength(6);
+    audioOutput->addItem(QStringLiteral("Kein Ausgang"), QString());
+    auto *audioOffset = new QSpinBox(content);
+    audioOffset->setRange(dss::kAudioOffsetMinMs, dss::kAudioOffsetMaxMs);
+    audioOffset->setSingleStep(1);
+    audioOffset->setValue(0);
+    audioOffset->setSuffix(QStringLiteral(" ms"));
+    audioOffset->setKeyboardTracking(false);
+    audioOffset->setToolTip(QStringLiteral("Versatz des Tons zum Bild"));
+    audioOffset->setAccessibleName(QStringLiteral("Versatz des Tons zum Bild"));
+    keepValueVisible(audioOffset);
+    auto *audioState = new QLabel(QStringLiteral("–"), content);
+    audioState->setWordWrap(true);
+    audioState->setFixedHeight(audioState->fontMetrics().size(0, QStringLiteral("a\nb")).height());
+    audioState->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    audioOutput->setEnabled(false);
+    audioOffset->setEnabled(false);
+    audioState->setEnabled(false);
+    nameWidgets({{audioOutput, "audioOutput"}, {audioOffset, "audioOffset"}, {audioState, "audioOutputState"}});
+    result.audioOutput = audioOutput;
+    result.audioOffset = audioOffset;
+    result.audioOutputState = audioState;
     auto *output = new QComboBox(content);
     output->addItem(QStringLiteral("Browserquelle"));
     auto *outputState = new QLabel(QStringLiteral("Ausgabe: –"), content);
@@ -504,17 +535,21 @@ ControlDock createControlDock(QWidget *parent)
     grid->addWidget(new QLabel(QStringLiteral("Ausgabe"), content), 3, 0);
     grid->addWidget(output, 3, 1);
     grid->addWidget(outputState, 3, 2, 1, 2);
-    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 4, 0);
-    grid->addWidget(preview, 4, 1);
-    grid->addWidget(previewSmall, 4, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Ton Videos"), content), 4, 0);
+    grid->addWidget(audioOutput, 4, 1);
+    grid->addWidget(audioOffset, 4, 2);
+    grid->addWidget(audioState, 4, 3);
+    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 5, 0);
+    grid->addWidget(preview, 5, 1);
+    grid->addWidget(previewSmall, 5, 2, 1, 2);
     auto *snapRow = new QHBoxLayout;
     snapRow->setSpacing(8);
     snapRow->addWidget(snap);
     snapRow->addStretch(1);
     snapRow->addWidget(gridCheck);
-    grid->addLayout(snapRow, 5, 0, 1, 2);
-    grid->addWidget(gridSize, 5, 2);
-    grid->addWidget(clearGuides, 5, 3);
+    grid->addLayout(snapRow, 6, 0, 1, 2);
+    grid->addWidget(gridSize, 6, 2);
+    grid->addWidget(clearGuides, 6, 3);
     // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
     result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
     result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
@@ -527,13 +562,13 @@ ControlDock createControlDock(QWidget *parent)
     result.overlayWidth->setEnabled(false);
     result.overlayHeight->setEnabled(false);
     nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
-    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 6, 0);
-    grid->addWidget(result.overlayWidth, 6, 1);
-    grid->addWidget(result.overlayHeight, 6, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 7, 0);
+    grid->addWidget(result.overlayWidth, 7, 1);
+    grid->addWidget(result.overlayHeight, 7, 2);
 
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(7, 1);
+    grid->setRowStretch(8, 1);
     result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
     return result;
 }

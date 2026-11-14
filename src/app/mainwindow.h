@@ -110,6 +110,10 @@ private:
     void copyBrowserSource();
     // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
     void refreshObsSource();
+    // P12b b5: Zeile «Ton Videos» im Dock «Steuerung» aus Einstellungen und Ausgängen des Kerns;
+    // Änderungen gehen mit update_settings an den Kern.
+    void refreshAudioRoute();
+    void sendAudioRoute(const dss::AudioRouteChange &change);
     void showObsSourceDialog();
     std::optional<dss::Overlay> selectedOverlay() const;
 
@@ -232,6 +236,7 @@ private:
     // Nach der Antwort auf diese Änderungen das neue Overlay bzw. die neue Quelle wählen.
     enum class SelectNew { Overlay, Source };
     QHash<qint64, SelectNew> m_selectOnResult;
+    QList<qint64> m_audioRouteRequests; // P12b b5: offene update_settings der Zeile «Ton Videos»
     QString m_lastListError;
     // Auswahl im Dock «Medien» (P10b): höchstens eines davon
     QString m_selectedMediaFile;

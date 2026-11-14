@@ -108,6 +108,30 @@ struct ObsSourceRow
     bool addsToScene = false; // Quelle da: der Knopf fügt sie in eine weitere Szene ein
 };
 ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const ObsSourceInfo &source);
+// P12b b5 (Entscheid 6 vom 2026-11-12): Zeile «Ton Videos» im Dock «Steuerung». Auswahlliste der
+// Ausgänge mit erstem Eintrag «Kein Ausgang» (name leer), Versatz in ms, Hinweis wie die Zeile «OBS».
+struct AudioOutputChoice
+{
+    QString name;  // node.name; leer = kein Ausgang
+    QString label; // Anzeige
+    bool operator==(const AudioOutputChoice &) const = default;
+};
+struct AudioRouteRow
+{
+    QList<AudioOutputChoice> choices; // erster Eintrag immer «Kein Ausgang»
+    int current = 0;                  // Eintrag des gewählten Ausgangs
+    int offsetMs = 0;
+    int offsetMinMs = kAudioOffsetMinMs;
+    int offsetMaxMs = kAudioOffsetMaxMs;
+    QString text = QStringLiteral("–"); // Zustand
+    QString toolTip;
+    bool problem = false; // roter Text wie die Zeile «OBS»
+    bool canEdit = false; // Einstellungen und Ausgänge vom Kern da
+};
+// purpose: Zweck aus kAudioPurposes (zuerst kAudioPurposeVideo). Ohne Einstellungen oder Ausgänge
+// vom Kern (keine Verbindung) ausgegraut mit «–».
+AudioRouteRow audioRouteRow(const std::optional<SettingsInfo> &settings,
+                            const std::optional<AudioOutputsInfo> &outputs, const QString &purpose);
 // P10c, E-29: Zustand des Fensters «Quelle in OBS anlegen». pending: Eine Anfrage läuft.
 struct ObsSourceDialogState
 {

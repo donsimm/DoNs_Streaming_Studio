@@ -296,6 +296,76 @@ private slots:
         s = ServerStatusInfo();
         QVERIFY(serverMessages(true, s).text.contains(QStringLiteral("ohne Overlay-Server")));
     }
+
+    // P12b b5 (Entscheid 6 vom 2026-11-12): Zeile «Ton Videos» im Dock «Steuerung»
+    void audioRouteRow()
+    {
+        const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        // Ohne Verbindung: nur «Kein Ausgang», ausgegraut, «–»
+        AudioRouteRow row = dss::audioRouteRow(std::nullopt, std::nullopt, video);
+        QCOMPARE(row.choices, (QList<AudioOutputChoice>{{QString(), QStringLiteral("Kein Ausgang")}}));
+        QCOMPARE(row.current, 0);
+        QCOMPARE(row.text, QStringLiteral("–"));
+        QVERIFY(!row.canEdit);
+        QVERIFY(!row.problem);
+
+        // Neuer Kern: kein Ausgang gewählt, Versatz 0, Geräte nach «Kein Ausgang»
+        SettingsInfo settings;
+        AudioOutputsInfo outputs;
+        outputs.enabled = true;
+        outputs.devices = {{QStringLiteral("alsa_output.hdmi"), QStringLiteral("HDMI"), true},
+                           {QStringLiteral("alsa_output.iec958"), QString(), false}};
+        outputs.routes.insert(video, {QStringLiteral("no_target"), QString()});
+        row = dss::audioRouteRow(settings, outputs, video);
+        QCOMPARE(row.choices, (QList<AudioOutputChoice>{{QString(), QStringLiteral("Kein Ausgang")},
+                                                       {QStringLiteral("alsa_output.hdmi"), QStringLiteral("HDMI (Standard)")},
+                                                       {QStringLiteral("alsa_output.iec958"), QStringLiteral("alsa_output.iec958")}}));
+        QCOMPARE(row.current, 0); // nie der Standardausgang vorgewählt
+        QCOMPARE(row.offsetMs, 0);
+        QCOMPARE(row.offsetMinMs, -500);
+        QCOMPARE(row.offsetMaxMs, 500);
+        QCOMPARE(row.text, QStringLiteral("Kein Ausgang gewählt"));
+        QVERIFY(row.canEdit);
+        QVERIFY(!row.problem);
+
+        // Gewählt und bereit
+        settings.settings.audioRoutes[video] = {QStringLiteral("alsa_output.iec958"), -120};
+        outputs.routes[video] = {QStringLiteral("playing"), QString()};
+        row = dss::audioRouteRow(settings, outputs, video);
+        QCOMPARE(row.current, 2);
+        QCOMPARE(row.offsetMs, -120);
+        QCOMPARE(row.text, QStringLiteral("Ausgabe läuft"));
+        QVERIFY(!row.problem);
+
+        // Gewählter Ausgang fehlt: bleibt gewählt (eigener Eintrag), Hinweis rot wie die Zeile «OBS»
+        settings.settings.audioRoutes[video].output = QStringLiteral("alsa_output.rodecaster");
+        outputs.routes[video] = {QStringLiteral("missing"), QString()};
+        row = dss::audioRouteRow(settings, outputs, video);
+        QCOMPARE(row.choices.size(), 4);
+        QCOMPARE(row.current, 3);
+        QCOMPARE(row.choices.last().name, QStringLiteral("alsa_output.rodecaster"));
+        QCOMPARE(row.choices.last().label, QStringLiteral("alsa_output.rodecaster (fehlt)"));
+        QCOMPARE(row.text, QStringLiteral("Ausgang fehlt"));
+        QVERIFY(row.problem);
+
+        // Fehler mit Grund im Tooltip; PipeWire fehlt
+        outputs.routes[video] = {QStringLiteral("error"), QStringLiteral("Verbindung zu einem anderen Gerät")};
+        row = dss::audioRouteRow(settings, outputs, video);
+        QCOMPARE(row.text, QStringLiteral("Fehler am Ausgang"));
+        QCOMPARE(row.toolTip, QStringLiteral("Fehler am Ausgang: Verbindung zu einem anderen Gerät"));
+        QVERIFY(row.problem);
+        outputs.routes[video] = {QStringLiteral("no_pipewire"), QString()};
+        QVERIFY(dss::audioRouteRow(settings, outputs, video).problem);
+        outputs.routes[video] = {QStringLiteral("connecting"), QString()};
+        QCOMPARE(dss::audioRouteRow(settings, outputs, video).text, QStringLiteral("Verbindungsversuch läuft"));
+
+        // Kern ohne Ton gebaut: ausgegraut, kein Problem
+        outputs = AudioOutputsInfo();
+        row = dss::audioRouteRow(settings, outputs, video);
+        QCOMPARE(row.text, QStringLiteral("Kern ohne Ton gebaut"));
+        QVERIFY(!row.canEdit);
+        QVERIFY(!row.problem);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestWindowData)

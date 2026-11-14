@@ -47,6 +47,9 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QSlider>
+#include <QtMath>
+
+#include <cmath>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
@@ -699,6 +702,68 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!volume->isVisible(), 3000);
     }
 
+    // P12b b5 (Entscheid 6 vom 2026-11-12): Zeile «Ton Videos» im Dock «Steuerung». Gewählt wird
+    // nur «Kein Ausgang» oder ein Ausgang, den es nicht gibt: Der Kern legt keinen Strom an, auf
+    // keinem Gerät ist etwas zu hören.
+    void audioRouteRow()
+    {
+        auto *output = child<QComboBox>("audioOutput");
+        auto *offset = child<QSpinBox>("audioOffset");
+        auto *state = child<QLabel>("audioOutputState");
+        const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        const auto route = [this, &video] {
+            const std::optional<SettingsInfo> s = m_client->settings();
+            return s ? s->settings.audioRoutes.value(video) : AudioRoute{QStringLiteral("(keine Einstellungen)"), 9999};
+        };
+        // Neuer Kern: «Kein Ausgang», Versatz 0
+        QTRY_VERIFY_WITH_TIMEOUT(output->isEnabled() && offset->isEnabled(), 5000);
+        QCOMPARE(output->itemText(0), QStringLiteral("Kein Ausgang"));
+        QCOMPARE(output->currentIndex(), 0);
+        QCOMPARE(offset->minimum(), -500);
+        QCOMPARE(offset->maximum(), 500);
+        QCOMPARE(offset->singleStep(), 1);
+        QCOMPARE(offset->value(), 0);
+        QCOMPARE(offset->suffix(), QStringLiteral(" ms"));
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Kein Ausgang gewählt"), 3000);
+        QCOMPARE(state->property("state").toString(), QStringLiteral("normal"));
+        const int stateHeight = state->height();
+
+        // Versatz im Fenster eingeben: kommt beim Kern an
+        offset->setFocus();
+        offset->selectAll();
+        QTest::keyClicks(offset, QStringLiteral("-35"));
+        QTest::keyClick(offset, Qt::Key_Return);
+        if (!m_client->settings())
+            m_client->requestSettings();
+        QTRY_COMPARE_WITH_TIMEOUT(route().offsetMs, -35, 3000);
+
+        // Gewählter Ausgang fehlt (von einem anderen Fenster gewählt): bleibt gewählt, Hinweis
+        // «Ausgang fehlt» rot wie die Zeile «OBS», Anordnung unverändert
+        SettingsUpdate update;
+        update.audioRoutes.insert(video, AudioRouteChange{QStringLiteral("dss_tst_ausgang_fehlt"), std::nullopt});
+        QVERIFY(m_client->sendSettingsUpdate(update) > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Ausgang fehlt"), 5000);
+        QCOMPARE(state->property("state").toString(), QStringLiteral("problem"));
+        QCOMPARE(output->currentText(), QStringLiteral("dss_tst_ausgang_fehlt (fehlt)"));
+        QCOMPARE(offset->value(), -35);
+        QCOMPARE(state->height(), stateHeight);
+
+        // Im Fenster zurück auf «Kein Ausgang» (erster Eintrag)
+        output->setFocus();
+        QTest::keyClick(output, Qt::Key_Home);
+        QTRY_COMPARE_WITH_TIMEOUT(route().output, QString(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("Kein Ausgang gewählt"), 5000);
+        QCOMPARE(state->property("state").toString(), QStringLiteral("normal"));
+        QCOMPARE(output->findText(QStringLiteral("dss_tst_ausgang_fehlt (fehlt)")), -1);
+
+        // Zurück auf den Stand eines neuen Kerns
+        offset->setFocus();
+        offset->selectAll();
+        QTest::keyClicks(offset, QStringLiteral("0"));
+        QTest::keyClick(offset, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(route().offsetMs, 0, 3000);
+    }
+
     // P09 Entscheid 5: Auflösung im Dock «Steuerung»; Quellen behalten ihre Pixelwerte.
     void overlayResolution()
     {
@@ -1018,10 +1083,21 @@ private slots:
         // Ohne Shift: Zehntelgrad, nicht eingerastet
         {
             const QPointF handle = canvas->toWidget(QPointF(400, 200)) + QPointF(30, 0); // gedreht: rechts
-            drag(canvas, handle, at(450, 250));
+            // Sollwinkel aus den Pixeln des Ziels (Griff liegt rechts der Mitte, also 90° + Winkel
+            // des Ziels). Ziel so gewählt, dass er ohne Einrasten sicher kein ganzer Grad ist; je
+            // nach Grösse der Leinwand ergäbe at(450, 250) zufällig genau 108.0° (P12b b5).
+            const QPointF centre = canvas->toWidget(QPointF(300, 200));
+            const auto expectedTenths = [&centre](QPoint t) {
+                return 900 + int(std::lround(qRadiansToDegrees(std::atan2(t.y() - centre.y(), t.x() - centre.x())) * 10));
+            };
+            QPoint target = at(450, 250);
+            while (std::abs(expectedTenths(target) % 10 - 5) > 2)
+                target.ry() += 1;
+            drag(canvas, handle, target);
             QTRY_VERIFY_WITH_TIMEOUT(sourceAtRow(2).rotation != 900, 3000);
             const int r = sourceAtRow(2).rotation;
-            QVERIFY2(r > 900 && r < 1800 && r % 10 != 0, qPrintable(QString::number(r)));
+            QVERIFY2(r > 900 && r < 1800 && r % 10 != 0 && std::abs(r - expectedTenths(target)) <= 2,
+                     qPrintable(QStringLiteral("%1, erwartet %2").arg(r).arg(expectedTenths(target))));
         }
         // Pfeiltasten: 1 Pixel, mit Shift 10
         place(image, 100, 100, 400, 200);

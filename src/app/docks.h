@@ -129,6 +129,11 @@ struct ControlDock
     // P10c, E-29: Zeile «OBS»
     QLabel *obsSourceState = nullptr;
     QPushButton *obsSourceButton = nullptr;
+    // P12b b5: Zeile «Ton Videos»: Ausgang (Daten: node.name, leer = kein Ausgang), Versatz in ms,
+    // Zustand des Ausgangs wie die Zeile «OBS»
+    QComboBox *audioOutput = nullptr;
+    QSpinBox *audioOffset = nullptr;
+    QLabel *audioOutputState = nullptr;
     QSpinBox *overlayWidth = nullptr;
     QSpinBox *overlayHeight = nullptr;
 };

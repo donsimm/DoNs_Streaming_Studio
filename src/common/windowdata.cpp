@@ -208,6 +208,67 @@ ObsSourceRow obsSourceRow(bool overlaySelected, ConnectionState obsState, const 
     return row;
 }
 
+AudioRouteRow audioRouteRow(const std::optional<SettingsInfo> &settings,
+                            const std::optional<AudioOutputsInfo> &outputs, const QString &purpose)
+{
+    AudioRouteRow row;
+    row.choices.append({QString(), QStringLiteral("Kein Ausgang")});
+    if (settings) {
+        const AudioRoute route = settings->settings.audioRoutes.value(purpose);
+        row.offsetMs = route.offsetMs;
+        row.offsetMinMs = settings->audioOffsetMinMs;
+        row.offsetMaxMs = settings->audioOffsetMaxMs;
+    }
+    if (outputs) {
+        for (const AudioDeviceInfo &d : outputs->devices) {
+            QString label = d.description.isEmpty() ? d.name : d.description;
+            if (d.isDefault)
+                label += QStringLiteral(" (Standard)");
+            row.choices.append({d.name, label});
+        }
+    }
+    const QString selected = settings ? settings->settings.audioRoutes.value(purpose).output : QString();
+    if (!selected.isEmpty()) {
+        const auto it = std::find_if(row.choices.cbegin(), row.choices.cend(),
+                                     [&selected](const AudioOutputChoice &c) { return c.name == selected; });
+        if (it == row.choices.cend()) {
+            // Gewählter Ausgang nicht in der Liste: bleibt sichtbar gewählt, kein Ausweichen
+            row.choices.append({selected, QStringLiteral("%1 (fehlt)").arg(selected)});
+            row.current = int(row.choices.size()) - 1;
+        } else {
+            row.current = int(it - row.choices.cbegin());
+        }
+    }
+    if (!settings || !outputs)
+        return row;
+    if (!outputs->enabled) {
+        row.text = QStringLiteral("Kern ohne Ton gebaut");
+        row.toolTip = row.text;
+        return row;
+    }
+    row.canEdit = true;
+    const AudioRouteStatus status = outputs->routes.value(purpose);
+    if (status.state == QLatin1String("no_pipewire")) {
+        row.text = QStringLiteral("PipeWire nicht erreichbar");
+        row.problem = true;
+    } else if (status.state == QLatin1String("no_target")) {
+        row.text = QStringLiteral("Kein Ausgang gewählt");
+    } else if (status.state == QLatin1String("missing")) {
+        row.text = QStringLiteral("Ausgang fehlt");
+        row.problem = true;
+    } else if (status.state == QLatin1String("connecting")) {
+        // Dieselben Worte wie die Verbindungsknöpfe (connectionStateText, Ausgabe wie NDI).
+        row.text = QStringLiteral("Verbindungsversuch läuft");
+    } else if (status.state == QLatin1String("playing")) {
+        row.text = QStringLiteral("Ausgabe läuft");
+    } else if (status.state == QLatin1String("error")) {
+        row.text = QStringLiteral("Fehler am Ausgang");
+        row.problem = true;
+    }
+    row.toolTip = status.detail.isEmpty() ? row.text : QStringLiteral("%1: %2").arg(row.text, status.detail);
+    return row;
+}
+
 ObsSourceDialogState obsSourceDialogState(bool coreConnected, ConnectionState obsState, int sceneCount,
                                           const QString &name, bool pending)
 {
