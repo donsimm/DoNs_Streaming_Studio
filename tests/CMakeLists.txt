@@ -330,7 +330,8 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media AND DSS_BUILD_APP AND DSS_APP_RE
   find_package(Qt6 QUIET COMPONENTS WebEngineWidgets QuickWidgets)
   if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::QuickWidgets)
     qt_add_executable(tst_browserquelle tst_browserquelle.cpp)
-    target_link_libraries(tst_browserquelle PRIVATE dss_render dss_media dss_bildvergleich dss_warnings
+    # dss_obs: Testserver von OBS (P12b, Rückfall GetSourceActive)
+    target_link_libraries(tst_browserquelle PRIVATE dss_render dss_media dss_obs dss_bildvergleich dss_warnings
       Qt6::Test Qt6::WebEngineWidgets Qt6::QuickWidgets)
     target_compile_definitions(tst_browserquelle PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
       DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}" DSS_TEST_FONT="${DSS_TEST_FONT}"

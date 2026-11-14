@@ -781,6 +781,29 @@ private slots:
         disconnect(c2);
     }
 
+    // P12b, Rückfall nach M3: «obs_active» nur an die Seite mit dieser Kennung (sendPageEvent).
+    void pageEventOnlyToThatPage()
+    {
+        EventClient one(m_port, base() + "events/seiteg01");
+        EventClient two(m_port, base() + "events/seiteg02");
+        EventClient plain(m_port, base() + "events");
+        QCOMPARE(one.next().first, QByteArray("overlay"));
+        QCOMPARE(two.next().first, QByteArray("overlay"));
+        QCOMPARE(plain.next().first, QByteArray("overlay"));
+        const QJsonObject data{{QStringLiteral("active"), true}};
+        QVERIFY(m_server->sendPageEvent(m_id, QStringLiteral("seiteg02"), "obs_active", data));
+        const auto e = two.next();
+        QCOMPARE(e.first, QByteArray("obs_active"));
+        QCOMPARE(QJsonDocument::fromJson(e.second).object(), data);
+        QCOMPARE(one.next(300).first, QByteArray());
+        QCOMPARE(plain.next(100).first, QByteArray());
+        // Unbekannte Seite, anderes Overlay, leere Kennung: nichts geschickt
+        QVERIFY(!m_server->sendPageEvent(m_id, QStringLiteral("seiteg09"), "obs_active", data));
+        QVERIFY(!m_server->sendPageEvent(QUuid::createUuid(), QStringLiteral("seiteg01"), "obs_active", data));
+        QVERIFY(!m_server->sendPageEvent(m_id, QString(), "obs_active", data));
+        QCOMPARE(one.next(200).first, QByteArray());
+    }
+
     // Nur IPv4: ss zeigt 127.0.0.1 und 127.0.0.2, kein [::] und kein *.
     void listensOnlyOnIpv4()
     {

@@ -634,6 +634,22 @@ void OverlayServer::allChanged()
         checkStreams(id);
 }
 
+bool OverlayServer::sendPageEvent(const QUuid &overlayId, const QString &page, const QByteArray &event,
+                                  const QJsonObject &data)
+{
+    if (page.isEmpty())
+        return false;
+    bool sent = false;
+    for (auto it = m_connections.cbegin(); it != m_connections.cend(); ++it) {
+        const Connection &c = **it;
+        if (!c.events || c.overlayId != overlayId || c.page != page)
+            continue;
+        it.key()->write("event: " + event + "\ndata: " + QJsonDocument(data).toJson(QJsonDocument::Compact) + "\n\n");
+        sent = true;
+    }
+    return sent;
+}
+
 void OverlayServer::heartbeat()
 {
     // Kommentarzeile: hält die Verbindung offen und lässt tote Verbindungen auffallen.

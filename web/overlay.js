@@ -35,8 +35,10 @@
 //   - Neue Datei (oder Wiederholen/Anhalten geändert): neues Element, von vorne, mit «start»
 //     (Entscheid des Nutzers 2026-11-13).
 //   - Bis zum ersten Ereignis ist der Zustand unbekannt: Videos laufen wie ohne OBS, ohne Meldungen.
-//     Beim Laden einer schon aktiven Quelle meldet OBS kein «aktiv» (M3, 2026-11-13); den Rückfall
-//     über den Kern (GetSourceActive) gibt es noch nicht.
+//     Beim Laden einer schon aktiven Quelle meldet OBS kein «aktiv» (M3, 2026-11-13). Rückfall: Der
+//     Kern fragt OBS beim Beginn von «events/<Kennung>» (GetSourceActive) und schickt «obs_active»
+//     ({active}); die Seite nimmt es wie «aktiv»/«inaktiv», aber nur bei unbekanntem Zustand.
+//     Ohne Verbindung zu OBS schickt der Kern nichts, der Zustand bleibt unbekannt.
 //
 // Quellen:
 //   EventSource: https://html.spec.whatwg.org/multipage/server-sent-events.html
@@ -393,6 +395,12 @@ function connect() {
   const source = new EventSource(obs ? 'events/' + clock.page : 'events');
   source.addEventListener('open', () => { window.dssState.connected = true; });
   source.addEventListener('overlay', (event) => apply(JSON.parse(event.data)));
+  // Rückfall des Kerns (GetSourceActive): nur solange der Zustand unbekannt ist; ein Ereignis aus
+  // OBS hat Vorrang.
+  source.addEventListener('obs_active', (event) => {
+    if (obs && clock.active === null)
+      setActive(!!JSON.parse(event.data).active);
+  });
   source.addEventListener('gone', () => {
     source.close();
     location.reload();

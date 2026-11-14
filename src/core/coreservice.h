@@ -156,6 +156,9 @@ private:
     // Schickt jeder fragenden Verbindung die Adresse neu, wenn sie sich geändert hat.
     void updateBrowserSources();
     QJsonObject serverStatusMessage() const;
+    // P12b: Seite mit Kennung verbunden: OBS fragen, ob ihre Quelle im Programm ist, und der Seite
+    // «obs_active» schicken (Rückfall beim Laden einer schon aktiven Quelle, M3).
+    void onPageOpened(const QUuid &overlayId, const QString &page);
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);

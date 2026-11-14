@@ -21,6 +21,7 @@
 #include <QSet>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTimer>
 #include <QUuid>
 #include <QWebSocket>
 #include <QWebSocketServer>
@@ -173,6 +174,7 @@ public:
     QList<ObsTestRequest> log;
     QSet<QString> silentRequests;      // keine Antwort
     QSet<QString> closingRequests;     // Verbindung bricht nach dem Ausführen ab, ohne Antwort
+    QHash<QString, int> delayedRequests; // Antwort erst nach so vielen ms (P12b)
     int busyAnswers = 0;               // die nächsten Anfragen mit 207 beantworten
     QString busyRequest;               // nur diese Anfrage; leer = alle
     bool collectionChanging = false;
@@ -276,6 +278,14 @@ private:
         execute(type, fields, &code, &response);
         if (closingRequests.contains(type)) {
             socket->abort();
+            return;
+        }
+        if (delayedRequests.contains(type)) {
+            const QPointer<QWebSocket> target(socket);
+            QTimer::singleShot(delayedRequests.value(type), this, [this, target, request, code, response] {
+                if (target)
+                    answer(target, request, code, response);
+            });
             return;
         }
         answer(socket, request, code, response);

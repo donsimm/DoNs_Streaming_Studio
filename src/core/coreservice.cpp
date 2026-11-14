@@ -473,12 +473,47 @@ void CoreService::setOverlayServer(dss::OverlayServer *server)
     m_overlayServer = server;
     connect(server, &dss::OverlayServer::statusChanged, this,
             [this] { broadcast(serverStatusMessage()); });
+    connect(server, &dss::OverlayServer::pageOpened, this, &CoreService::onPageOpened);
     connectVideoAudio();
     const dss::CoreSettings s = m_settings ? m_settings->settings() : dss::defaultCoreSettings();
     server->configure(s.port, s.homeAddress);
     broadcast(serverStatusMessage());
 #else
     Q_UNUSED(server);
+#endif
+}
+
+void CoreService::onPageOpened(const QUuid &overlayId, const QString &page)
+{
+#if DSS_CORE_OVERLAY_SERVER
+    // P12b, Rückfall nach M3: Beim Laden einer schon aktiven Quelle meldet OBS der Seite kein
+    // «aktiv». Der Kern fragt OBS und schickt der Seite «obs_active»; sie übernimmt es nur, solange
+    // ihr Zustand unbekannt ist (web/overlay.js). Ohne Antwort kein Ereignis, Verhalten wie zuvor.
+    const dss::Overlay *o = m_store->overlay(overlayId);
+    const QString label = QStringLiteral("Seite %1 von «%2»").arg(page, o ? o->name : QStringLiteral("?"));
+    if (!m_obsSources) {
+        qInfo("OBS: %s: Zustand im Programm unbekannt (OBS nicht eingerichtet), kein obs_active", qPrintable(label));
+        return;
+    }
+    const QPointer<dss::OverlayServer> server(m_overlayServer);
+    m_obsSources->queryActive(overlayId, [server, overlayId, page, label](const dss::obs::ObsSources::ActiveResult &r) {
+        if (!server)
+            return;
+        if (!r.active.has_value()) {
+            qInfo("OBS: %s: Zustand im Programm unbekannt (%s), kein obs_active", qPrintable(label),
+                  qPrintable(r.detail));
+            return;
+        }
+        const bool active = *r.active;
+        const bool sent = server->sendPageEvent(overlayId, page, "obs_active",
+                                                QJsonObject{{QStringLiteral("active"), active}});
+        qInfo("OBS: %s: Quelle %s (%d Quellen gefragt), obs_active %s", qPrintable(label),
+              active ? "im Programm" : "nicht im Programm", r.sources,
+              sent ? "geschickt" : "nicht geschickt (Seite getrennt)");
+    });
+#else
+    Q_UNUSED(overlayId);
+    Q_UNUSED(page);
 #endif
 }
 

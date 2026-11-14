@@ -45,6 +45,7 @@ struct HttpRequest;
 // Protokoll ohne Token. docs/08-kern-schnittstelle.md, «Overlay-Server».
 // P12b b4: …/clock (POST, JSON, Lage der Videos für den Ton, Format in clockreport.h, Grenze je
 // Seite) und …/events/<page> (Ereignisse mit Kennung der Seite: pageOpened, pageClosed).
+// Rückfall nach M3: «obs_active» ({"active": true|false}) an eine Seite, sendPageEvent.
 // Server-Sent Events: https://html.spec.whatwg.org/multipage/server-sent-events.html
 class OverlayServer : public QObject
 {
@@ -89,6 +90,10 @@ public:
     void tokenChanged(const QUuid &overlayId);
     // Nach dem Neu laden des Datenordners: alle Seiten prüfen.
     void allChanged();
+    // P12b: Ereignis an die Seite mit dieser Kennung (…/events/<page>), z. B. «obs_active».
+    // false: Seite nicht (mehr) verbunden.
+    bool sendPageEvent(const QUuid &overlayId, const QString &page, const QByteArray &event,
+                       const QJsonObject &data);
 
     Status status() const { return m_status; }
     int port() const { return m_port; }

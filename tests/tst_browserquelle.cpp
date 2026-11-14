@@ -8,7 +8,9 @@
 // neuer Token (alte Adresse leer, Hinweis), Wiederverbinden nach Neustart des Kerns.
 // P12b b4: Seite in OBS mit nachgebildetem window.obsstudio und CustomEvent
 // «obsSourceActiveChanged»: Meldungen an …/clock (Inhalt, Folge, Antwort des Kerns), anhalten und
-// zurück bei «inaktiv», neue Datei von vorne; ohne window.obsstudio keine Meldungen.
+// zurück bei «inaktiv», neue Datei von vorne; ohne window.obsstudio keine Meldungen. Rückfall
+// «obs_active» des Kerns (GetSourceActive gegen obstestserver.h, kein echtes OBS): aktiv, inaktiv,
+// Ereignis aus OBS hat Vorrang; ohne OBS kein «obs_active».
 // Mit DSS_BROWSERQUELLE_LAST=1 zusätzlich die Last: 10 Quellen mit 2 Videos 1080p30, CPU und
 // Speicher von Kern und Testprogramm (mit den Prozessen von Chromium).
 // Abweichungen werden mit Zahlen ausgegeben (feste Grenze erst mit P11); geprüft wird hier, dass
@@ -30,6 +32,7 @@
 #include "overlayimage.h"
 #include "overlaystore.h"
 #include "mediainfo.h"
+#include "obstestserver.h"
 #include "prozesshilfe.h"
 #include "sourcerenderer.h"
 #include "version.h"
@@ -211,6 +214,16 @@ private:
         m_coreLog.clear();
         return waitForLog(m_core.get(), QStringLiteral("Overlay-Server lauscht auf %1:%2").arg(m_home).arg(m_port),
                           &m_coreLog, 8000);
+    }
+
+    // Wie waitForLog, aber mit Ereignisschleife: Die Attrappe von OBS (obstestserver.h) läuft im
+    // selben Prozess und antwortet sonst nicht.
+    bool waitForCoreLog(const QString &text, int timeoutMs)
+    {
+        return QTest::qWaitFor([&] {
+            m_coreLog += QString::fromUtf8(m_core->readAllStandardError());
+            return m_coreLog.contains(text);
+        }, timeoutMs);
     }
 
     QVariant js(const QString &code) { return js(m_view.get(), code); }
@@ -673,10 +686,16 @@ private slots:
         const QString loopFile = js(view.get(), videos + QStringLiteral("[1].dssFile")).toString();
         QVERIFY(longFile.startsWith(QStringLiteral("media/")) && loopFile.startsWith(QStringLiteral("media/")));
 
-        // Zustand unbekannt (wie nach dem Laden einer schon aktiven Quelle, M3): Videos laufen, keine Meldungen
+        // Zustand unbekannt (wie nach dem Laden einer schon aktiven Quelle, M3): Videos laufen, keine Meldungen.
+        // Ohne OBS schickt der Kern kein «obs_active» (Rückfall, obsActiveFallback).
         QTest::qWait(1200);
         QCOMPARE(js(view.get(), QStringLiteral("window.dssClock.length")).toInt(), 0);
         QVERIFY(js(view.get(), videos + QStringLiteral("[0].currentTime")).toDouble() > 0.5);
+        QVERIFY(js(view.get(), QStringLiteral("window.dssState.active === null")).toBool());
+        QVERIFY2(waitForCoreLog(QStringLiteral("OBS: Seite %1 von «Prüfung Seite in OBS»: Zustand im Programm "
+                                               "unbekannt (OBS nicht verbunden), kein obs_active").arg(page),
+                                3000),
+                 qPrintable(m_coreLog));
 
         // Folge einer Quelle: Ereignisse mit Lauf, Wiederholung und Lage
         const auto bySource = [](const QJsonArray &all, const QUuid &source, int from = 0) {
@@ -845,6 +864,115 @@ private slots:
         QVERIFY(QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("document.getElementById('overlay') === null")).toBool(); }, 8000));
         m_client->requestBrowserSource(m_id);
         QTRY_VERIFY_WITH_TIMEOUT(url() == mainUrl, 3000);
+    }
+
+    // P12b, Rückfall nach M3: Beim Laden einer schon aktiven Quelle meldet OBS kein «aktiv». Der
+    // Kern fragt OBS (hier obstestserver.h, GetSourceActive) beim Beginn von …/events/<page> und
+    // schickt «obs_active»; die Seite übernimmt es nur bei unbekanntem Zustand.
+    void obsActiveFallback()
+    {
+        testhelp::ObsTestServer server;
+        QVERIFY(server.start());
+        SettingsUpdate update;
+        update.obsEnabled = true;
+        update.obsHost = QStringLiteral("127.0.0.1");
+        update.obsPort = server.port();
+        QSignalSpy settingsAnswered(m_client.get(), &CoreClient::settingsUpdateFinished);
+        m_client->sendSettingsUpdate(update);
+        QTRY_COMPARE(settingsAnswered.size(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->connectionStates().value(Connection::Obs), ConnectionState::Connected, 10000);
+        // Quelle in OBS über den Kern anlegen: Adresse wie im Betrieb
+        QSignalSpy answered(m_client.get(), &CoreClient::obsRequestFinished);
+        QVERIFY(m_client->sendObsCreateSource(m_obsId, QStringLiteral("scene-live"), QStringLiteral("Seite in OBS")) > 0);
+        QTRY_COMPARE(answered.size(), 1);
+        QVERIFY(answered.takeFirst().first().value<ChangeResult>().ok);
+        const QString input = server.inputs.constLast().uuid;
+
+        const QString mainUrl = url();
+        m_client->requestBrowserSource(m_obsId);
+        QTRY_VERIFY_WITH_TIMEOUT(!url().isEmpty() && url() != mainUrl, 3000);
+        const QString obsUrl = url();
+        QCOMPARE(server.input(input)->settings.value(QStringLiteral("url")).toString(), obsUrl);
+        m_client->requestBrowserSource(m_id);
+        QTRY_VERIFY_WITH_TIMEOUT(url() == mainUrl, 3000);
+
+        const QString videos = QStringLiteral("[...document.querySelectorAll('video')]");
+        const auto open = [&] {
+            auto view = std::make_unique<QWebEngineView>();
+            view->page()->setBackgroundColor(Qt::transparent);
+            view->page()->settings()->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
+            addClockRecorder(view.get(), true);
+            view->resize(640, 360);
+            view->show();
+            static_cast<void>(QTest::qWaitForWindowExposed(view.get()));
+            view->load(QUrl(obsUrl));
+            static_cast<void>(QTest::qWaitFor([&] {
+                return js(view.get(), QStringLiteral("window.dssState ? window.dssState.applied : 0")).toInt() >= 1;
+            }, 15000));
+            return view;
+        };
+        const auto events = [&](QWebEngineView *view) {
+            QStringList out;
+            const QJsonArray all = clockReports(view);
+            for (const QJsonValue &e : all)
+                out.append(e.toObject().value(QStringLiteral("body")).toObject().value(QStringLiteral("event")).toString());
+            return out;
+        };
+        const auto sentLine = [](const QString &page, bool active) {
+            return QStringLiteral("OBS: Seite %1 von «Prüfung Seite in OBS»: Quelle %2 (1 Quellen gefragt), obs_active geschickt")
+                .arg(page, active ? QStringLiteral("im Programm") : QStringLiteral("nicht im Programm"));
+        };
+
+        // Quelle im Programm: «aktiv» ohne Ereignis aus OBS, Lauf 1 von vorne mit «start»
+        server.activeInputs.insert(input);
+        {
+            auto view = open();
+            QVERIFY(QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("window.dssState.active === true")).toBool(); }, 5000));
+            const QString page = js(view.get(), QStringLiteral("window.dssState.page")).toString();
+            QVERIFY(QTest::qWaitFor([&] { return events(view.get()).count(QStringLiteral("start")) == 2; }, 8000));
+            const QJsonObject first = clockReports(view.get()).first().toObject().value(QStringLiteral("body")).toObject();
+            QCOMPARE(first.value(QStringLiteral("run")).toInt(), 1);
+            QVERIFY(first.value(QStringLiteral("media_s")).toDouble(-1) < 0.2);
+            QVERIFY2(waitForCoreLog(sentLine(page, true), 3000), qPrintable(m_coreLog));
+            // Ein echtes Ereignis aus OBS gilt danach wie gewohnt
+            setObsActive(view.get(), false);
+            QTRY_VERIFY_WITH_TIMEOUT(events(view.get()).endsWith(QStringLiteral("stop")), 3000);
+        }
+
+        // Quelle nicht im Programm: «inaktiv», Videos am Anfang angehalten, «stop»
+        server.activeInputs.clear();
+        {
+            auto view = open();
+            QVERIFY(QTest::qWaitFor([&] { return js(view.get(), QStringLiteral("window.dssState.active === false")).toBool(); }, 5000));
+            const QString page = js(view.get(), QStringLiteral("window.dssState.page")).toString();
+            QTRY_VERIFY_WITH_TIMEOUT(js(view.get(), videos + QStringLiteral(".every(v => v.paused && v.currentTime === 0 && !v.seeking)")).toBool(), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(events(view.get()), QStringList{QStringLiteral("stop")}, 3000);
+            QVERIFY2(waitForCoreLog(sentLine(page, false), 3000), qPrintable(m_coreLog));
+        }
+
+        // Ereignis aus OBS vor der Antwort: hat Vorrang, «obs_active» (inaktiv) wird übergangen
+        server.delayedRequests.insert(QStringLiteral("GetSourceActive"), 1500);
+        {
+            auto view = open();
+            setObsActive(view.get(), true);
+            const QString page = js(view.get(), QStringLiteral("window.dssState.page")).toString();
+            QVERIFY2(waitForCoreLog(sentLine(page, false), 5000), qPrintable(m_coreLog));
+            QTest::qWait(500);
+            QVERIFY(js(view.get(), QStringLiteral("window.dssState.active === true")).toBool());
+            const QStringList seen = events(view.get());
+            QVERIFY2(!seen.contains(QStringLiteral("stop")) && seen.count(QStringLiteral("start")) == 2, qPrintable(seen.join(u' ')));
+            QVERIFY(js(view.get(), videos + QStringLiteral(".every(v => !v.paused)")).toBool());
+        }
+        server.delayedRequests.clear();
+
+        // OBS wieder aus (die weiteren Tests laufen ohne)
+        update = SettingsUpdate();
+        update.obsEnabled = false;
+        settingsAnswered.clear();
+        m_client->sendSettingsUpdate(update);
+        QTRY_COMPARE(settingsAnswered.size(), 1);
+        m_coreLog += QString::fromUtf8(m_core->readAllStandardError());
+        QVERIFY(!m_coreLog.contains(QStringLiteral("Meldung der Uhr abgewiesen")));
     }
 
     // Neuer Token: alte Adresse leer und durchsichtig, Hinweis im Fenster; neue Adresse geht
