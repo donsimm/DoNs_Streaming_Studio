@@ -10,6 +10,7 @@
 #include "overlayjson.h"
 #include "overlaylist.h"
 #include "tokenstore.h"
+#include "viewerdata.h"
 
 #include <QDir>
 #include <QFile>
@@ -92,6 +93,21 @@ Scan scan(const QString &dataDir)
     };
     single(QStringLiteral("liste.json"), kListFormatVersion);
     single(QStringLiteral("tokens.json"), kTokenFormatVersion);
+
+    // Dateien des Aktionssystems (P14 a, Plan 2.11), je nur eine Version: streng lesen wie beim
+    // Laden; ungültig heisst nicht lesbar (der Kern überschreibt sie nicht).
+    for (const actions::DataFileFormat &format : actions::actionDataFiles()) {
+        if (!QFile::exists(dataDir + QLatin1Char('/') + format.fileName))
+            continue;
+        const FileFormat f = readFormat(dataDir, format.fileName);
+        QString error;
+        if (f.version == 0)
+            s.status.unreadable.append(f.relative + QStringLiteral(": ") + f.problem);
+        else if (f.version > format.version)
+            s.status.newer.append(describe(f));
+        else if (!format.check(f.data, &error))
+            s.status.unreadable.append(f.relative + QStringLiteral(": ") + error);
+    }
 
     const QDir overlays(dataDir + QStringLiteral("/overlays"));
     for (const QString &name :
