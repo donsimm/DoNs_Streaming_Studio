@@ -24,8 +24,8 @@ namespace {
 
 const QUuid kOverlayA = QUuid::fromString(QStringLiteral("aaaaaaaa-0000-4000-8000-000000000001"));
 const QUuid kOverlayB = QUuid::fromString(QStringLiteral("bbbbbbbb-0000-4000-8000-000000000002"));
-const QString kUrlA = QStringLiteral("http://192.168.1.9:8081/o/a/?token=geheimerTokenA");
-const QString kUrlB = QStringLiteral("http://192.168.1.9:8081/o/b/?token=geheimerTokenB");
+const QString kUrlA = QStringLiteral("http://192.168.1.20:8081/o/a/?token=geheimerTokenA");
+const QString kUrlB = QStringLiteral("http://192.168.1.20:8081/o/b/?token=geheimerTokenB");
 
 ObsConnection::Timing shortTiming()
 {
@@ -310,8 +310,8 @@ private slots:
     void adoptionNeedsExactUrl()
     {
         const QString exact = m_server->addInput(QStringLiteral("Von Hand"), settingsOf(kUrlA));
-        m_server->addInput(QStringLiteral("Anderer Port"), settingsOf(QStringLiteral("http://192.168.1.9:9000/o/b/?token=geheimerTokenB")));
-        m_server->addInput(QStringLiteral("Anderer Token"), settingsOf(QStringLiteral("http://192.168.1.9:8081/o/b/?token=x")));
+        m_server->addInput(QStringLiteral("Anderer Port"), settingsOf(QStringLiteral("http://192.168.1.20:9000/o/b/?token=geheimerTokenB")));
+        m_server->addInput(QStringLiteral("Anderer Token"), settingsOf(QStringLiteral("http://192.168.1.20:8081/o/b/?token=x")));
         connectAll({{kOverlayA, kUrlA, 1920, 1080}, {kOverlayB, kUrlB, 1920, 1080}});
         QTRY_COMPARE(entryOf(*m_sources, kOverlayA).state, SourceState::Present);
         QCOMPARE(entryOf(*m_sources, kOverlayA).inputName, QStringLiteral("Von Hand"));
@@ -595,7 +595,7 @@ private slots:
         // Ohne Quelle in OBS: unbekannt, keine Anfrage
         const QUuid other = QUuid::fromString(QStringLiteral("cccccccc-0000-4000-8000-000000000003"));
         m_sources->setDesired({{kOverlayA, kUrlA, 1920, 1080}, {kOverlayB, kUrlB, 1920, 1080},
-                               {other, QStringLiteral("http://192.168.1.9:8081/o/c/?token=x"), 1920, 1080}});
+                               {other, QStringLiteral("http://192.168.1.20:8081/o/c/?token=x"), 1920, 1080}});
         const int before = m_server->requestCount(QStringLiteral("GetSourceActive"));
         auto none = ask(other);
         QVERIFY(none->arrived);

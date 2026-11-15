@@ -468,7 +468,7 @@ private slots:
     {
         SettingsInfo info{{8081, QString()}, 1024, 32767, QStringLiteral("/tmp/kern.ini"), QString()};
         info.settings.obsEnabled = true;
-        info.settings.obsHost = QStringLiteral("192.168.1.116");
+        info.settings.obsHost = QStringLiteral("192.168.1.30");
         info.settings.obsPort = 4456;
         info.obsPasswordSet = true;
         SettingsInfo backInfo;
@@ -575,11 +575,11 @@ private slots:
     // P10-vor: Einstellungen des Kerns
     void settingsMessages()
     {
-        const SettingsInfo info{{8081, QStringLiteral("192.168.1.9")}, 1024, 32767,
+        const SettingsInfo info{{8081, QStringLiteral("192.168.1.20")}, 1024, 32767,
                                 QStringLiteral("/tmp/kern.ini"), QString()};
         const QJsonObject o = settingsMessage(info);
         QCOMPARE(QString::fromUtf8(encodeMessage(o)),
-                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.9\","
+                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.20\","
                                 "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
                                 "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
@@ -755,17 +755,17 @@ private slots:
     // P10: Adresse der Browserquelle
     void browserSourceMessages()
     {
-        QCOMPARE(browserSourceUrl(QStringLiteral("192.168.1.9"), 8081, QStringLiteral("ueberblick"),
+        QCOMPARE(browserSourceUrl(QStringLiteral("192.168.1.20"), 8081, QStringLiteral("ueberblick"),
                                   QStringLiteral("abc")),
-                 QStringLiteral("http://192.168.1.9:8081/o/ueberblick/abc/"));
+                 QStringLiteral("http://192.168.1.20:8081/o/ueberblick/abc/"));
         QCOMPARE(browserSourceLogPath(QStringLiteral("ueberblick")), QStringLiteral("/o/ueberblick/…"));
 
         const QUuid id = QUuid::fromString(QStringLiteral("2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11"));
-        const BrowserSourceInfo info{id, QStringLiteral("http://192.168.1.9:8081/o/a/b/"), QString()};
+        const BrowserSourceInfo info{id, QStringLiteral("http://192.168.1.20:8081/o/a/b/"), QString()};
         QJsonObject o = browserSourceMessage(info);
         QCOMPARE(QString::fromUtf8(encodeMessage(o)),
                  QStringLiteral("{\"overlay_id\":\"2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11\",\"problem\":null,"
-                                "\"type\":\"browser_source\",\"url\":\"http://192.168.1.9:8081/o/a/b/\"}\n"));
+                                "\"type\":\"browser_source\",\"url\":\"http://192.168.1.20:8081/o/a/b/\"}\n"));
         BrowserSourceInfo back;
         QString error;
         QVERIFY2(parseBrowserSource(o, &back, &error), qPrintable(error));
@@ -809,7 +809,7 @@ private slots:
     {
         ServerStatusInfo info;
         info.enabled = true;
-        info.listening = {QStringLiteral("127.0.0.1:8081"), QStringLiteral("192.168.1.9:8081")};
+        info.listening = {QStringLiteral("127.0.0.1:8081"), QStringLiteral("192.168.1.20:8081")};
         info.problems = {QStringLiteral("Port 8081 ist belegt")};
         info.invalidUse = QStringLiteral("Eine Browserquelle benutzt eine ungültige Adresse");
         info.pages.insert(QUuid::fromString(QStringLiteral("2b0b3c39-4d0c-4c39-9a0e-6f1f0a3c1d11")), 2);
