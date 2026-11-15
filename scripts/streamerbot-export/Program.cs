@@ -285,7 +285,10 @@ static class Exporter
     // JSON-Text: Wurzel-Array zählt jeden Eintrag als Dokument, ein Wurzel-Objekt als ein Dokument
     static void PrintJsonStructure(string path)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllBytes(path), new JsonDocumentOptions { AllowTrailingCommas = true });
+        // Streamer.bot schreibt quotes.dat mit UTF-8-Kennung (BOM), die JsonDocument nicht annimmt
+        var bytes = File.ReadAllBytes(path);
+        int start = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+        using var doc = JsonDocument.Parse(bytes.AsMemory(start), new JsonDocumentOptions { AllowTrailingCommas = true });
         var root = doc.RootElement;
         var entries = root.ValueKind == JsonValueKind.Array ? root.EnumerateArray().ToList() : new List<JsonElement> { root };
 
