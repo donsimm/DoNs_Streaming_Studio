@@ -27,6 +27,29 @@ Plan des Projektleiter-Agenten vom 2026-11-15. Gebaut wird erst nach dem Go des 
 3. **Schutz:** **A)** ohne Anmeldung, drei Schichten (Abschnitt 5).
 4. **Go:** **A)** Schritt 0 und Abschnitte a bis c parallel zu P13/P14, wenn Platz ist, ohne P13/P14 zu verschieben; d bis f nach der Abnahme von P14. Rechte für Lotse am Streaming-PC wie in Frage 4 A (nie während eines Streams; bleibende Werte nur mit OK in der Sitzung). Grenze: Bau.
 
+## Ergebnis Schritt 0 (Lotse am Gerät, 2026-11-15, 21:55–22:12, Nutzer schaute zu)
+
+Werkzeug: Python-ioctl über SSH (Skript nur im Scratchpad von Lotse), kein Videostrom offen (OBS lief, Tiny 2 in keiner Quelle), kein Stream, keine Aufnahme (`GetStreamStatus`, `GetRecordStatus`). Kernel-Protokoll (`journalctl -k -f`) lief mit: keine Meldung der Kameras.
+
+| Nr. | Ergebnis |
+|---|---|
+| Konstanten | aus den Header-Dateien des Studio-PCs (gcc): `UVCIOC_CTRL_QUERY` 0xC0107521, Struktur 16 Byte (`size` Offset 4, `data` Offset 8), `UVC_SET_CUR` 0x01, `GET_CUR` 0x81, `GET_LEN` 0x85, `GET_INFO` 0x86, `VIDIOC_G_CTRL` 0xC008561B, `S_CTRL` 0xC008561C, Pan 0x9A0908, Tilt 0x9A0909, Zoom 0x9A090D. Stimmen mit dem Plan |
+| 1, 2, 5 | Selektor 0x06 und 0x02: Länge `3c 00` (60), Info `03` (GET und SET) |
+| 3, 4 | Statusblock wach: Byte 0x09 = 1; Schlaf: 3. Lesen 0–5 ms, auch bei USB `runtime_status` «suspended» (erster Zugriff nach dem Öffnen ~146 ms) |
+| 6 | **Wecken** über Frame-Protokoll (Selektor 0x02, Befehl 0xA0C2, Nutzlast u32 0 = wecken, 1 = schlafen; Aufbau nach `tiny2` `frame.rs`, eigene CRC-16/USB gegen dessen Musterframe geprüft). Status 1 nach 1,51–1,61 s, Kopf hoch, LED an (Nutzer) |
+| 8, 9 | **Schlafen**: Status 3 nach ~0,1 s (einmal 1,2 s). 5 × Schlafen/Wecken ohne Ausreisser |
+| 7 | **Befehl nach dem Wecken:** Nach Status 1 fährt die Kamera in die Grundstellung und **verwirft Pan-Befehle** in dieser Zeit: mit 0/100/200/400 ms und 1,5 s und 2,5 s Pause **kein** Schwenk (Nutzer; 400 ms einmal ja, einmal nein), mit **4 s** Schwenk sichtbar. `G_CTRL` meldet trotzdem den gesendeten Wert (Cache). → **Wartezeit nach dem Wecken 4,5 s** (statt 400 ms), in Prüfung b mit 10 Wiederholungen genauer messen. Ein verlorener Befehl ist nicht erkennbar; der Dienst muss warten, nicht prüfen |
+| 10 | HDR `01 01 00`/`01 01 01`: Status 0x06 folgt. **Bildwinkel `04 01 xx`: Status 0x11 blieb 0**, und nach `04 01 00` stand HDR auf 0 → **nicht bestätigt, gesperrt** (mit Videostrom in b nochmals, Bild ansehen) |
+| 11 | Autosuspend: kein Problem (siehe 3, 4); **keine udev-Regel nötig** |
+| 12 | KI `16 02 02 00` → Status 2/0, `16 02 02 01` → 2/1, aber «keine» `16 02 00 00` → **6/1** (unbekannt), nach Schlafen 0/0 → **nicht bestätigt, gesperrt**; Vergleich Position nach Verfolgung nicht gemacht (braucht Videostrom) |
+| 13 | Auto-Schlaf: Status 0x0A–0x0B = 120 s. Nicht geschrieben; Nutzer: **so lassen** |
+| 14 | **Schwelle zum Einschlafen: Tilt −76°** (−74° noch wach, ohne Videostrom). → **Grenze unten −66°** |
+| 15, 16 | mit Videostrom: **nicht gemacht**, Nutzer: bei Prüfung b mit dem Dienst |
+| Weiter | Python **3.14.8**; `/dev/video*` Gruppe `video` mit ACL (Benutzer ohne Gruppe `video`, Zugriff geht); Port 8093 frei; `cameractrls`/`cameractrlsd` laufen nicht. **Firewall:** Zone `FedoraWorkstation` (eno2) öffnet heute nur `41641/udp`, Dienste dhcpv6-client, mdns, samba-client, dazu reiche Regeln (4455 nur vom Studio-PC, ssh aus dem Heimnetz) → der Bereich 1025–65535 aus `docs/02-umgebung.md` ist **nicht mehr offen** (veraltet); `system-einrichten.sh` braucht nur eine Regel wie die für 4455 |
+| C922 | Netzfrequenz 50 Hz stand (heute gesetzt); nach Umstecken durch den Nutzer **60 Hz** → zurückgesetzt auf 50 Hz. Dienst muss sie beim Erscheinen setzen (wie geplant) |
+
+**Anpassungen am Plan daraus (gelten vor dem Abschnittstext):** 2.3 Regel 2: Wartezeit 4,5 s statt 400 ms. Regel 3: Grenze unten −66°. Regel 8: keine udev-Regel. 2.5 und 8: Bildwinkel und KI-Modus erst nach Prüfung mit Videostrom freischalten (in b). 5.3: Firewall-Regel nur für den Port vom Studio-PC (Zone hat den offenen Bereich nicht mehr), `docs/02` nachführen.
+
 ## Wichtigste Befunde
 
 | Befund | Beleg |
