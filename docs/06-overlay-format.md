@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-14 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-15 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5, Dateien des Chat-Bots P14 a). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -15,6 +15,7 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
 ├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
 ├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
+├── aktionen.json             Aktionen, Befehle, Zeitnachrichten des Chat-Bots (P14), siehe «Aktionen»
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
@@ -225,6 +226,27 @@ Beispiel: ein Ordner «Logos» mit dem Unterordner «Alt», darin eine Datei; ei
 }
 ```
 <!-- medien-beispiel-ende -->
+
+## Aktionen (`aktionen.json`)
+
+Seit P14 (Abschnitt a). Aktionen mit Auslösern und Schritten, Befehle, Zeitnachrichten, Warteschlangen und Benutzergruppen des Chat-Bots, Aufbau wie Streamer.bot (Fassung 24) mit Namen in `snake_case`. Plan und Bedeutung der Felder: `docs/archiv/prompts/P14-chatbot.md`, Abschnitte 2.2 bis 2.8. Massgebend ist der Code in `src/actions/` (`actionmodel.h`, `actionjson.cpp`, Typtabellen `steptypes.cpp` und `triggertypes.cpp`); Testdaten `tests/daten/aktionen/`.
+
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `format_version` | ganze Zahl, genau `1` | Version des Formats |
+| `enabled` | true/false | Hauptschalter «Chat-Bot aktiv», beim ersten Start aus |
+| `queues` | Liste | Warteschlangen (`id`, `name`, `blocking`); «Standard» steht nicht in der Liste |
+| `groups` | Liste | Benutzergruppen (`id`, `name`, `users` mit `user_id` = Twitch-Benutzer-ID) |
+| `actions` | Liste | Aktionen (`id`, `name`, `group`, `enabled`, `queue`, `exclude_from_history`, `random_action`, `concurrent`, `always_run`, `template_id`, `triggers`, `steps`) |
+| `commands` | Liste | Befehle (`id`, `name`, `enabled`, `group`, `commands`, `mode`, `location`, `case_sensitive`, `ignore_bot_account`, `ignore_internal`, `sources`, `global_cooldown_s`, `user_cooldown_s`, `persist_counter`, `persist_user_counter`, `permissions` mit `grant`, `roles`, `groups`, `users`) |
+| `timers` | Liste | Zeitnachrichten (`id`, `name`, `enabled`, `repeat`, `interval_s` ab 60, `random`, `random_min_s`, `random_max_s`, `lines`, `only_live`) |
+
+- **Schritte:** gemeinsame Felder `id`, `type`, `enabled`, `weight` (Zahl ab 0, kein Pflichtfeld, Standard 0) und bei `group`, `if`, `if_true`, `if_false` die Liste `steps`. Dazu die Felder des Typs nach der Tabelle in `steptypes.cpp` (Plan 2.4). `if` hat genau die Kinder `if_true` und `if_false` in dieser Reihenfolge; diese stehen nur dort. Verschachtelt höchstens 32 Ebenen. `unsupported` ist immer aus; `script` wird gelesen und geschrieben, nie ausgeführt.
+- **Auslöser:** `id`, `type`, `enabled` und die Filter nach `triggertypes.cpp` (Plan 2.5).
+- **Kennungen:** UUID in Kleinbuchstaben ohne Klammern, je Art eindeutig in der ganzen Datei (Aktionen, Schritte, Auslöser, Befehle, Zeitnachrichten, Warteschlangen, Gruppen). `queue` und `template_id` dürfen `null` sein; bei `queue` heisst auch die UUID aus lauter Nullen «Standard» und wird als `null` geschrieben.
+- **Unbekannte Felder** sind erlaubt und bleiben auf jeder Ebene erhalten (beim Lesen gesammelt, beim Schreiben wieder ausgegeben). Alle übrigen Felder sind Pflicht; ein fehlendes oder ungültiges Feld macht die Datei ungültig, die Meldung nennt es (zum Beispiel `actions[0].steps[2].text`).
+- **Verweise** (Warteschlange, Befehl und Zeitnachricht eines Auslösers, Ziel von `run_action`, Benutzergruppen, Overlay und Elemente, Mediendateien) machen die Datei nicht ungültig. Ein fehlender Verweis ist eine Warnung (`src/actions/actionrefs.h`), ebenso doppelte Befehle unter den aktiven und gespeicherte, aber nicht ausgeführte Werte (`mode` `regex`, Vergleich `regex`).
+- Geschrieben wird eingerückt mit Feldern in alphabetischer Reihenfolge. Keine Zugangsdaten und keine Daten von Zuschauern ausser Twitch-Benutzer-IDs in `groups` und `permissions.users`.
 
 ## Versionen
 

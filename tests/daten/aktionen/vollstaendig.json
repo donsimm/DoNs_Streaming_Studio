@@ -1,0 +1,147 @@
+{
+    "format_version": 1,
+    "enabled": false,
+    "test_unbekannt_oben": "bleibt erhalten",
+    "queues": [
+        { "id": "a1000000-0000-4000-8000-000000000001", "name": "Alerts", "blocking": true },
+        { "id": "a1000000-0000-4000-8000-000000000002", "name": "Meldungen", "blocking": true, "test_unbekannt": [1, 2] }
+    ],
+    "groups": [
+        { "id": "a2000000-0000-4000-8000-000000000001", "name": "Stammgäste",
+          "users": [ { "user_id": "100000001" }, { "user_id": "100000002", "test_unbekannt": "erfunden" } ] }
+    ],
+    "actions": [
+        {
+            "id": "a3000000-0000-4000-8000-000000000001", "name": "Begrüssung", "group": "Begrüssung", "enabled": true,
+            "queue": "a1000000-0000-4000-8000-000000000002", "exclude_from_history": false,
+            "random_action": false, "concurrent": false, "always_run": false,
+            "template_id": "a9000000-0000-4000-8000-000000000001",
+            "exclude_from_pending": false,
+            "triggers": [ { "id": "a4000000-0000-4000-8000-000000000001", "type": "twitch.first_message", "enabled": true } ],
+            "steps": [
+                { "id": "a5000000-0000-4000-8000-000000000001", "type": "if", "enabled": true, "weight": 0,
+                  "input": "%role%", "operation": "equals", "value": "4", "auto_type": true,
+                  "steps": [
+                      { "id": "a5000000-0000-4000-8000-000000000002", "type": "if_true", "enabled": true, "weight": 0,
+                        "steps": [ { "id": "a5000000-0000-4000-8000-000000000003", "type": "break", "enabled": true, "weight": 0 } ] },
+                      { "id": "a5000000-0000-4000-8000-000000000004", "type": "if_false", "enabled": true, "weight": 0, "steps": [] }
+                  ] },
+                { "id": "a5000000-0000-4000-8000-000000000005", "type": "user_info", "enabled": true, "weight": 0, "login": "%userName%" },
+                { "id": "a5000000-0000-4000-8000-000000000006", "type": "chat_send", "enabled": true, "weight": 0,
+                  "text": "Willkommen, %user%! 100% Freude", "use_bot": true, "fallback": true, "reply": false },
+                { "id": "a5000000-0000-4000-8000-000000000007", "type": "overlay_source", "enabled": true, "weight": 0,
+                  "overlay": "a6000000-0000-4000-8000-000000000001", "mode": "show",
+                  "elements": [
+                      { "source": "a7000000-0000-4000-8000-000000000001", "text": null, "image": "%targetUserProfileImageUrl%" },
+                      { "source": "a7000000-0000-4000-8000-000000000002", "text": "Hallo %user%", "image": null, "test_unbekannt": true }
+                  ],
+                  "duration_ms": 8000, "wait": true, "transition_in": "none", "transition_out": "fade", "transition_ms": 0 }
+            ]
+        },
+        {
+            "id": "a3000000-0000-4000-8000-000000000002", "name": "Shoutout ausführen", "group": "Shoutout", "enabled": true,
+            "queue": null, "exclude_from_history": true, "random_action": false, "concurrent": true, "always_run": true,
+            "template_id": null, "triggers": [],
+            "steps": [
+                { "id": "a5000000-0000-4000-8000-000000000010", "type": "user_info", "enabled": true, "weight": 0, "login": "%shoutoutLogin%" },
+                { "id": "a5000000-0000-4000-8000-000000000011", "type": "twitch_shoutout", "enabled": true, "weight": 0, "login": "%targetUserName%" },
+                { "id": "a5000000-0000-4000-8000-000000000012", "type": "twitch_announce", "enabled": false, "weight": 0,
+                  "text": "Schaut bei %targetUser% vorbei", "color": "purple", "use_bot": false },
+                { "id": "a5000000-0000-4000-8000-000000000013", "type": "chat_send", "enabled": true, "weight": 0,
+                  "text": "Danke ~raidDank~", "use_bot": false, "fallback": false, "reply": true }
+            ]
+        },
+        {
+            "id": "a3000000-0000-4000-8000-000000000003", "name": "Shoutout per Befehl", "group": "Shoutout", "enabled": true,
+            "queue": null, "exclude_from_history": false, "random_action": false, "concurrent": false, "always_run": false,
+            "template_id": null,
+            "triggers": [ { "id": "a4000000-0000-4000-8000-000000000002", "type": "command", "enabled": true,
+                            "command_id": "a8000000-0000-4000-8000-000000000002" } ],
+            "steps": [
+                { "id": "a5000000-0000-4000-8000-000000000020", "type": "set_argument", "enabled": true, "weight": 0,
+                  "name": "shoutoutLogin", "value": "%input0%", "auto_type": false },
+                { "id": "a5000000-0000-4000-8000-000000000021", "type": "run_action", "enabled": true, "weight": 0,
+                  "action_id": "a3000000-0000-4000-8000-000000000002", "immediately": true }
+            ]
+        },
+        {
+            "id": "a3000000-0000-4000-8000-000000000004", "name": "First Chatters", "group": "", "enabled": true,
+            "queue": null, "exclude_from_history": false, "random_action": true, "concurrent": false, "always_run": false,
+            "template_id": null, "triggers": [],
+            "steps": [
+                { "id": "a5000000-0000-4000-8000-000000000030", "type": "global_set", "enabled": true, "weight": 1.5,
+                  "name": "firstChatterPlace", "scope": "global", "user": "trigger", "persisted": true,
+                  "operation": "increment", "value": "1" },
+                { "id": "a5000000-0000-4000-8000-000000000031", "type": "global_get", "enabled": true, "weight": 2,
+                  "name": "firsts", "scope": "user", "user": "target", "persisted": false,
+                  "destination": "firstsBisher", "default": "0" },
+                { "id": "a5000000-0000-4000-8000-000000000032", "type": "group", "enabled": false, "weight": 0,
+                  "name": "Zufall", "random": true,
+                  "steps": [
+                      { "id": "a5000000-0000-4000-8000-000000000033", "type": "comment", "enabled": true, "weight": 0,
+                        "text": "nur eine Notiz", "color": "#ff8800" },
+                      { "id": "a5000000-0000-4000-8000-000000000034", "type": "if", "enabled": true, "weight": 0,
+                        "input": "%firstsBisher%", "operation": "regex", "value": "^[0-9]+$", "auto_type": false,
+                        "steps": [
+                            { "id": "a5000000-0000-4000-8000-000000000035", "type": "if_true", "enabled": true, "weight": 0,
+                              "steps": [ { "id": "a5000000-0000-4000-8000-000000000036", "type": "delay", "enabled": true, "weight": 0,
+                                           "value_ms": 500, "max_value_ms": 3600000, "random": true } ] },
+                            { "id": "a5000000-0000-4000-8000-000000000037", "type": "if_false", "enabled": true, "weight": 0, "steps": [] }
+                        ] }
+                  ] }
+            ]
+        },
+        {
+            "id": "a3000000-0000-4000-8000-000000000005", "name": "Alle Auslöser", "group": "Test", "enabled": false,
+            "queue": "a1000000-0000-4000-8000-000000000001", "exclude_from_history": false, "random_action": false,
+            "concurrent": false, "always_run": false, "template_id": null,
+            "triggers": [
+                { "id": "a4000000-0000-4000-8000-000000000010", "type": "twitch.chat_message", "enabled": false },
+                { "id": "a4000000-0000-4000-8000-000000000011", "type": "twitch.follow", "enabled": true, "test_unbekannt": "x" },
+                { "id": "a4000000-0000-4000-8000-000000000012", "type": "twitch.subscribe", "enabled": true, "tiers": ["1000", "3000"] },
+                { "id": "a4000000-0000-4000-8000-000000000013", "type": "twitch.resubscribe", "enabled": true, "tiers": [], "min_months": 2 },
+                { "id": "a4000000-0000-4000-8000-000000000014", "type": "twitch.gift_sub", "enabled": true, "tiers": ["2000"] },
+                { "id": "a4000000-0000-4000-8000-000000000015", "type": "twitch.gift_bomb", "enabled": true, "tiers": [], "min": 5, "max": 0 },
+                { "id": "a4000000-0000-4000-8000-000000000016", "type": "twitch.cheer", "enabled": true, "min": 1, "max": 0 },
+                { "id": "a4000000-0000-4000-8000-000000000017", "type": "twitch.raid", "enabled": true, "min": 1, "max": 100 },
+                { "id": "a4000000-0000-4000-8000-000000000018", "type": "twitch.stream_online", "enabled": true, "skip_at_start": true },
+                { "id": "a4000000-0000-4000-8000-000000000019", "type": "twitch.stream_offline", "enabled": true },
+                { "id": "a4000000-0000-4000-8000-00000000001a", "type": "timer", "enabled": true,
+                  "timer_id": "ab000000-0000-4000-8000-000000000001" },
+                { "id": "a4000000-0000-4000-8000-00000000001b", "type": "test", "enabled": true,
+                  "variables": { "user": "Testzuschauer", "bits": "100" } }
+            ],
+            "steps": [
+                { "id": "a5000000-0000-4000-8000-000000000040", "type": "play_sound", "enabled": true, "weight": 0,
+                  "file": "media/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.mp3", "volume": 150, "wait": false },
+                { "id": "a5000000-0000-4000-8000-000000000041", "type": "obs_source_visible", "enabled": true, "weight": 0,
+                  "scene_name": "test 2", "source_name": "Kamera", "state": "toggle" },
+                { "id": "a5000000-0000-4000-8000-000000000042", "type": "script", "enabled": true, "weight": 0,
+                  "language": "csharp", "code": "public class CPHInline { }" },
+                { "id": "a5000000-0000-4000-8000-000000000043", "type": "unsupported", "enabled": false, "weight": 0,
+                  "sb_type": 16, "original": { "type": 16, "gameName": "Beispiel", "index": 3 } }
+            ]
+        }
+    ],
+    "commands": [
+        { "id": "a8000000-0000-4000-8000-000000000001", "name": "Discord", "enabled": true, "group": "Info",
+          "commands": ["!discord", "!dc"], "mode": "basic", "location": "start", "case_sensitive": false,
+          "ignore_bot_account": true, "ignore_internal": true, "sources": ["twitch_message"],
+          "global_cooldown_s": 5, "user_cooldown_s": 0, "persist_counter": false, "persist_user_counter": false,
+          "permissions": { "grant": "allow", "roles": [], "groups": [], "users": [] } },
+        { "id": "a8000000-0000-4000-8000-000000000002", "name": "Shoutout", "enabled": true, "group": "",
+          "commands": ["!so"], "mode": "basic", "location": "exact", "case_sensitive": true,
+          "ignore_bot_account": false, "ignore_internal": false, "sources": [],
+          "global_cooldown_s": 0, "user_cooldown_s": 30, "persist_counter": true, "persist_user_counter": true,
+          "permissions": { "grant": "deny", "roles": ["moderator", "vip"], "groups": ["a2000000-0000-4000-8000-000000000001"],
+                           "users": [ { "user_id": "100000003" } ], "test_unbekannt": 7 },
+          "test_unbekannt": { "a": 1 } }
+    ],
+    "timers": [
+        { "id": "ab000000-0000-4000-8000-000000000001", "name": "Info alle 20 min", "enabled": true, "repeat": true,
+          "interval_s": 1200, "random": false, "random_min_s": 0, "random_max_s": 0, "lines": 5, "only_live": true },
+        { "id": "ab000000-0000-4000-8000-000000000002", "name": "Zufällig", "enabled": false, "repeat": false,
+          "interval_s": 60, "random": true, "random_min_s": 60, "random_max_s": 600, "lines": 0, "only_live": false,
+          "test_unbekannt": null }
+    ]
+}

@@ -83,6 +83,13 @@ target_compile_definitions(tst_datenformat PRIVATE DSS_CORE_BIN="$<TARGET_FILE:d
 add_dependencies(tst_datenformat dss-core)
 set_tests_properties(tst_kernverbindung PROPERTIES FIXTURES_REQUIRED dss_media)
 
+# P14 a: Modell der Aktionen (aktionen.json, Typtabellen, Verweise) mit erfundenen Testdaten
+# tests/daten/aktionen/, ohne Qt Gui.
+dss_add_test(tst_aktionsformat)
+target_link_libraries(tst_aktionsformat PRIVATE dss_actions)
+target_compile_definitions(tst_aktionsformat PRIVATE
+  DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
+
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).
 if(DSS_BUILD_APP)
