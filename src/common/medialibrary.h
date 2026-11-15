@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mediaimport.h"
 #include "overlay.h"
 
 #include <QByteArray>
@@ -26,11 +27,15 @@ inline constexpr int kMediaLibraryFormatVersion = 1;
 inline constexpr char kMediaLibraryFileName[] = "medien.json";
 
 // Art einer Mediendatei, aus der Endung des Verweises (docs/06-overlay-format.md, «media/»).
-enum class MediaKind { Image, Video, Font };
+// P14 t: Audio (Töne des Chat-Bots, ohne Quelle in einem Overlay).
+enum class MediaKind { Image, Video, Font, Audio };
+inline constexpr MediaKind kMediaKinds[] = {MediaKind::Image, MediaKind::Video, MediaKind::Font, MediaKind::Audio};
 std::optional<MediaKind> mediaKindOf(const QString &reference);
-// «Bild», «Video», «Schrift»
+// Verwendung beim Übernehmen (erlaubte Endungen), je Art genau eine
+MediaUse mediaUseOf(MediaKind kind);
+// «Bild», «Video», «Schrift», «Ton»
 QString mediaKindName(MediaKind kind);
-// Art aus dem Namen im Protokoll und zurück: "image", "video", "font"
+// Art aus dem Namen im Protokoll und zurück: "image", "video", "font", "audio"
 QString mediaKindKey(MediaKind kind);
 std::optional<MediaKind> mediaKindFromKey(const QString &key);
 

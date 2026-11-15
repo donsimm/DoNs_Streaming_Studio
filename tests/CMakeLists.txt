@@ -42,8 +42,9 @@ set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
 # P10b: Namen und Ordner der Mediendateien (medien.json), ohne Qt Gui und ohne Kern-Prozess.
 dss_add_test(tst_medienliste)
 target_compile_definitions(tst_medienliste PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
-  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md")
-set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED dss_media)
+  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md"
+  DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED "dss_media;dss_toene")
 
 # P07: Schnittstelle, Leistungswerte, Aufbereitung für das Fenster (ohne Qt Gui).
 dss_add_test(tst_protocol)
@@ -218,6 +219,12 @@ if(TARGET dss_audiodecoder)
   dss_add_test(tst_tondecoder)
   target_link_libraries(tst_tondecoder PRIVATE dss_audiodecoder)
   target_compile_definitions(tst_tondecoder PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+  # P14 t: Tondateien ohne Bild (eingefroren im Repo); erzeugt sie nur, falls sie fehlen. Braucht
+  # dann ffmpeg mit libmp3lame und libvorbis (wie media_vorbereiten).
+  add_test(NAME toene_vorbereiten
+    COMMAND sh -c "test -f '${CMAKE_CURRENT_SOURCE_DIR}/daten/ton/ton-piep.m4a' || sh '${CMAKE_CURRENT_SOURCE_DIR}/daten/ton/erzeugen-toene.sh'")
+  set_tests_properties(toene_vorbereiten PROPERTIES FIXTURES_SETUP dss_toene)
+  set_tests_properties(tst_tondecoder PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
 # P12b b2: Mischer mit gedachter Uhr und gedachten Werten des Ausgangs, ohne Gerät; ein Fall mit
 # echtem Decoder und tests/daten/ton/blitz-piep.mp4.

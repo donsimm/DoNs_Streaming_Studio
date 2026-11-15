@@ -96,6 +96,9 @@ QString mediaFileFilter(MediaUse use)
     case MediaUse::Font:
         title = QStringLiteral("Schriften");
         break;
+    case MediaUse::Audio:
+        title = QStringLiteral("Töne");
+        break;
     }
     return QStringLiteral("%1 (%2)").arg(title, patterns.join(QLatin1Char(' ')));
 }
@@ -109,13 +112,35 @@ int newSourceIndex(const Overlay &overlay, int insertRow)
 QString mediaLibraryFileFilter()
 {
     QStringList all;
-    for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font}) {
-        for (const QString &suffix : allowedMediaSuffixes(use))
+    QStringList filters;
+    for (MediaKind kind : kMediaKinds) {
+        for (const QString &suffix : allowedMediaSuffixes(mediaUseOf(kind)))
             all.append(QStringLiteral("*.") + suffix);
+        filters.append(mediaFileFilter(mediaUseOf(kind)));
     }
-    return QStringLiteral("Mediendateien (%1);;%2;;%3;;%4")
-        .arg(all.join(QLatin1Char(' ')), mediaFileFilter(MediaUse::Image),
-             mediaFileFilter(MediaUse::Video), mediaFileFilter(MediaUse::Font));
+    return QStringLiteral("Mediendateien (%1);;%2").arg(all.join(QLatin1Char(' ')), filters.join(QStringLiteral(";;")));
+}
+
+QString mediaDurationText(qint64 ms)
+{
+    if (ms <= 0)
+        return {};
+    // Unter einer Minute mit Zehnteln (Töne des Chat-Bots sind oft kürzer als 1 s); Punkt wie
+    // mediaSizeText.
+    if (ms < 60'000)
+        return QStringLiteral("%1 s").arg(double(ms) / 1000.0, 0, 'f', 1);
+    const qint64 seconds = (ms + 500) / 1000;
+    const QString mmss = QStringLiteral("%1:%2").arg(seconds / 60 % 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
+    if (seconds < 3600)
+        return mmss;
+    return QStringLiteral("%1:%2:%3").arg(seconds / 3600).arg(seconds / 60 % 60, 2, 10, QLatin1Char('0'))
+        .arg(seconds % 60, 2, 10, QLatin1Char('0'));
+}
+
+QString mediaKindText(const MediaFileData &file)
+{
+    const QString duration = mediaDurationText(file.durationMs);
+    return duration.isEmpty() ? mediaKindName(file.kind) : mediaKindName(file.kind) + QStringLiteral(" · ") + duration;
 }
 
 bool mediaRowBefore(const MediaSortKey &a, const MediaSortKey &b, MediaColumn column, bool ascending)
@@ -246,7 +271,7 @@ MediaSelectionInfo mediaSelectionInfo(const MediaListData &media,
 QString mediaFileToolTip(const MediaFileData &file)
 {
     QStringList lines{file.entry.name};
-    QString kind = mediaKindName(file.kind) + QStringLiteral(" · ") + mediaSizeText(file.bytes);
+    QString kind = mediaKindText(file) + QStringLiteral(" · ") + mediaSizeText(file.bytes);
     if (!file.codec.isEmpty())
         kind += QStringLiteral(" · Format ") + file.codec;
     lines << kind << file.entry.file;

@@ -63,6 +63,11 @@ int newSourceIndex(const Overlay &overlay, int insertRow);
 
 // Filter für «Hinzufügen» im Dock «Medien»: alle erlaubten Endungen, dann je Art.
 QString mediaLibraryFileFilter();
+// P14 t: Länge eines Tons: «0.4 s», «12.0 s» unter einer Minute, sonst «3:07» bzw. «1:02:03»;
+// leer bei 0 (unbekannt).
+QString mediaDurationText(qint64 ms);
+// Spalte «Art» im Dock «Medien»: «Bild», …, bei Tönen mit Länge «Ton · 2.5 s».
+QString mediaKindText(const MediaFileData &file);
 
 // Zeile im Dock «Medien» zum Sortieren nach einer Spalte (Teil B 1). Ordner stehen immer vor
 // Dateien, in beiden Richtungen, wie im Dateimanager.
@@ -71,7 +76,7 @@ struct MediaSortKey
 {
     bool folder = false;
     QString name;
-    QString kind;      // «Bild», «Video», «Schrift», bei Ordnern «Ordner»
+    QString kind;      // «Bild», «Video», «Schrift», «Ton …», bei Ordnern «Ordner»
     qint64 bytes = 0;  // bei Ordnern 0
     QString tieBreak;  // Verweis bzw. Kennung des Ordners: gleiche Namen in fester Folge
 };

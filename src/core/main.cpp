@@ -238,6 +238,8 @@ int main(int argc, char *argv[])
     store.setMediaSizeReader(dss::readMediaSize);
     // Format der Videos (P10b, Punkt 81): Hinweis, wenn die Browserquelle es nicht abspielt
     store.setVideoCodecReader(dss::readVideoCodec);
+    // P14 t: Länge der Töne im Dock «Medien»
+    store.setMediaDurationReader(dss::readMediaDuration);
 #endif
     if (!store.load(&error)) {
         qCritical("Datenordner %s: %s", qPrintable(store.dataDir()), qPrintable(error));

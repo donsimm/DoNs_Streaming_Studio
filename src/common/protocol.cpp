@@ -1623,6 +1623,8 @@ QJsonObject mediaListMessage(const MediaListData &data)
                                  {QStringLiteral("kind"), mediaKindKey(f.kind)},
                                  {QStringLiteral("bytes"), double(f.bytes)},
                                  {QStringLiteral("codec"), textOrNull(f.codec)},
+                                 {QStringLiteral("duration_ms"), f.durationMs > 0 ? QJsonValue(double(f.durationMs))
+                                                                                  : QJsonValue(QJsonValue::Null)},
                                  {QStringLiteral("browser_problem"), textOrNull(f.browserProblem)},
                                  {QStringLiteral("used_in"), used}});
     }
@@ -1679,6 +1681,10 @@ bool parseMediaList(const QJsonObject &message, MediaListData *data, QString *er
         }
         file.kind = *k;
         file.bytes = bytes;
+        // P14 t: Länge eines Tons oder null
+        if (!f.value(QStringLiteral("duration_ms")).isNull()
+            && !requireInt(f, QStringLiteral("duration_ms"), 1, qint64(1) << 53, &file.durationMs, error))
+            return false;
         const QJsonValue used = f.value(QStringLiteral("used_in"));
         if (!used.isArray()) {
             *error = QStringLiteral("Feld used_in muss eine Liste sein");

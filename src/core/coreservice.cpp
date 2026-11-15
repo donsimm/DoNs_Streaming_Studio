@@ -1036,9 +1036,7 @@ QString CoreService::fileToImport(const dss::ChangeRequest &r, dss::MediaUse *us
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind)
             return {};
-        *use = *kind == MediaKind::Image ? MediaUse::Image
-               : *kind == MediaKind::Video ? MediaUse::Video
-                                           : MediaUse::Font;
+        *use = mediaUseOf(*kind);
         return r.file;
     }
     if (type == QLatin1String(msg::kAddTextSource)) {
@@ -1128,6 +1126,7 @@ dss::MediaListData CoreService::mediaListData() const
         f.kind = dss::mediaKindOf(e.file).value_or(dss::MediaKind::Image);
         f.bytes = std::max<qint64>(m_store->mediaBytes(e.file), 0);
         f.codec = m_store->videoCodec(e.file);
+        f.durationMs = m_store->mediaDurationMs(e.file);
         f.browserProblem = m_store->browserProblem(e.file);
         f.usedIn = usages.value(e.file);
         data.files.append(f);
@@ -1345,15 +1344,12 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind) {
             QStringList all;
-            for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font})
-                all.append(allowedMediaSuffixes(use));
+            for (MediaKind k : kMediaKinds)
+                all.append(allowedMediaSuffixes(mediaUseOf(k)));
             return fail(err::kRejected, QStringLiteral("Endung «%1» nicht erlaubt, erlaubt sind: %2.")
                                             .arg(QFileInfo(r.file).suffix(), all.join(QStringLiteral(", "))));
         }
-        const MediaUse use = *kind == MediaKind::Image   ? MediaUse::Image
-                             : *kind == MediaKind::Video ? MediaUse::Video
-                                                         : MediaUse::Font;
-        const QString reference = m_store->importMedia(r.file, use, &error, r.folderId);
+        const QString reference = m_store->importMedia(r.file, mediaUseOf(*kind), &error, r.folderId);
         if (reference.isEmpty())
             return fail(err::kRejected, error);
         ChangeResult result = done(true, QString());

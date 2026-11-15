@@ -275,6 +275,21 @@ QString OverlayStore::videoCodec(const QString &reference) const
     return *it;
 }
 
+qint64 OverlayStore::mediaDurationMs(const QString &reference) const
+{
+    if (!m_mediaDurationReader || mediaKindOf(reference) != MediaKind::Audio)
+        return 0;
+    auto it = m_mediaDurationCache.constFind(reference);
+    if (it == m_mediaDurationCache.constEnd()) {
+        qint64 ms = 0;
+        QString ignored;
+        if (!m_mediaDurationReader(mediaFilePath(reference), &ms, &ignored))
+            ms = 0;
+        it = m_mediaDurationCache.insert(reference, ms);
+    }
+    return *it;
+}
+
 QString OverlayStore::browserProblem(const QString &reference, const QString &name) const
 {
     const std::optional<QString> unsupported = browserUnsupportedVideoCodec(videoCodec(reference));
@@ -375,6 +390,7 @@ bool OverlayStore::removeMedia(const QString &reference, QString *error)
     }
     m_mediaSizeCache.remove(reference);
     m_videoCodecCache.remove(reference);
+    m_mediaDurationCache.remove(reference);
     m_mediaBytes.remove(reference);
     QString writeError;
     if (!changeMedia([&](MediaLibrary *l) { return removeMediaFromLibrary(l, reference); }, false,

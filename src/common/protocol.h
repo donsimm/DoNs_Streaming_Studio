@@ -47,8 +47,10 @@ namespace dss {
 //   audio_offset_max_ms; update_settings mit audio_routes)
 // 13 seit P12b b5: Overlays im Format 5 (video.volume, video.muted), changes.video.volume und
 //   changes.video.muted
+// 14 seit P14 t (vorläufig, Lotse vergibt die Nummer beim Zusammenführen): media_list mit kind
+//   "audio" und duration_ms
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 13;
+inline constexpr int kProtocolVersion = 14;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -490,6 +492,7 @@ struct MediaFileData
     MediaKind kind = MediaKind::Image;
     qint64 bytes = 0;
     QString codec;              // Video: Name in FFmpeg ("vp9", "hevc", …); leer = unbekannt
+    qint64 durationMs = 0;      // P14 t: Länge eines Tons in ms; 0 = unbekannt oder kein Ton
     QString browserProblem;     // Hinweis, wenn die Browserquelle die Datei nicht abspielt
     QList<MediaUsage> usedIn;   // leer = ungenutzt, darf gelöscht werden
 

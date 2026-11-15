@@ -237,8 +237,9 @@ QString droppedMediaSource(const QMimeData *mime)
         return {};
     const QString reference = QString::fromUtf8(mime->data(QString::fromLatin1(kMediaMimeType)));
     const std::optional<dss::MediaKind> kind = dss::mediaKindOf(reference);
-    // Schriften: keine Quelle aus einer Datei allein (Textquelle braucht Text), nicht Teil von P10b
-    return kind && *kind != dss::MediaKind::Font ? reference : QString();
+    // Schriften: keine Quelle aus einer Datei allein (Textquelle braucht Text), nicht Teil von P10b.
+    // Töne (P14 t): keine Quelle im Overlay, nur für Schritte des Chat-Bots.
+    return kind && (*kind == dss::MediaKind::Image || *kind == dss::MediaKind::Video) ? reference : QString();
 }
 
 namespace {

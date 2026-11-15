@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 13); // seit P12b b5 (Format 5)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 14); // seit P12b b5 (Format 5)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -852,7 +852,14 @@ private slots:
         video.bytes = qint64(3) << 32; // über 4 GiB
         video.codec = QStringLiteral("hevc");
         video.browserProblem = QStringLiteral("zaehler.mp4 (HEVC) wird in der Browserquelle nicht angezeigt.");
-        d.files = {image, video};
+        // P14 t: Ton mit Länge
+        MediaFileData sound;
+        sound.entry = {QStringLiteral("media/") + QString(64, QLatin1Char('c')) + QStringLiteral(".mp3"),
+                       QStringLiteral("glocke.mp3"), QUuid()};
+        sound.kind = MediaKind::Audio;
+        sound.bytes = 4096;
+        sound.durationMs = 2450;
+        d.files = {image, video, sound};
         d.error = QStringLiteral("medien.json: kaputt");
         const QJsonObject o = roundTrip(mediaListMessage(d));
         QCOMPARE(messageType(o), QStringLiteral("media_list"));
@@ -867,16 +874,31 @@ private slots:
         QVERIFY(files.at(0).toObject().value(QStringLiteral("codec")).isNull());
         QVERIFY(files.at(0).toObject().value(QStringLiteral("browser_problem")).isNull());
         QVERIFY(files.at(1).toObject().value(QStringLiteral("folder")).isNull());
+        QVERIFY(files.at(0).toObject().value(QStringLiteral("duration_ms")).isNull());
+        QCOMPARE(files.at(2).toObject().value(QStringLiteral("kind")).toString(), QStringLiteral("audio"));
+        QCOMPARE(files.at(2).toObject().value(QStringLiteral("duration_ms")).toInt(), 2450);
         d.error.clear();
         QVERIFY(mediaListMessage(d).value(QStringLiteral("error")).isNull());
         // Unbekannte Art
         QJsonObject bad = o;
         QJsonArray badFiles = files;
         QJsonObject f = badFiles.at(0).toObject();
-        f.insert(QStringLiteral("kind"), QStringLiteral("audio"));
+        f.insert(QStringLiteral("kind"), QStringLiteral("musik"));
         badFiles[0] = f;
         bad.insert(QStringLiteral("files"), badFiles);
         QVERIFY(!parseMediaList(bad, &back, &error));
+        // Länge fehlt oder ist 0
+        for (const QJsonValue &duration : {QJsonValue(QJsonValue::Undefined), QJsonValue(0)}) {
+            QJsonObject s = files.at(2).toObject();
+            if (duration.isUndefined())
+                s.remove(QStringLiteral("duration_ms"));
+            else
+                s.insert(QStringLiteral("duration_ms"), duration);
+            badFiles = files;
+            badFiles[2] = s;
+            bad.insert(QStringLiteral("files"), badFiles);
+            QVERIFY(!parseMediaList(bad, &back, &error));
+        }
 
         const QList<ImportProgressData> imports = {
             {1, QStringLiteral("gross.webm"), d.folders.first().id, 42},
