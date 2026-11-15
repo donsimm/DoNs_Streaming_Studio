@@ -156,7 +156,7 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 
 - Prüfstufe «Baustein»: gelaufen 2026-11-14 (Abschnitt oben), alles bestanden, die Leistung mit 3 Videos mit Ton als Nachtrag mit `scripts/leistung.py --ton`.
 - Handtest H1 bis H4, N1 bis N3.
-- `[OFFEN]` Nutzer: Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
+- Entschieden (Nutzer, 2026-11-14, bestätigt 2026-11-15): Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
 - Offene Punkte 103 bis 112 in `docs/04-offene-punkte.md`: Regler ohne eigenen Stil, OBS-Start mit Szene im Programm, «Abweichung zuletzt», Neustart von PipeWire, `dss-cli einstellungen` ohne Ausgang und Versatz, Lautstärke linear, `delay` und `versatz_ms` am echten Ausgang, OBS-Fälle (verschachtelte Szenen, «shutdown», 60 min), Klick 197.
 - Vor dem Push: Heimnetz-Adresse in `prototypes/ton/LIESMICH.md` bereinigen (aus der Übergabe, nicht Teil von b6).
 
