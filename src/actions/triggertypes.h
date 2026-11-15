@@ -11,8 +11,14 @@
 // Regel 9). Die Ereignistypen stehen hier als Text; dss_events (P13) wird nicht eingebunden, die
 // Anbindung kommt mit b2.
 //
+// Argumentnamen nach Schritt 0 (docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md,
+// Abschnitt C). Wo Streamer.bot keinen Namen hat, steht ein eigener in derselben Schreibweise
+// (isAnonymous bei Cheer, firstEver).
+//
 // Quellen: Plan P14 2.5 (Recherche von Lotse vom 2026-11-09, https://docs.streamer.bot/guide/triggers,
-// https://docs.streamer.bot/api/triggers/core/commands/command-triggered), Plan P13 1.3 und 1.4.
+// https://docs.streamer.bot/api/triggers/core/commands/command-triggered), Plan P13 1.3 und 1.4,
+// https://github.com/Streamerbot/docs/tree/main/streamerbot/3.api/.variables,
+// https://docs.streamer.bot/api/triggers/twitch/
 
 namespace dss::actions {
 
@@ -20,7 +26,7 @@ struct TriggerTypeInfo
 {
     QString key;            // Typ in aktionen.json
     QString label;          // Bezeichnung auf Deutsch (Meldungen; vorläufig, Editor in e1)
-    int sbType = 0;         // Nummer bei Streamer.bot; 0 = Schritt 0 offen
+    int sbType = 0;         // Nummer bei Streamer.bot; 0 = Typnummer aus z0 (nicht dokumentiert)
     QString eventType;      // Ereignis aus P13 1.3, das den Auslöser speist; leer = keins
     QList<FieldSpec> filters; // Filter ohne die gemeinsamen Felder (id, type, enabled)
     QStringList arguments;  // zusätzliche Argumente eines Laufs (Plan 2.5)
@@ -46,14 +52,17 @@ const QList<TriggerTypeInfo> &triggerTypes();
 // nullptr, wenn der Typ unbekannt ist
 const TriggerTypeInfo *triggerType(const QString &key);
 
-// Stufen der Abos wie in P13 1.3 (Feld tier)
+// Stufen der Abos im Filter tiers wie in P13 1.3 (Feld tier, Zahl als Text). Das Argument tier hat
+// dagegen die Form von Streamer.bot («tier 1»), subscriptionTier die Zahl (Schritt 0, C 19).
 QStringList subscriptionTiers();
 
 // Allgemeine Argumente in jedem Lauf (Plan 2.5)
 QStringList commonArguments();
 // Argumente aus einem Ereignis mit user_* (Plan P13 1.4)
 QStringList userArguments();
-// Argumente aus einer Chat-Nachricht (Plan P13 1.4; isSubscribed, isVip, isModerator Schritt 0)
+// Rolle und Abzeichen des Absenders einer Chat-Nachricht (Plan P13 1.4)
 QStringList chatArguments();
+// Argumente der Nachricht selbst (Chat-Gruppe bei Streamer.bot)
+QStringList chatMessageArguments();
 
 } // namespace dss::actions
