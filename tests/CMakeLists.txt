@@ -96,6 +96,12 @@ dss_add_test(tst_platzhalter)
 target_link_libraries(tst_platzhalter PRIVATE dss_actions)
 dss_add_test(tst_variablen)
 target_link_libraries(tst_variablen PRIVATE dss_actions)
+# P14 b1: Ablauf der Läufe (Zustandsmaschine, Warteschlangen, Grenzen) mit ersetzter Uhr und
+# ersetzten Diensten, ohne Qt Gui und ohne Netz.
+dss_add_test(tst_aktionsablauf)
+target_link_libraries(tst_aktionsablauf PRIVATE dss_actions)
+target_compile_definitions(tst_aktionsablauf PRIVATE
+  DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).
