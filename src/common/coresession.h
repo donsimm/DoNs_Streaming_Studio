@@ -36,6 +36,13 @@ public:
     // P13: nächste Nachricht event oder events_dropped, ohne Zeitgrenze; std::nullopt mit
     // Meldung, wenn der Kern trennt.
     std::optional<QJsonObject> nextEventMessage(QString *error);
+    // P14 b3: Anfrage des Aktionssystems (request_id wird hier vergeben) und Antwort vom Typ
+    // replyType (change_result oder eigene Nachricht) mit derselben request_id. Ein change_result
+    // mit ok false ist eine Antwort, kein Fehler.
+    std::optional<QJsonObject> actionsRequest(const QString &type, const QJsonObject &fields,
+                                              const QString &replyType, QString *error);
+    // P14 b3: nächste Nachricht vom Typ type (zum Beispiel actions_config nach hello)
+    std::optional<QJsonObject> waitForMessage(const QString &type, QString *error);
 
 private:
     bool send(const QJsonObject &message, QString *error);

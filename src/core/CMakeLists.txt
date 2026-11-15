@@ -1,7 +1,10 @@
 # dss-core: Kern (Hintergrundprogramm), ohne Fenster
 # P13: obsevents (Adapter OBS → Ereignisfluss)
-qt_add_executable(dss-core main.cpp coreservice.h coreservice.cpp obsevents.h obsevents.cpp)
-target_link_libraries(dss-core PRIVATE dss_common dss_obs dss_events dss_warnings Qt6::Network)
+# P14 b3: actionservice (Aktionssystem im Kern); angelegt nur mit DSS_CORE_ACTIONS
+qt_add_executable(dss-core main.cpp coreservice.h coreservice.cpp obsevents.h obsevents.cpp
+  actionservice.h actionservice.cpp)
+target_link_libraries(dss-core PRIVATE dss_common dss_obs dss_events dss_actions dss_warnings Qt6::Network)
+target_compile_definitions(dss-core PRIVATE DSS_CORE_ACTIONS=$<BOOL:${DSS_CORE_ACTIONS}>)
 # Watchdog von systemd (P10a, Punkt 41, Schalter DSS_CORE_WATCHDOG)
 target_compile_definitions(dss-core PRIVATE DSS_CORE_WATCHDOG=$<BOOL:${DSS_CORE_WATCHDOG}>
   DSS_CORE_IMPORT_THREAD=$<BOOL:${DSS_CORE_IMPORT_THREAD}>)

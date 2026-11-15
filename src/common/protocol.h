@@ -50,8 +50,10 @@ namespace dss {
 //   changes.video.muted
 // 14 seit P13: Ereignisfluss (subscribe_events, event_history, event, events_dropped). Nummer
 //   vorläufig nach Plan P13; Lotse vergibt sie beim Zusammenführen paralleler Spuren.
+// 15 seit P14 b3: Aktionssystem (actions_config, actions_status, Änderungen und Läufe;
+//   Nachrichten in actionprotocol.h), Ereignisse actions.run_*. Nummer vorläufig (Plan P14 5).
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 14;
+inline constexpr int kProtocolVersion = 15;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 

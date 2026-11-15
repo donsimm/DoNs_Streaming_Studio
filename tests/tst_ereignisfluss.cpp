@@ -51,9 +51,9 @@ class TestEventBus : public QObject
 private slots:
     void typeListIsConsistent()
     {
-        // Plan 1.3: 12 Typen von Twitch und obs.scene_changed
+        // Plan 1.3: 12 Typen von Twitch und obs.scene_changed; P14 b3: drei Typen actions.run_*
         const QStringList names = eventTypeNames();
-        QCOMPARE(names.size(), 13);
+        QCOMPARE(names.size(), 16);
         QCOMPARE(QSet<QString>(names.begin(), names.end()).size(), names.size());
         for (const EventType &type : kEventTypes) {
             const QString name = QString::fromLatin1(type.type);

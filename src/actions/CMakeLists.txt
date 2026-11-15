@@ -2,7 +2,8 @@
 # Netz und kein protocol.h (CLAUDE.md Regel 9 und 14): dss_common fehlt hier absichtlich.
 # Ablauf der Läufe (b1): actionengine, actionrun, Uhr und Schnittstellen nach aussen.
 # Auslöser ohne Netz (b2): triggerevent (Ereignis → Argumente), triggerdispatcher (Filter, Befehle,
-# Zeitnachrichten). Die Anbindung an den Ereignisfluss (dss_events, P13) und den Kern kommt mit b3.
+# Zeitnachrichten). b3: actionedit (Änderungen an aktionen.json); die Anbindung an den Ereignisfluss
+# und an den Kern steht in src/core/actionservice.cpp, darum bleibt dss_events hier draussen.
 add_library(dss_actions STATIC
   fieldspec.h fieldspec.cpp
   steptypes.h steptypes.cpp
@@ -19,6 +20,7 @@ add_library(dss_actions STATIC
   actionrun.h actionrun.cpp
   triggerevent.h triggerevent.cpp
   triggerdispatcher.h triggerdispatcher.cpp
+  actionedit.h actionedit.cpp # b3: Änderungen an aktionen.json (Kern)
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_actions PUBLIC Qt6::Core PRIVATE dss_warnings)

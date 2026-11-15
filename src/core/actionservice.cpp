@@ -1,0 +1,643 @@
+#include "actionservice.h"
+
+#include "actionedit.h"
+#include "actionjson.h"
+#include "protocol.h"
+#include "savescheduler.h"
+#include "triggerevent.h"
+#include "triggertypes.h"
+
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QLocalSocket>
+#include <QSaveFile>
+#include <QTimer>
+
+namespace {
+
+const QString kTwitchNotConnected = QStringLiteral("Twitch nicht verbunden");
+constexpr int kProbeTimeoutMs = 1000;
+
+QJsonObject result(qint64 requestId, bool ok, const QString &code = {}, const QString &message = {},
+                   const QUuid &id = {})
+{
+    return dss::changeResultMessage({requestId, ok, id, code, message});
+}
+
+QJsonObject rejected(qint64 requestId, const QString &message)
+{
+    return result(requestId, false, QString::fromLatin1(dss::err::kRejected), message);
+}
+
+bool writeFile(const QString &path, const QByteArray &bytes, QString *error)
+{
+    // Atomar: QSaveFile schreibt eine vorläufige Datei und benennt sie erst am Ende um
+    // (https://doc.qt.io/qt-6.8/qsavefile.html)
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+        *error = QStringLiteral("%1: %2").arg(QFileInfo(path).fileName(), file.errorString());
+        return false;
+    }
+    return true;
+}
+
+// Liest eine Datei des Aktionssystems. Fehlt sie: true ohne Inhalt. Ungültig: false mit Meldung.
+bool readFile(const QString &path, QByteArray *bytes, bool *exists, QString *error)
+{
+    QFile file(path);
+    *exists = file.exists();
+    if (!*exists)
+        return true;
+    if (!file.open(QIODevice::ReadOnly)) {
+        *error = QStringLiteral("%1 nicht lesbar: %2").arg(QFileInfo(path).fileName(), file.errorString());
+        return false;
+    }
+    *bytes = file.readAll();
+    return true;
+}
+
+QString pathText(const QList<int> &path)
+{
+    QStringList parts;
+    for (int n : path)
+        parts.append(QString::number(n));
+    return parts.join(QLatin1Char('.'));
+}
+
+} // namespace
+
+// Bis Abschnitt c1: Chat und Twitch melden «Twitch nicht verbunden»
+class ActionService::NotConnectedChat : public dss::actions::ChatSender
+{
+public:
+    void sendChat(const dss::actions::ChatRequest &, dss::actions::StepDone done) override
+    {
+        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+    }
+};
+
+class ActionService::NotConnectedTwitch : public dss::actions::TwitchApi
+{
+public:
+    void userInfo(const QString &, dss::actions::StepDone done) override
+    {
+        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+    }
+    void shoutout(const QString &, dss::actions::StepDone done) override
+    {
+        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+    }
+    void announce(const dss::actions::AnnounceRequest &, dss::actions::StepDone done) override
+    {
+        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+    }
+};
+
+ActionService::ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent)
+    : QObject(parent)
+    , m_bus(bus)
+    , m_options(options)
+    , m_engine(std::make_unique<dss::actions::ActionEngine>(&m_clock, &m_variables))
+    , m_dispatcher(std::make_unique<dss::actions::TriggerDispatcher>(&m_clock, &m_variables))
+    , m_chat(std::make_unique<NotConnectedChat>())
+    , m_twitch(std::make_unique<NotConnectedTwitch>())
+    , m_saver(new dss::SaveScheduler(this))
+{
+    dss::actions::ActionServices services;
+    services.chat = m_chat.get();
+    services.twitch = m_twitch.get();
+    m_engine->setServices(services);
+    m_engine->setBaseArguments([this] {
+        return dss::actions::Arguments{{QStringLiteral("isLive"), m_dispatcher->isLive()}};
+    });
+    connect(m_engine.get(), &dss::actions::ActionEngine::runStarted, this, &ActionService::onRunStarted);
+    connect(m_engine.get(), &dss::actions::ActionEngine::runChanged, this, &ActionService::onRunChanged);
+    connect(m_engine.get(), &dss::actions::ActionEngine::runFinished, this, &ActionService::onRunFinished);
+    m_dispatcher->setTimerHandler([this](const dss::actions::TriggerResult &r) {
+        dss::actions::submit(*m_engine, r);
+    });
+    connect(m_saver, &dss::SaveScheduler::saveRequested, this, [this] {
+        QString error;
+        if (!savePending(&error))
+            qCritical("Aktionen: Speichern fehlgeschlagen: %s", qPrintable(error));
+    });
+    // Twitch-Ereignisse vom Fluss (P13); die Anbindung an Twitch selbst kommt mit c1
+    m_subscription = m_bus->subscribe(this, {QStringLiteral("twitch.")},
+                                      [this](const dss::events::Event &event) { onEvent(event); });
+
+    if (!m_options.inUseSocket.isEmpty()) {
+        m_probeTimer = new QTimer(this);
+        m_probeTimer->setInterval(m_options.probeIntervalMs);
+        connect(m_probeTimer, &QTimer::timeout, this, &ActionService::probeInUse);
+        m_probeTimer->start();
+        QTimer::singleShot(0, this, &ActionService::probeInUse);
+    }
+}
+
+ActionService::~ActionService()
+{
+    QString error;
+    if (!savePending(&error))
+        qCritical("Aktionen: beim Beenden nicht gespeichert: %s", qPrintable(error));
+    // Läufe vor Uhr und Variablen beenden (Reihenfolge der Mitglieder)
+    m_dispatcher.reset();
+    m_engine.reset();
+}
+
+QString ActionService::filePath(const char *name) const
+{
+    return QDir(m_options.dataDir).filePath(QString::fromLatin1(name));
+}
+
+void ActionService::load()
+{
+    QString error;
+    m_variablesError.clear();
+    m_viewersError.clear();
+    m_quotesError.clear();
+    QByteArray bytes;
+    bool exists = false;
+
+    // aktionen.json; fehlt sie, gilt der leere Stand (die mitgelieferten Aktionen kommen mit f)
+    dss::actions::ActionsConfig config;
+    m_configError.clear();
+    if (!readFile(filePath(dss::actions::kActionsFileName), &bytes, &exists, &error)
+        || (exists && !dss::actions::parseActions(bytes, &config, &error))) {
+        m_configError = QStringLiteral("%1: %2").arg(QLatin1String(dss::actions::kActionsFileName), error);
+        config = {};
+        qCritical("Aktionen: %s; die Datei bleibt unverändert, Chat-Bot aus", qPrintable(m_configError));
+    }
+    m_config = config;
+
+    dss::actions::VariablesData variables;
+    bytes.clear();
+    if (!readFile(filePath(dss::actions::kVariablesFileName), &bytes, &exists, &error)
+        || (exists && !dss::actions::parseVariables(bytes, &variables, &error))) {
+        m_variablesError = QStringLiteral("%1: %2").arg(QLatin1String(dss::actions::kVariablesFileName), error);
+        variables = {};
+        qCritical("Aktionen: %s; die Datei bleibt unverändert", qPrintable(m_variablesError));
+    }
+    m_variables.setData(variables);
+    m_variables.clearChanged();
+
+    m_viewers = {};
+    bytes.clear();
+    if (!readFile(filePath(dss::actions::kViewersFileName), &bytes, &exists, &error)
+        || (exists && !dss::actions::parseViewers(bytes, &m_viewers, &error))) {
+        m_viewersError = QStringLiteral("%1: %2").arg(QLatin1String(dss::actions::kViewersFileName), error);
+        m_viewers = {};
+        qCritical("Aktionen: %s; die Datei bleibt unverändert", qPrintable(m_viewersError));
+    }
+    m_viewersChanged = false;
+
+    m_quotes = {};
+    bytes.clear();
+    if (!readFile(filePath(dss::actions::kQuotesFileName), &bytes, &exists, &error)
+        || (exists && !dss::actions::parseQuotes(bytes, &m_quotes, &error))) {
+        m_quotesError = QStringLiteral("%1: %2").arg(QLatin1String(dss::actions::kQuotesFileName), error);
+        m_quotes = {};
+        qCritical("Aktionen: %s; die Datei bleibt unverändert", qPrintable(m_quotesError));
+    }
+
+    applyConfig();
+    qInfo("Aktionen: %lld Aktionen, %lld Befehle, %lld Zeitnachrichten geladen, Chat-Bot %s",
+          static_cast<long long>(m_config.actions.size()), static_cast<long long>(m_config.commands.size()),
+          static_cast<long long>(m_config.timers.size()), m_config.enabled ? "an" : "aus");
+    emit broadcastRequested(configMessage());
+    broadcastStatusIfChanged();
+}
+
+void ActionService::applyConfig()
+{
+    m_engine->setConfig(m_config);
+    m_dispatcher->setConfig(m_config);
+}
+
+bool ActionService::savePending(QString *error)
+{
+    bool ok = true;
+    if (m_variables.changed() && m_variablesError.isEmpty()) {
+        if (writeFile(filePath(dss::actions::kVariablesFileName), dss::actions::serializeVariables(m_variables.data()),
+                      error))
+            m_variables.clearChanged();
+        else
+            ok = false;
+    }
+    if (m_viewersChanged && m_viewersError.isEmpty()) {
+        if (writeFile(filePath(dss::actions::kViewersFileName), dss::actions::serializeViewers(m_viewers), error))
+            m_viewersChanged = false;
+        else
+            ok = false;
+    }
+    return ok;
+}
+
+bool ActionService::writeConfig(const dss::actions::ActionsConfig &config, QString *error)
+{
+    return writeFile(filePath(dss::actions::kActionsFileName), dss::actions::serializeActions(config), error);
+}
+
+QJsonObject ActionService::configMessage() const
+{
+    dss::ActionsConfigInfo info;
+    if (m_configError.isEmpty())
+        info.config = m_config;
+    info.fileError = m_configError;
+    return dss::actionsConfigMessage(info);
+}
+
+dss::ActionsStatus ActionService::status() const
+{
+    dss::ActionsStatus s;
+    if (!m_configError.isEmpty()) {
+        s.state = QStringLiteral("file_error");
+        s.message = QStringLiteral("aktionen.json ungültig, Chat-Bot aus: ") + m_configError;
+    } else if (m_muted) {
+        s.state = QStringLiteral("muted");
+        s.message = QStringLiteral("stumm: Version im Einsatz läuft");
+    } else if (!m_config.enabled) {
+        s.state = QStringLiteral("off");
+        s.message = QStringLiteral("Chat-Bot aus");
+    } else {
+        s.state = QStringLiteral("on");
+        s.message = QStringLiteral("Chat-Bot aktiv");
+    }
+    const QList<dss::actions::RunRecord> runs = m_engine->history();
+    const auto queueStatus = [&](const QUuid &id, const QString &name, bool blocking) {
+        dss::ActionsQueueStatus q{id, name, blocking, m_engine->isQueuePaused(id), 0, 0};
+        for (const dss::actions::RunRecord &r : runs) {
+            if (r.queue != id)
+                continue;
+            if (r.state == dss::actions::RunState::Waiting)
+                ++q.waiting;
+            else if (r.state == dss::actions::RunState::Running)
+                ++q.running;
+        }
+        return q;
+    };
+    s.queues.append(queueStatus(QUuid(), QStringLiteral("Standard"), false));
+    for (const dss::actions::Queue &q : m_config.queues)
+        s.queues.append(queueStatus(q.id, q.name, q.blocking));
+    s.running = m_engine->runningCount();
+    // Konten «kann senden» (Plan 5); die Anmeldung bei Twitch kommt mit c1
+    s.accounts = {{QStringLiteral("bot"), false, kTwitchNotConnected},
+                  {QStringLiteral("broadcaster"), false, kTwitchNotConnected}};
+    return s;
+}
+
+void ActionService::broadcastStatusIfChanged()
+{
+    const QJsonObject message = dss::actionsStatusMessage(status());
+    if (message == m_lastStatus)
+        return;
+    m_lastStatus = message;
+    emit broadcastRequested(message);
+}
+
+QList<QJsonObject> ActionService::helloMessages() const
+{
+    return {configMessage(), dss::actionsStatusMessage(status())};
+}
+
+void ActionService::noteVariablesChanged()
+{
+    if (m_variables.changed() || m_viewersChanged)
+        m_saver->changed();
+}
+
+// --- Anfragen ---
+
+void ActionService::handleRequest(const QJsonObject &message, const Reply &reply)
+{
+    dss::ActionsRequest request;
+    QString error;
+    if (!dss::parseActionsRequest(message, &request, &error)) {
+        reply(result(std::max<qint64>(dss::messageRequestId(message), 0), false,
+                     QString::fromLatin1(dss::err::kInvalidMessage), error));
+        return;
+    }
+    const QString &type = request.type;
+    const qint64 id = request.requestId;
+    if (dss::actions::isConfigEditType(type)) {
+        handleEdit(request, reply);
+    } else if (type == QLatin1String(dss::msg::kVariableSet) || type == QLatin1String(dss::msg::kVariableRemove)) {
+        handleVariableEdit(request, reply);
+    } else if (type == QLatin1String(dss::msg::kQuotePut) || type == QLatin1String(dss::msg::kQuoteRemove)) {
+        handleQuoteEdit(request, reply);
+    } else if (type == QLatin1String(dss::msg::kQueueControl)) {
+        handleQueueControl(request, reply);
+    } else if (type == QLatin1String(dss::msg::kActionTest)) {
+        handleTest(request, reply);
+    } else if (type == QLatin1String(dss::msg::kActionRunCancel)) {
+        const QUuid run = *dss::uuidField(request.fields, QStringLiteral("run_id"), false, &error);
+        if (!m_engine->cancel(run, QStringLiteral("abgebrochen")))
+            reply(result(id, false, QString::fromLatin1(dss::err::kUnknownRun), QStringLiteral("Der Lauf läuft nicht (mehr)")));
+        else
+            reply(result(id, true));
+    } else if (type == QLatin1String(dss::msg::kActionRunDetails)) {
+        const QUuid run = *dss::uuidField(request.fields, QStringLiteral("run_id"), false, &error);
+        const std::optional<dss::actions::RunRecord> record = m_engine->record(run);
+        if (!record)
+            reply(result(id, false, QString::fromLatin1(dss::err::kUnknownRun), QStringLiteral("Lauf unbekannt")));
+        else
+            reply(dss::actionRunMessage(id, *record));
+    } else if (type == QLatin1String(dss::msg::kGetActionRuns)) {
+        reply(dss::actionRunsMessage(id, m_engine->history()));
+    } else if (type == QLatin1String(dss::msg::kGetVariables)) {
+        dss::VariablesInfo info{m_variables.data(), m_variables.volatileGlobal(), m_variables.volatileUsers(),
+                                m_variablesError};
+        reply(dss::variablesMessage(id, info));
+    } else if (type == QLatin1String(dss::msg::kGetViewers)) {
+        dss::actions::ViewersData found;
+        for (const QJsonValue &v : request.fields.value(QStringLiteral("user_ids")).toArray()) {
+            const auto it = m_viewers.viewers.constFind(v.toString());
+            if (it != m_viewers.viewers.cend())
+                found.viewers.insert(it.key(), it.value());
+        }
+        reply(dss::viewersMessage(id, found));
+    } else if (type == QLatin1String(dss::msg::kGetQuotes)) {
+        reply(dss::quotesMessage(id, m_quotes));
+    } else if (type == QLatin1String(dss::msg::kTestEvent)) {
+        handleTestEvent(request, reply);
+    }
+}
+
+void ActionService::handleEdit(const dss::ActionsRequest &request, const Reply &reply)
+{
+    if (!m_configError.isEmpty()) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kActionsFileError),
+                     QStringLiteral("Nicht gespeichert, aktionen.json ist ungültig: ") + m_configError));
+        return;
+    }
+    dss::actions::ActionsConfig next = m_config;
+    const dss::actions::ConfigEditResult r = dss::actions::applyConfigEdit(&next, request.type, request.fields);
+    if (!r.ok) {
+        reply(rejected(request.requestId, r.message));
+        return;
+    }
+    QString error;
+    if (!writeConfig(next, &error)) {
+        qCritical("Aktionen: aktionen.json nicht gespeichert: %s", qPrintable(error));
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kSaveFailed),
+                     QStringLiteral("Nicht gespeichert: ") + error));
+        return;
+    }
+    m_config = next;
+    applyConfig();
+    qInfo("Aktionen gespeichert: %s «%s»", qPrintable(request.type), qPrintable(r.name));
+    emit broadcastRequested(configMessage());
+    reply(result(request.requestId, true, {}, {}, r.created));
+    broadcastStatusIfChanged();
+}
+
+void ActionService::handleVariableEdit(const dss::ActionsRequest &request, const Reply &reply)
+{
+    const QJsonObject &f = request.fields;
+    dss::actions::VariableKey key;
+    const QString scope = f.value(QStringLiteral("scope")).toString();
+    if (scope == QLatin1String("user")) {
+        key.scope = dss::actions::VariableScope::User;
+        key.userId = f.value(QStringLiteral("user_id")).toString();
+    } else if (scope != QLatin1String("global")) {
+        reply(rejected(request.requestId, QStringLiteral("scope muss global oder user sein")));
+        return;
+    }
+    key.name = f.value(QStringLiteral("name")).toString();
+    key.persisted = f.value(QStringLiteral("persisted")).toBool();
+    if (key.persisted && !m_variablesError.isEmpty()) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kActionsFileError),
+                     QStringLiteral("Nicht gespeichert, variablen.json ist ungültig: ") + m_variablesError));
+        return;
+    }
+    if (request.type == QLatin1String(dss::msg::kVariableSet)) {
+        const QString error = m_variables.set(key, f.value(QStringLiteral("value")), m_clock.now());
+        if (!error.isEmpty()) {
+            reply(rejected(request.requestId, error));
+            return;
+        }
+    } else if (!m_variables.remove(key)) {
+        reply(rejected(request.requestId, QStringLiteral("Variable «%1» gibt es nicht").arg(key.name)));
+        return;
+    }
+    noteVariablesChanged();
+    reply(result(request.requestId, true));
+}
+
+void ActionService::handleQuoteEdit(const dss::ActionsRequest &request, const Reply &reply)
+{
+    if (!m_quotesError.isEmpty()) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kActionsFileError),
+                     QStringLiteral("Nicht gespeichert, zitate.json ist ungültig: ") + m_quotesError));
+        return;
+    }
+    const qint64 index = qint64(request.fields.value(QStringLiteral("index")).toDouble());
+    dss::actions::QuotesData next = m_quotes;
+    if (request.type == QLatin1String(dss::msg::kQuotePut)) {
+        // index -1 (oder Anzahl) = neues Zitat am Ende, sonst ersetzen
+        if (index < -1 || index > next.quotes.size()) {
+            reply(rejected(request.requestId, QStringLiteral("Kein Zitat mit der Nummer %1").arg(index)));
+            return;
+        }
+        const QJsonObject quote = request.fields.value(QStringLiteral("quote")).toObject();
+        if (index == -1 || index == next.quotes.size())
+            next.quotes.append(quote);
+        else
+            next.quotes[index] = quote;
+    } else {
+        if (index < 0 || index >= next.quotes.size()) {
+            reply(rejected(request.requestId, QStringLiteral("Kein Zitat mit der Nummer %1").arg(index)));
+            return;
+        }
+        next.quotes.removeAt(index);
+    }
+    QString error;
+    // Prüfen wie beim Lesen, dann atomar schreiben
+    dss::actions::QuotesData checked;
+    const QByteArray bytes = dss::actions::serializeQuotes(next);
+    if (!dss::actions::parseQuotes(bytes, &checked, &error)) {
+        reply(rejected(request.requestId, error));
+        return;
+    }
+    if (!writeFile(filePath(dss::actions::kQuotesFileName), bytes, &error)) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kSaveFailed),
+                     QStringLiteral("Nicht gespeichert: ") + error));
+        return;
+    }
+    m_quotes = checked;
+    reply(result(request.requestId, true));
+}
+
+void ActionService::handleQueueControl(const dss::ActionsRequest &request, const Reply &reply)
+{
+    QString error;
+    const QUuid queue = *dss::uuidField(request.fields, QStringLiteral("queue_id"), true, &error);
+    if (!queue.isNull() && !m_config.queue(queue)) {
+        reply(rejected(request.requestId, QStringLiteral("Warteschlange unbekannt")));
+        return;
+    }
+    const QString control = request.fields.value(QStringLiteral("control")).toString();
+    if (control == QLatin1String("pause")) {
+        m_engine->pauseQueue(queue);
+    } else if (control == QLatin1String("resume")) {
+        m_engine->resumeQueue(queue);
+    } else if (control == QLatin1String("clear")) {
+        m_engine->clearQueue(queue);
+    } else {
+        reply(rejected(request.requestId, QStringLiteral("control muss pause, resume oder clear sein")));
+        return;
+    }
+    reply(result(request.requestId, true));
+    broadcastStatusIfChanged();
+}
+
+void ActionService::handleTest(const dss::ActionsRequest &request, const Reply &reply)
+{
+    QString error;
+    const QUuid actionId = *dss::uuidField(request.fields, QStringLiteral("action_id"), false, &error);
+    const bool dryRun = request.fields.value(QStringLiteral("dry_run")).toBool();
+    if (!m_configError.isEmpty()) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kActionsFileError),
+                     QStringLiteral("aktionen.json ist ungültig: ") + m_configError));
+        return;
+    }
+    if (!m_config.action(actionId)) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kUnknownAction),
+                     QStringLiteral("Aktion unbekannt")));
+        return;
+    }
+    // Stumm (Plan 3.4): nach aussen handelt nur die Version im Einsatz; Probeläufe gehen weiter
+    if (m_muted && !dryRun) {
+        reply(rejected(request.requestId, QStringLiteral("stumm: Version im Einsatz läuft, nur Probelauf möglich")));
+        return;
+    }
+    dss::actions::Arguments arguments;
+    const QJsonObject args = request.fields.value(QStringLiteral("arguments")).toObject();
+    for (auto it = args.begin(); it != args.end(); ++it)
+        arguments.insert(it.key(), it.value());
+    const QUuid run = m_engine->enqueue(
+        {actionId, QString::fromLatin1(dss::actions::kTriggerTest), QUuid(), arguments, dryRun});
+    reply(result(request.requestId, true, {}, {}, run));
+}
+
+void ActionService::handleTestEvent(const dss::ActionsRequest &request, const Reply &reply)
+{
+    if (!m_options.testEvents) {
+        reply(result(request.requestId, false, QString::fromLatin1(dss::err::kUnknownType),
+                     QStringLiteral("test_event gibt es nur mit dss-core --testereignisse")));
+        return;
+    }
+    dss::events::Event event;
+    QString error;
+    if (!dss::events::eventFromJson(request.fields.value(QStringLiteral("event")).toObject(), &event, &error)) {
+        reply(rejected(request.requestId, error));
+        return;
+    }
+    if (!m_bus->publish(event)) {
+        reply(rejected(request.requestId, dss::events::EventBus::validate(event)));
+        return;
+    }
+    reply(result(request.requestId, true));
+}
+
+// --- Ereignisse und Läufe ---
+
+void ActionService::onEvent(const dss::events::Event &event)
+{
+    // Zuschauer nachführen (Plan 2.10): nur Login und Anzeigename
+    if (event.type == QLatin1String(dss::actions::kTriggerChatMessage) && m_viewersError.isEmpty()) {
+        if (dss::actions::noteViewer(&m_viewers, event.data.value(QStringLiteral("user_id")).toString(),
+                                     event.data.value(QStringLiteral("user_login")).toString(),
+                                     event.data.value(QStringLiteral("user_name")).toString()))
+            m_viewersChanged = true;
+    }
+    m_dispatcher->setMuted(m_muted);
+    const dss::actions::TriggerEvent trigger{event.type, event.time, event.originId, event.data};
+    // Eigener Kanal und «vom Studio gesendet» kommen mit c1 (TwitchService)
+    const dss::actions::TriggerResult r = m_dispatcher->handleEvent(trigger, {});
+    dss::actions::submit(*m_engine, r);
+    noteVariablesChanged();
+}
+
+void ActionService::publishRun(const char *type, const dss::actions::RunRecord &record)
+{
+    dss::events::Event event;
+    event.type = QString::fromLatin1(type);
+    event.data = dss::runEventData(record);
+    m_bus->publish(event);
+}
+
+void ActionService::onRunStarted(const dss::actions::RunRecord &record)
+{
+    publishRun("actions.run_started", record);
+    broadcastStatusIfChanged();
+}
+
+void ActionService::onRunChanged(const dss::actions::RunRecord &record)
+{
+    publishRun("actions.run_changed", record);
+    broadcastStatusIfChanged();
+}
+
+void ActionService::onRunFinished(const dss::actions::RunRecord &record)
+{
+    publishRun("actions.run_finished", record);
+    // Journal (Plan 3.5): Name der Aktion, Ergebnis, Fehler; keine Chat-Texte, keine Zuschauernamen.
+    // Die Meldungen der Schritte im Lauf (mit eingesetzten Texten) bleiben im Speicher.
+    const QString state = dss::actions::runStateKey(record.state);
+    qInfo("Lauf «%s»%s: %s%s%s", qPrintable(record.actionName), record.dryRun ? " (Probelauf)" : "",
+          qPrintable(state), record.message.isEmpty() ? "" : ", ", qPrintable(record.message));
+    for (const dss::actions::StepLogEntry &e : record.log) {
+        if (e.result != dss::actions::StepLogEntry::Result::Error)
+            continue;
+        qInfo("  Schritt %s (%s): Fehler", qPrintable(pathText(e.path)), qPrintable(e.type));
+    }
+    noteVariablesChanged();
+    broadcastStatusIfChanged();
+}
+
+// --- Stumm-Regel (Plan 3.4) ---
+
+void ActionService::probeInUse()
+{
+    if (m_probe)
+        return;
+    auto *probe = new QLocalSocket(this);
+    m_probe = probe;
+    auto buffer = std::make_shared<QByteArray>();
+    const auto finish = [this, probe](bool running) {
+        if (m_probe != probe)
+            return;
+        m_probe = nullptr;
+        probe->abort();
+        probe->deleteLater();
+        setMuted(running);
+    };
+    connect(probe, &QLocalSocket::errorOccurred, this, [finish] { finish(false); });
+    connect(probe, &QLocalSocket::disconnected, this, [finish] { finish(false); });
+    connect(probe, &QLocalSocket::readyRead, this, [probe, buffer, finish] {
+        buffer->append(probe->readAll());
+        const qsizetype end = buffer->indexOf('\n');
+        if (end < 0)
+            return;
+        QJsonObject message;
+        QString error;
+        dss::Hello hello;
+        finish(dss::decodeMessage(buffer->left(end), &message, &error)
+               && dss::messageType(message) == QLatin1String(dss::msg::kHello)
+               && dss::parseHello(message, &hello, &error) && hello.program == QLatin1String("dss-core"));
+    });
+    QTimer::singleShot(kProbeTimeoutMs, probe, [finish] { finish(false); });
+    probe->connectToServer(m_options.inUseSocket);
+}
+
+void ActionService::setMuted(bool muted)
+{
+    if (muted == m_muted)
+        return;
+    m_muted = muted;
+    m_dispatcher->setMuted(muted);
+    qInfo(muted ? "Aktionen: stumm, die Version im Einsatz läuft" : "Aktionen: nicht mehr stumm");
+    broadcastStatusIfChanged();
+}

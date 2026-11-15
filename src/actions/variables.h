@@ -106,6 +106,10 @@ public:
     CommandCount countCommand(const QUuid &commandId, const QString &userId, bool persistCounter,
                               bool persistUserCounter, const QDateTime &now);
 
+    // Flüchtige Werte (b3: Abfrage variables des Fensters)
+    const QMap<QString, QJsonValue> &volatileGlobal() const { return m_volatileGlobal; }
+    const QMap<QString, QMap<QString, QJsonValue>> &volatileUsers() const { return m_volatileUsers; }
+
     bool changed() const { return m_changed; }
     void clearChanged() { m_changed = false; }
 

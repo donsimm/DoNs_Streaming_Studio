@@ -162,6 +162,21 @@ inline constexpr EventField kObsSceneChanged[] = {
     {"scene_name", "sceneName"},
 };
 
+// P14 b3: Läufe der Aktionen (Plan 3.5), Herkunft «actions», kein Auslöser. Ohne Chat-Texte und
+// ohne Zuschauernamen; Einzelheiten holt das Fenster mit action_run_details. Eigene Namen.
+inline constexpr EventField kActionRun[] = {
+    {"run_id", "runId"},
+    {"action_id", "actionId"},
+    {"action_name", "actionName"},
+    {"trigger_type", "triggerType"},
+    {"queue_name", "queueName"},
+    {"dry_run", "isDryRun"},
+    {"state", "runState"},        // waiting, running, ok, break, error, rejected, muted, dropped, limit, cancelled
+    {"message", "runMessage"},    // Grund bei rejected, muted, dropped, limit, cancelled
+    {"step_index", "stepIndex"},  // «Schritt x von y», 0 = noch keiner
+    {"step_count", "stepCount"},
+};
+
 #undef DSS_EVENT_CHAT_FIELDS
 #undef DSS_EVENT_TIER_FIELDS
 #undef DSS_EVENT_USER_FIELDS
@@ -183,7 +198,15 @@ inline constexpr EventType kEventTypes[] = {
     {"twitch.stream_online", "twitch", true, detail::kStreamOnline},
     {"twitch.stream_offline", "twitch", true, detail::kStreamOffline},
     {"obs.scene_changed", "obs", false, detail::kObsSceneChanged},
+    {"actions.run_started", "actions", false, detail::kActionRun},
+    {"actions.run_changed", "actions", false, detail::kActionRun},
+    {"actions.run_finished", "actions", false, detail::kActionRun},
 };
+
+// P14 b3: Ereignisse der Herkunft «actions» bleiben nicht im Verlauf des Flusses (ein Lauf mit
+// vielen Schritten würde sonst die Ereignisse von Twitch verdrängen); die letzten 200 Läufe hält
+// der Kern selbst (get_action_runs).
+bool keepsHistory(const QString &type);
 
 // nullptr, wenn der Typ nicht in der Liste steht.
 const EventType *findEventType(const QString &type);

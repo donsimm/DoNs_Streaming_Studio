@@ -1,5 +1,6 @@
 #include "coresession.h"
 
+#include "actionprotocol.h"
 #include "coreclient.h"
 #include "version.h"
 
@@ -125,6 +126,20 @@ std::optional<QJsonObject> CoreSession::nextEventMessage(QString *error)
 {
     return waitForAny({QString::fromLatin1(msg::kEvent), QString::fromLatin1(msg::kEventsDropped)}, error,
                       -1, -1);
+}
+
+std::optional<QJsonObject> CoreSession::actionsRequest(const QString &type, const QJsonObject &fields,
+                                                       const QString &replyType, QString *error)
+{
+    const qint64 id = m_nextRequestId++;
+    if (!send(actionsRequestMessage({id, type, fields}), error))
+        return std::nullopt;
+    return waitForAny({replyType, QString::fromLatin1(msg::kChangeResult)}, error, id, m_timeoutMs);
+}
+
+std::optional<QJsonObject> CoreSession::waitForMessage(const QString &type, QString *error)
+{
+    return waitFor(type, error);
 }
 
 std::optional<QJsonObject> CoreSession::waitFor(const QString &type, QString *error, qint64 requestId)

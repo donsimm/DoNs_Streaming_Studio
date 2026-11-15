@@ -19,6 +19,12 @@ QStringList eventTypeNames()
     return names;
 }
 
+bool keepsHistory(const QString &type)
+{
+    const EventType *entry = findEventType(type);
+    return !entry || QLatin1String(entry->origin) != QLatin1String("actions");
+}
+
 bool matchesFilter(const QString &type, const QString &filter)
 {
     if (filter.endsWith(QLatin1Char('.')))

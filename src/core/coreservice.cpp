@@ -1,5 +1,7 @@
 #include "coreservice.h"
 
+#include "actionprotocol.h"
+#include "actionservice.h"
 #include "browsersource.h"
 #include "eventtypes.h"
 #include "obsconnection.h"
@@ -178,9 +180,33 @@ int CoreService::stopImports()
 
 bool CoreService::savePending(QString *error)
 {
+    // P14 b3: Variablen und Zuschauer des Aktionssystems
+    if (m_actions && !m_actions->savePending(error))
+        return false;
     if (!m_store->hasPendingWrites())
         return true;
     return m_store->flushPendingWrites(error);
+}
+
+void CoreService::setActionService(ActionService *actions)
+{
+    m_actions = actions;
+    connect(actions, &ActionService::broadcastRequested, this, &CoreService::broadcast);
+}
+
+void CoreService::handleActionsRequest(QLocalSocket *socket, const QJsonObject &message)
+{
+    if (!m_actions) {
+        send(socket, dss::changeResultMessage({std::max<qint64>(dss::messageRequestId(message), 0), false, QUuid(),
+                                               QString::fromLatin1(dss::err::kActionsUnavailable),
+                                               QStringLiteral("Aktionssystem nicht gebaut (DSS_CORE_ACTIONS aus)")}));
+        return;
+    }
+    QPointer<QLocalSocket> target(socket);
+    m_actions->handleRequest(message, [this, target](const QJsonObject &reply) {
+        if (target)
+            send(target, reply);
+    });
 }
 
 void CoreService::onSaveRequested()
@@ -261,6 +287,8 @@ void CoreService::reload()
 #endif
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
           static_cast<long long>(m_store->overlays().size()), changed, removed);
+    if (m_actions)
+        m_actions->load(); // P14 b3: aktionen.json und die Dateien der Zuschauer
     // Schriftdateien im Datenordner können sich geändert haben.
     if (m_fontsLoaded) {
         m_fontsLoaded = false;
@@ -367,6 +395,14 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, obsStatusMessage());
         send(socket, obsSourcesMessage());
         send(socket, audioOutputsMessage());
+        // P14 b3: Aktionssystem (actions_config, actions_status)
+        if (m_actions) {
+            for (const QJsonObject &m : m_actions->helloMessages())
+                send(socket, m);
+        } else {
+            send(socket, dss::actionsStatusMessage({QStringLiteral("unavailable"),
+                                                    QStringLiteral("Aktionssystem nicht gebaut"), 0, {}, {}}));
+        }
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -401,6 +437,8 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         updateBrowserSources();
     } else if (type == QLatin1String(dss::msg::kSubscribeEvents)) {
         handleSubscribeEvents(socket, client, message);
+    } else if (dss::isActionsRequestType(type)) {
+        handleActionsRequest(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetMediaList)) {

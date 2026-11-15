@@ -106,6 +106,14 @@ target_compile_definitions(tst_aktionsablauf PRIVATE
 # erfundenen Ereignissen nach Plan P13 1.3, Uhr aus aktionsuhr.h.
 dss_add_test(tst_ausloeser)
 target_link_libraries(tst_ausloeser PRIVATE dss_actions)
+# P14 b3: Aktionssystem im Kern (dss-core und dss-cli als eigene Prozesse, Ereignisse über
+# test_event mit dss-core --testereignisse, zweiter Kern als «Version im Einsatz»).
+if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
+  dss_add_test(tst_kernaktionen)
+  target_compile_definitions(tst_kernaktionen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
+  add_dependencies(tst_kernaktionen dss-core dss-cli)
+endif()
 # P14 e1: Ansichtslogik des Editors im Reiter «Chat-Bot» (Listen, Auswahl, Filter, Bearbeiten über
 # Änderungsbefehle, Prüfmeldungen) mit tests/daten/aktionen/vollstaendig.json, ohne Qt Gui.
 dss_add_test(tst_aktionsansicht)

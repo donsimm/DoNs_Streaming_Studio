@@ -40,6 +40,10 @@ option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P
 # P12b b3: Ton der Videos über PipeWire im Kern (libpipewire-0.3, Thread von PipeWire im Dienst).
 # Aus: Kern ohne Ton und ohne libpipewire (Stand P11).
 option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
+# P14 b3: Aktionssystem im Kern (Chat-Bot: Läufe aus Ereignissen, Befehlen, Zeitnachrichten).
+# Schalter, weil der Bot selbständig öffentlich handelt (Plan 5). Aus: Kern ohne ActionService,
+# actions_status «unavailable», Anfragen des Aktionssystems werden abgewiesen.
+option(DSS_CORE_ACTIONS "Aktionssystem (Chat-Bot) im Kern (P14 b3)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html

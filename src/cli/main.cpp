@@ -5,6 +5,7 @@
 // Befehle lesen dann nur (nichts wird geschrieben); Änderungs-Befehle nehmen die Sperre im
 // Datenordner und brechen ab, wenn sie belegt ist.
 
+#include "actionprotocol.h"
 #include "browsersource.h"
 #include "configpaths.h"
 #include "coresession.h"
@@ -18,10 +19,12 @@
 #include "version.h"
 
 #include <QCoreApplication>
+#include <QDeadlineTimer>
 #include <QFile>
 #include <QJsonDocument>
 #include <QRegularExpression>
 #include <QTextStream>
+#include <QThread>
 
 #include <functional>
 
@@ -46,6 +49,20 @@ const QList<std::pair<QString, int>> kMediaCommands = {
     {QStringLiteral("medium-loeschen"), 1},         {QStringLiteral("medien-ordner-anlegen"), 1},
     {QStringLiteral("medien-ordner-umbenennen"), 2}, {QStringLiteral("medien-ordner-verschieben"), 2},
     {QStringLiteral("medien-ordner-loeschen"), 1}};
+
+// Befehle des Aktionssystems (P14 b3): gehen an den laufenden Kern. Name → Anzahl Argumente
+// (-1 = mindestens eines).
+const QList<std::pair<QString, int>> kActionCommands = {
+    {QStringLiteral("aktionen"), 0},       {QStringLiteral("aktion-setzen"), 1},
+    {QStringLiteral("aktion-loeschen"), 1}, {QStringLiteral("aktion-test"), -1},
+    {QStringLiteral("laeufe"), 0},         {QStringLiteral("warteschlange"), 2},
+    {QStringLiteral("variablen"), 0}};
+
+bool isActionCommand(const QString &command)
+{
+    return std::any_of(kActionCommands.begin(), kActionCommands.end(),
+                       [&command](const auto &c) { return c.first == command; });
+}
 
 bool isMediaCommand(const QString &command)
 {
@@ -93,6 +110,13 @@ const char *const kUsageTemplate =
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
     "  ereignisse [--folgen] [--typ FILTER]\n"
+    "  aktionen\n"
+    "  aktion-setzen DATEI.json\n"
+    "  aktion-loeschen AKTION\n"
+    "  aktion-test AKTION [--echt] [ARG=WERT ...]\n"
+    "  laeufe [--folgen]\n"
+    "  warteschlange NAME anhalten|fortsetzen|leeren\n"
+    "  variablen [--zaehlen]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -123,10 +147,18 @@ const char *const kUsageTemplate =
     "JSON-Zeile je Ereignis. --folgen: danach neue Ereignisse, bis der Kern trennt (Ctrl+C beendet).\n"
     "--typ: genauer Typ wie twitch.chat_message oder Vorsilbe mit Punkt wie twitch.; mehrmals\n"
     "möglich; ohne: alle Typen. Verworfene Ereignisse (Ausgabe zu langsam) meldet dss-cli auf stderr.\n"
+    "Aktionssystem (P14, über den laufenden Kern; nur er schreibt aktionen.json):\n"
+    "aktionen: Hauptschalter, Zustand und alle Aktionen. aktion-setzen: Aktion aus einer JSON-Datei\n"
+    "(Aufbau wie ein Eintrag in actions von aktionen.json) anlegen oder ersetzen. AKTION: Kennung oder\n"
+    "Name (eindeutig). aktion-test: Probelauf (Twitch und OBS nur gemeldet), --echt wie ein echter\n"
+    "Auslöser; ARG=WERT setzt Argumente wie user=Testname; zeigt danach die Schritte des Laufs.\n"
+    "laeufe: letzte 200 Läufe (nur im Speicher); --folgen: danach neue, bis der Kern trennt.\n"
+    "warteschlange: NAME «Standard» oder Name aus aktionen.json. variablen: Variablen für alle und je\n"
+    "Zuschauer (Twitch-ID); --zaehlen: nur Anzahl Werte je Name.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
     "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern,\n"
-    "ereignisse).\n";
+    "ereignisse, Aktionssystem).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -144,8 +176,10 @@ struct Arguments
     bool flipHorizontal = false; // P09b
     bool flipVertical = false;   // P09b
     bool yes = false;            // P10: neuer-token ohne Rückfrage
-    bool follow = false;         // P13: ereignisse --folgen
+    bool follow = false;         // P13: ereignisse --folgen; P14 b3: laeufe --folgen
     QStringList eventTypes;      // P13: ereignisse --typ (mehrmals möglich)
+    bool real = false;           // P14 b3: aktion-test --echt
+    bool count = false;          // P14 b3: variablen --zaehlen
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -181,6 +215,10 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->yes = true;
         } else if (a == QLatin1String("--folgen")) {
             result->follow = true;
+        } else if (a == QLatin1String("--echt")) {
+            result->real = true;
+        } else if (a == QLatin1String("--zaehlen")) {
+            result->count = true;
         } else if (a == QLatin1String("--typ")) {
             if (i + 1 >= args.size()) {
                 *error = QStringLiteral("--typ braucht einen Filter.");
@@ -908,6 +946,296 @@ int runEvents(const Arguments &args)
     }
 }
 
+// --- Aktionssystem (P14 b3) ---
+
+QString runLine(const dss::actions::RunRecord &r)
+{
+    const QDateTime when = (r.startedAt.isValid() ? r.startedAt : r.queuedAt).toLocalTime();
+    QString state = dss::actions::runStateKey(r.state);
+    if (r.state == dss::actions::RunState::Running)
+        state += QStringLiteral(" %1 von %2").arg(r.stepIndex).arg(r.stepCount);
+    return QStringLiteral("%1  %2%3  %4  %5%6")
+        .arg(when.toString(QStringLiteral("HH:mm:ss")), r.actionName, r.dryRun ? QStringLiteral(" (Probelauf)") : QString(),
+             r.triggerType, state, r.message.isEmpty() ? QString() : QStringLiteral(": ") + r.message);
+}
+
+int runActions(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const int expected = std::find_if(kActionCommands.begin(), kActionCommands.end(),
+                                      [&command](const auto &c) { return c.first == command; })->second;
+    if ((expected >= 0 && a.size() != expected) || (expected < 0 && a.isEmpty())) {
+        err() << "Fehler: " << QStringLiteral("%1: falsche Anzahl Argumente (%2).").arg(command).arg(a.size())
+              << "\n\n" << usageText();
+        return kExitUsage;
+    }
+    if ((args.real && command != QLatin1String("aktion-test")) || (args.count && command != QLatin1String("variablen"))
+        || (args.follow && command != QLatin1String("laeufe"))) {
+        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen, --folgen für laeufe "
+                 "und ereignisse.\n\n" << usageText();
+        return kExitUsage;
+    }
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Das Aktionssystem läuft im Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    // Nach hello schickt der Kern actions_config und actions_status
+    const std::optional<QJsonObject> configMessage = session.waitForMessage(QString::fromLatin1(dss::msg::kActionsConfig), &error);
+    if (!configMessage)
+        return fail(error);
+    dss::ActionsConfigInfo info;
+    if (!dss::parseActionsConfig(*configMessage, &info, &error))
+        return fail(error);
+    const dss::actions::ActionsConfig config = info.config.value_or(dss::actions::ActionsConfig());
+
+    // Antwort change_result auswerten; true = ok
+    const auto changeOk = [&](const std::optional<QJsonObject> &reply, dss::ChangeResult *r) {
+        if (!reply)
+            return false;
+        if (!dss::parseChangeResult(*reply, r, &error))
+            return false;
+        if (!r->ok)
+            error = r->message;
+        return r->ok;
+    };
+    const auto findAction = [&](const QString &text) -> const dss::actions::Action * {
+        const QUuid id = QUuid::fromString(text);
+        const dss::actions::Action *found = nullptr;
+        for (const dss::actions::Action &action : config.actions) {
+            if ((!id.isNull() && action.id == id) || action.name == text) {
+                if (found) {
+                    error = QStringLiteral("Name «%1» ist nicht eindeutig, Kennung angeben").arg(text);
+                    return nullptr;
+                }
+                found = &action;
+            }
+        }
+        if (!found)
+            error = QStringLiteral("Keine Aktion «%1»").arg(text);
+        return found;
+    };
+    const QString changeResult = QString::fromLatin1(dss::msg::kChangeResult);
+
+    if (command == QLatin1String("aktionen")) {
+        if (!info.fileError.isEmpty())
+            return fail(info.fileError);
+        const std::optional<QJsonObject> statusMessage = session.waitForMessage(QString::fromLatin1(dss::msg::kActionsStatus), &error);
+        dss::ActionsStatus status;
+        if (!statusMessage || !dss::parseActionsStatus(*statusMessage, &status, &error))
+            return fail(error);
+        out() << "Chat-Bot: " << (config.enabled ? "an" : "aus") << " (" << status.message << ")\n";
+        QList<QStringList> rows{{QStringLiteral("Nr"), QStringLiteral("Name"), QStringLiteral("Gruppe"), QStringLiteral("Aktiv"),
+                                 QStringLiteral("Auslöser"), QStringLiteral("Schritte"), QStringLiteral("Kennung")}};
+        int nr = 0;
+        for (const dss::actions::Action &action : config.actions) {
+            int steps = 0;
+            dss::actions::forEachStep(action.steps, [&steps](const dss::actions::Step &, const QList<int> &) { ++steps; });
+            QStringList triggers;
+            for (const dss::actions::Trigger &t : action.triggers)
+                triggers.append(t.type);
+            rows.append({QString::number(++nr), action.name, action.group, yesNo(action.enabled),
+                         triggers.isEmpty() ? QStringLiteral("—") : triggers.join(QStringLiteral(", ")),
+                         QString::number(steps), action.id.toString(QUuid::WithoutBraces)});
+        }
+        printTable(rows);
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-setzen")) {
+        QFile file(a.at(0));
+        if (!file.open(QIODevice::ReadOnly))
+            return fail(QStringLiteral("%1 nicht lesbar (%2)").arg(a.at(0), file.errorString()));
+        QJsonParseError parseError;
+        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (!doc.isObject())
+            return fail(QStringLiteral("%1 ist kein JSON-Objekt (%2)").arg(a.at(0), parseError.errorString()));
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionPut),
+                                             {{QStringLiteral("action"), doc.object()}}, changeResult, &error), &r))
+            return fail(error);
+        out() << dss::savedStatusText(doc.object().value(QStringLiteral("name")).toString()) << '\n';
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-loeschen")) {
+        const dss::actions::Action *action = findAction(a.at(0));
+        if (!action)
+            return fail(error);
+        const QString name = action->name;
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionRemove),
+                                             {{QStringLiteral("action_id"), action->id.toString(QUuid::WithoutBraces)}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        out() << "«" << name << "» gelöscht.\n";
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-test")) {
+        const dss::actions::Action *action = findAction(a.at(0));
+        if (!action)
+            return fail(error);
+        QJsonObject arguments;
+        for (const QString &pair : a.mid(1)) {
+            const qsizetype eq = pair.indexOf(QLatin1Char('='));
+            if (eq <= 0) {
+                err() << "Fehler: Argument «" << pair << "» hat nicht die Form ARG=WERT.\n\n" << usageText();
+                return kExitUsage;
+            }
+            arguments.insert(pair.left(eq), pair.mid(eq + 1));
+        }
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionTest),
+                                             {{QStringLiteral("action_id"), action->id.toString(QUuid::WithoutBraces)},
+                                              {QStringLiteral("arguments"), arguments},
+                                              {QStringLiteral("dry_run"), !args.real}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        // Auf das Ende des Laufs warten (Abfrage alle 100 ms, höchstens bis zur Grenze von 15 min)
+        const QDeadlineTimer deadline(dss::actions::kMaxRunDurationMs + 5000);
+        dss::actions::RunRecord run;
+        for (;;) {
+            const std::optional<QJsonObject> reply = session.actionsRequest(
+                QString::fromLatin1(dss::msg::kActionRunDetails), {{QStringLiteral("run_id"), r.id.toString(QUuid::WithoutBraces)}},
+                QString::fromLatin1(dss::msg::kActionRun), &error);
+            if (!reply)
+                return fail(error);
+            if (dss::messageType(*reply) == changeResult) {
+                dss::ChangeResult missing;
+                changeOk(reply, &missing);
+                return fail(error);
+            }
+            if (!dss::parseActionRun(*reply, &run, &error))
+                return fail(error);
+            if (dss::actions::isFinished(run.state) || deadline.hasExpired())
+                break;
+            QThread::msleep(100);
+        }
+        out() << runLine(run) << '\n';
+        for (const dss::actions::StepLogEntry &e : run.log) {
+            QStringList path;
+            for (int n : e.path)
+                path.append(QString::number(n));
+            out() << "  " << (path.isEmpty() ? QStringLiteral("–") : path.join(QLatin1Char('.'))) << ' '
+                  << (e.type.isEmpty() ? QStringLiteral("Lauf") : e.type) << ": " << dss::actions::stepResultKey(e.result)
+                  << (e.message.isEmpty() ? QString() : QStringLiteral(", ") + e.message) << '\n';
+        }
+        return run.state == dss::actions::RunState::Ok ? kExitOk : kExitError;
+    }
+    if (command == QLatin1String("laeufe")) {
+        if (args.follow && !session.subscribeEvents({QStringLiteral("actions.")}, &error))
+            return fail(error);
+        const std::optional<QJsonObject> reply = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kGetActionRuns), {}, QString::fromLatin1(dss::msg::kActionRuns), &error);
+        QList<dss::actions::RunRecord> runs;
+        if (!reply || !dss::parseActionRuns(*reply, &runs, &error))
+            return fail(error);
+        for (const dss::actions::RunRecord &r : runs)
+            out() << runLine(r) << '\n';
+        out().flush();
+        if (!args.follow)
+            return kExitOk;
+        for (;;) {
+            const std::optional<QJsonObject> message = session.nextEventMessage(&error);
+            if (!message)
+                return fail(error);
+            dss::events::Event event;
+            if (dss::messageType(*message) != QLatin1String(dss::msg::kEvent)
+                || !dss::parseEventMessage(*message, &event, &error)
+                || event.type == QLatin1String("actions.run_changed"))
+                continue;
+            dss::actions::RunRecord r;
+            QJsonObject data = event.data;
+            if (event.type == QLatin1String("actions.run_started"))
+                data.insert(QStringLiteral("queued_at"), event.time.toString(Qt::ISODateWithMs));
+            else
+                data.insert(QStringLiteral("finished_at"), event.time.toString(Qt::ISODateWithMs));
+            if (!dss::runFromJson(data, &r, &error))
+                continue;
+            if (!r.startedAt.isValid())
+                r.startedAt = event.time;
+            out() << runLine(r) << '\n';
+            out().flush();
+        }
+    }
+    if (command == QLatin1String("warteschlange")) {
+        static const QHash<QString, QString> controls{{QStringLiteral("anhalten"), QStringLiteral("pause")},
+                                                      {QStringLiteral("fortsetzen"), QStringLiteral("resume")},
+                                                      {QStringLiteral("leeren"), QStringLiteral("clear")}};
+        if (!controls.contains(a.at(1))) {
+            err() << "Fehler: «" << a.at(1) << "»: anhalten, fortsetzen oder leeren.\n\n" << usageText();
+            return kExitUsage;
+        }
+        QJsonValue queueId = QJsonValue::Null;
+        if (a.at(0) != QLatin1String("Standard")) {
+            const auto q = std::find_if(config.queues.cbegin(), config.queues.cend(),
+                                        [&](const dss::actions::Queue &queue) { return queue.name == a.at(0); });
+            if (q == config.queues.cend())
+                return fail(QStringLiteral("Keine Warteschlange «%1»").arg(a.at(0)));
+            queueId = q->id.toString(QUuid::WithoutBraces);
+        }
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kQueueControl),
+                                             {{QStringLiteral("queue_id"), queueId}, {QStringLiteral("control"), controls.value(a.at(1))}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        out() << "Warteschlange «" << a.at(0) << "»: " << a.at(1) << ".\n";
+        return kExitOk;
+    }
+    // variablen
+    const std::optional<QJsonObject> reply = session.actionsRequest(
+        QString::fromLatin1(dss::msg::kGetVariables), {}, QString::fromLatin1(dss::msg::kVariables), &error);
+    dss::VariablesInfo vars;
+    if (!reply || !dss::parseVariablesMessage(*reply, &vars, &error))
+        return fail(error);
+    if (!vars.fileError.isEmpty())
+        err() << "Fehler in der Datei: " << vars.fileError << '\n';
+    if (args.count) {
+        // Nur Anzahlen je Name (zum Beispiel nach dem Import), ohne Werte und ohne Zuschauer
+        QMap<QString, std::pair<int, int>> counts; // Name → (für alle, je Zuschauer)
+        for (auto it = vars.persisted.global.cbegin(); it != vars.persisted.global.cend(); ++it)
+            ++counts[it.key()].first;
+        for (const dss::actions::VariableMap &user : std::as_const(vars.persisted.users)) {
+            for (auto it = user.cbegin(); it != user.cend(); ++it)
+                ++counts[it.key()].second;
+        }
+        QList<QStringList> rows{{QStringLiteral("Name"), QStringLiteral("Für alle"), QStringLiteral("Zuschauer")}};
+        for (auto it = counts.cbegin(); it != counts.cend(); ++it)
+            rows.append({it.key(), QString::number(it->first), QString::number(it->second)});
+        printTable(rows);
+        out() << vars.persisted.users.size() << " Zuschauer mit dauerhaften Variablen\n";
+        return kExitOk;
+    }
+    QList<QStringList> rows{{QStringLiteral("Für"), QStringLiteral("Name"), QStringLiteral("Wert"), QStringLiteral("Art"),
+                             QStringLiteral("Herkunft")}};
+    for (auto it = vars.persisted.global.cbegin(); it != vars.persisted.global.cend(); ++it)
+        rows.append({QStringLiteral("alle"), it.key(), dss::variableValueText(it->value), QStringLiteral("dauerhaft"),
+                     dss::actions::variableOriginKey(it->origin)});
+    for (auto it = vars.volatileGlobal.cbegin(); it != vars.volatileGlobal.cend(); ++it)
+        rows.append({QStringLiteral("alle"), it.key(), dss::variableValueText(*it), QStringLiteral("flüchtig"), QStringLiteral("—")});
+    for (auto u = vars.persisted.users.cbegin(); u != vars.persisted.users.cend(); ++u) {
+        for (auto it = u->cbegin(); it != u->cend(); ++it)
+            rows.append({u.key(), it.key(), dss::variableValueText(it->value), QStringLiteral("dauerhaft"),
+                         dss::actions::variableOriginKey(it->origin)});
+    }
+    for (auto u = vars.volatileUsers.cbegin(); u != vars.volatileUsers.cend(); ++u) {
+        for (auto it = u->cbegin(); it != u->cend(); ++it)
+            rows.append({u.key(), it.key(), dss::variableValueText(*it), QStringLiteral("flüchtig"), QStringLiteral("—")});
+    }
+    printTable(rows);
+    return kExitOk;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -936,6 +1264,21 @@ int main(int argc, char *argv[])
         return kExitUsage;
     }
 
+    if (isActionCommand(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für das Aktionssystem (es läuft im Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runActions(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
+    if (args.real || args.count) {
+        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen.\n\n" << usageText();
+        return kExitUsage;
+    }
     const bool events = args.positional.first() == QLatin1String("ereignisse");
     if (!events && (args.follow || !args.eventTypes.isEmpty())) {
         err() << "Fehler: --folgen und --typ gelten nur für ereignisse.\n\n" << usageText();

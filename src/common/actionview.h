@@ -28,8 +28,8 @@ namespace dss {
 
 // Nachricht an den Kern ohne request_id. type wie im Plan 5 (action_put, action_remove, action_copy,
 // action_reset, command_put, command_remove, timer_put, timer_remove, variable_set,
-// variable_remove); fields die Felder der Nachricht. Die Nachrichten selbst und ihre Felder legt
-// b3 in protocol.h und docs/08 fest; bis dahin sind die Felder hier ein Vorschlag:
+// variable_remove); fields die Felder der Nachricht. Festgelegt seit b3 in actionprotocol.h und
+// docs/08, «Aktionen» (actionsEditMessage setzt type und request_id dazu):
 // action_put {action}, command_put {command}, timer_put {timer} (Inhalt wie in aktionen.json),
 // *_remove, action_copy, action_reset {action_id | command_id | timer_id},
 // variable_set {scope, user_id, name, persisted, value}, variable_remove {scope, user_id, name, persisted}.

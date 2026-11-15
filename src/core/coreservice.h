@@ -18,6 +18,7 @@
 class QLocalServer;
 class QLocalSocket;
 class QTimer;
+class ActionService;
 
 namespace dss {
 class AudioOutput;
@@ -75,6 +76,11 @@ public:
     // sie danach auf dem Stand. Ohne Aufruf: OBS bleibt «off».
     void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
                           dss::obs::ObsSources *sources);
+
+    // Aktionssystem (P14 b3, Schalter DSS_CORE_ACTIONS): Anfragen der Fenster gehen an actions,
+    // seine Meldungen an alle Fenster. Ohne Aufruf: actions_status «unavailable», Anfragen werden
+    // mit actions_unavailable beantwortet.
+    void setActionService(ActionService *actions);
 
 #if DSS_CORE_AUDIO
     // Ton der Videos (P12b b3, Schalter DSS_CORE_AUDIO): Ausgang und Versatz aus den Einstellungen
@@ -254,4 +260,7 @@ private:
     dss::events::EventBus *m_events = nullptr;
     dss::events::Subscription m_windowEvents;
     QUuid m_lastDeliveredEvent;
+    // P14 b3: Aktionssystem; lebt in main.cpp kürzer als dieser Dienst
+    QPointer<ActionService> m_actions;
+    void handleActionsRequest(QLocalSocket *socket, const QJsonObject &message);
 };
