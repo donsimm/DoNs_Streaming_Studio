@@ -1,0 +1,17 @@
+[
+  {
+    "_id": "6540e0000000000000000001",
+    "cumulativeMonths": 2,
+    "gifterUserId": "100000004",
+    "gifterUserLogin": "testzuschauer4",
+    "gifterUserName": "TestZuschauer4",
+    "isGift": true,
+    "multiMonth": 1,
+    "resub": false,
+    "subscribedAt": "2026-10-01T18:00:00.0000000Z",
+    "tier": "1000",
+    "userId": "100000003",
+    "userLogin": "testzuschauer3",
+    "userName": "TestZuschauer3"
+  }
+]

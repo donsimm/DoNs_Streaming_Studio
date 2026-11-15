@@ -97,6 +97,12 @@ dss_add_test(tst_platzhalter)
 target_link_libraries(tst_platzhalter PRIVATE dss_actions)
 dss_add_test(tst_variablen)
 target_link_libraries(tst_variablen PRIVATE dss_actions)
+# P14 z1a: Import der Zuschauer-Daten aus Streamer.bot (Zuordnung, Probelauf, Sicherung) mit
+# erfundenen Exportdaten tests/daten/streamerbot-export/, ohne Qt Gui und ohne Kern.
+dss_add_test(tst_zuschauerimport)
+target_link_libraries(tst_zuschauerimport PRIVATE dss_actions)
+target_compile_definitions(tst_zuschauerimport PRIVATE
+  DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).

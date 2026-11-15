@@ -11,6 +11,7 @@ add_library(dss_actions STATIC
   placeholders.h placeholders.cpp
   variables.h variables.cpp
   viewerdata.h viewerdata.cpp
+  viewerimport.h viewerimport.cpp
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_actions PUBLIC Qt6::Core PRIVATE dss_warnings)
