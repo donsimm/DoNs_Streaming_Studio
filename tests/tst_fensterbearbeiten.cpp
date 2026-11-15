@@ -181,8 +181,9 @@ bool dragWithMouse(QWidget *from, QPoint fromPos, QWidget *to, QPoint toPos)
 
 void clickButton(QWidget *dialog, const QString &text)
 {
+    // Nur sichtbare Knöpfe: Der Bereich «Twitch» hat seit P13 einen versteckten «Abbrechen» je Konto.
     for (QPushButton *b : dialog->findChildren<QPushButton *>()) {
-        if (b->text() == text) {
+        if (b->text() == text && b->isVisible()) {
             b->click();
             return;
         }
@@ -2066,7 +2067,8 @@ private slots:
             if (b->text() == QStringLiteral("TW"))
                 twitchButton = b;
         QVERIFY(twitchButton);
-        QVERIFY(twitchButton->toolTip().startsWith(QStringLiteral("Twitch: ")));
+        // Tooltip: Zustand des Kanals (connectionStateText, z. B. «Twitch ist aus.»), danach ein Problem des Bots
+        QVERIFY2(twitchButton->toolTip().startsWith(QStringLiteral("Twitch")), qPrintable(twitchButton->toolTip()));
         QTest::mouseClick(twitchButton, Qt::LeftButton);
         QDialog *dialog = nullptr;
         QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
