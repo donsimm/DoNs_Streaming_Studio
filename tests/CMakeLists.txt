@@ -89,6 +89,11 @@ dss_add_test(tst_aktionsformat)
 target_link_libraries(tst_aktionsformat PRIVATE dss_actions)
 target_compile_definitions(tst_aktionsformat PRIVATE
   DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
+# P14 a: Platzhalter wie Streamer.bot, Variablen und Zähler (variablen.json), ohne Qt Gui.
+dss_add_test(tst_platzhalter)
+target_link_libraries(tst_platzhalter PRIVATE dss_actions)
+dss_add_test(tst_variablen)
+target_link_libraries(tst_variablen PRIVATE dss_actions)
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).

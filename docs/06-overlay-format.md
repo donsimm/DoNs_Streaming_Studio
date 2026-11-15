@@ -16,6 +16,7 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
 ├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
 ├── aktionen.json             Aktionen, Befehle, Zeitnachrichten des Chat-Bots (P14), siehe «Aktionen»
+├── variablen.json            dauerhafte Variablen und Zähler der Befehle (P14), siehe «Variablen»
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
@@ -247,6 +248,26 @@ Seit P14 (Abschnitt a). Aktionen mit Auslösern und Schritten, Befehle, Zeitnach
 - **Unbekannte Felder** sind erlaubt und bleiben auf jeder Ebene erhalten (beim Lesen gesammelt, beim Schreiben wieder ausgegeben). Alle übrigen Felder sind Pflicht; ein fehlendes oder ungültiges Feld macht die Datei ungültig, die Meldung nennt es (zum Beispiel `actions[0].steps[2].text`).
 - **Verweise** (Warteschlange, Befehl und Zeitnachricht eines Auslösers, Ziel von `run_action`, Benutzergruppen, Overlay und Elemente, Mediendateien) machen die Datei nicht ungültig. Ein fehlender Verweis ist eine Warnung (`src/actions/actionrefs.h`), ebenso doppelte Befehle unter den aktiven und gespeicherte, aber nicht ausgeführte Werte (`mode` `regex`, Vergleich `regex`).
 - Geschrieben wird eingerückt mit Feldern in alphabetischer Reihenfolge. Keine Zugangsdaten und keine Daten von Zuschauern ausser Twitch-Benutzer-IDs in `groups` und `permissions.users`.
+- **Platzhalter** in Textfeldern (`src/actions/placeholders.h`): `%name%` setzt ein Argument des Laufs ein, `~name~` eine dauerhafte globale Variable; Namen aus `A`–`Z`, `a`–`z`, Ziffern und `_`, Gross- und Kleinschreibung zählt. Unbekannte bleiben wörtlich stehen, eingesetzte Werte werden nicht nochmals durchsucht.
+
+## Variablen (`variablen.json`)
+
+Seit P14 (Abschnitt a). Dauerhafte Variablen und Zähler der Befehle (Plan P14, Abschnitt 2.9); flüchtige stehen nur im Speicher. Massgebend ist `src/actions/variables.h/.cpp`. **Datenschutz:** Die Datei enthält Daten von Zuschauern; sie liegt nur im Datenordner, nie im Repo, im Protokoll, in Berichten oder Tests (Tests nutzen erfundene Werte).
+
+```
+{
+  "format_version": 1,
+  "global": { "<Name>": <Wert> },
+  "users": { "<Twitch-ID>": { "<Name>": <Wert> } },
+  "command_counters": { "<UUID des Befehls>": { "counter": <Wert> oder null, "user_counter": { "<Twitch-ID>": <Wert> } } }
+}
+<Wert> = { "value": Text oder Zahl, "origin": "studio" oder "streamerbot", "changed_at": "2026-11-15T12:00:00.000Z" }
+```
+
+- Je Zuschauer über die Twitch-Benutzer-ID, nie über den Namen. Namen der Variablen sind frei; Namen aus Streamer.bot bleiben beim Import unverändert.
+- `origin` und `changed_at` (UTC, ISO 8601 mit Millisekunden) je Wert: Jede Änderung im Studio setzt `studio` und den Zeitpunkt; so erkennt ein erneuter Import, was seither geändert wurde.
+- Zähler der Befehle sind ganze Zahlen ab 0. Erhöhen einer fehlenden Variable beginnt bei 0; ein Text, der ganz eine Zahl ist, zählt als Zahl.
+- Streng gelesen wie `liste.json`: unbekannte oder fehlende Felder machen die Datei ungültig (die Datei gehört nur dem Kern).
 
 ## Versionen
 
