@@ -327,6 +327,12 @@ add_test(NAME tst_twitchprotokoll COMMAND tst_twitchprotokoll)
 qt_add_executable(tst_twitchanmeldung tst_twitchanmeldung.cpp twitchtestserver.h)
 target_link_libraries(tst_twitchanmeldung PRIVATE dss_twitch dss_warnings Qt6::Test)
 add_test(NAME tst_twitchanmeldung COMMAND tst_twitchanmeldung)
+# P13: Verbindung zu EventSub (Abos, Keepalive, session_reconnect, Close-Codes, revocation, doppelte
+# Nachrichten, Wartezeiten, Stream-Zustand beim Start) gegen den WebSocket-Teil des Testservers.
+qt_add_executable(tst_twitchverbindung tst_twitchverbindung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchverbindung PRIVATE dss_twitch dss_warnings Qt6::Test)
+target_compile_definitions(tst_twitchverbindung PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+add_test(NAME tst_twitchverbindung COMMAND tst_twitchverbindung)
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
