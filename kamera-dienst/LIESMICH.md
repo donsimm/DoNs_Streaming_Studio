@@ -31,6 +31,12 @@ Prüfen: `curl http://127.0.0.1:8093/api/v1/status`
 
 `python3 -m dss_camera --attrappe` simuliert eine Tiny 2, eine C922 und zwei Lampen (erfundene Kennungen), ohne ein Gerät anzufassen. Für Tests (`ctest -R '^kd_'`) und Prüfungen ohne Kameras.
 
+Mit `--attrappe --geraeteordner PFAD` sucht der Dienst die Kameras wie echt, aber im Ordner `PFAD` statt in `/dev` und `/sys` (Aufbau in `dss_camera/fake.py`). Ein- und Ausstecken: Verweis in `PFAD/dev/v4l/by-id` anlegen oder löschen.
+
+## Kameras
+
+Der Dienst sucht die Kameras jede Sekunde in `/dev/v4l/by-id` (Meta-Knoten zählen nicht). Kennung: `<vid>:<pid>:<seriennummer>` des USB-Geräts, ohne Seriennummer `<vid>:<pid>`. Eine ausgesteckte Kamera bleibt in `status` mit `present: false` und `state: "absent"`. Nach dem Einstecken wartet der Dienst 3 s, bevor er Werte schreibt.
+
 ## Installation
 
 Folgt mit Abschnitt c (`installieren.sh`, `system-einrichten.sh`).
