@@ -76,7 +76,7 @@ void ActionRun::start()
     m_args.insert(QStringLiteral("actionId"), uuidText(m_action.id));
     m_args.insert(QStringLiteral("runId"), uuidText(m_record.runId));
     m_args.insert(QStringLiteral("triggerType"), m_record.triggerType);
-    m_args.insert(QStringLiteral("date"), local.toString(QStringLiteral("yyyy-MM-dd")));
+    m_args.insert(QStringLiteral("date"), local.toString(QStringLiteral("dd.MM.yyyy")));
     m_args.insert(QStringLiteral("time"), local.toString(QStringLiteral("HH:mm:ss")));
     m_args.insert(QStringLiteral("unixtime"), double(now.toSecsSinceEpoch()));
 

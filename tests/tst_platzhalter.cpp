@@ -65,7 +65,7 @@ private slots:
         QTest::newRow("leerer Name") << QStringLiteral("%%") << QStringLiteral("%%");
         QTest::newRow("Leerzeichen im Namen") << QStringLiteral("%us er%") << QStringLiteral("%us er%");
         QTest::newRow("Format nicht in P14") << QStringLiteral("%user:upper%") << QStringLiteral("%user:upper%");
-        QTest::newRow("Gross/klein zählt") << QStringLiteral("%User%") << QStringLiteral("%User%");
+        QTest::newRow("Gross/klein egal") << QStringLiteral("%User% %USER%") << QStringLiteral("Testzuschauer Testzuschauer");
         QTest::newRow("Umlaut kein Name") << QStringLiteral("%grüsse%") << QStringLiteral("%grüsse%");
         QTest::newRow("keine zweite Runde") << QStringLiteral("Eingabe: %input0%") << QStringLiteral("Eingabe: %user% ~zaehler~");
         QTest::newRow("global") << QStringLiteral("~gruss~ %user%, Zähler ~zaehler~") << QStringLiteral("Hallo Testzuschauer, Zähler 7");

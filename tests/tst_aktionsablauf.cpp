@@ -193,7 +193,7 @@ private slots:
         const QUuid a = env.add(act(QStringLiteral("Hallo"),
                                     {mk(kStepComment, {{"text", "nur Notiz"}}),
                                      mk(kStepSetArgument, {{"name", "zahl"}, {"value", "41"}, {"auto_type", true}}),
-                                     chat(QStringLiteral("%user% bei %broadcastUser% in %actionName%, %zahl% %unbekannt%")),
+                                     chat(QStringLiteral("%user% bei %BroadcastUser% in %actionname%, %zahl% %unbekannt%")),
                                      chat(QStringLiteral("%triggerType% %isLive% %date% %unixtime%"))}));
         const QUuid run = env.run(a, {{QStringLiteral("user"), QStringLiteral("Testzuschauer")}});
         const RunRecord r = env.rec(run);
@@ -203,7 +203,7 @@ private slots:
         const QDateTime start = env.clock.now();
         QCOMPARE(env.services.chatTexts().value(1),
                  QStringLiteral("test True %1 %2")
-                     .arg(start.toLocalTime().toString(QStringLiteral("yyyy-MM-dd")))
+                     .arg(start.toLocalTime().toString(QStringLiteral("dd.MM.yyyy")))
                      .arg(start.toSecsSinceEpoch()));
         QCOMPARE(r.stepCount, 4);
         QCOMPARE(r.stepIndex, 4);
