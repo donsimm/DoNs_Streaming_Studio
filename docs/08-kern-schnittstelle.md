@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-14 (P12b). Version der Schnittstelle: **13**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
+Stand: 2026-11-15 (P13, Ereignisfluss). Version der Schnittstelle: **14** (vorläufig, Nummer vergibt Lotse beim Zusammenführen paralleler Spuren). Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp`, Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 14 (P13)
+
+Neu ist der Ereignisfluss des Kerns (Punkt 92, Abschnitt «Ereignisfluss»): `subscribe_events`, `event_history`, `event` und `events_dropped`. Ereignisse gehen nur an Verbindungen, die sie bestellt haben; ein Fenster der Version 13 bestellt nicht und bekommt nichts. Ein Kern der Version 13 würde `subscribe_events` mit `unknown_type` beantworten. Darum stieg die Version.
 
 ### Version 13 (P12b b5)
 
@@ -130,7 +134,7 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 13 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 13».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 14 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 14».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
@@ -166,7 +170,7 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":13,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":14,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -459,7 +463,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `13`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `14`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -471,10 +475,11 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 | `get_browser_source` | `overlay_id` (Text oder `null` = keine Adresse mehr schicken; seit Version 7) | `browser_source` an diese Verbindung, danach bei jeder Änderung von selbst |
 | `obs_create_source` | `request_id`, `overlay_id`, `scene_uuid`, `name` (seit Version 11) | legt eine Browserquelle in OBS an und fügt sie in die Szene ein: `obs_sources` an alle, dann `change_result`. Die Antwort kommt später, OBS antwortet über das Netz |
 | `obs_add_to_scene` | `request_id`, `overlay_id`, `scene_uuid` (seit Version 11) | fügt die vorhandene Quelle in eine weitere Szene ein, dann `change_result` |
+| `subscribe_events` | `types` (Liste von Filtern, leer = abbestellen), `history` (true/false) (seit Version 14, Abschnitt «Ereignisfluss») | bei `history` `event_history` an diese Verbindung, danach `event` für jedes neue passende Ereignis; ungültiger Filter: `error` `invalid_message`, die bisherige Bestellung bleibt |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":13,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":14,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -482,7 +487,37 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 {"type":"get_settings"}
 {"type":"get_media_list"}
 {"type":"get_browser_source","overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618"}
+{"history":true,"type":"subscribe_events","types":["twitch.","obs.scene_changed"]}
 ```
+
+## Ereignisfluss (P13, seit Version 14)
+
+Der Kern hat einen Ereignisfluss (`src/events/`, Regel 14): Module veröffentlichen dort, was geschehen ist (`twitch.chat_message`, `obs.scene_changed`, …), und abonnieren, was sie brauchen. Über den Fluss laufen nur Ereignisse, keine Befehle. Jeder Typ steht mit seinen Pflichtfeldern und den Namen der Argumente für das Aktionssystem in `src/events/eventtypes.h`; der Kern weist ein Ereignis ab, das nicht dazu passt (unbekannter Typ, falsche Herkunft, fehlendes oder zusätzliches Feld), und schreibt eine Warnung mit Typ und Grund ins Protokoll, nie den Inhalt. Der Verlauf hält die letzten 200 Ereignisse, nur im Speicher.
+
+Ein Ereignis in `event` und `event_history`:
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `id` | Text (Kennung) | vom Kern vergeben |
+| `type` | Text | Typ, zum Beispiel `obs.scene_changed` |
+| `origin` | Text | Herkunft: `twitch`, `obs` |
+| `time` | Text | Zeitpunkt in UTC (ISO 8601 mit Millisekunden), laut Herkunft, sonst Empfang |
+| `origin_id` | Text | Kennung bei der Herkunft (Twitch: `message_id`), leer wenn keine |
+| `data` | Objekt | Felder je Typ, nie Rohdaten oder Token |
+
+Typen in Version 14: die Typen von Twitch aus `docs/archiv/prompts/P13-twitch.md`, Abschnitt 1.3 (noch ohne Anbindung an Twitch), und `obs.scene_changed` mit `scene_uuid` und `scene_name`. Dieser kommt beim Wechsel der aktuellen Szene in OBS, auch für die erste Szene nach dem Verbinden; ohne Szene (getrennt) kommt nichts. Der Adapter steht in `src/core/obsevents.cpp`, `dss_obs` kennt den Fluss nicht.
+
+**Bestellen:** Ohne `subscribe_events` schickt der Kern einer Verbindung keine Ereignisse. Filter sind genaue Typen oder Vorsilben mit Punkt am Ende (`twitch.`); ein Filter, zu dem es keinen Typ gibt, wird abgewiesen. Eine neue Bestellung ersetzt die alte. Mit `history: true` kommt zuerst `event_history` mit den passenden Ereignissen aus dem Verlauf (älteste zuerst); ein Ereignis aus diesem Verlauf kommt danach nicht noch einmal als `event`.
+
+**Gegendruck:** Liegen bei einer Verbindung mehr als 1 MiB ungesendet (`bytesToWrite`), verwirft der Kern weitere Ereignisse für sie und schreibt «Ereignisse: <Programm> liest nicht …» ins Protokoll. Sobald sie wieder unter 1 MiB ist, schickt er einmal `events_dropped` mit der Anzahl und danach wieder `event`. Ein hängendes Fenster bremst den Kern so nicht. Andere Nachrichten (`overlay_changed`, `stats`, …) verwirft er nicht.
+
+```json
+{"events":[{"data":{"scene_name":"Szene","scene_uuid":"<uuid>"},"id":"3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b","origin":"obs","origin_id":"","time":"2026-11-15T14:03:07.125Z","type":"obs.scene_changed"}],"type":"event_history"}
+{"event":{"data":{"scene_name":"test 2","scene_uuid":"<uuid>"},"id":"6a0f…","origin":"obs","origin_id":"","time":"2026-11-15T14:03:09.500Z","type":"obs.scene_changed"},"type":"event"}
+{"count":17,"type":"events_dropped"}
+```
+
+**Werkzeug:** `dss-cli ereignisse [--folgen] [--typ FILTER]` zeigt den Verlauf als eine JSON-Zeile je Ereignis, mit `--folgen` danach neue Ereignisse, bis der Kern trennt. `--typ` ist mehrmals möglich, ohne gelten alle Typen. Verworfene Ereignisse meldet es auf stderr.
 
 ## Änderungen (P08)
 

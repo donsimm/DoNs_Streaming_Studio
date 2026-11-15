@@ -31,6 +31,11 @@ public:
     // P10b: Medienliste und Änderungen (request.requestId wird hier vergeben).
     std::optional<MediaListData> getMediaList(QString *error);
     std::optional<ChangeResult> change(ChangeRequest request, QString *error);
+    // P13: Ereignisse bestellen (request.history wird gesetzt) und den Verlauf zurückgeben.
+    std::optional<QList<events::Event>> subscribeEvents(const QStringList &filters, QString *error);
+    // P13: nächste Nachricht event oder events_dropped, ohne Zeitgrenze; std::nullopt mit
+    // Meldung, wenn der Kern trennt.
+    std::optional<QJsonObject> nextEventMessage(QString *error);
 
 private:
     bool send(const QJsonObject &message, QString *error);
@@ -38,6 +43,9 @@ private:
     // andere (overlay_list, stats, …) werden übersprungen.
     std::optional<QJsonObject> waitFor(const QString &type, QString *error,
                                        qint64 requestId = -1);
+    // Wie waitFor, für mehrere Typen; timeoutMs < 0 = ohne Grenze.
+    std::optional<QJsonObject> waitForAny(const QStringList &types, QString *error, qint64 requestId,
+                                          int timeoutMs);
 
     int m_timeoutMs;
     QLocalSocket m_socket;

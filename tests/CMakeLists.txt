@@ -340,6 +340,29 @@ qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
 target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
 
+# P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
+qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)
+target_link_libraries(tst_ereignisfluss PRIVATE dss_events dss_warnings Qt6::Test)
+add_test(NAME tst_ereignisfluss COMMAND tst_ereignisfluss)
+
+# P13: Protokoll von EventSub (Nachrichten, Ereignisse, Abos) und «erste Nachricht in diesem
+# Stream», mit den Testnachrichten aus tests/daten/twitch/, ohne Verbindung und ohne Qt Gui.
+qt_add_executable(tst_twitchprotokoll tst_twitchprotokoll.cpp)
+target_link_libraries(tst_twitchprotokoll PRIVATE dss_twitch dss_warnings Qt6::Test)
+target_compile_definitions(tst_twitchprotokoll PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+add_test(NAME tst_twitchprotokoll COMMAND tst_twitchprotokoll)
+# P13: Anmeldung (Gerätefluss, Erneuern, Prüfen, Abmelden, zwei Konten) und Helix gegen den
+# Testserver tests/twitchtestserver.h auf 127.0.0.1, ohne Netz und ohne Qt Gui.
+qt_add_executable(tst_twitchanmeldung tst_twitchanmeldung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchanmeldung PRIVATE dss_twitch dss_warnings Qt6::Test)
+add_test(NAME tst_twitchanmeldung COMMAND tst_twitchanmeldung)
+# P13: Verbindung zu EventSub (Abos, Keepalive, session_reconnect, Close-Codes, revocation, doppelte
+# Nachrichten, Wartezeiten, Stream-Zustand beim Start) gegen den WebSocket-Teil des Testservers.
+qt_add_executable(tst_twitchverbindung tst_twitchverbindung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchverbindung PRIVATE dss_twitch dss_warnings Qt6::Test)
+target_compile_definitions(tst_twitchverbindung PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+add_test(NAME tst_twitchverbindung COMMAND tst_twitchverbindung)
+
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
 if(DSS_BUILD_APP)

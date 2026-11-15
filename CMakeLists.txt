@@ -70,6 +70,7 @@ qt_standard_project_setup()
 add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
+add_subdirectory(src/events) # P13: Ereignisfluss (dss_events)
 add_subdirectory(src/actions) # P14 a: Modell des Aktionssystems, nur Qt Core
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER) OR DSS_CORE_AUDIO)
@@ -79,7 +80,9 @@ endif()
 if(DSS_CORE_OVERLAY_SERVER)
   add_subdirectory(src/server)
 endif()
+add_subdirectory(src/secrets) # P13: Geheimnisse (systemd-creds), für dss_obs und dss_twitch
 add_subdirectory(src/obs)
+add_subdirectory(src/twitch) # P13: Anbindung an Twitch (dss_twitch)
 add_subdirectory(src/core)
 if(DSS_BUILD_CLI)
   add_subdirectory(src/cli)

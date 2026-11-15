@@ -1,5 +1,6 @@
 #pragma once
 
+#include "eventbus.h"
 #include "fontcatalog.h"
 #include "mediaimport.h"
 #include "overlaystore.h"
@@ -60,6 +61,10 @@ public:
 
     int clientCount() const { return int(m_clients.size()); }
 
+    // Ereignisfluss des Kerns (P13, Plan 1.1, Regel 14): Module veröffentlichen und abonnieren hier.
+    // Fenster bekommen Ereignisse nur auf Bestellung (subscribe_events).
+    dss::events::EventBus *eventBus() const { return m_events; }
+
     // Overlay-Server für die Browserquelle (P10, Schalter DSS_CORE_OVERLAY_SERVER): startet ihn
     // mit Port und Adresse aus den Einstellungen und hält ihn danach auf dem Stand (Änderungen,
     // neuer Token, neue Einstellungen). Ohne Aufruf: kein Server (server_status enabled false).
@@ -105,6 +110,11 @@ private:
         // Browserquelle (P10): Overlay aus get_browser_source und zuletzt geschickte Adresse
         QUuid browserSource;
         dss::BrowserSourceInfo browserSourceSent;
+        // P13: bestellte Ereignisse (leer = keine), verworfene seit der letzten Meldung
+        // (Gegendruck) und Ereignisse, die schon im geschickten Verlauf standen.
+        QStringList eventTypes;
+        qint64 droppedEvents = 0;
+        QSet<QUuid> eventsInHistory;
     };
 
     void onNewConnection();
@@ -189,6 +199,11 @@ private:
     // Nach dem Kopieren einer Schriftdatei: Schnitt der neuen Kopie in die Liste aufnehmen und
     // die Liste an alle schicken.
     void addMediaFont(const QString &reference);
+    // P13: Ereignisse an die Fenster (nur auf Bestellung, Gegendruck kEventBacklogBytes)
+    void handleSubscribeEvents(QLocalSocket *socket, Client &client, const QJsonObject &message);
+    void onEvent(const dss::events::Event &event);
+    // Meldet verworfene Ereignisse, sobald die Verbindung wieder liest.
+    void reportDroppedEvents(QLocalSocket *socket);
 
     dss::OverlayStore *m_store;
     QString m_socketPath;
@@ -234,4 +249,9 @@ private:
     QSet<QString> m_canceledCopies;
     // P10b, Punkt 85: leere Adresse im Heimnetz alle 2 s aus der Standardroute
     dss::HomeAddressWatcher *m_addressWatcher = nullptr;
+    // P13: Ereignisfluss; Abo des Kerns für die Fenster; zuletzt an die Fenster verteiltes
+    // Ereignis (Verlauf ohne Doppel, handleSubscribeEvents)
+    dss::events::EventBus *m_events = nullptr;
+    dss::events::Subscription m_windowEvents;
+    QUuid m_lastDeliveredEvent;
 };
