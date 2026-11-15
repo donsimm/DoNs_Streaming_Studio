@@ -14,3 +14,8 @@ target_link_libraries(kamera_ioctl_werte PRIVATE dss_warnings)
 add_test(NAME kd_v4l2
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_v4l2.py $<TARGET_FILE:kamera_ioctl_werte>)
 set_tests_properties(kd_v4l2 PROPERTIES TIMEOUT 120)
+
+# Bildwerte: GET/PUT controls, Reihenfolge Automatik → Wert, gemerkte Werte in kameras.json.
+add_test(NAME kd_werte
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_werte.py)
+set_tests_properties(kd_werte PROPERTIES TIMEOUT 120)

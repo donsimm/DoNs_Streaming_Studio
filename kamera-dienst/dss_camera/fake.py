@@ -18,6 +18,8 @@ Ein- und Ausstecken: Verweis in `by-id` anlegen bzw. löschen.
 import errno
 import json
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
@@ -59,11 +61,7 @@ class FakeBackend(Backend):
         return [dict(preset) for preset in self._light_presets]
 
 
-def probe_fake_device(node: Path) -> DeviceInfo:
-    """Wie `devices.probe_device`, liest aber die JSON-Datei des Knotens.
-
-    `"fehler": "EPROTO"` simuliert einen Knoten, der sich nicht abfragen lässt.
-    """
+def _read_node(node: Path) -> dict:
     try:
         data = json.loads(node.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -71,9 +69,85 @@ def probe_fake_device(node: Path) -> DeviceInfo:
     if "fehler" in data:
         code = getattr(errno, data["fehler"])
         raise OSError(code, os.strerror(code))
-    controls = [v4l2.Control(**{**control, "menu": {int(k): v for k, v in control.get("menu", {}).items()}})
-                for control in data.get("controls", [])]
-    return DeviceInfo(data["card"], data["device_caps"], controls)
+    return data
+
+
+def _controls(data: dict) -> list[v4l2.Control]:
+    return [v4l2.Control(**{**control, "menu": {int(k): v for k, v in control.get("menu", {}).items()}})
+            for control in data.get("controls", [])]
+
+
+def probe_fake_device(node: Path) -> DeviceInfo:
+    """Wie `devices.probe_device`, liest aber die JSON-Datei des Knotens.
+
+    `"fehler": "EPROTO"` simuliert einen Knoten, der sich nicht abfragen lässt.
+    """
+    data = _read_node(node)
+    return DeviceInfo(data["card"], data["device_caps"], _controls(data))
+
+
+# Wert → (Automatik-Schalter, Stellungen, in denen der Wert inaktiv ist), wie uvcvideo.
+_INACTIVE_WHEN = {
+    v4l2.V4L2_CID_EXPOSURE_ABSOLUTE: (v4l2.V4L2_CID_EXPOSURE_AUTO, (0, 2, 3)),
+    v4l2.V4L2_CID_FOCUS_ABSOLUTE: (v4l2.V4L2_CID_FOCUS_AUTO, (1,)),
+    v4l2.V4L2_CID_WHITE_BALANCE_TEMPERATURE: (v4l2.V4L2_CID_AUTO_WHITE_BALANCE, (1,)),
+}
+
+
+class FakeDevice:
+    """Werte eines Attrappen-Knotens wie `controls.V4l2Device` (G_CTRL/S_CTRL).
+
+    Die Werte stehen unter `values` in der Knotendatei, jedes Schreiben zusätzlich
+    unter `protokoll` (für die Prüfung der Reihenfolge). Schreiben auf einen inaktiven
+    Wert scheitert mit `EACCES`; das Gerät rundet auf den Schritt.
+    """
+
+    def __init__(self, node: Path) -> None:
+        self._node = node
+        self._data = _read_node(node)
+        self._controls = {control.id: control for control in _controls(self._data)}
+
+    def _value(self, control_id: int) -> int:
+        return self._data.get("values", {}).get(str(control_id), self._controls[control_id].default)
+
+    def _inactive(self, control_id: int) -> bool:
+        rule = _INACTIVE_WHEN.get(control_id)
+        return rule is not None and rule[0] in self._controls and self._value(rule[0]) in rule[1]
+
+    def controls(self) -> list[v4l2.Control]:
+        result = []
+        for control in self._controls.values():
+            flags = control.flags | (v4l2.V4L2_CTRL_FLAG_INACTIVE if self._inactive(control.id) else 0)
+            result.append(v4l2.Control(**{**asdict(control), "flags": flags}))
+        return result
+
+    def flags(self, control_id: int) -> int:
+        if control_id not in self._controls:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        return next(c.flags for c in self.controls() if c.id == control_id)
+
+    def get(self, control_id: int) -> int:
+        if control_id not in self._controls:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        return self._value(control_id)
+
+    def set(self, control_id: int, value: int) -> None:
+        control = self._controls.get(control_id)
+        if control is None:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        if self._inactive(control_id):
+            raise OSError(errno.EACCES, os.strerror(errno.EACCES))
+        if control.step > 1:
+            value = control.minimum + round((value - control.minimum) / control.step) * control.step
+        value = max(control.minimum, min(control.maximum, value))
+        self._data.setdefault("values", {})[str(control_id)] = value
+        self._data.setdefault("protokoll", []).append([control_id, value])
+        self._node.write_text(json.dumps(self._data), encoding="utf-8")
+
+
+@contextmanager
+def open_fake_device(node: Path) -> Iterator[FakeDevice]:
+    yield FakeDevice(node)
 
 
 def fake_watcher(root: Path, **kwargs) -> DeviceWatcher:
@@ -87,8 +161,12 @@ def control(control_id: int, kind: int, name: str, minimum: int, maximum: int, s
     return v4l2.Control(control_id, kind, name, minimum, maximum, step, default, 0, menu or {})
 
 
-# Erfundene Werte (keine echten Seriennummern). Bereiche nur als Beispiel; die echten
-# Bereiche der C922 bringt a3.
+# Erfundene Kennungen (keine echten Seriennummern). Bereiche aus dem Probelauf am Gerät
+# (2026-11-15): Tiny 2 Pan/Tilt/Zoom; C922 Pan/Tilt digital ±10°, Zoom, Fokus, Netzfrequenz,
+# Belichtung, Weissabgleich. Helligkeit und Belichtungszeit der C922 sind Annahmen.
+_INT = v4l2.V4L2_CTRL_TYPE_INTEGER
+_BOOL = v4l2.V4L2_CTRL_TYPE_BOOLEAN
+_MENU = v4l2.V4L2_CTRL_TYPE_MENU
 TINY2_CONTROLS = [
     control(v4l2.V4L2_CID_PAN_ABSOLUTE, v4l2.V4L2_CTRL_TYPE_INTEGER, "Pan, Absolute",
             -468000, 468000, 3600, 0),
@@ -98,9 +176,20 @@ TINY2_CONTROLS = [
             0, 100, 1, 0),
 ]
 C922_CONTROLS = [
-    control(0x00980900, v4l2.V4L2_CTRL_TYPE_INTEGER, "Brightness", 0, 255, 1, 128),
-    control(0x00980918, v4l2.V4L2_CTRL_TYPE_MENU, "Power Line Frequency", 0, 2, 1, 2,
+    control(v4l2.V4L2_CID_BRIGHTNESS, _INT, "Brightness", 0, 255, 1, 128),
+    control(v4l2.V4L2_CID_AUTO_WHITE_BALANCE, _BOOL, "White Balance, Automatic", 0, 1, 1, 1),
+    control(v4l2.V4L2_CID_POWER_LINE_FREQUENCY, _MENU, "Power Line Frequency", 0, 2, 1, 2,
             {0: "Disabled", 1: "50 Hz", 2: "60 Hz"}),
+    control(v4l2.V4L2_CID_WHITE_BALANCE_TEMPERATURE, _INT, "White Balance Temperature",
+            2000, 6500, 1, 4000),
+    control(v4l2.V4L2_CID_EXPOSURE_AUTO, _MENU, "Auto Exposure", 0, 3, 1, 3,
+            {1: "Manual Mode", 3: "Aperture Priority Mode"}),
+    control(v4l2.V4L2_CID_EXPOSURE_ABSOLUTE, _INT, "Exposure Time, Absolute", 3, 2047, 1, 250),
+    control(v4l2.V4L2_CID_PAN_ABSOLUTE, _INT, "Pan, Absolute", -36000, 36000, 3600, 0),
+    control(v4l2.V4L2_CID_TILT_ABSOLUTE, _INT, "Tilt, Absolute", -36000, 36000, 3600, 0),
+    control(v4l2.V4L2_CID_FOCUS_ABSOLUTE, _INT, "Focus, Absolute", 0, 250, 5, 0),
+    control(v4l2.V4L2_CID_FOCUS_AUTO, _BOOL, "Focus, Automatic Continuous", 0, 1, 1, 1),
+    control(v4l2.V4L2_CID_ZOOM_ABSOLUTE, _INT, "Zoom, Absolute", 100, 500, 1, 100),
 ]
 
 
@@ -141,9 +230,23 @@ class FakeDeviceFolder:
             (folder / name).write_text(value + "\n", encoding="utf-8")
 
     def plug(self, by_id_name: str, node: str) -> None:
+        """Einstecken; die Werte fallen auf den Standard zurück (C922: Netzfrequenz 60 Hz)."""
         link = self.by_id / by_id_name
         if not link.is_symlink():
-            link.symlink_to(os.path.relpath(self.dev / node, self.by_id))
+            path = self.dev / node
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.pop("values", None) is not None:
+                path.write_text(json.dumps(data), encoding="utf-8")
+            link.symlink_to(os.path.relpath(path, self.by_id))
+
+    def values(self, node: str) -> dict[int, int]:
+        """Geschriebene Werte eines Knotens (ohne Standardwerte)."""
+        data = json.loads((self.dev / node).read_text(encoding="utf-8"))
+        return {int(key): value for key, value in data.get("values", {}).items()}
+
+    def write_log(self, node: str) -> list[tuple[int, int]]:
+        data = json.loads((self.dev / node).read_text(encoding="utf-8"))
+        return [tuple(item) for item in data.get("protokoll", [])]
 
     def unplug(self, by_id_name: str) -> None:
         (self.by_id / by_id_name).unlink(missing_ok=True)

@@ -116,6 +116,11 @@ class DeviceWatcher:
         self._failed: set[Path] = set()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Nach jeder Suche aufgerufen (Neusetzen gemerkter Werte, controls.py).
+        self._listeners: list[Callable[[], None]] = []
+
+    def add_listener(self, listener: Callable[[], None]) -> None:
+        self._listeners.append(listener)
 
     def _candidates(self) -> list[tuple[int, Path]]:
         try:
@@ -211,6 +216,8 @@ class DeviceWatcher:
                     camera.node = None
                     camera.appeared_at = None
                     log.info("Kamera fehlt: %s (%s).", camera_id, camera.model)
+        for listener in self._listeners:
+            listener()
 
     def cameras(self) -> list[Camera]:
         with self._lock:

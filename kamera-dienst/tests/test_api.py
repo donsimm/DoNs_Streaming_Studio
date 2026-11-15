@@ -55,6 +55,7 @@ class Service:
         env = dict(os.environ)
         env["XDG_RUNTIME_DIR"] = str(self.runtime)
         env["XDG_CONFIG_HOME"] = str(self.folder / "config")
+        env["XDG_DATA_HOME"] = str(self.folder / "daten")
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         return env
 

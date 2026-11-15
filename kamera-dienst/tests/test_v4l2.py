@@ -100,7 +100,8 @@ class WatcherTest(unittest.TestCase):
             self.assertTrue(camera.present)
             self.assertEqual(camera.state, "awake")
         self.assertTrue(cameras[TINY2_ID].ptz)
-        self.assertFalse(cameras[C922_ID].ptz)
+        # Die C922 hat digitales Pan/Tilt (±10°, Probelauf am Gerät 2026-11-15).
+        self.assertTrue(cameras[C922_ID].ptz)
         # Werte und Bereiche aus der Abfrage, mit Menü.
         controls = {control.name: control for control in cameras[C922_ID].controls}
         self.assertEqual(controls["Power Line Frequency"].menu, {0: "Disabled", 1: "50 Hz", 2: "60 Hz"})

@@ -37,6 +37,10 @@ Mit `--attrappe --geraeteordner PFAD` sucht der Dienst die Kameras wie echt, abe
 
 Der Dienst sucht die Kameras jede Sekunde in `/dev/v4l/by-id` (Meta-Knoten zählen nicht). Kennung: `<vid>:<pid>:<seriennummer>` des USB-Geräts, ohne Seriennummer `<vid>:<pid>`. Eine ausgesteckte Kamera bleibt in `status` mit `present: false` und `state: "absent"`. Nach dem Einstecken wartet der Dienst 3 s, bevor er Werte schreibt.
 
+## Bildwerte
+
+`GET /api/v1/cameras/{cam}/controls` listet alle Werte der Kamera, `PUT` mit `{"<key>": Wert}` setzt sie (zuerst die Automatik-Schalter, dann die Werte) und meldet die zurückgelesenen Werte; `null` setzt den Standard des Geräts. Pan, Tilt und Zoom stehen in der Liste, gesetzt werden sie über Bewegen. Verstellte Werte merkt sich der Dienst in `~/.local/share/dss-kamera/kameras.json` und setzt sie beim Erscheinen der Kamera und beim Start neu. Eine ungültige `kameras.json` wird gemeldet und nicht überschrieben; Änderungen werden dann abgewiesen. In der Attrappe gibt es Bildwerte nur mit `--geraeteordner`.
+
 ## Installation
 
 Folgt mit Abschnitt c (`installieren.sh`, `system-einrichten.sh`).

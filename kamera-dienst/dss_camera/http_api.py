@@ -13,6 +13,7 @@ import re
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import unquote
 
 from . import API_VERSION, SERVICE_VERSION
 from .backend import Backend
@@ -75,11 +76,15 @@ class Router:
 
 
 class Api:
-    def __init__(self, backend: Backend, fake: bool) -> None:
+    def __init__(self, backend: Backend, fake: bool, controls=None) -> None:
         self.backend = backend
         self.fake = fake
+        # controls.ControlManager; fehlt ohne Geräte (Attrappe ohne --geraeteordner).
+        self.controls = controls
         self.router = Router()
         self.router.add("GET", "status", self.get_status)
+        self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
+        self.router.add("PUT", "cameras/{cam}/controls", self.put_controls)
 
     def get_status(self, request: Request) -> dict:
         return {
@@ -91,6 +96,19 @@ class Api:
             "camera_presets": self.backend.camera_presets(),
             "light_presets": self.backend.light_presets(),
         }
+
+    def _control_manager(self):
+        if self.controls is None:
+            raise ApiError(404, "not_found",
+                           "Bildwerte gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
+        return self.controls
+
+    def get_controls(self, request: Request, cam: str) -> dict:
+        return {"controls": self._control_manager().get(cam)}
+
+    def put_controls(self, request: Request, cam: str) -> dict:
+        manager = self._control_manager()
+        return {"controls": manager.put(cam, request.json())}
 
 
 def make_handler(api: Api, allowed_addresses: frozenset[str]):
@@ -126,6 +144,8 @@ def make_handler(api: Api, allowed_addresses: frozenset[str]):
                     func, args = api.router.resolve(method, path[len(API_PREFIX):])
                 if func is None:
                     raise ApiError(404, "not_found", f"Unbekannte Anfrage: {method} {path}")
+                # Kennungen enthalten «:», das Absender auch als %3A schicken.
+                args = {name: unquote(value) for name, value in args.items()}
                 body = func(Request(self, method, path), **args)
                 self._send(200, {"ok": True, **body})
             except ApiError as error:

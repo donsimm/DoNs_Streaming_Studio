@@ -14,9 +14,11 @@ from pathlib import Path
 
 from . import SERVICE_VERSION, config, lock
 from .backend import DeviceBackend
+from .controls import ControlManager, open_v4l2
 from .devices import DeviceWatcher
-from .fake import FakeBackend, fake_watcher
+from .fake import FakeBackend, fake_watcher, open_fake_device
 from .http_api import Api, Servers
+from .store import CameraStore, default_data_dir
 
 EXIT_CONFIG = 1
 EXIT_LOCK = 3
@@ -56,14 +58,21 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_LOCK
 
     devices = None
+    open_device = open_v4l2
     if args.attrappe:
         if args.geraeteordner is not None:
             devices = fake_watcher(args.geraeteordner)
+            open_device = open_fake_device
         backend = FakeBackend(devices)
     else:
         devices = DeviceWatcher()
         backend = DeviceBackend(devices)
-    api = Api(backend, fake=args.attrappe)
+    manager = None
+    if devices is not None:
+        # Gemerkte Werte in $XDG_DATA_HOME/dss-kamera/kameras.json (Plan 3).
+        manager = ControlManager(devices, CameraStore(default_data_dir()), open_device)
+        devices.add_listener(manager.restore_pending)
+    api = Api(backend, fake=args.attrappe, controls=manager)
     try:
         servers = Servers(api, settings.listen_addresses, settings.port, settings.allowed_addresses)
     except OSError as error:
