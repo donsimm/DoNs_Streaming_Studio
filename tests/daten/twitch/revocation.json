@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "message_id": "nachricht-0004",
+    "message_type": "revocation",
+    "message_timestamp": "2026-11-15T20:00:00.000000000Z",
+    "subscription_type": "channel.follow",
+    "subscription_version": "2"
+  },
+  "payload": {
+    "subscription": {
+      "id": "abo-0004",
+      "status": "authorization_revoked",
+      "type": "channel.follow",
+      "version": "2",
+      "cost": 0,
+      "condition": {
+        "broadcaster_user_id": "100000001",
+        "moderator_user_id": "100000001"
+      },
+      "transport": {
+        "method": "websocket",
+        "session_id": "AgoQ-testsitzung-0001"
+      },
+      "created_at": "2026-11-15T17:59:00.000000000Z"
+    }
+  }
+}

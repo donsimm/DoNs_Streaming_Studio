@@ -81,6 +81,7 @@ if(DSS_CORE_OVERLAY_SERVER)
 endif()
 add_subdirectory(src/secrets) # P13: Geheimnisse (systemd-creds), für dss_obs und dss_twitch
 add_subdirectory(src/obs)
+add_subdirectory(src/twitch) # P13: Anbindung an Twitch (dss_twitch)
 add_subdirectory(src/core)
 if(DSS_BUILD_CLI)
   add_subdirectory(src/cli)

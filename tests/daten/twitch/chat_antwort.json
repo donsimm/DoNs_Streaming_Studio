@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "message_id": "nachricht-0012",
+    "message_type": "notification",
+    "message_timestamp": "2026-11-15T18:00:03.000000000Z",
+    "subscription_type": "channel.chat.message",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "abo-0010",
+      "status": "enabled",
+      "type": "channel.chat.message",
+      "version": "1",
+      "cost": 0,
+      "condition": {"broadcaster_user_id": "100000001", "user_id": "100000001"},
+      "transport": {"method": "websocket", "session_id": "AgoQ-testsitzung-0001"},
+      "created_at": "2026-11-15T17:59:00.000000000Z"
+    },
+    "event": {
+      "broadcaster_user_id": "100000001",
+      "broadcaster_user_login": "testkanal",
+      "broadcaster_user_name": "TestKanal",
+      "source_broadcaster_user_id": null,
+      "source_broadcaster_user_login": null,
+      "source_broadcaster_user_name": null,
+      "chatter_user_id": "100000101",
+      "chatter_user_login": "zuschauer_eins",
+      "chatter_user_name": "Zuschauer_Eins",
+      "message_id": "chat-0012",
+      "source_message_id": null,
+      "is_source_only": null,
+      "message": {
+        "text": "@Moderatorin danke",
+        "fragments": [
+          {"type": "mention", "text": "@Moderatorin", "cheermote": null, "emote": null,
+           "mention": {"user_id": "100000102", "user_name": "Moderatorin", "user_login": "moderatorin"}},
+          {"type": "text", "text": " danke", "cheermote": null, "emote": null, "mention": null}
+        ]
+      },
+      "color": "#1E90FF",
+      "badges": [],
+      "source_badges": null,
+      "message_type": "text",
+      "cheer": null,
+      "reply": {
+        "parent_message_id": "chat-0013",
+        "parent_message_body": "Willkommen",
+        "parent_user_id": "100000102",
+        "parent_user_name": "Moderatorin",
+        "parent_user_login": "moderatorin",
+        "thread_message_id": "chat-0013",
+        "thread_user_id": "100000102",
+        "thread_user_name": "Moderatorin",
+        "thread_user_login": "moderatorin"
+      },
+      "channel_points_custom_reward_id": null,
+      "channel_points_animation_id": null
+    }
+  }
+}

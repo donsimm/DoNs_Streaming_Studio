@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "message_id": "nachricht-0033",
+    "message_type": "notification",
+    "message_timestamp": "2026-11-15T18:00:01.123456789Z",
+    "subscription_type": "channel.subscription.message",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "abo-0033",
+      "status": "enabled",
+      "type": "channel.subscription.message",
+      "version": "1",
+      "cost": 0,
+      "condition": {"broadcaster_user_id": "100000001"},
+      "transport": {"method": "websocket", "session_id": "AgoQ-testsitzung-0001"},
+      "created_at": "2026-11-15T17:59:00.000000000Z"
+    },
+    "event": {
+      "user_id": "100000101",
+      "user_login": "zuschauer_eins",
+      "user_name": "Zuschauer_Eins",
+      "broadcaster_user_id": "100000001",
+      "broadcaster_user_login": "testkanal",
+      "broadcaster_user_name": "TestKanal",
+      "tier": "3000",
+      "message": {
+        "text": "Schon ein Jahr dabei",
+        "emotes": []
+      },
+      "cumulative_months": 12,
+      "streak_months": null,
+      "duration_months": 1
+    }
+  }
+}

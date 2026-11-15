@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "message_id": "nachricht-0038",
+    "message_type": "notification",
+    "message_timestamp": "2026-11-15T18:00:01.123456789Z",
+    "subscription_type": "channel.raid",
+    "subscription_version": "1"
+  },
+  "payload": {
+    "subscription": {
+      "id": "abo-0038",
+      "status": "enabled",
+      "type": "channel.raid",
+      "version": "1",
+      "cost": 0,
+      "condition": {"to_broadcaster_user_id": "100000001"},
+      "transport": {"method": "websocket", "session_id": "AgoQ-testsitzung-0001"},
+      "created_at": "2026-11-15T17:59:00.000000000Z"
+    },
+    "event": {
+      "from_broadcaster_user_id": "100000201",
+      "from_broadcaster_user_login": "anderer_kanal",
+      "from_broadcaster_user_name": "Anderer_Kanal",
+      "to_broadcaster_user_id": "100000001",
+      "to_broadcaster_user_login": "testkanal",
+      "to_broadcaster_user_name": "TestKanal",
+      "viewers": 9001
+    }
+  }
+}
