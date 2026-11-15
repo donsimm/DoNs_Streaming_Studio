@@ -8,8 +8,8 @@
 
 // Typen der Auslöser (P14 a, Plan 2.5) mit Nummer bei Streamer.bot, Ereignis des Ereignisflusses
 // (Plan P13 1.3) und den Argumenten, die ein Lauf bekommt (Plan P13 1.4). Nur Qt Core (CLAUDE.md
-// Regel 9). Die Ereignistypen stehen hier als Text; dss_events (P13) wird nicht eingebunden, die
-// Anbindung kommt mit b2.
+// Regel 9). Die Ereignistypen stehen hier als Text; dss_events (P13) wird nicht eingebunden. Wie
+// ein Ereignis zu Argumenten wird, steht in triggerevent.cpp (b2).
 //
 // Argumentnamen nach Schritt 0 (docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md,
 // Abschnitt C). Wo Streamer.bot keinen Namen hat, steht ein eigener in derselben Schreibweise

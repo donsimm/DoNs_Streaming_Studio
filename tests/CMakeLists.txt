@@ -102,6 +102,10 @@ dss_add_test(tst_aktionsablauf)
 target_link_libraries(tst_aktionsablauf PRIVATE dss_actions)
 target_compile_definitions(tst_aktionsablauf PRIVATE
   DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
+# P14 b2: Auslöser ohne Netz (Argumente aus Ereignissen, Filter, Befehle, Zeitnachrichten) mit
+# erfundenen Ereignissen nach Plan P13 1.3, Uhr aus aktionsuhr.h.
+dss_add_test(tst_ausloeser)
+target_link_libraries(tst_ausloeser PRIVATE dss_actions)
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).

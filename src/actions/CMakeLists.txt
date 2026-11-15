@@ -1,7 +1,8 @@
 # dss_actions: Modell des Aktionssystems (P14 a, Plan 2 und 3.1). Nur Qt Core, kein Qt Gui, kein
 # Netz und kein protocol.h (CLAUDE.md Regel 9 und 14): dss_common fehlt hier absichtlich.
 # Ablauf der Läufe (b1): actionengine, actionrun, Uhr und Schnittstellen nach aussen.
-# Die Anbindung an den Ereignisfluss (dss_events, P13) kommt mit b3, die an den Kern ebenso.
+# Auslöser ohne Netz (b2): triggerevent (Ereignis → Argumente), triggerdispatcher (Filter, Befehle,
+# Zeitnachrichten). Die Anbindung an den Ereignisfluss (dss_events, P13) und den Kern kommt mit b3.
 add_library(dss_actions STATIC
   fieldspec.h fieldspec.cpp
   steptypes.h steptypes.cpp
@@ -16,6 +17,8 @@ add_library(dss_actions STATIC
   actionservices.h
   actionengine.h actionengine.cpp
   actionrun.h actionrun.cpp
+  triggerevent.h triggerevent.cpp
+  triggerdispatcher.h triggerdispatcher.cpp
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_actions PUBLIC Qt6::Core PRIVATE dss_warnings)
