@@ -322,6 +322,11 @@ qt_add_executable(tst_twitchprotokoll tst_twitchprotokoll.cpp)
 target_link_libraries(tst_twitchprotokoll PRIVATE dss_twitch dss_warnings Qt6::Test)
 target_compile_definitions(tst_twitchprotokoll PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
 add_test(NAME tst_twitchprotokoll COMMAND tst_twitchprotokoll)
+# P13: Anmeldung (Gerätefluss, Erneuern, Prüfen, Abmelden, zwei Konten) und Helix gegen den
+# Testserver tests/twitchtestserver.h auf 127.0.0.1, ohne Netz und ohne Qt Gui.
+qt_add_executable(tst_twitchanmeldung tst_twitchanmeldung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchanmeldung PRIVATE dss_twitch dss_warnings Qt6::Test)
+add_test(NAME tst_twitchanmeldung COMMAND tst_twitchanmeldung)
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
