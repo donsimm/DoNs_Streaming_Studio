@@ -39,7 +39,7 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
 
 | Stufe | Wann | Prüfung |
 |---|---|---|
-| Klein | kleine Änderung | Bau (`cmake --build build -j8`) und `ctest --test-dir build`. Handtest nur, wenn sichtbar oder bedienbar |
+| Klein | kleine Änderung | Bau (`cmake --build build -j8`) und `ctest --test-dir build`. Agenten bauen und testen mit `scripts/bauen.sh` und `scripts/testen.sh` (kurze Ausgabe, volles Protokoll in `build/bauen.log` und `build/testen.log`). Handtest nur, wenn sichtbar oder bedienbar |
 | Baustein | Baustein aus dem Bauplan | dazu frischer Klon (Bau und `ctest`), `scripts/startpruefung.py` und `scripts/dienstpruefung.py`. 50 Wiederholungen (`scripts/wiederholen.sh`) nur für betroffene Tests, bei Änderungen an Takt, Threads oder Video oder nach einem Fehlschlag |
 | Vor der Installation | bevor der Nutzer installiert | dazu Release-Bau und `scripts/installieren-pruefen.sh` (Testoptionen, Kopie der echten Daten), Prüfsummen von Installation und echten Daten vorher und nachher. Alle Schalter einzeln (`scripts/schalter-lauf.sh`) nur auf Wunsch |
 
