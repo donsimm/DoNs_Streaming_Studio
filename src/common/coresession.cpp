@@ -98,6 +98,51 @@ std::optional<ChangeResult> CoreSession::change(ChangeRequest request, QString *
     return result;
 }
 
+std::optional<OverlayListData> CoreSession::getOverlayList(QString *error)
+{
+    if (!send(simpleMessage(msg::kGetOverlayList), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlayList), error);
+    if (!reply)
+        return std::nullopt;
+    OverlayListData data;
+    if (!parseOverlayList(*reply, &data, error))
+        return std::nullopt;
+    return data;
+}
+
+std::optional<Overlay> CoreSession::getOverlay(const QUuid &id, QString *error)
+{
+    if (!send(overlayIdMessage(msg::kGetOverlay, id), error))
+        return std::nullopt;
+    for (;;) {
+        const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlay), error);
+        if (!reply)
+            return std::nullopt;
+        Overlay overlay;
+        MediaSizes sizes;
+        if (!parseOverlayMessage(*reply, &overlay, &sizes, error))
+            return std::nullopt;
+        if (overlay.id == id)
+            return overlay;
+    }
+}
+
+std::optional<ChangeResult> CoreSession::request(QJsonObject message, QString *error)
+{
+    const qint64 requestId = m_nextRequestId++;
+    message.insert(QStringLiteral("request_id"), double(requestId));
+    if (!send(message, error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kChangeResult), error, requestId);
+    if (!reply)
+        return std::nullopt;
+    ChangeResult result;
+    if (!parseChangeResult(*reply, &result, error))
+        return std::nullopt;
+    return result;
+}
+
 bool CoreSession::send(const QJsonObject &message, QString *error)
 {
     m_socket.write(encodeMessage(message));

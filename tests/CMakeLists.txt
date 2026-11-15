@@ -307,6 +307,16 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media)
     DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
 endif()
 
+# P14 d: Laufzustand der Overlays (Platzhalter, Nachrichten, Dauer, Profilbilder gegen einen eigenen
+# HTTP-Server auf 127.0.0.1), Kern und dss-cli als eigene Prozesse. Ohne Qt Gui.
+if(DSS_BUILD_CLI)
+  dss_add_test(tst_laufzustand)
+  target_compile_definitions(tst_laufzustand PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+    DSS_TEST_FONT="${DSS_TEST_FONT}")
+  add_dependencies(tst_laufzustand dss-core dss-cli)
+endif()
+
 # P10c: Protokoll von obs-websocket, ohne Verbindung und ohne Qt Gui.
 qt_add_executable(tst_obsprotokoll tst_obsprotokoll.cpp)
 target_link_libraries(tst_obsprotokoll PRIVATE dss_obs dss_warnings Qt6::Test)

@@ -48,7 +48,8 @@ namespace dss {
 // 13 seit P12b b5: Overlays im Format 5 (video.volume, video.muted), changes.video.volume und
 //   changes.video.muted
 // 14 seit P14 t (vorläufig, Lotse vergibt die Nummer beim Zusammenführen): media_list mit kind
-//   "audio" und duration_ms
+//   "audio" und duration_ms; seit P14 d (gleiche vorläufige Nummer) overlay_live,
+//   overlay_live_set, overlay_live_reset (overlaylive.h)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
 inline constexpr int kProtocolVersion = 14;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.

@@ -31,13 +31,19 @@ public:
     // P10b: Medienliste und Änderungen (request.requestId wird hier vergeben).
     std::optional<MediaListData> getMediaList(QString *error);
     std::optional<ChangeResult> change(ChangeRequest request, QString *error);
+    // P14 d: Overlay-Liste und ganzes Overlay (für dss-cli live-…)
+    std::optional<OverlayListData> getOverlayList(QString *error);
+    std::optional<Overlay> getOverlay(const QUuid &id, QString *error);
+    // P14 d: Anfrage mit eigener request_id (wird hier eingesetzt), Antwort change_result
+    // (overlay_live_set, overlay_live_reset).
+    std::optional<ChangeResult> request(QJsonObject message, QString *error);
+    // Nächste Nachricht vom Typ type; error-Nachrichten des Kerns brechen mit deren Text ab,
+    // andere (overlay_list, stats, …) werden übersprungen. P14 d: öffentlich für overlay_live.
+    std::optional<QJsonObject> waitFor(const QString &type, QString *error,
+                                       qint64 requestId = -1);
 
 private:
     bool send(const QJsonObject &message, QString *error);
-    // Nächste Nachricht vom Typ type; error-Nachrichten des Kerns brechen mit deren Text ab,
-    // andere (overlay_list, stats, …) werden übersprungen.
-    std::optional<QJsonObject> waitFor(const QString &type, QString *error,
-                                       qint64 requestId = -1);
 
     int m_timeoutMs;
     QLocalSocket m_socket;

@@ -4,6 +4,7 @@
 #include "obsconnection.h"
 #include "obssecretstore.h"
 #include "obssources.h"
+#include "overlaylivestate.h"
 #include "version.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
@@ -63,6 +64,11 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
 #endif
     // Namen und Ordner der Medien schreibt nur der Kern (P10b, Teil A 1).
     m_store->setWritesMediaLibrary(true);
+    // P14 d: Laufzustand der Overlays, Profilbilder unter <Datenordner>/live-bilder
+    dss::OverlayLiveState::Options liveOptions;
+    liveOptions.imageDir = m_store->dataDir() + QLatin1Char('/') + QLatin1String(dss::kLiveImageDir);
+    m_live = new dss::OverlayLiveState(m_store, liveOptions, this);
+    connect(m_live, &dss::OverlayLiveState::changed, this, &CoreService::onLiveChanged);
     m_progressTimer = new QTimer(this);
     m_progressTimer->setInterval(kProgressIntervalMs);
     connect(m_progressTimer, &QTimer::timeout, this, &CoreService::broadcastImportProgress);
@@ -139,6 +145,9 @@ CoreService::ListenResult CoreService::listen(QString *error)
         return ListenResult::Failed;
     }
     qInfo("Verbindung offen: %s", qPrintable(m_server->fullServerName()));
+    // P14 d: Profilbilder der letzten Sitzung weg (Laufzustand beginnt leer)
+    if (const int removed = m_live->clearImages(); removed > 0)
+        qInfo("Laufzustand: %d alte Profilbilder gelöscht", removed);
     m_sinceLastSample.start();
     sampleStats();
     m_statsTimer->start();
@@ -220,6 +229,9 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
     const QJsonObject listAfter = listMessage();
     if (listAfter != listBefore)
         broadcast(listAfter);
+    // P14 d: Laufzustand gelöschter Overlays und Quellen fällt weg
+    if (changed > 0 || removed > 0)
+        m_live->overlaysChanged();
 #if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
     // P12b b4: Stopp-Regeln (Ausgabe aus, Quelle verborgen, gelöscht oder geändert)
     if (m_videoAudio && (changed > 0 || removed > 0))
@@ -361,6 +373,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, obsStatusMessage());
         send(socket, obsSourcesMessage());
         send(socket, audioOutputsMessage());
+        send(socket, dss::overlayLiveMessage(m_live->all())); // P14 d
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -384,6 +397,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleObsSourceRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kObsAddToScene)) {
         handleObsSourceRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveSet)) {
+        handleLiveRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveReset)) {
+        handleLiveRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
         QUuid id;
         if (!dss::parseGetBrowserSource(message, &id, &error)) {
@@ -472,6 +489,7 @@ void CoreService::setOverlayServer(dss::OverlayServer *server)
 {
 #if DSS_CORE_OVERLAY_SERVER
     m_overlayServer = server;
+    server->setLiveState(m_live); // P14 d
     connect(server, &dss::OverlayServer::statusChanged, this,
             [this] { broadcast(serverStatusMessage()); });
     connect(server, &dss::OverlayServer::pageOpened, this, &CoreService::onPageOpened);
@@ -515,6 +533,48 @@ void CoreService::onPageOpened(const QUuid &overlayId, const QString &page)
 #else
     Q_UNUSED(overlayId);
     Q_UNUSED(page);
+#endif
+}
+
+void CoreService::handleLiveRequest(QLocalSocket *socket, const QJsonObject &message, bool reset)
+{
+    const QString type = dss::messageType(message);
+    QString error;
+    const QPointer<QLocalSocket> target(socket);
+    const auto answer = [this, target](const dss::ChangeResult &result) {
+        if (target && m_clients.contains(target))
+            send(target, dss::changeResultMessage(result));
+    };
+    if (reset) {
+        dss::LiveResetRequest r;
+        if (!dss::parseLiveReset(message, &r, &error)) {
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+            return;
+        }
+        error = m_live->reset(r);
+        answer({r.requestId, error.isEmpty(), QUuid(),
+                error.isEmpty() ? QString() : QString::fromLatin1(dss::err::kUnknownOverlay), error});
+        return;
+    }
+    dss::LiveSetRequest r;
+    if (!dss::parseLiveSet(message, &r, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, type);
+        return;
+    }
+    const qint64 requestId = r.requestId;
+    m_live->set(r, [answer, requestId](const dss::OverlayLiveState::Result &result) {
+        answer({requestId, result.ok, QUuid(), result.code, result.message, result.warning});
+    });
+}
+
+void CoreService::onLiveChanged(const QUuid &overlayId)
+{
+    broadcast(dss::overlayLiveMessage(m_live->all()));
+#if DSS_CORE_OVERLAY_SERVER
+    if (m_overlayServer)
+        m_overlayServer->liveChanged(overlayId);
+#else
+    Q_UNUSED(overlayId);
 #endif
 }
 

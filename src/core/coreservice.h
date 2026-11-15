@@ -22,6 +22,7 @@ namespace dss {
 class ActionSound;
 class AudioOutput;
 class Mixer;
+class OverlayLiveState;
 class OverlayServer;
 class VideoAudio;
 }
@@ -88,6 +89,10 @@ public:
     // P12b b4: Ton der Videos beenden (Decoder, Stellen im Mischer), solange Mischer und Ausgang
     // noch leben; nach der Hauptschleife. Ohne Ton nichts. P14 t: ebenso die Töne des Chat-Bots.
     void stopAudio();
+
+    // P14 d: Laufzustand der Overlays (nur im Speicher). Den Schritt «Overlay-Element zeigen»
+    // bindet Abschnitt c2 hier an.
+    dss::OverlayLiveState *overlayLive() const { return m_live; }
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -165,6 +170,9 @@ private:
     // P12b: Seite mit Kennung verbunden: OBS fragen, ob ihre Quelle im Programm ist, und der Seite
     // «obs_active» schicken (Rückfall beim Laden einer schon aktiven Quelle, M3).
     void onPageOpened(const QUuid &overlayId, const QString &page);
+    // P14 d: overlay_live_set bzw. overlay_live_reset, Antwort change_result
+    void handleLiveRequest(QLocalSocket *socket, const QJsonObject &message, bool reset);
+    void onLiveChanged(const QUuid &overlayId);
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
@@ -200,6 +208,7 @@ private:
     QString m_socketPath;
     dss::CoreSettingsStore *m_settings = nullptr;
     dss::OverlayServer *m_overlayServer = nullptr;
+    dss::OverlayLiveState *m_live = nullptr; // P14 d
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     dss::obs::ObsSources *m_obsSources = nullptr;

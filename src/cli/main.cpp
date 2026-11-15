@@ -10,6 +10,7 @@
 #include "coresession.h"
 #include "coresettings.h"
 #include "datalock.h"
+#include "overlaylive.h"
 #include "overlaystore.h"
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
@@ -44,6 +45,10 @@ const QList<std::pair<QString, int>> kMediaCommands = {
     {QStringLiteral("medium-loeschen"), 1},         {QStringLiteral("medien-ordner-anlegen"), 1},
     {QStringLiteral("medien-ordner-umbenennen"), 2}, {QStringLiteral("medien-ordner-verschieben"), 2},
     {QStringLiteral("medien-ordner-loeschen"), 1}};
+
+// Laufzustand der Overlays (P14 d): gehen an den laufenden Kern, er hält ihn nur im Speicher.
+const QStringList kLiveCommands = {QStringLiteral("live"), QStringLiteral("live-zeigen"),
+                                   QStringLiteral("live-ausblenden")};
 
 bool isMediaCommand(const QString &command)
 {
@@ -90,6 +95,10 @@ const char *const kUsageTemplate =
     "  einstellungen\n"
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
+    "  live ADRESSE\n"
+    "  live-zeigen ADRESSE NR[,NR…] [--verstecken|--umschalten] [--dauer MS] [--text TEXT]\n"
+    "              [--bild BILD] [NAME=WERT …]\n"
+    "  live-ausblenden ADRESSE [NR …]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -116,9 +125,16 @@ const char *const kUsageTemplate =
     "ORDNER, ZIELORDNER: Pfad wie in medien-liste, zum Beispiel «Logos/Alt»; \"/\" = oberste Ebene.\n"
     "medien-ordner-anlegen legt den letzten Teil des Pfads an. Löschen eines Ordners: Inhalt kommt\n"
     "eine Ebene höher. medium-loeschen löscht nur Dateien, die keine Quelle verwendet.\n"
+    "live, live-zeigen, live-ausblenden: Laufzustand eines Overlays über den laufenden Kern (wie\n"
+    "ein Schritt des Chat-Bots, nur «jetzt», nie in der Overlay-Datei, nach einem Neustart weg).\n"
+    "live zeigt ihn je Element. live-zeigen zeigt die Elemente NR (aus quelle-liste), mit\n"
+    "--verstecken versteckt, mit --umschalten schaltet es um; --dauer: danach fällt der Laufzustand\n"
+    "weg (ohne: bis live-ausblenden); --text ersetzt den Text der Textelemente, --bild das Bild der\n"
+    "Bildelemente (media/… oder Adresse eines Profilbilds); NAME=WERT sind Argumente für die\n"
+    "Platzhalter %NAME% im Text. live-ausblenden setzt die Elemente NR zurück (ohne NR: alle).\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
-    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern).\n";
+    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern, live).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -136,6 +152,12 @@ struct Arguments
     bool flipHorizontal = false; // P09b
     bool flipVertical = false;   // P09b
     bool yes = false;            // P10: neuer-token ohne Rückfrage
+    // P14 d: live-zeigen
+    bool liveHide = false;
+    bool liveToggle = false;
+    std::optional<int> liveDurationMs;
+    std::optional<QString> liveText;
+    std::optional<QString> liveImage;
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -169,6 +191,28 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->flipVertical = true;
         } else if (a == QLatin1String("--ja")) {
             result->yes = true;
+        } else if (a == QLatin1String("--verstecken")) {
+            result->liveHide = true;
+        } else if (a == QLatin1String("--umschalten")) {
+            result->liveToggle = true;
+        } else if (a == QLatin1String("--dauer") || a == QLatin1String("--text") || a == QLatin1String("--bild")) {
+            if (i + 1 >= args.size()) {
+                *error = QStringLiteral("%1 braucht einen Wert.").arg(a);
+                return false;
+            }
+            const QString value = args.at(++i);
+            if (a == QLatin1String("--text")) {
+                result->liveText = value;
+            } else if (a == QLatin1String("--bild")) {
+                result->liveImage = value;
+            } else {
+                bool ok = false;
+                result->liveDurationMs = value.toInt(&ok);
+                if (!ok) {
+                    *error = QStringLiteral("--dauer «%1» ist keine ganze Zahl.").arg(value);
+                    return false;
+                }
+            }
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -263,6 +307,9 @@ public:
         if (command != QLatin1String("quelle-geometrie") && (m_args.flipHorizontal || m_args.flipVertical))
             return usage(QStringLiteral("--waagrecht-gespiegelt und --senkrecht-gespiegelt gelten nur für "
                                         "quelle-geometrie."));
+        if (m_args.liveHide || m_args.liveToggle || m_args.liveDurationMs || m_args.liveText || m_args.liveImage)
+            return usage(QStringLiteral("--verstecken, --umschalten, --dauer, --text und --bild gelten nur für "
+                                        "live-zeigen."));
 
         struct Command
         {
@@ -825,6 +872,139 @@ int runMedia(const Arguments &args)
     return kExitOk;
 }
 
+// P14 d: Laufzustand über den laufenden Kern (live, live-zeigen, live-ausblenden).
+int runLive(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const auto usageError = [](const QString &message) {
+        err() << "Fehler: " << message << "\n\n" << usageText();
+        return kExitUsage;
+    };
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    const bool show = command == QLatin1String("live-zeigen");
+    if (!show && (args.liveHide || args.liveToggle || args.liveDurationMs || args.liveText || args.liveImage))
+        return usageError(QStringLiteral("--verstecken, --umschalten, --dauer, --text und --bild gelten nur für "
+                                         "live-zeigen."));
+    if (args.liveHide && args.liveToggle)
+        return usageError(QStringLiteral("--verstecken und --umschalten schliessen sich aus."));
+    if (a.isEmpty() || (command == QLatin1String("live") && a.size() != 1) || (show && a.size() < 2))
+        return usageError(QStringLiteral("%1: falsche Anzahl Argumente.").arg(command));
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Den Laufzustand hält nur der Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    // Laufzustand kommt nach hello (vor den Antworten auf die Anfragen unten)
+    const std::optional<QJsonObject> liveMessage = session.waitFor(QString::fromLatin1(dss::msg::kOverlayLive), &error);
+    QList<dss::OverlayLiveInfo> live;
+    if (!liveMessage || !dss::parseOverlayLive(*liveMessage, &live, &error))
+        return fail(error);
+    const std::optional<dss::OverlayListData> list = session.getOverlayList(&error);
+    if (!list)
+        return fail(error);
+    const auto summary = std::find_if(list->overlays.cbegin(), list->overlays.cend(),
+                                      [&a](const dss::OverlaySummary &s) { return s.address == a.at(0); });
+    if (summary == list->overlays.cend())
+        return fail(QStringLiteral("Kein Overlay mit der Adresse «%1» (overlay-liste zeigt die Adressen).").arg(a.at(0)));
+    const std::optional<dss::Overlay> overlay = session.getOverlay(summary->id, &error);
+    if (!overlay)
+        return fail(error);
+    // NR wie quelle-liste: 1 = ganz hinten
+    const auto sourceOf = [&overlay](const QString &text, QUuid *id, QString *problem) {
+        bool ok = false;
+        const int nr = text.toInt(&ok);
+        if (!ok || nr < 1 || nr > overlay->sources.size()) {
+            *problem = QStringLiteral("NR «%1» ungültig, das Overlay hat %2 Quellen.").arg(text).arg(overlay->sources.size());
+            return false;
+        }
+        *id = overlay->sources.at(nr - 1).id;
+        return true;
+    };
+
+    if (command == QLatin1String("live")) {
+        dss::LiveElements elements;
+        for (const dss::OverlayLiveInfo &info : std::as_const(live)) {
+            if (info.overlayId == overlay->id)
+                elements = info.elements;
+        }
+        if (elements.isEmpty()) {
+            out() << "Kein Laufzustand in «" << overlay->name << "».\n";
+            return kExitOk;
+        }
+        QList<QStringList> rows = {{QStringLiteral("Nr"), QStringLiteral("Name"), QStringLiteral("Jetzt"),
+                                    QStringLiteral("Text"), QStringLiteral("Bild")}};
+        for (qsizetype i = 0; i < overlay->sources.size(); ++i) {
+            const dss::Source &s = overlay->sources.at(i);
+            const auto e = elements.constFind(s.id);
+            if (e == elements.constEnd())
+                continue;
+            QString text = e->text ? *e->text : QStringLiteral("–");
+            text.replace(QLatin1Char('\n'), QLatin1Char(' '));
+            rows.append({QString::number(i + 1), s.name, dss::liveStateText(*e, e->remainingMs), text,
+                         e->image.isEmpty() ? QStringLiteral("–") : e->image});
+        }
+        printTable(rows);
+        return kExitOk;
+    }
+
+    std::optional<dss::ChangeResult> result;
+    if (show) {
+        dss::LiveSetRequest r;
+        r.overlayId = overlay->id;
+        r.mode = args.liveHide ? dss::LiveMode::Hide : args.liveToggle ? dss::LiveMode::Toggle : dss::LiveMode::Show;
+        r.durationMs = args.liveDurationMs.value_or(0);
+        for (const QString &nr : a.at(1).split(QLatin1Char(','))) {
+            dss::LiveElementRequest e;
+            if (!sourceOf(nr.trimmed(), &e.source, &error))
+                return fail(error);
+            const dss::Source &s = overlay->sources.at(dss::sourceIndex(*overlay, e.source));
+            if (args.liveText && s.kind == dss::SourceKind::Text)
+                e.text = *args.liveText;
+            if (args.liveImage && s.kind == dss::SourceKind::Image)
+                e.image = *args.liveImage;
+            r.elements.append(e);
+        }
+        for (const QString &pair : a.mid(2)) {
+            const qsizetype eq = pair.indexOf(QLatin1Char('='));
+            if (eq <= 0)
+                return usageError(QStringLiteral("Argument «%1» hat nicht die Form NAME=WERT.").arg(pair));
+            r.arguments.insert(pair.left(eq), pair.mid(eq + 1));
+        }
+        result = session.request(dss::liveSetMessage(r), &error);
+    } else {
+        dss::LiveResetRequest r;
+        r.overlayId = overlay->id;
+        for (const QString &nr : a.mid(1)) {
+            QUuid id;
+            if (!sourceOf(nr, &id, &error))
+                return fail(error);
+            r.sources.append(id);
+        }
+        result = session.request(dss::liveResetMessage(r), &error);
+    }
+    if (!result)
+        return fail(error);
+    if (!result->ok)
+        return fail(result->message);
+    if (!result->warning.isEmpty())
+        err() << "Hinweis: " << result->warning << '\n';
+    out() << (show ? QStringLiteral("Laufzustand gesetzt in «%1».") : QStringLiteral("Laufzustand zurückgesetzt in «%1»."))
+                         .arg(overlay->name)
+          << '\n';
+    return kExitOk;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -870,9 +1050,20 @@ int main(int argc, char *argv[])
         err().flush();
         return rc;
     }
+    if (kLiveCommands.contains(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für live-Befehle (sie gehen an den Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runLive(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
     if (!args.connection.isEmpty()) {
         err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port, "
-                 "einstellung-adresse und die Änderungen der Medienliste.\n\n" << usageText();
+                 "einstellung-adresse, die Änderungen der Medienliste und live.\n\n" << usageText();
         return kExitUsage;
     }
 

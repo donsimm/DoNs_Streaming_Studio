@@ -36,6 +36,8 @@ add_library(dss_common STATIC
   coresession.h coresession.cpp
   browsersource.h browsersource.cpp
   canvasimage.h canvasimage.cpp
+  overlaylive.h overlaylive.cpp
+  overlaylivestate.h overlaylivestate.cpp
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und
