@@ -311,6 +311,11 @@ qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
 target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
 
+# P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
+qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)
+target_link_libraries(tst_ereignisfluss PRIVATE dss_events dss_warnings Qt6::Test)
+add_test(NAME tst_ereignisfluss COMMAND tst_ereignisfluss)
+
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
 if(DSS_BUILD_APP)

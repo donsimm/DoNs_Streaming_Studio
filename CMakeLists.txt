@@ -70,6 +70,7 @@ qt_standard_project_setup()
 add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
+add_subdirectory(src/events) # P13: Ereignisfluss (dss_events)
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER) OR DSS_CORE_AUDIO)
   add_subdirectory(src/media)
