@@ -14,12 +14,22 @@
 // zusätzliches Feld → abgewiesen. Pflichtfelder sind immer da; «oder null» heisst, der Wert darf
 // null sein. So bleiben Code und docs/08 («Ereignisfluss») deckungsgleich.
 //
-// «Schritt 0 offen»: Name des Arguments ist nicht belegt (Doku von Streamer.bot eingeklappt), bis
-// zur Prüfung in Schritt 0 ein eigener Name in der Schreibweise von Streamer.bot (Plan 1.4),
-// meist der Name des Feldes in camelCase.
-// Belegt sind: user, userName, role, tier (Daten des Nutzers), msgId (Doku «Command Triggered»).
-// Quellen: https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/,
-// https://dev.twitch.tv/docs/eventsub/eventsub-reference/,
+// Argumentnamen nach Schritt 0 (docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md,
+// Abschnitt C). Ohne Kommentar: dort belegt. «eigener Name»: bei Streamer.bot nicht belegt oder ohne
+// Gegenstück; ein eigener Name in der Schreibweise von Streamer.bot (Plan 1.4). «abgeleitet»: aus
+// den Variablengruppen von Streamer.bot, beim Auslöser nicht einzeln belegt.
+//
+// Abweichungen vom Plan 1.3 nach Schritt 0:
+// - tier: Twitch liefert 1000/2000/3000 (Feld tier, als Zahl, Argument subscriptionTier);
+//   Streamer.bot nennt bei den Sub-Auslösern tier als Text «tier 1» … (Feld tier_name).
+// - twitch.gift_sub: Bei Streamer.bot ist user der Schenkende und recipientUser der Beschenkte.
+//   channel.subscribe nennt nur den Beschenkten → recipient_user_*; user_* bleibt null.
+// - twitch.chat_message: is_highlight (Argument isHighlight) aus message_type.
+// - twitch.stream_offline: ended_at (Argument endedAt), Zeitpunkt der Nachricht von Twitch.
+//
+// Quellen: https://dev.twitch.tv/docs/eventsub/reference/ (Unterseiten /chat, /channel,
+// /channel-points, /stream), https://github.com/Streamerbot/docs/tree/main/streamerbot/3.api/.variables,
+// https://docs.streamer.bot/api/triggers/twitch/,
 // https://docs.streamer.bot/api/triggers/core/commands/command-triggered
 
 namespace dss::events {
@@ -40,126 +50,120 @@ struct EventType
 
 namespace detail {
 
-// user_id, user_login, user_name (Plan 1.3: «user_*»)
+// user_id, user_login, user_name (Plan 1.3: «user_*»); Gruppe «User» bei Streamer.bot
 #define DSS_EVENT_USER_FIELDS                                                                    \
-    {"user_id", "userId"}, /* Schritt 0 offen */                                                 \
-        {"user_login", "userName"}, {"user_name", "user"}
+    {"user_id", "userId"}, {"user_login", "userName"}, {"user_name", "user"}
 
-inline constexpr EventField kChatMessage[] = {
-    {"message_id", "msgId"},
-    DSS_EVENT_USER_FIELDS,
-    {"text", "message"},                         // Schritt 0 offen
-    {"fragments", "fragments"},                  // Schritt 0 offen; je type, text, emote_id oder null
-    {"color", "color"},                          // Schritt 0 offen
-    {"badges", "badges"},                        // Schritt 0 offen; je set_id, id
-    {"role", "role"},                            // 1 Zuschauer, 2 VIP, 3 Moderator, 4 Kanal; Werte 1 bis 3 Schritt 0 offen
-    {"is_subscriber", "isSubscribed"},           // Schritt 0 offen
-    {"is_vip", "isVip"},                         // Schritt 0 offen
-    {"is_moderator", "isModerator"},             // Schritt 0 offen
-    {"is_broadcaster", "isBroadcaster"},         // Schritt 0 offen
-    {"is_bot_account", "isBotAccount"},          // Schritt 0 offen; Absender ist das angemeldete Bot-Konto
-    {"bits", "bits"},                            // Schritt 0 offen; 0 ohne Cheer
-    {"reply_to", "replyTo"},                     // Schritt 0 offen; message_id oder null
-    {"reward_id", "rewardId"},                   // Schritt 0 offen; oder null
-    {"message_type", "messageType"},             // Schritt 0 offen
-    {"source_broadcaster_id", "sourceBroadcasterId"}, // Schritt 0 offen; oder null (geteilter Chat)
-};
+// tier: Zahl 1000, 2000, 3000 (Twitch); tier_name: «tier 1», «tier 2», «tier 3» (Streamer.bot,
+// dort auch «prime»; Prime erkennt EventSub bei channel.subscribe nicht)
+#define DSS_EVENT_TIER_FIELDS {"tier", "subscriptionTier"}, {"tier_name", "tier"}
+
+#define DSS_EVENT_CHAT_FIELDS                                                                    \
+    {"message_id", "msgId"}, DSS_EVENT_USER_FIELDS, {"text", "message"},                         \
+        {"fragments", "fragments"},                     /* eigener Name; je type, text, emote_id oder null */ \
+        {"color", "color"}, {"badges", "badges"},       /* badges: eigener Name; je set_id, id */ \
+        {"role", "role"},                               /* 1 Zuschauer, 2 VIP, 3 Moderator, 4 Kanal */ \
+        {"is_subscriber", "isSubscribed"}, {"is_vip", "isVip"}, {"is_moderator", "isModerator"}, \
+        {"is_broadcaster", "isBroadcaster"},            /* eigener Name */                       \
+        {"is_bot_account", "isBotAccount"},             /* eigener Name; Absender ist das angemeldete Bot-Konto */ \
+        {"bits", "bits"},                               /* 0 ohne Cheer */                       \
+        {"reply_to", "replyTo"},                        /* eigener Name; message_id oder null */ \
+        {"reward_id", "rewardId"},                      /* eigener Name; oder null */            \
+        {"message_type", "messageType"},                /* eigener Name */                       \
+        {"is_highlight", "isHighlight"},                /* message_type channel_points_highlighted */ \
+        {"source_broadcaster_id", "sourceBroadcasterId"} /* eigener Name; oder null (geteilter Chat) */
+
+inline constexpr EventField kChatMessage[] = {DSS_EVENT_CHAT_FIELDS};
 
 // Alle Felder von twitch.chat_message und first_ever (message_type = user_intro)
 inline constexpr EventField kFirstMessage[] = {
-    {"message_id", "msgId"},
-    DSS_EVENT_USER_FIELDS,
-    {"text", "message"},                         // Schritt 0 offen
-    {"fragments", "fragments"},                  // Schritt 0 offen
-    {"color", "color"},                          // Schritt 0 offen
-    {"badges", "badges"},                        // Schritt 0 offen
-    {"role", "role"},                            // Werte 1 bis 3 Schritt 0 offen
-    {"is_subscriber", "isSubscribed"},           // Schritt 0 offen
-    {"is_vip", "isVip"},                         // Schritt 0 offen
-    {"is_moderator", "isModerator"},             // Schritt 0 offen
-    {"is_broadcaster", "isBroadcaster"},         // Schritt 0 offen
-    {"is_bot_account", "isBotAccount"},          // Schritt 0 offen
-    {"bits", "bits"},                            // Schritt 0 offen
-    {"reply_to", "replyTo"},                     // Schritt 0 offen
-    {"reward_id", "rewardId"},                   // Schritt 0 offen
-    {"message_type", "messageType"},             // Schritt 0 offen
-    {"source_broadcaster_id", "sourceBroadcasterId"}, // Schritt 0 offen
-    {"first_ever", "firstEver"},                 // Schritt 0 offen; eigener Name (Plan 1.4)
+    DSS_EVENT_CHAT_FIELDS,
+    {"first_ever", "firstEver"}, // eigener Name (Plan 1.4)
 };
 
 inline constexpr EventField kFollow[] = {
     DSS_EVENT_USER_FIELDS,
-    {"followed_at", "followDate"}, // Schritt 0 offen; %followDate% in den Daten des Nutzers, Zusammenhang nicht belegt
+    {"followed_at", "followDate"}, // eigener Name; %followDate% in den Daten des Nutzers, Herkunft nicht belegt
 };
 
+// Nur Abos ohne Geschenk; Geschenke gehen als twitch.gift_sub hinaus (Plan 1.3).
 inline constexpr EventField kSubscribe[] = {
     DSS_EVENT_USER_FIELDS,
-    {"tier", "tier"},      // «1000», «2000», «3000»; Form des Werts bei Streamer.bot Schritt 0 offen
-    {"is_gift", "isGift"}, // Schritt 0 offen
+    DSS_EVENT_TIER_FIELDS,
+    {"is_gift", "isGift"}, // eigener Name; hier immer false
 };
 
 inline constexpr EventField kResubscribe[] = {
     DSS_EVENT_USER_FIELDS,
-    {"tier", "tier"},                       // Form des Werts Schritt 0 offen
-    {"text", "message"},                    // Schritt 0 offen
-    {"months", "months"},                   // Schritt 0 offen
-    {"streak_months", "streakMonths"},      // Schritt 0 offen; oder null
-    {"duration_months", "durationMonths"},  // Schritt 0 offen
+    DSS_EVENT_TIER_FIELDS,
+    {"text", "message"},
+    {"months", "cumulative"},
+    {"streak_months", "monthStreak"},          // oder null (nicht geteilt)
+    {"duration_months", "multiMonthDuration"},
 };
 
 // user_* null bei anonym
 inline constexpr EventField kGiftBomb[] = {
     DSS_EVENT_USER_FIELDS,
-    {"is_anonymous", "isAnonymous"},        // Schritt 0 offen
-    {"total", "total"},                     // Schritt 0 offen
-    {"tier", "tier"},                       // Form des Werts Schritt 0 offen
-    {"cumulative_total", "cumulativeTotal"}, // Schritt 0 offen; oder null
+    {"is_anonymous", "anonymous"},
+    {"total", "gifts"},
+    DSS_EVENT_TIER_FIELDS,
+    {"cumulative_total", "totalGifts"}, // oder null (anonym oder nicht geteilt)
 };
 
-// user_* ist der Beschenkte; den Schenkenden liefert channel.subscribe nicht (Plan 1.3, Schritt 0).
-// Bei Streamer.bot heisst der Beschenkte vermutlich anders als «user» (Schritt 0 offen).
+// Beschenkter in recipient_user_*. Den Schenkenden liefert channel.subscribe nicht (Schritt 0, A3):
+// user_* ist null.
 inline constexpr EventField kGiftSub[] = {
     DSS_EVENT_USER_FIELDS,
-    {"tier", "tier"}, // Form des Werts Schritt 0 offen
+    {"recipient_user_id", "recipientId"},
+    {"recipient_user_login", "recipientUserName"},
+    {"recipient_user_name", "recipientUser"},
+    DSS_EVENT_TIER_FIELDS,
 };
 
 // user_* null bei anonym
 inline constexpr EventField kCheer[] = {
     DSS_EVENT_USER_FIELDS,
-    {"is_anonymous", "isAnonymous"}, // Schritt 0 offen
-    {"bits", "bits"},            // Schritt 0 offen
-    {"text", "message"},           // Schritt 0 offen
+    {"is_anonymous", "anonymous"}, // eigener Name (bei Cheer nicht belegt, bei Geschenken «anonymous»)
+    {"bits", "bits"},
+    {"text", "message"},
 };
 
 inline constexpr EventField kRaid[] = {
-    {"from_user_id", "userId"},       // Schritt 0 offen
-    {"from_user_login", "userName"},  // Schritt 0 offen
-    {"from_user_name", "user"},       // Schritt 0 offen
-    {"viewers", "viewers"},           // Schritt 0 offen
+    {"from_user_id", "userId"},      // abgeleitet
+    {"from_user_login", "userName"}, // abgeleitet
+    {"from_user_name", "user"},      // abgeleitet
+    {"viewers", "viewers"},
 };
 
 inline constexpr EventField kRewardRedeemed[] = {
-    {"redemption_id", "redemptionId"}, // Schritt 0 offen
+    {"redemption_id", "redemptionId"}, // eigener Name
     DSS_EVENT_USER_FIELDS,
-    {"user_input", "userInput"},       // Schritt 0 offen
-    {"reward_id", "rewardId"},         // Schritt 0 offen
-    {"reward_title", "rewardTitle"},   // Schritt 0 offen
-    {"reward_cost", "rewardCost"},     // Schritt 0 offen
-    {"status", "status"},              // Schritt 0 offen
+    {"user_input", "userInput"},       // eigener Name
+    {"reward_id", "rewardId"},         // eigener Name
+    {"reward_title", "rewardTitle"},   // eigener Name
+    {"reward_cost", "rewardCost"},     // eigener Name
+    {"status", "status"},              // eigener Name
 };
 
 inline constexpr EventField kStreamOnline[] = {
-    {"started_at", "startedAt"}, // Schritt 0 offen
-    {"kind", "kind"},            // Schritt 0 offen
-    {"at_start", "atStart"},     // Schritt 0 offen; eigener Name (Plan 2.5)
+    {"started_at", "startedAt"},
+    {"kind", "kind"},        // eigener Name (type bei Twitch: live, playlist, …)
+    {"at_start", "atStart"}, // eigener Name (Plan 2.5)
 };
 
-// Eigene Namen: kein Auslöser in P14 und nicht Teil von Schritt 0.
+inline constexpr EventField kStreamOffline[] = {
+    {"ended_at", "endedAt"}, // Zeitpunkt der Nachricht von Twitch (stream.offline hat kein eigenes Feld)
+};
+
+// Eigene Namen: kein Auslöser in P14.
 inline constexpr EventField kObsSceneChanged[] = {
     {"scene_uuid", "sceneUuid"},
     {"scene_name", "sceneName"},
 };
 
+#undef DSS_EVENT_CHAT_FIELDS
+#undef DSS_EVENT_TIER_FIELDS
 #undef DSS_EVENT_USER_FIELDS
 
 } // namespace detail
@@ -177,7 +181,7 @@ inline constexpr EventType kEventTypes[] = {
     // Auslöser erst später (Kanalpunkte-Effekte, Entscheid 2026-11-15)
     {"twitch.reward_redeemed", "twitch", false, detail::kRewardRedeemed},
     {"twitch.stream_online", "twitch", true, detail::kStreamOnline},
-    {"twitch.stream_offline", "twitch", true, {}},
+    {"twitch.stream_offline", "twitch", true, detail::kStreamOffline},
     {"obs.scene_changed", "obs", false, detail::kObsSceneChanged},
 };
 

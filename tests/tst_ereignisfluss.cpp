@@ -87,7 +87,31 @@ private slots:
             QCOMPARE(QLatin1String(first->fields[i].argument), QLatin1String(chat->fields[i].argument));
         }
         QCOMPARE(QLatin1String(first->fields.back().name), QLatin1String("first_ever"));
-        QVERIFY(findEventType(QStringLiteral("twitch.stream_offline"))->fields.empty());
+        // Schritt 0: belegte Namen bei Sub, Geschenk und Stream
+        const auto argumentsOf = [](const char *type) {
+            QHash<QString, QString> result;
+            for (const EventField &field : findEventType(QLatin1String(type))->fields)
+                result.insert(QString::fromLatin1(field.name), QString::fromLatin1(field.argument));
+            return result;
+        };
+        QCOMPARE(argument.value(QStringLiteral("user_id")), QStringLiteral("userId"));
+        QCOMPARE(argument.value(QStringLiteral("is_highlight")), QStringLiteral("isHighlight"));
+        const auto subscribe = argumentsOf("twitch.subscribe");
+        QCOMPARE(subscribe.value(QStringLiteral("tier")), QStringLiteral("subscriptionTier"));
+        QCOMPARE(subscribe.value(QStringLiteral("tier_name")), QStringLiteral("tier"));
+        const auto resub = argumentsOf("twitch.resubscribe");
+        QCOMPARE(resub.value(QStringLiteral("months")), QStringLiteral("cumulative"));
+        QCOMPARE(resub.value(QStringLiteral("streak_months")), QStringLiteral("monthStreak"));
+        QCOMPARE(resub.value(QStringLiteral("duration_months")), QStringLiteral("multiMonthDuration"));
+        const auto bomb = argumentsOf("twitch.gift_bomb");
+        QCOMPARE(bomb.value(QStringLiteral("total")), QStringLiteral("gifts"));
+        QCOMPARE(bomb.value(QStringLiteral("cumulative_total")), QStringLiteral("totalGifts"));
+        const auto gift = argumentsOf("twitch.gift_sub");
+        QCOMPARE(gift.value(QStringLiteral("user_name")), QStringLiteral("user")); // Schenkender
+        QCOMPARE(gift.value(QStringLiteral("recipient_user_name")), QStringLiteral("recipientUser"));
+        QCOMPARE(gift.value(QStringLiteral("recipient_user_id")), QStringLiteral("recipientId"));
+        QCOMPARE(argumentsOf("twitch.stream_online").value(QStringLiteral("started_at")), QStringLiteral("startedAt"));
+        QCOMPARE(argumentsOf("twitch.stream_offline").value(QStringLiteral("ended_at")), QStringLiteral("endedAt"));
         QVERIFY(!findEventType(QStringLiteral("twitch.reward_redeemed"))->trigger);
         QVERIFY(!findEventType(QStringLiteral("obs.scene_changed"))->trigger);
         QVERIFY(findEventType(QStringLiteral("twitch.follow"))->trigger);
