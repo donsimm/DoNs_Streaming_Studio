@@ -3,6 +3,7 @@
 // Läuft als Benutzerdienst von systemd (scripts/dienst-einrichten.sh), lässt sich aber auch
 // direkt starten. Schnittstelle: docs/08-kern-schnittstelle.md
 
+#include "actionservice.h"
 #include "configpaths.h"
 #include "coreservice.h"
 #include "coresettings.h"
@@ -151,6 +152,20 @@ int main(int argc, char *argv[])
                        "für Tests).").arg(QLatin1String(dss::NullOutput::kDeviceName)));
     parser.addOption(substituteOutputOption);
 #endif
+    // P14 b3, Stumm-Regel (Plan 3.4): Verbindung des Kerns der Version im Einsatz; Tests geben
+    // einen eigenen Pfad, damit ein laufender Kern im Einsatz sie nicht stumm schaltet.
+    const QCommandLineOption inUseOption(
+        QStringLiteral("einsatz-verbindung"),
+        QStringLiteral("Unix-Socket des Kerns der Version im Einsatz; antwortet dort ein Kern, startet "
+                       "dieser Kern keine Läufe aus Ereignissen (Standard in Arbeit: %1; für Tests).")
+            .arg(dss::defaultConnectionPath(dss::Edition::Installed)),
+        QStringLiteral("PFAD"));
+    const QCommandLineOption testEventsOption(
+        QStringLiteral("testereignisse"),
+        QStringLiteral("Nachricht test_event erlauben: Ereignisse vom Fenster auf den Ereignisfluss "
+                       "(nur für Tests)."));
+    parser.addOption(inUseOption);
+    parser.addOption(testEventsOption);
     parser.addOption(versionOption);
     parser.addOption(defaultPortOption);
     parser.addOption(dataDirOption);
@@ -287,6 +302,25 @@ int main(int argc, char *argv[])
     });
     dss::obs::ObsSources obsSources(&obsConnection, dataDir + QStringLiteral("/obs-quellen.json"));
     service.setObsConnection(&obsConnection, &obsSecrets, &obsSources);
+
+#if DSS_CORE_ACTIONS
+    // Aktionssystem (P14 b3). Nach service angelegt, also vor ihm zerstört (speichert dabei).
+    ActionService::Options actionOptions;
+    actionOptions.dataDir = dataDir;
+    if (parser.isSet(inUseOption))
+        actionOptions.inUseSocket = parser.value(inUseOption);
+    else if (dss::buildEdition() == dss::Edition::Development)
+        actionOptions.inUseSocket = dss::defaultConnectionPath(dss::Edition::Installed);
+    if (QFileInfo(actionOptions.inUseSocket).absoluteFilePath() == QFileInfo(socketPath).absoluteFilePath())
+        actionOptions.inUseSocket.clear(); // nie sich selbst prüfen
+    actionOptions.testEvents = parser.isSet(testEventsOption);
+    ActionService actions(service.eventBus(), actionOptions);
+    actions.load();
+    service.setActionService(&actions);
+#else
+    if (parser.isSet(testEventsOption))
+        qWarning("--testereignisse ohne Aktionssystem (DSS_CORE_ACTIONS aus)");
+#endif
 
 #if DSS_CORE_AUDIO
     // Ton der Videos über PipeWire (P12b b3): eigener Strom mit dem Ausgang aus kern.ini

@@ -24,7 +24,7 @@ struct StepTypeInfo
 {
     QString key;            // Typ in aktionen.json
     QString label;          // Bezeichnung auf Deutsch (Meldungen; vorläufig, Editor in e1)
-    int sbType = 0;         // Nummer bei Streamer.bot; 0 = keine Entsprechung oder Schritt 0 offen
+    int sbType = 0;         // Nummer bei Streamer.bot; 0 = keine Entsprechung oder Typnummer aus z0
     StepPart part = StepPart::P14_1;
     bool hasSteps = false;  // trägt eine eigene Liste steps (Gruppe, Wenn, Dann, Sonst)
     bool creatable = true;  // im Editor anlegbar (nicht: Dann, Sonst, script, unsupported)

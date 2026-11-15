@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "message_id": "nachricht-0030",
+    "message_type": "notification",
+    "message_timestamp": "2026-11-15T18:00:01.123456789Z",
+    "subscription_type": "channel.follow",
+    "subscription_version": "2"
+  },
+  "payload": {
+    "subscription": {
+      "id": "abo-0030",
+      "status": "enabled",
+      "type": "channel.follow",
+      "version": "2",
+      "cost": 0,
+      "condition": {"broadcaster_user_id": "100000001", "moderator_user_id": "100000001"},
+      "transport": {"method": "websocket", "session_id": "AgoQ-testsitzung-0001"},
+      "created_at": "2026-11-15T17:59:00.000000000Z"
+    },
+    "event": {
+      "user_id": "100000101",
+      "user_login": "zuschauer_eins",
+      "user_name": "Zuschauer_Eins",
+      "broadcaster_user_id": "100000001",
+      "broadcaster_user_login": "testkanal",
+      "broadcaster_user_name": "TestKanal",
+      "followed_at": "2026-11-15T18:00:00.987654321Z"
+    }
+  }
+}

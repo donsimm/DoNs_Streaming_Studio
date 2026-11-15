@@ -273,6 +273,22 @@ private slots:
         QVERIFY(triggerType(QStringLiteral("command"))->arguments.contains(QStringLiteral("input9")));
         QCOMPARE(triggerType(QStringLiteral("twitch.stream_offline"))->sbType, 155);
         QCOMPARE(commonArguments().size(), 11);
+        // Argumentnamen nach Schritt 0 (Bericht 2026-11-15, Abschnitt C 19)
+        const auto args = [](const char *type) { return triggerType(QString::fromLatin1(type))->arguments; };
+        QVERIFY(args("twitch.chat_message").contains(QStringLiteral("isHighlight")));
+        QVERIFY(!args("twitch.chat_message").contains(QStringLiteral("isHighlighted")));
+        QVERIFY(args("command").contains(QStringLiteral("firstMessage")));
+        QCOMPARE(args("command").count(QStringLiteral("msgId")), 1);
+        QVERIFY(args("twitch.subscribe").contains(QStringLiteral("subscriptionTier")));
+        QVERIFY(args("twitch.resubscribe").contains(QStringLiteral("monthStreak")));
+        QVERIFY(args("twitch.gift_sub").contains(QStringLiteral("recipientId")));
+        QVERIFY(!args("twitch.gift_sub").contains(QStringLiteral("user")));
+        QVERIFY(args("twitch.gift_bomb").contains(QStringLiteral("totalGifts")));
+        QVERIFY(args("twitch.cheer").contains(QStringLiteral("isAnonymous")));
+        QCOMPARE(args("twitch.stream_online"), QStringList{QStringLiteral("startedAt")});
+        QCOMPARE(args("twitch.stream_offline"), QStringList{QStringLiteral("endedAt")});
+        for (const TriggerTypeInfo &t : triggerTypes())
+            QCOMPARE(QSet<QString>(t.arguments.cbegin(), t.arguments.cend()).size(), t.arguments.size());
 
         // vollstaendig.json enthält jeden Typ
         ActionsConfig c;

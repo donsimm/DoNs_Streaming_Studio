@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 14); // seit P14 t (Medienart «Ton»)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 16); // seit P14 t und d (Ton, Laufzustand)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -793,6 +793,72 @@ private slots:
         QVERIFY(parseGetBrowserSource(getBrowserSourceMessage(QUuid()), &parsed, &error));
         QVERIFY(parsed.isNull());
         QVERIFY(!parseGetBrowserSource(simpleMessage(msg::kGetBrowserSource), &parsed, &error));
+    }
+
+    // P13: Ereignisfluss (subscribe_events, event_history, event, events_dropped)
+    void eventMessages()
+    {
+        const SubscribeEvents request{{QStringLiteral("twitch."), QStringLiteral("obs.scene_changed")}, true};
+        QJsonObject o = roundTrip(subscribeEventsMessage(request));
+        QCOMPARE(messageType(o), QStringLiteral("subscribe_events"));
+        SubscribeEvents backRequest;
+        QString error;
+        QVERIFY2(parseSubscribeEvents(o, &backRequest, &error), qPrintable(error));
+        QCOMPARE(backRequest, request);
+        // Leer = abbestellen
+        QVERIFY(parseSubscribeEvents(subscribeEventsMessage({}), &backRequest, &error));
+        QCOMPARE(backRequest, SubscribeEvents());
+        // Filter gegen die Typenliste
+        for (const QString &bad : {QStringLiteral("twitch"), QStringLiteral("twitch.gibtsnicht"),
+                                   QStringLiteral("youtube."), QString()}) {
+            QVERIFY2(!parseSubscribeEvents(subscribeEventsMessage({{bad}, false}), &backRequest, &error),
+                     qPrintable(bad));
+        }
+        QVERIFY(error.contains(QStringLiteral("Unbekannter Ereignistyp")));
+        o.remove(QStringLiteral("history"));
+        QVERIFY(!parseSubscribeEvents(o, &backRequest, &error));
+        o = subscribeEventsMessage(request);
+        o.insert(QStringLiteral("types"), QJsonArray{1});
+        QVERIFY(!parseSubscribeEvents(o, &backRequest, &error));
+
+        events::Event event;
+        event.id = QUuid::fromString(QStringLiteral("3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b"));
+        event.type = QStringLiteral("obs.scene_changed");
+        event.origin = QStringLiteral("obs");
+        event.time = QDateTime(QDate(2026, 11, 15), QTime(14, 3, 7, 125), QTimeZone::UTC);
+        event.data = QJsonObject{{QStringLiteral("scene_uuid"), QStringLiteral("u-1")},
+                                 {QStringLiteral("scene_name"), QStringLiteral("Szene «test 2»")}};
+        o = roundTrip(eventMessage(event));
+        QCOMPARE(messageType(o), QStringLiteral("event"));
+        QCOMPARE(QJsonDocument(o.value(QStringLiteral("event")).toObject()).toJson(QJsonDocument::Compact),
+                 QByteArray("{\"data\":{\"scene_name\":\"Szene «test 2»\",\"scene_uuid\":\"u-1\"},"
+                            "\"id\":\"3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b\",\"origin\":\"obs\","
+                            "\"origin_id\":\"\",\"time\":\"2026-11-15T14:03:07.125Z\",\"type\":\"obs.scene_changed\"}"));
+        events::Event back;
+        QVERIFY2(parseEventMessage(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, event);
+        QVERIFY(!parseEventMessage(simpleMessage(msg::kEvent), &back, &error));
+
+        events::Event second = event;
+        second.id = QUuid::createUuid();
+        second.originId = QStringLiteral("abc");
+        o = roundTrip(eventHistoryMessage({event, second}));
+        QCOMPARE(messageType(o), QStringLiteral("event_history"));
+        QList<events::Event> history;
+        QVERIFY2(parseEventHistory(o, &history, &error), qPrintable(error));
+        QCOMPARE(history, (QList<events::Event>{event, second}));
+        QVERIFY(parseEventHistory(eventHistoryMessage({}), &history, &error));
+        QVERIFY(history.isEmpty());
+        o.insert(QStringLiteral("events"), QJsonArray{1});
+        QVERIFY(!parseEventHistory(o, &history, &error));
+
+        o = roundTrip(eventsDroppedMessage(17));
+        QCOMPARE(messageType(o), QStringLiteral("events_dropped"));
+        qint64 count = 0;
+        QVERIFY2(parseEventsDropped(o, &count, &error), qPrintable(error));
+        QCOMPARE(count, 17);
+        QVERIFY(!parseEventsDropped(eventsDroppedMessage(0), &count, &error));
+        QCOMPARE(kEventBacklogBytes, 1024 * 1024);
     }
 
     // P10, Punkt 77

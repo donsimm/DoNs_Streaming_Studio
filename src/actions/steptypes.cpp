@@ -95,10 +95,11 @@ QList<StepTypeInfo> buildStepTypes()
                boolField(QStringLiteral("fallback"), true), boolField(QStringLiteral("reply"), false)}});
     t.append({QString::fromLatin1(kStepUserInfo), QStringLiteral("Benutzerinfo holen"), 50,
               StepPart::P14_1, false, true, {textField(QStringLiteral("login"), QStringLiteral("%userName%"))}});
-    // Schritt 0 offen: Nummer von «Twitch Shoutout» bei Streamer.bot (Plan 2.4, 10.3)
+    // Typnummer aus z0: Nummer von «Twitch Shoutout» bei Streamer.bot nicht dokumentiert (Schritt 0, C 20)
     t.append({QString::fromLatin1(kStepTwitchShoutout), QStringLiteral("Shoutout"), 0, StepPart::P14_1,
               false, true, {textField(QStringLiteral("login"))}});
-    // color: Farbe der Ansage bei Twitch als Text; die erlaubten Werte prüft c1 (Schritt 0)
+    // color: Farbe der Ansage bei Twitch als Text. Laut Schritt 0 (B 17) blue, green, orange, purple,
+    // primary; die Prüfung kommt mit dem Schritt in c1.
     t.append({QString::fromLatin1(kStepTwitchAnnounce), QStringLiteral("Ansage"), 23, StepPart::P14_1,
               false, true,
               {textField(QStringLiteral("text")), textField(QStringLiteral("color"), QStringLiteral("primary")),

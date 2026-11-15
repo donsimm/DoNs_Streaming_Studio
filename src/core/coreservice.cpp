@@ -1,7 +1,11 @@
 #include "coreservice.h"
 
+#include "actionprotocol.h"
+#include "actionservice.h"
 #include "browsersource.h"
+#include "eventtypes.h"
 #include "obsconnection.h"
+#include "obsevents.h"
 #include "obssecretstore.h"
 #include "obssources.h"
 #include "overlaylivestate.h"
@@ -90,6 +94,10 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
     connect(m_server, &QLocalServer::newConnection, this, &CoreService::onNewConnection);
     m_statsTimer->setInterval(kStatsIntervalMs);
     connect(m_statsTimer, &QTimer::timeout, this, &CoreService::sampleStats);
+    // P13: Ereignisfluss. Der Kern hört auf alle Typen und schickt jedem Fenster, was es bestellt hat.
+    m_events = new dss::events::EventBus(this);
+    m_windowEvents = m_events->subscribe(this, dss::events::eventTypeNames(),
+                                         [this](const dss::events::Event &event) { onEvent(event); });
 }
 
 CoreService::~CoreService()
@@ -182,9 +190,33 @@ int CoreService::stopImports()
 
 bool CoreService::savePending(QString *error)
 {
+    // P14 b3: Variablen und Zuschauer des Aktionssystems
+    if (m_actions && !m_actions->savePending(error))
+        return false;
     if (!m_store->hasPendingWrites())
         return true;
     return m_store->flushPendingWrites(error);
+}
+
+void CoreService::setActionService(ActionService *actions)
+{
+    m_actions = actions;
+    connect(actions, &ActionService::broadcastRequested, this, &CoreService::broadcast);
+}
+
+void CoreService::handleActionsRequest(QLocalSocket *socket, const QJsonObject &message)
+{
+    if (!m_actions) {
+        send(socket, dss::changeResultMessage({std::max<qint64>(dss::messageRequestId(message), 0), false, QUuid(),
+                                               QString::fromLatin1(dss::err::kActionsUnavailable),
+                                               QStringLiteral("Aktionssystem nicht gebaut (DSS_CORE_ACTIONS aus)")}));
+        return;
+    }
+    QPointer<QLocalSocket> target(socket);
+    m_actions->handleRequest(message, [this, target](const QJsonObject &reply) {
+        if (target)
+            send(target, reply);
+    });
 }
 
 void CoreService::onSaveRequested()
@@ -268,6 +300,8 @@ void CoreService::reload()
 #endif
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
           static_cast<long long>(m_store->overlays().size()), changed, removed);
+    if (m_actions)
+        m_actions->load(); // P14 b3: aktionen.json und die Dateien der Zuschauer
     // Schriftdateien im Datenordner können sich geändert haben.
     if (m_fontsLoaded) {
         m_fontsLoaded = false;
@@ -282,6 +316,7 @@ void CoreService::onNewConnection()
         m_clients.insert(socket, Client());
         connect(socket, &QLocalSocket::readyRead, this, [this, socket] { onReadyRead(socket); });
         connect(socket, &QLocalSocket::disconnected, this, [this, socket] { onDisconnected(socket); });
+        connect(socket, &QLocalSocket::bytesWritten, this, [this, socket] { reportDroppedEvents(socket); });
         // Der Kern grüsst zuerst (docs/08-kern-schnittstelle.md, «Ablauf»).
         // Datenordner im hello (P09): Das Fenster liest Bilder, Videos und Schriften von dort.
         send(socket, dss::helloMessage({QStringLiteral("dss-core"), dss::version(),
@@ -374,6 +409,14 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, obsSourcesMessage());
         send(socket, audioOutputsMessage());
         send(socket, dss::overlayLiveMessage(m_live->all())); // P14 d
+        // P14 b3: Aktionssystem (actions_config, actions_status)
+        if (m_actions) {
+            for (const QJsonObject &m : m_actions->helloMessages())
+                send(socket, m);
+        } else {
+            send(socket, dss::actionsStatusMessage({QStringLiteral("unavailable"),
+                                                    QStringLiteral("Aktionssystem nicht gebaut"), 0, {}, {}}));
+        }
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -410,6 +453,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         client.browserSource = id;
         client.browserSourceSent = {};
         updateBrowserSources();
+    } else if (type == QLatin1String(dss::msg::kSubscribeEvents)) {
+        handleSubscribeEvents(socket, client, message);
+    } else if (dss::isActionsRequestType(type)) {
+        handleActionsRequest(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetMediaList)) {
@@ -606,6 +653,7 @@ void CoreService::setObsConnection(dss::obs::ObsConnection *connection, dss::obs
     connect(connection, &ObsConnection::currentSceneChanged, this, &CoreService::onObsChanged);
     connect(sources, &ObsSources::scenesChanged, this, &CoreService::onObsChanged);
     connect(sources, &ObsSources::entriesChanged, this, [this] { broadcast(obsSourcesMessage()); });
+    new ObsEvents(connection, m_events, this); // P13: obs.scene_changed auf dem Ereignisfluss
     // Zuerst der Sollzustand: Der Abgleich beim Verbinden braucht ihn.
     updateObsSources();
     applyObsSettings();
@@ -1032,6 +1080,71 @@ void CoreService::broadcast(const QJsonObject &message)
         if (it->greeted)
             it.key()->write(line);
     }
+}
+
+void CoreService::handleSubscribeEvents(QLocalSocket *socket, Client &client, const QJsonObject &message)
+{
+    dss::SubscribeEvents request;
+    QString error;
+    if (!dss::parseSubscribeEvents(message, &request, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        return;
+    }
+    client.eventTypes = request.types;
+    client.eventsInHistory.clear();
+    qInfo("Ereignisse: %s bestellt %s%s", qPrintable(client.hello.program),
+          request.types.isEmpty() ? "nichts" : qPrintable(request.types.join(QLatin1Char(' '))),
+          request.history ? " mit Verlauf" : "");
+    if (!request.history)
+        return;
+    // Ereignisse, die schon im Verlauf stehen, aber noch nicht verteilt sind (Zustellung verzögert),
+    // kommen nicht noch einmal als event.
+    const QList<dss::events::Event> all = m_events->history(dss::events::eventTypeNames());
+    qsizetype first = 0;
+    for (qsizetype i = all.size() - 1; i >= 0; --i) {
+        if (all.at(i).id == m_lastDeliveredEvent) {
+            first = i + 1;
+            break;
+        }
+    }
+    for (qsizetype i = first; i < all.size(); ++i)
+        client.eventsInHistory.insert(all.at(i).id);
+    send(socket, dss::eventHistoryMessage(m_events->history(request.types)));
+}
+
+void CoreService::onEvent(const dss::events::Event &event)
+{
+    m_lastDeliveredEvent = event.id;
+    QByteArray line;
+    for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+        if (it->eventsInHistory.remove(event.id) || !it->greeted
+            || !dss::events::matchesFilters(event.type, it->eventTypes))
+            continue;
+        QLocalSocket *socket = it.key();
+        // Gegendruck (Plan 1.5): Ein Fenster, das nicht liest, bremst den Kern nicht.
+        if (socket->bytesToWrite() > dss::kEventBacklogBytes) {
+            if (it->droppedEvents++ == 0)
+                qWarning("Ereignisse: %s liest nicht (mehr als %lld Byte ungesendet), verwerfe Ereignisse",
+                         qPrintable(it->hello.program), static_cast<long long>(dss::kEventBacklogBytes));
+            continue;
+        }
+        reportDroppedEvents(socket);
+        if (line.isEmpty())
+            line = dss::encodeMessage(dss::eventMessage(event));
+        socket->write(line);
+    }
+}
+
+void CoreService::reportDroppedEvents(QLocalSocket *socket)
+{
+    const auto it = m_clients.find(socket);
+    if (it == m_clients.end() || it->droppedEvents == 0 || socket->bytesToWrite() > dss::kEventBacklogBytes)
+        return;
+    const qint64 count = it->droppedEvents;
+    it->droppedEvents = 0;
+    qInfo("Ereignisse: %s liest wieder, verworfen: %lld", qPrintable(it->hello.program),
+          static_cast<long long>(count));
+    send(socket, dss::eventsDroppedMessage(count));
 }
 
 void CoreService::sampleStats()

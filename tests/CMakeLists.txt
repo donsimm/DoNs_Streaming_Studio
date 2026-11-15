@@ -103,6 +103,29 @@ dss_add_test(tst_zuschauerimport)
 target_link_libraries(tst_zuschauerimport PRIVATE dss_actions)
 target_compile_definitions(tst_zuschauerimport PRIVATE
   DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
+# P14 b1: Ablauf der Läufe (Zustandsmaschine, Warteschlangen, Grenzen) mit ersetzter Uhr und
+# ersetzten Diensten, ohne Qt Gui und ohne Netz.
+dss_add_test(tst_aktionsablauf)
+target_link_libraries(tst_aktionsablauf PRIVATE dss_actions)
+target_compile_definitions(tst_aktionsablauf PRIVATE
+  DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
+# P14 b2: Auslöser ohne Netz (Argumente aus Ereignissen, Filter, Befehle, Zeitnachrichten) mit
+# erfundenen Ereignissen nach Plan P13 1.3, Uhr aus aktionsuhr.h.
+dss_add_test(tst_ausloeser)
+target_link_libraries(tst_ausloeser PRIVATE dss_actions)
+# P14 b3: Aktionssystem im Kern (dss-core und dss-cli als eigene Prozesse, Ereignisse über
+# test_event mit dss-core --testereignisse, zweiter Kern als «Version im Einsatz»).
+if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
+  dss_add_test(tst_kernaktionen)
+  target_compile_definitions(tst_kernaktionen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
+  add_dependencies(tst_kernaktionen dss-core dss-cli)
+endif()
+# P14 e1: Ansichtslogik des Editors im Reiter «Chat-Bot» (Listen, Auswahl, Filter, Bearbeiten über
+# Änderungsbefehle, Prüfmeldungen) mit tests/daten/aktionen/vollstaendig.json, ohne Qt Gui.
+dss_add_test(tst_aktionsansicht)
+target_compile_definitions(tst_aktionsansicht PRIVATE
+  DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).
@@ -353,6 +376,29 @@ add_test(NAME tst_obspasswort COMMAND tst_obspasswort)
 qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
 target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
+
+# P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
+qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)
+target_link_libraries(tst_ereignisfluss PRIVATE dss_events dss_warnings Qt6::Test)
+add_test(NAME tst_ereignisfluss COMMAND tst_ereignisfluss)
+
+# P13: Protokoll von EventSub (Nachrichten, Ereignisse, Abos) und «erste Nachricht in diesem
+# Stream», mit den Testnachrichten aus tests/daten/twitch/, ohne Verbindung und ohne Qt Gui.
+qt_add_executable(tst_twitchprotokoll tst_twitchprotokoll.cpp)
+target_link_libraries(tst_twitchprotokoll PRIVATE dss_twitch dss_warnings Qt6::Test)
+target_compile_definitions(tst_twitchprotokoll PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+add_test(NAME tst_twitchprotokoll COMMAND tst_twitchprotokoll)
+# P13: Anmeldung (Gerätefluss, Erneuern, Prüfen, Abmelden, zwei Konten) und Helix gegen den
+# Testserver tests/twitchtestserver.h auf 127.0.0.1, ohne Netz und ohne Qt Gui.
+qt_add_executable(tst_twitchanmeldung tst_twitchanmeldung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchanmeldung PRIVATE dss_twitch dss_warnings Qt6::Test)
+add_test(NAME tst_twitchanmeldung COMMAND tst_twitchanmeldung)
+# P13: Verbindung zu EventSub (Abos, Keepalive, session_reconnect, Close-Codes, revocation, doppelte
+# Nachrichten, Wartezeiten, Stream-Zustand beim Start) gegen den WebSocket-Teil des Testservers.
+qt_add_executable(tst_twitchverbindung tst_twitchverbindung.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchverbindung PRIVATE dss_twitch dss_warnings Qt6::Test)
+target_compile_definitions(tst_twitchverbindung PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+add_test(NAME tst_twitchverbindung COMMAND tst_twitchverbindung)
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.

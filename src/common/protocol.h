@@ -2,6 +2,7 @@
 
 #include "connectionstate.h"
 #include "coresettings.h"
+#include "event.h"
 #include "fontcatalog.h"
 #include "medialibrary.h"
 #include "overlay.h"
@@ -47,11 +48,13 @@ namespace dss {
 //   audio_offset_max_ms; update_settings mit audio_routes)
 // 13 seit P12b b5: Overlays im Format 5 (video.volume, video.muted), changes.video.volume und
 //   changes.video.muted
-// 14 seit P14 t (vorläufig, Lotse vergibt die Nummer beim Zusammenführen): media_list mit kind
-//   "audio" und duration_ms; seit P14 d (gleiche vorläufige Nummer) overlay_live,
+// 14 seit P13: Ereignisfluss (subscribe_events, event_history, event, events_dropped)
+// 15 seit P14 b3: Aktionssystem (actions_config, actions_status, Änderungen und Läufe;
+//   Nachrichten in actionprotocol.h), Ereignisse actions.run_*
+// 16 seit P14 t: media_list mit kind "audio" und duration_ms; seit P14 d overlay_live,
 //   overlay_live_set, overlay_live_reset (overlaylive.h)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 14;
+inline constexpr int kProtocolVersion = 16;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -126,6 +129,11 @@ inline constexpr char kObsCreateSource[] = "obs_create_source";
 inline constexpr char kObsAddToScene[] = "obs_add_to_scene";
 // P12b b3: Ausgänge für den Ton und ihr Zustand
 inline constexpr char kAudioOutputs[] = "audio_outputs";
+// P13: Ereignisfluss, nur auf Bestellung
+inline constexpr char kSubscribeEvents[] = "subscribe_events";
+inline constexpr char kEventHistory[] = "event_history";
+inline constexpr char kEvent[] = "event";
+inline constexpr char kEventsDropped[] = "events_dropped";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -529,5 +537,30 @@ bool parseImportProgress(const QJsonObject &message, QList<ImportProgressData> *
 // get_browser_source: Kennung des Overlays; null = keine Adresse mehr schicken.
 QJsonObject getBrowserSourceMessage(const QUuid &overlayId);
 bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString *error);
+
+// subscribe_events (P13, Plan 1.5): Ereignisse für diese Verbindung bestellen. types: Filter
+// (genaue Typen oder Vorsilben mit Punkt, src/events/eventtypes.h); leer = abbestellen. history:
+// zuerst event_history mit dem Verlauf zu diesen Filtern. Ohne Bestellung kommt nichts.
+struct SubscribeEvents
+{
+    QStringList types;
+    bool history = false;
+
+    bool operator==(const SubscribeEvents &) const = default;
+};
+QJsonObject subscribeEventsMessage(const SubscribeEvents &request);
+// Prüft auch die Filter gegen die Typenliste.
+bool parseSubscribeEvents(const QJsonObject &message, SubscribeEvents *request, QString *error);
+// event_history: Verlauf (höchstens 200, älteste zuerst), nur an die bestellende Verbindung.
+QJsonObject eventHistoryMessage(const QList<events::Event> &events);
+bool parseEventHistory(const QJsonObject &message, QList<events::Event> *events, QString *error);
+// event: ein neues Ereignis, nur an Verbindungen, deren Bestellung passt.
+QJsonObject eventMessage(const events::Event &event);
+bool parseEventMessage(const QJsonObject &message, events::Event *event, QString *error);
+// events_dropped (Gegendruck): count Ereignisse für diese Verbindung verworfen, weil mehr als
+// kEventBacklogBytes ungesendet lagen.
+inline constexpr qint64 kEventBacklogBytes = 1024 * 1024;
+QJsonObject eventsDroppedMessage(qint64 count);
+bool parseEventsDropped(const QJsonObject &message, qint64 *count, QString *error);
 
 } // namespace dss

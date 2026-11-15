@@ -102,9 +102,16 @@ QString replacePlaceholders(const QString &text, const Arguments &arguments, con
 {
     return scan(text, [&](QChar c, const QString &name) -> std::optional<QString> {
         if (c == QLatin1Char('%')) {
-            const auto it = arguments.constFind(name);
-            if (it == arguments.constEnd())
-                return std::nullopt;
+            // Wie Streamer.bot: Gross- und Kleinschreibung des Namens zählt nicht (Entscheid Nutzer, 2026-11-15)
+            auto it = arguments.constFind(name);
+            if (it == arguments.constEnd()) {
+                for (it = arguments.constBegin(); it != arguments.constEnd(); ++it) {
+                    if (it.key().compare(name, Qt::CaseInsensitive) == 0)
+                        break;
+                }
+                if (it == arguments.constEnd())
+                    return std::nullopt;
+            }
             return placeholderText(*it);
         }
         if (!globals)

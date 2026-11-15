@@ -72,7 +72,9 @@ public:
             }
             if (deadline.hasExpired() || m_socket.state() != QLocalSocket::ConnectedState)
                 return {};
-            if (m_socket.waitForReadyRead(int(deadline.remainingTime())))
+            // Schon gepufferte Daten zuerst (mit begrenztem Lesepuffer meldet waitForReadyRead
+            // bei vollem Puffer nichts Neues).
+            if (m_socket.bytesAvailable() > 0 || m_socket.waitForReadyRead(int(deadline.remainingTime())))
                 m_lines.append(m_socket.readAll());
         }
     }
@@ -89,6 +91,19 @@ public:
         return m_socket.state() == QLocalSocket::UnconnectedState;
     }
     QByteArray allLines() const { return m_all.join('\n'); }
+    void setReadBufferSize(qint64 size) { m_socket.setReadBufferSize(size); }
+    // Wie waitFor, lässt dazwischen die Ereignisschleife des Tests laufen (Testserver von OBS).
+    QJsonObject waitWithEvents(const QString &type, int timeoutMs = 5000)
+    {
+        const QDeadlineTimer deadline(timeoutMs);
+        while (!deadline.hasExpired()) {
+            const QJsonObject o = waitFor(type, 20);
+            if (!o.isEmpty())
+                return o;
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        }
+        return {};
+    }
 
 private:
     QLocalSocket m_socket;
@@ -190,7 +205,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 14); // seit P14 t (Medienart «Ton»)
+        QCOMPARE(c->coreHello().protocolVersion, 16); // seit P14 t und d (Ton, Laufzustand)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -625,6 +640,174 @@ private slots:
         QVERIFY2(!log.contains(password), qPrintable(log));
         QVERIFY2(!log.contains(server.password), qPrintable(log));
         QVERIFY2(log.contains(QStringLiteral("OBS: Passwort verschlüsselt gespeichert")), qPrintable(log));
+    }
+
+    // P13, Plan 1.5: Ereignisfluss über den Socket. Der Szenenwechsel vom Testserver von OBS kommt
+    // als event nur bei Fenstern an, die bestellt haben; Verlauf auf Bestellung; Gegendruck: ein
+    // Fenster, das nicht liest, verliert Ereignisse und erfährt es mit events_dropped; dss-cli
+    // ereignisse. Eigener Kern, eigener Ordner.
+    void events()
+    {
+        QTemporaryDir data;
+        QTemporaryDir config;
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        const QString socket = run->filePath(QStringLiteral("e.sock"));
+        // Grosses Overlay (Text mit 200 000 Zeichen): 20 Antworten auf get_overlay füllen den
+        // Puffer eines Fensters, das nicht liest, weit über 1 MiB.
+        QUuid bigId;
+        {
+            OverlayStore store(data.path());
+            QString error;
+            QVERIFY(store.load(&error));
+            bigId = store.createOverlay(QStringLiteral("Gross"), 1920, 1080, &error);
+            QVERIFY2(!bigId.isNull(), qPrintable(error));
+            QVERIFY(!store.addTextSource(bigId, QString(200000, QLatin1Char('x')), kFont, &error).isNull());
+        }
+        std::unique_ptr<QProcess> core = testhelp::startCore(data.path(), socket, config.path());
+        QString log;
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+
+        const auto sceneOf = [](const QJsonObject &message) {
+            events::Event e;
+            QString error;
+            if (!parseEventMessage(message, &e, &error))
+                return QStringLiteral("ungültig: ") + error;
+            return e.type + QLatin1Char(' ') + e.data.value(QStringLiteral("scene_name")).toString();
+        };
+        const QByteArray eventLine = "\"type\":\"event\"}";
+
+        // A bestellt mit Verlauf (noch leer), B bestellt nichts
+        RawConnection a(socket);
+        RawConnection b(socket);
+        QVERIFY(a.isConnected() && b.isConnected());
+        a.hello(QStringLiteral("fenster-a"));
+        b.hello(QStringLiteral("fenster-b"));
+        a.sendLine(encodeMessage(subscribeEventsMessage({{QStringLiteral("obs.")}, true})).chopped(1));
+        QList<events::Event> history;
+        QString error;
+        QVERIFY(parseEventHistory(a.waitFor(QStringLiteral("event_history")), &history, &error));
+        QVERIFY(history.isEmpty());
+        // Ungültiger Filter: Fehler, Bestellung bleibt
+        a.sendLine(encodeMessage(subscribeEventsMessage({{QStringLiteral("twitch")}, false})).chopped(1));
+        ErrorInfo e;
+        QVERIFY(parseError(a.waitFor(QStringLiteral("error")), &e, &error));
+        QCOMPARE(e.code, QStringLiteral("invalid_message"));
+        QCOMPARE(e.request, QStringLiteral("subscribe_events"));
+
+        // OBS einschalten (Testserver auf 127.0.0.1): Die erste Szene nach dem Verbinden ist ein Wechsel.
+        testhelp::ObsTestServer server;
+        QVERIFY(server.start());
+        CoreClient::Options o;
+        o.socketPath = socket;
+        o.program = QStringLiteral("tst_kernverbindung");
+        o.version = version();
+        CoreClient settingsClient(o);
+        settingsClient.start();
+        QTRY_VERIFY(settingsClient.obsStatus().has_value());
+        SettingsUpdate update;
+        update.obsEnabled = true;
+        update.obsHost = QStringLiteral("127.0.0.1");
+        update.obsPort = server.port();
+        settingsClient.sendSettingsUpdate(update);
+        QCOMPARE(sceneOf(a.waitWithEvents(QStringLiteral("event"), 15000)), QStringLiteral("obs.scene_changed Live"));
+
+        // D bestellt und liest danach nicht mehr. Ohne Grenze läse Qt im Test während qWait alles in
+        // den eigenen Puffer; ein hängendes Fenster liest dagegen nichts.
+        RawConnection d(socket);
+        QVERIFY(d.isConnected());
+        d.setReadBufferSize(64 * 1024);
+        d.hello(QStringLiteral("fenster-d"));
+        d.sendLine(encodeMessage(subscribeEventsMessage({{QStringLiteral("obs.scene_changed")}, false})).chopped(1));
+        for (int i = 0; i < 20; ++i)
+            d.sendLine(encodeMessage(overlayIdMessage(msg::kGetOverlay, bigId)).chopped(1));
+        QTest::qWait(1000);
+
+        server.switchScene(server.scenes.at(1));
+        QCOMPARE(sceneOf(a.waitWithEvents(QStringLiteral("event"))), QStringLiteral("obs.scene_changed Pause"));
+        // Ohne Bestellung kommt nichts
+        QVERIFY(b.waitWithEvents(QStringLiteral("event"), 1000).isEmpty());
+        QVERIFY(!b.allLines().contains(eventLine));
+
+        // D liest wieder: zuerst die Antworten, dann events_dropped mit 1, kein event dazwischen
+        qint64 dropped = 0;
+        const QJsonObject droppedMessage = d.waitWithEvents(QStringLiteral("events_dropped"), 15000);
+        QVERIFY2(parseEventsDropped(droppedMessage, &dropped, &error),
+                 qPrintable(QStringLiteral("%1 Byte gelesen, event %2, overlay %3")
+                                .arg(d.allLines().size())
+                                .arg(d.allLines().count(eventLine))
+                                .arg(d.allLines().count("\"type\":\"overlay\"}"))));
+        QCOMPARE(dropped, 1);
+        QVERIFY(!d.allLines().contains(eventLine));
+        server.switchScene(server.scenes.at(0));
+        QCOMPARE(sceneOf(d.waitWithEvents(QStringLiteral("event"))), QStringLiteral("obs.scene_changed Live"));
+        QCOMPARE(sceneOf(a.waitWithEvents(QStringLiteral("event"))), QStringLiteral("obs.scene_changed Live"));
+
+        // Später verbunden: Verlauf in der Reihenfolge, nur passende Typen
+        RawConnection c(socket);
+        QVERIFY(c.isConnected());
+        c.hello(QStringLiteral("fenster-c"));
+        c.sendLine(encodeMessage(subscribeEventsMessage({{QStringLiteral("obs.scene_changed")}, true})).chopped(1));
+        QVERIFY(parseEventHistory(c.waitFor(QStringLiteral("event_history")), &history, &error));
+        QStringList names;
+        for (const events::Event &ev : std::as_const(history))
+            names.append(ev.data.value(QStringLiteral("scene_name")).toString());
+        QCOMPARE(names, (QStringList{"Live", "Pause", "Live"}));
+        QCOMPARE(history.first().origin, QStringLiteral("obs"));
+        c.sendLine(encodeMessage(subscribeEventsMessage({{QStringLiteral("twitch.")}, true})).chopped(1));
+        QVERIFY(parseEventHistory(c.waitFor(QStringLiteral("event_history")), &history, &error));
+        QVERIFY(history.isEmpty());
+
+        // Abbestellen: A bekommt nichts mehr
+        a.sendLine(encodeMessage(subscribeEventsMessage({})).chopped(1));
+        QTest::qWait(200);
+        server.switchScene(server.scenes.at(1));
+        QCOMPARE(sceneOf(d.waitWithEvents(QStringLiteral("event"))), QStringLiteral("obs.scene_changed Pause"));
+        QVERIFY(a.waitWithEvents(QStringLiteral("event"), 1000).isEmpty());
+
+#ifdef DSS_CLI_BIN
+        // dss-cli ereignisse: Verlauf als JSON-Zeilen
+        CliResult cli = runCliOnly({QStringLiteral("--verbindung"), socket, QStringLiteral("ereignisse")});
+        QCOMPARE(cli.exitCode, 0);
+        QStringList lines = cli.out.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+        QCOMPARE(lines.size(), 4);
+        for (const QString &line : std::as_const(lines)) {
+            events::Event ev;
+            QVERIFY2(events::eventFromJson(QJsonDocument::fromJson(line.toUtf8()).object(), &ev, &error), qPrintable(line));
+            QCOMPARE(ev.type, QStringLiteral("obs.scene_changed"));
+        }
+        cli = runCliOnly({QStringLiteral("--verbindung"), socket, QStringLiteral("ereignisse"), QStringLiteral("--typ"),
+                          QStringLiteral("twitch.")});
+        QCOMPARE(cli.exitCode, 0);
+        QVERIFY(cli.out.isEmpty());
+        cli = runCliOnly({QStringLiteral("--verbindung"), socket, QStringLiteral("ereignisse"), QStringLiteral("--typ"),
+                          QStringLiteral("twitch")});
+        QCOMPARE(cli.exitCode, 2);
+        QVERIFY2(cli.err.contains(QStringLiteral("Unbekannter Ereignistyp")), qPrintable(cli.err));
+        cli = runCliOnly({QStringLiteral("--verbindung"), run->filePath(QStringLiteral("keiner.sock")),
+                          QStringLiteral("ereignisse")});
+        QCOMPARE(cli.exitCode, 4);
+        cli = runCliOnly({QStringLiteral("einstellungen"), QStringLiteral("--folgen")});
+        QCOMPARE(cli.exitCode, 2);
+
+        // --folgen: Verlauf, danach neue Ereignisse
+        QProcess follow;
+        follow.start(QStringLiteral(DSS_CLI_BIN), {QStringLiteral("--verbindung"), socket, QStringLiteral("ereignisse"),
+                                                   QStringLiteral("--folgen"), QStringLiteral("--typ"),
+                                                   QStringLiteral("obs.scene_changed")});
+        QByteArray followed;
+        QTRY_VERIFY_WITH_TIMEOUT((followed += follow.readAllStandardOutput()).count('\n') == 4, 5000);
+        server.switchScene(server.scenes.at(0));
+        QTRY_VERIFY_WITH_TIMEOUT((followed += follow.readAllStandardOutput()).count('\n') == 5, 5000);
+        QVERIFY2(followed.split('\n').at(4).contains("\"scene_name\":\"Live\""), followed.constData());
+        follow.kill();
+        follow.waitForFinished(3000);
+#endif
+
+        core->terminate();
+        QVERIFY(core->waitForFinished(5000));
+        log += QString::fromUtf8(core->readAllStandardError());
+        QVERIFY2(log.contains(QStringLiteral("Ereignisse: fenster-d liest nicht")), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("Ereignisse: fenster-d liest wieder, verworfen: 1")), qPrintable(log));
     }
 
     // P12b b3: audio_outputs nach hello an jedes Fenster; Ausgang und Versatz über update_settings in

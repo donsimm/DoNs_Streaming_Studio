@@ -16,7 +16,7 @@
 //   Zeichen % ist kein Platzhalter («100% sicher, %user%» ersetzt nur %user%). Damit bleiben auch
 //   Formate wie %name:format% wörtlich stehen (nicht in P14).
 // - Gross- und Kleinschreibung zählt. Ob Streamer.bot Namen ohne Rücksicht darauf auflöst, ist
-//   Schritt 0 offen.
+//   im Schritt-0-Bericht vom 2026-11-15 nicht geklärt ([OFFEN]).
 // - Eingesetzte Werte werden nicht nochmals durchsucht (keine Platzhalter aus Chat-Texten).
 // - Nicht in P14: $math()$, $length()$ (kommen beim Nutzer nicht vor).
 
@@ -31,7 +31,7 @@ QString replacePlaceholders(const QString &text, const Arguments &arguments,
 
 // Text eines Werts beim Einsetzen: Text unverändert; ganze Zahlen ohne Nachkommastellen, andere
 // Zahlen in kürzester Form mit Punkt; true/false als «True»/«False» wie .NET (Streamer.bot,
-// Schritt 0 offen); null leer; Listen und Objekte als kompaktes JSON.
+// im Schritt-0-Bericht nicht geklärt); null leer; Listen und Objekte als kompaktes JSON.
 QString placeholderText(const QJsonValue &value);
 
 // Namen der Platzhalter %name% bzw. ~name~ im Text, in der Reihenfolge des Vorkommens, ohne Doppelte
@@ -40,7 +40,7 @@ QStringList globalNames(const QString &text);
 
 // «auto_type» (Plan 2.4): Text, der ganz eine Zahl ist (zum Beispiel «12», «-3», «1.5»), wird
 // zur Zahl, sonst bleibt er Text. Variablen sind Text oder Zahl (Plan 2.9); true/false bleiben
-// darum Text (ob Streamer.bot sie umwandelt, ist Schritt 0 offen).
+// darum Text (ob Streamer.bot sie umwandelt, ist im Schritt-0-Bericht nicht geklärt).
 QJsonValue autoTypedValue(const QString &text);
 
 } // namespace dss::actions

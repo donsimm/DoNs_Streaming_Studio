@@ -38,6 +38,8 @@ add_library(dss_common STATIC
   canvasimage.h canvasimage.cpp
   overlaylive.h overlaylive.cpp
   overlaylivestate.h overlaylivestate.cpp
+  actionview.h actionview.cpp
+  actionprotocol.h actionprotocol.cpp # P14 b3: Nachrichten des Aktionssystems
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und
@@ -51,8 +53,10 @@ else()
 endif()
 target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}"
   DSS_COMMIT="${DSS_COMMIT}" DSS_BUILTIN_FONT_DIR="${DSS_BUILTIN_FONT_DIR}")
-# dss_actions (P14 a): nur für das Prüfen der Datenformate (dataformat.cpp)
-target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network PRIVATE dss_warnings dss_actions)
+# dss_actions (P14 a): Prüfen der Datenformate (dataformat.cpp); seit e1 öffentlich, weil die
+# Ansichtslogik des Editors (actionview.h) das Modell der Aktionen in ihrer Schnittstelle nutzt.
+# dss_events (P13): Ereignisse in der Schnittstelle (subscribe_events, event, event_history)
+target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network dss_actions dss_events PRIVATE dss_warnings)
 # Version in Arbeit oder im Einsatz (P10a, Teil B, Schalter in der obersten CMakeLists.txt)
 target_compile_definitions(dss_common PRIVATE
   DSS_INSTALLED_EDITION=$<BOOL:${DSS_INSTALLED_EDITION}>)
