@@ -1938,6 +1938,71 @@ private slots:
         QCOMPARE(server.connectionCount(), connections);
     }
 
+    // P13: Bereich «Twitch» wie der Bereich «OBS». Twitch bleibt aus (kein Zugriff auf Twitch im
+    // Test); geprüft werden Felder, Zustand der Konten, Abweisung von «Anmelden …» und die Client-ID.
+    void settingsDialogTwitch()
+    {
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
+                                     && dialog->isVisible(), 3000);
+        auto *enabled = dialog->findChild<QCheckBox *>(QStringLiteral("settingsTwitchEnabled"));
+        auto *clientId = dialog->findChild<QLineEdit *>(QStringLiteral("settingsTwitchClientId"));
+        auto *secret = dialog->findChild<QLineEdit *>(QStringLiteral("settingsTwitchClientSecret"));
+        auto *deleteSecret = dialog->findChild<QPushButton *>(QStringLiteral("settingsTwitchDeleteSecret"));
+        auto *channelState = dialog->findChild<QLabel *>(QStringLiteral("settingsTwitchChannelState"));
+        auto *botState = dialog->findChild<QLabel *>(QStringLiteral("settingsTwitchBotState"));
+        auto *channelLogin = dialog->findChild<QPushButton *>(QStringLiteral("settingsTwitchChannelLogin"));
+        auto *channelLogout = dialog->findChild<QPushButton *>(QStringLiteral("settingsTwitchChannelLogout"));
+        auto *channelStack = dialog->findChild<QStackedWidget *>(QStringLiteral("settingsTwitchChannelStack"));
+        auto *botStack = dialog->findChild<QStackedWidget *>(QStringLiteral("settingsTwitchBotStack"));
+        auto *status = dialog->findChild<QLabel *>(QStringLiteral("settingsTwitchStatus"));
+        auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("settingsOk"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("settingsProblem"));
+        QVERIFY(enabled && clientId && secret && deleteSecret && channelState && botState && channelLogin
+                && channelLogout && channelStack && botStack && status && ok && problem);
+        QVERIFY(dialog->findChild<QLabel *>(QStringLiteral("settingsTwitchBotHint")));
+        QCOMPARE(dialog->findChildren<QLabel *>(QStringLiteral("propertySectionTitle")).size(), 2);
+        QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled() && enabled->isEnabled(), 3000);
+        QVERIFY(!enabled->isChecked());
+        QCOMPARE(clientId->text(), QString());
+        QCOMPARE(secret->echoMode(), QLineEdit::Password);
+        QCOMPARE(secret->placeholderText(), QStringLiteral("kein Secret gespeichert"));
+        QVERIFY(!deleteSecret->isEnabled());
+        QCOMPARE(channelState->text(), QStringLiteral("nicht angemeldet"));
+        QCOMPARE(botState->text(), QStringLiteral("nicht angemeldet"));
+        QCOMPARE(channelStack->currentIndex(), 0);
+        QCOMPARE(botStack->currentIndex(), 0);
+        QVERIFY(channelLogin->isEnabled());
+        QVERIFY(!channelLogout->isEnabled());
+
+        // «Anmelden …» bei ausgeschaltetem Twitch: Meldung des Kerns, Höhe der Meldung unverändert
+        const int problemHeight = problem->height();
+        const int stackHeight = channelStack->height();
+        QTest::mouseClick(channelLogin, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("Twitch ist aus")), 3000);
+        QVERIFY(channelLogin->isEnabled());
+        QCOMPARE(problem->height(), problemHeight);
+        QCOMPARE(channelStack->height(), stackHeight);
+
+        // Client-ID ohne Leerzeichen am Rand gespeichert, Twitch bleibt aus
+        clientId->setText(QStringLiteral(" testclientid "));
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QVERIFY(secret->text().isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(m_check->settings()->settings.twitchClientId, QStringLiteral("testclientid"), 3000);
+        QVERIFY(!m_check->settings()->settings.twitchEnabled);
+
+        // Zurück auf leer, damit die anderen Tests den Ausgangsstand haben
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && ok->isEnabled(), 3000);
+        QCOMPARE(clientId->text(), QStringLiteral("testclientid"));
+        clientId->clear();
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->settings()->settings.twitchClientId.isEmpty(), 3000);
+    }
+
     // P10, Punkt 77: Dialog mit einem eigenen Kern, dessen kern.ini ungültig ist: «OK» ausgegraut,
     // «Auf Standardwerte zurücksetzen» frei; danach die neuen Werte im Dialog und der Hinweis.
     void settingsDialogReset()

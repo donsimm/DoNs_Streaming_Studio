@@ -132,8 +132,17 @@ std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current
         update.obsPassword = form.obsPassword;
     else if (form.deleteObsPassword)
         update.obsPassword = QString();
+    const QString twitchClientId = form.twitchClientId.trimmed();
+    if (form.twitchEnabled != current.twitchEnabled)
+        update.twitchEnabled = form.twitchEnabled;
+    if (twitchClientId != current.twitchClientId)
+        update.twitchClientId = twitchClientId;
+    if (!form.twitchClientSecret.isEmpty())
+        update.twitchClientSecret = form.twitchClientSecret;
+    else if (form.deleteTwitchClientSecret)
+        update.twitchClientSecret = QString();
     if (!update.port && !update.homeAddress && !update.obsEnabled && !update.obsHost && !update.obsPort
-        && !update.obsPassword) {
+        && !update.obsPassword && !update.twitchEnabled && !update.twitchClientId && !update.twitchClientSecret) {
         if (!form.obsEnabled || !obsInError)
             return std::nullopt;
         update.obsEnabled = form.obsEnabled;
@@ -158,6 +167,91 @@ QString obsPasswordPlaceholder(const std::optional<SettingsInfo> &info, bool del
         return QStringLiteral("wird mit «OK» gelöscht");
     return info->obsPasswordSet ? QStringLiteral("gespeichert; leer lassen = behalten")
                                 : QStringLiteral("kein Passwort gespeichert");
+}
+
+QString twitchSecretPlaceholder(const std::optional<SettingsInfo> &info, bool deleting)
+{
+    if (!info)
+        return {};
+    if (deleting)
+        return QStringLiteral("wird mit «OK» gelöscht");
+    return info->twitchClientSecretSet ? QStringLiteral("gespeichert; leer lassen = behalten")
+                                       : QStringLiteral("kein Secret gespeichert");
+}
+
+TwitchAccountView twitchAccountView(const std::optional<TwitchStatusInfo> &status, const QString &account)
+{
+    TwitchAccountView v;
+    if (!status) {
+        v.text = QStringLiteral("–");
+        return v;
+    }
+    const TwitchAccountInfo &a = account == QLatin1String("bot") ? status->bot : status->channel;
+    if (a.loginPending) {
+        v.loginPending = true;
+        v.userCode = a.loginPending->userCode;
+        v.verificationUri = a.loginPending->verificationUri;
+        v.expiresAt = a.loginPending->expiresAt;
+    }
+    QStringList lines;
+    if (a.login.isEmpty())
+        lines.append(QStringLiteral("nicht angemeldet"));
+    else if (a.state == QLatin1String("checking"))
+        lines.append(QStringLiteral("angemeldet als %1, wird geprüft …").arg(a.login));
+    else
+        lines.append(QStringLiteral("angemeldet als %1").arg(a.login));
+    if (!a.message.isEmpty())
+        lines.append(a.message);
+    if (!a.missingScopes.isEmpty())
+        lines.append(QStringLiteral("Es fehlen Rechte: %1").arg(a.missingScopes.join(QStringLiteral(", "))));
+    v.text = lines.join(QLatin1Char('\n'));
+    // Neu anmelden geht auch nach abgelaufener oder ungültiger Anmeldung; nur eine gültige (oder
+    // gerade geprüfte) Anmeldung braucht zuerst «Abmelden».
+    const bool valid = !a.login.isEmpty() && (a.state == QLatin1String("ok") || a.state == QLatin1String("checking"));
+    v.loginEnabled = status->enabled && !valid;
+    v.logoutEnabled = !a.login.isEmpty() || a.state != QLatin1String("off");
+    return v;
+}
+
+QString twitchCodeRemainingText(const QDateTime &expiresAt, const QDateTime &now)
+{
+    const qint64 seconds = now.secsTo(expiresAt);
+    if (!expiresAt.isValid() || seconds <= 0)
+        return QStringLiteral("Code abgelaufen, neu anmelden");
+    return QStringLiteral("Gültig noch %1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
+}
+
+QString twitchStatusText(const std::optional<TwitchStatusInfo> &status)
+{
+    if (!status)
+        return {};
+    if (!status->enabled)
+        return QStringLiteral("Kern ohne Anbindung an Twitch gebaut.");
+    QStringList lines;
+    if (!status->message.isEmpty())
+        lines.append(status->message);
+    if (!status->subscriptions.isEmpty()) {
+        int active = 0;
+        QStringList problems;
+        for (const TwitchSubscriptionInfo &s : status->subscriptions) {
+            if (s.ok)
+                ++active;
+            else
+                problems.append(s.problem.isEmpty() ? s.type : QStringLiteral("%1 (%2)").arg(s.type, s.problem));
+        }
+        QString line = QStringLiteral("Abos: %1 von %2 aktiv").arg(active).arg(status->subscriptions.size());
+        if (!problems.isEmpty())
+            line += QStringLiteral("; nicht aktiv: ") + problems.join(QStringLiteral(", "));
+        lines.append(line);
+    }
+    if (!status->badgeProblem.isEmpty())
+        lines.append(status->badgeProblem);
+    return lines.join(QLatin1Char('\n'));
+}
+
+QString twitchBotLoginHint()
+{
+    return QStringLiteral("Im Browser zuerst vom Kanal-Konto abmelden oder ein privates Fenster nutzen.");
 }
 
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status)

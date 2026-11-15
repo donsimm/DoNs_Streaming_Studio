@@ -22,6 +22,7 @@ struct Theme
     QString fontFamily;     // Open Sans
     int fontSize = 10;      // --font_base in Punkt
     int fontSizeSmall = 8;  // --font_small in Punkt (Titel der Docks)
+    int fontSizeLarge = 16; // P13: Code der Anmeldung bei Twitch
 
     // Grundfarben
     QColor window;          // --bg_window (--grey7): Fenster, Menüleiste, Statuszeile

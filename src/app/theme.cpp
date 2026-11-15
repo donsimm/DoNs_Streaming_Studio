@@ -16,6 +16,7 @@ Theme darkTheme()
     t.fontFamily = QStringLiteral("Open Sans");
     t.fontSize = 10;
     t.fontSizeSmall = 8;
+    t.fontSizeLarge = 16;
     t.window = QColor(0x1d, 0x1f, 0x26);
     t.base = QColor(0x27, 0x2a, 0x33);
     t.text = QColor(0xff, 0xff, 0xff);
@@ -330,6 +331,8 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
 #obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+/* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
+#settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},
@@ -370,5 +373,6 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
     css.replace(QStringLiteral("@fontFamily@"), t.fontFamily);
     css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
     css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));
+    css.replace(QStringLiteral("@fontSizeLarge@"), QString::number(t.fontSizeLarge));
     return css;
 }

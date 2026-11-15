@@ -158,6 +158,113 @@ private slots:
         QVERIFY(obsPasswordPlaceholder(std::nullopt, false).isEmpty());
     }
 
+    // P13: Bereich «Twitch»; Client-ID und Secret sind Platzhalter, keine echten Werte.
+    void settingsFormTwitch()
+    {
+        CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        SettingsForm f;
+        f.port = 8081;
+        f.address = QStringLiteral("192.168.1.9");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        f.twitchEnabled = true;
+        f.twitchClientId = QStringLiteral(" testclientid ");
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && !u->port && !u->obsEnabled && !u->twitchClientSecret);
+        QCOMPARE(u->twitchEnabled, std::optional<bool>(true));
+        QCOMPARE(u->twitchClientId, std::optional<QString>(QStringLiteral("testclientid")));
+        current.twitchEnabled = true;
+        current.twitchClientId = QStringLiteral("testclientid");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        // Leer = behalten; «Secret löschen» schickt leer; ein neues Secret geht vor
+        f.deleteTwitchClientSecret = true;
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && u->twitchClientSecret && u->twitchClientSecret->isEmpty());
+        QVERIFY(!u->twitchEnabled && !u->twitchClientId);
+        f.twitchClientSecret = QStringLiteral("testsecret");
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u);
+        QCOMPARE(u->twitchClientSecret, std::optional<QString>(QStringLiteral("testsecret")));
+
+        SettingsInfo info;
+        info.twitchClientSecretSet = true;
+        QVERIFY(twitchSecretPlaceholder(info, false).contains(QStringLiteral("behalten")));
+        QVERIFY(twitchSecretPlaceholder(info, true).contains(QStringLiteral("gelöscht")));
+        info.twitchClientSecretSet = false;
+        QCOMPARE(twitchSecretPlaceholder(info, false), QStringLiteral("kein Secret gespeichert"));
+        QVERIFY(twitchSecretPlaceholder(std::nullopt, false).isEmpty());
+    }
+
+    void twitchAccountRows()
+    {
+        // Ohne Status vom Kern: nichts bedienbar
+        TwitchAccountView v = twitchAccountView(std::nullopt, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("–"));
+        QVERIFY(!v.loginEnabled && !v.logoutEnabled && !v.loginPending);
+
+        TwitchStatusInfo s;
+        s.enabled = true;
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("nicht angemeldet"));
+        QVERIFY(v.loginEnabled && !v.logoutEnabled);
+        // Kern ohne Twitch gebaut: «Anmelden …» grau
+        s.enabled = false;
+        QVERIFY(!twitchAccountView(s, QStringLiteral("channel")).loginEnabled);
+        s.enabled = true;
+
+        s.channel.state = QStringLiteral("ok");
+        s.channel.login = QStringLiteral("testkanal");
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("angemeldet als testkanal"));
+        QVERIFY(!v.loginEnabled && v.logoutEnabled);
+        s.channel.state = QStringLiteral("checking");
+        QCOMPARE(twitchAccountView(s, QStringLiteral("channel")).text,
+                 QStringLiteral("angemeldet als testkanal, wird geprüft …"));
+        // Abgelaufen: neu anmelden geht, Meldung und fehlende Rechte darunter
+        s.channel.state = QStringLiteral("expired");
+        s.channel.message = QStringLiteral("Anmeldung abgelaufen");
+        s.channel.missingScopes = {QStringLiteral("channel:bot"), QStringLiteral("user:read:chat")};
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("angemeldet als testkanal\nAnmeldung abgelaufen\n"
+                                        "Es fehlen Rechte: channel:bot, user:read:chat"));
+        QVERIFY(v.loginEnabled && v.logoutEnabled);
+
+        // Bot getrennt vom Kanal; Anmeldung unterwegs mit Code und Adresse
+        const QDateTime expires(QDate(2026, 11, 15), QTime(12, 10), QTimeZone::UTC);
+        s.bot.loginPending = TwitchLoginPending{QStringLiteral("ABCD-EFGH"),
+                                                QStringLiteral("https://www.twitch.tv/activate"), expires};
+        v = twitchAccountView(s, QStringLiteral("bot"));
+        QVERIFY(v.loginPending);
+        QCOMPARE(v.userCode, QStringLiteral("ABCD-EFGH"));
+        QCOMPARE(v.verificationUri, QStringLiteral("https://www.twitch.tv/activate"));
+        QCOMPARE(v.expiresAt, expires);
+        QCOMPARE(v.text, QStringLiteral("nicht angemeldet"));
+        QVERIFY(!twitchAccountView(s, QStringLiteral("channel")).loginPending);
+
+        // Restzeit
+        QCOMPARE(twitchCodeRemainingText(expires, expires.addSecs(-245)), QStringLiteral("Gültig noch 4:05"));
+        QCOMPARE(twitchCodeRemainingText(expires, expires.addSecs(-1)), QStringLiteral("Gültig noch 0:01"));
+        QCOMPARE(twitchCodeRemainingText(expires, expires), QStringLiteral("Code abgelaufen, neu anmelden"));
+        QCOMPARE(twitchCodeRemainingText(QDateTime(), expires), QStringLiteral("Code abgelaufen, neu anmelden"));
+        QVERIFY(twitchBotLoginHint().contains(QStringLiteral("privates Fenster")));
+    }
+
+    void twitchStatusTexts()
+    {
+        QVERIFY(twitchStatusText(std::nullopt).isEmpty());
+        TwitchStatusInfo s;
+        QCOMPARE(twitchStatusText(s), QStringLiteral("Kern ohne Anbindung an Twitch gebaut."));
+        s.enabled = true;
+        QVERIFY(twitchStatusText(s).isEmpty());
+        s.message = QStringLiteral("Verbinde …");
+        s.subscriptions = {{QStringLiteral("channel.follow"), true, QString()},
+                           {QStringLiteral("channel.raid"), false, QStringLiteral("Rechte fehlen")},
+                           {QStringLiteral("channel.cheer"), false, QString()}};
+        s.badgeProblem = QStringLiteral("Abzeichen nicht aktiv: kein Client Secret");
+        QCOMPARE(twitchStatusText(s), QStringLiteral("Verbinde …\nAbos: 1 von 3 aktiv; nicht aktiv: "
+                                                     "channel.raid (Rechte fehlen), channel.cheer\n"
+                                                     "Abzeichen nicht aktiv: kein Client Secret"));
+    }
+
     void obsToolTipTexts()
     {
         ObsStatusInfo status;

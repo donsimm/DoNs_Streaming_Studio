@@ -174,6 +174,16 @@ qint64 CoreClient::sendObsAddToScene(const QUuid &overlayId, const QString &scen
     return id;
 }
 
+qint64 CoreClient::sendTwitchAccountRequest(const char *type, const QString &account)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    m_twitchRequests.insert(id);
+    send(twitchAccountRequestMessage(type, {id, account}));
+    return id;
+}
+
 qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
 {
     if (!m_connected)
@@ -508,6 +518,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_audioOutputs = info;
         emit audioOutputsChanged();
+    } else if (type == QLatin1String(msg::kTwitchStatus)) {
+        TwitchStatusInfo info;
+        if (!parseTwitchStatus(message, &info, &error)) {
+            qWarning("Kern: twitch_status ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_twitchStatus = info;
+        emit twitchStatusChanged();
     } else if (type == QLatin1String(msg::kObsSources)) {
         QList<ObsSourceInfo> sources;
         if (!parseObsSources(message, &sources, &error)) {
@@ -539,6 +557,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         if (m_obsRequests.remove(result.requestId)) {
             emit obsRequestFinished(result);
+            return;
+        }
+        if (m_twitchRequests.remove(result.requestId)) {
+            emit twitchRequestFinished(result);
             return;
         }
         const QString key = m_keyOfRequest.take(result.requestId);
@@ -600,6 +622,7 @@ void CoreClient::clearData()
     m_heldChanges.clear();
     m_settingsRequests.clear();
     m_obsRequests.clear();
+    m_twitchRequests.clear();
     const bool hadImports = !m_importNames.isEmpty();
     m_importNames.clear();
     if (hadImports)
@@ -624,6 +647,10 @@ void CoreClient::clearData()
     if (m_audioOutputs) {
         m_audioOutputs.reset();
         emit audioOutputsChanged();
+    }
+    if (m_twitchStatus) {
+        m_twitchStatus.reset();
+        emit twitchStatusChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();

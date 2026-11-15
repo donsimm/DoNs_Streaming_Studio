@@ -82,6 +82,11 @@ struct SettingsForm
     int obsPort = kObsDefaultPort;
     QString obsPassword;            // leer = behalten
     bool deleteObsPassword = false; // Knopf «Passwort löschen»; ein neues Passwort geht vor
+    // P13: Anbindung an Twitch, Client Secret wie das Passwort von OBS
+    bool twitchEnabled = false;
+    QString twitchClientId;
+    QString twitchClientSecret;            // leer = behalten
+    bool deleteTwitchClientSecret = false; // Knopf «Secret löschen»; ein neues Secret geht vor
 };
 // obsInError: Der OBS-Knopf ist rot. Dann geht auch ein unverändertes Formular an den Kern, denn
 // «OK» versucht es nach einem Abbruch durch OBS neu (P10c, Plan 1.7).
@@ -94,6 +99,29 @@ QString settingsDialogProblem(bool connected, const std::optional<SettingsInfo> 
 // P10c: Platzhalter im Passwortfeld. Der Wert selbst kommt nie vom Kern (Regel 12). Ohne Einstellungen
 // vom Kern ist unbekannt, ob ein Passwort gespeichert ist: leer.
 QString obsPasswordPlaceholder(const std::optional<SettingsInfo> &info, bool deleting);
+
+// P13, Bereich «Twitch» im Dialog «Einstellungen». Platzhalter im Feld «Client Secret» wie beim
+// Passwort von OBS; das Secret kommt nie vom Kern (Regel 12).
+QString twitchSecretPlaceholder(const std::optional<SettingsInfo> &info, bool deleting);
+// Zeile eines Kontos («channel» oder «bot»). Ohne Anmeldung unterwegs: text, «Anmelden …» und
+// «Abmelden»; während der Anmeldung: Code, Adresse und «Abbrechen».
+struct TwitchAccountView
+{
+    QString text;              // «nicht angemeldet», «angemeldet als …», Meldung, fehlende Rechte
+    bool loginEnabled = false; // «Anmelden …»: Twitch an im Kern, nicht schon gültig angemeldet
+    bool logoutEnabled = false; // «Abmelden»: ein Konto ist hinterlegt
+    bool loginPending = false;
+    QString userCode;
+    QString verificationUri;
+    QDateTime expiresAt; // UTC
+};
+TwitchAccountView twitchAccountView(const std::optional<TwitchStatusInfo> &status, const QString &account);
+// Restzeit des Codes: «Gültig noch 4:05», danach «Code abgelaufen, neu anmelden».
+QString twitchCodeRemainingText(const QDateTime &expiresAt, const QDateTime &now);
+// Zustand unter den Konten: Meldung des Kerns, Abos und Abzeichen; ohne Status leer.
+QString twitchStatusText(const std::optional<TwitchStatusInfo> &status);
+// Hinweis beim Bot während der Anmeldung (Plan P13, 2.1).
+QString twitchBotLoginHint();
 // P10c: Tooltip des OBS-Knopfes: «OBS: verbunden (OBS 33.0.1, Szene «Live»)», bei einem Problem die
 // Meldung des Kerns, sonst wie die anderen Knöpfe.
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status);
