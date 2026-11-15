@@ -680,7 +680,7 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 - **Später:** Kanalpunkte-Effekte, Kamera-Fernbedienung (nach der Kamerasteuerung), Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe, weitere OBS-Schritte, OBS-Ereignisse als Auslöser, Zitat-Befehle (Daten schon übernommen), Gruppen von Elementen im Overlay-Editor (falls Frage 2 B nicht gewählt), Rückgängig im Editor der Aktionen, Chat als Dock im Reiter «Overlays».
 - **Eigener Baustein:** Import der Aktionen aus Streamer.bot (liest Export und `data/`, übernimmt bekannte Typen, bewahrt Unbekanntes als `unsupported`; Zähler der Befehle sind schon da).
 - **Vorerst nicht:** Subathon, YouTube Music, Golf, Hugs (Daten bleiben als Variablen erhalten), Q&A, Skript-Schritt.
-- **Offen ohne Termin:** Abzeichen «Chat Bot» (P13 Frage 2), YouTube, Auslösen von aussen (Stream Deck).
+- **Offen ohne Termin:** YouTube, Auslösen von aussen (Stream Deck). Das Abzeichen «Chat Bot» kommt mit P13 (Entscheid 2026-11-15); Schritt «Chat senden als Bot» nutzt dafür das App-Token des Kerns.
 
 ## 14. Pakete (Regel 5)
 
@@ -714,7 +714,7 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
    - B) Wie A, aber nur ein Agent zur Zeit (weniger Abstimmung, etwa 4 bis 5 Sitzungen später streamfähig).
    - C) Änderungen, bitte nennen.
 
-Höchstens 4 Fragen je Auswahldialog: Vorschlag Dialog 1 mit P13 Fragen 1 und 2 und P14 Fragen 1 und 2, Dialog 2 mit P14 Fragen 3 bis 5 und P13 Frage 3 (Go).
+Höchstens 4 Fragen je Auswahldialog: Dialog 1 mit P13 Frage 1 und P14 Fragen 1 bis 3, Dialog 2 mit P14 Fragen 4 und 5 und P13 Frage 3 (Go). P13 Frage 2 (Abzeichen) ist am 2026-11-15 entschieden: mit Abzeichen.
 
 ## 17. Risiken und `[OFFEN]`
 
