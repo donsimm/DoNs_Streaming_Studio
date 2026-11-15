@@ -19,6 +19,10 @@
 #if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
 #include "videoaudio.h"
 #endif
+#if DSS_CORE_TWITCH
+#include "eventsubconnection.h"
+#include "twitchservice.h"
+#endif
 
 #include <QDir>
 #include <QFile>
@@ -394,6 +398,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, serverStatusMessage());
         send(socket, obsStatusMessage());
         send(socket, obsSourcesMessage());
+        send(socket, twitchStatusMessage());
         send(socket, audioOutputsMessage());
         // P14 b3: Aktionssystem (actions_config, actions_status)
         if (m_actions) {
@@ -439,6 +444,9 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleSubscribeEvents(socket, client, message);
     } else if (dss::isActionsRequestType(type)) {
         handleActionsRequest(socket, message);
+    } else if (type == QLatin1String(dss::msg::kTwitchLoginStart) || type == QLatin1String(dss::msg::kTwitchLoginCancel)
+               || type == QLatin1String(dss::msg::kTwitchLogout)) {
+        handleTwitchRequest(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetMediaList)) {
@@ -735,6 +743,138 @@ QJsonObject CoreService::obsStatusMessage() const
     return dss::obsStatusMessage(info);
 }
 
+// --- Twitch (P13, Plan 2.7) ----------------------------------------------------------------------
+
+#if DSS_CORE_TWITCH
+void CoreService::setTwitchService(dss::twitch::TwitchService *twitch)
+{
+    m_twitch = twitch;
+    connect(twitch, &dss::twitch::TwitchService::stateChanged, this, &CoreService::onTwitchChanged);
+    applyTwitchSettings();
+    onTwitchChanged();
+}
+#endif
+
+void CoreService::applyTwitchSettings()
+{
+#if DSS_CORE_TWITCH
+    if (!m_twitch || !m_settings)
+        return;
+    const dss::CoreSettings s = m_settings->settings();
+    m_twitch->configure(s.twitchEnabled, s.twitchClientId);
+#endif
+}
+
+void CoreService::onTwitchChanged()
+{
+#if DSS_CORE_TWITCH
+    using State = dss::twitch::TwitchService::State;
+    const State state = m_twitch->state();
+    const dss::ConnectionState shown = state == State::Connected    ? dss::ConnectionState::Connected
+                                       : state == State::Connecting ? dss::ConnectionState::Connecting
+                                       : state == State::Error      ? dss::ConnectionState::Error
+                                                                    : dss::ConnectionState::Off;
+    if (m_connectionStates.value(dss::Connection::Twitch) != shown) {
+        m_connectionStates.insert(dss::Connection::Twitch, shown);
+        broadcast(dss::connectionsMessage(m_connectionStates));
+    }
+#endif
+    // Nur bei einer Änderung: Der Dienst meldet mehrmals hintereinander.
+    if (const QJsonObject status = twitchStatusMessage(); status != m_lastTwitchStatus) {
+        m_lastTwitchStatus = status;
+        broadcast(status);
+    }
+}
+
+QJsonObject CoreService::twitchStatusMessage() const
+{
+    dss::TwitchStatusInfo info;
+#if DSS_CORE_TWITCH
+    if (m_twitch) {
+        using dss::twitch::TwitchAuth;
+        const auto account = [](const TwitchAuth *auth) {
+            dss::TwitchAccountInfo a;
+            switch (auth->state()) {
+            case TwitchAuth::State::Off:
+                a.state = QStringLiteral("off");
+                break;
+            case TwitchAuth::State::Checking:
+                a.state = QStringLiteral("checking");
+                break;
+            case TwitchAuth::State::Ok:
+                a.state = QStringLiteral("ok");
+                break;
+            case TwitchAuth::State::Expired:
+                a.state = QStringLiteral("expired");
+                break;
+            case TwitchAuth::State::Error:
+                a.state = QStringLiteral("error");
+                break;
+            }
+            a.message = auth->message();
+            a.login = auth->login();
+            a.userId = auth->userId();
+            if (!a.userId.isEmpty())
+                a.missingScopes = auth->missingScopes();
+            if (const auto pending = auth->pending())
+                a.loginPending = dss::TwitchLoginPending{pending->userCode, pending->verificationUri.toString(),
+                                                         pending->expiresAt};
+            return a;
+        };
+        info.enabled = true;
+        info.message = m_twitch->message();
+        info.live = m_twitch->connection()->isLive();
+        const QList<dss::twitch::EventSubConnection::Subscription> subscriptions = m_twitch->connection()->subscriptions();
+        for (const auto &s : subscriptions)
+            info.subscriptions.append({s.type, s.ok, s.problem});
+        info.channel = account(m_twitch->channel());
+        info.bot = account(m_twitch->bot());
+        info.badgeProblem = m_twitch->badgeProblem();
+        return dss::twitchStatusMessage(info);
+    }
+#endif
+    info.message = QStringLiteral("Kern ohne Anbindung an Twitch gebaut");
+    return dss::twitchStatusMessage(info);
+}
+
+void CoreService::handleTwitchRequest(QLocalSocket *socket, const QJsonObject &message)
+{
+    const QString type = dss::messageType(message);
+    dss::TwitchAccountRequest request;
+    QString error;
+    if (!dss::parseTwitchAccountRequest(message, &request, &error)) {
+        const qint64 id = dss::messageRequestId(message);
+        if (id < 0)
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+        else
+            send(socket, dss::changeResultMessage(
+                             {id, false, QUuid(), QString::fromLatin1(dss::err::kInvalidMessage), error}));
+        return;
+    }
+#if DSS_CORE_TWITCH
+    if (m_twitch) {
+        using Account = dss::twitch::TwitchAuth::Account;
+        const Account account = request.account == QLatin1String("bot") ? Account::Bot : Account::Channel;
+        if (type == QLatin1String(dss::msg::kTwitchLoginStart))
+            error = m_twitch->startLogin(account);
+        else if (type == QLatin1String(dss::msg::kTwitchLoginCancel))
+            error = m_twitch->cancelLogin(account);
+        else
+            error = m_twitch->logout(account);
+    } else
+#endif
+    {
+        error = QStringLiteral("Kern ohne Anbindung an Twitch gebaut.");
+    }
+    if (!error.isEmpty()) {
+        qWarning("Twitch: %s abgelehnt: %s", qPrintable(type), qPrintable(error));
+        send(socket, dss::changeResultMessage(
+                         {request.requestId, false, QUuid(), QString::fromLatin1(dss::err::kRejected), error}));
+        return;
+    }
+    send(socket, dss::changeResultMessage({request.requestId, true, QUuid(), QString(), QString()}));
+}
+
 #if DSS_CORE_AUDIO
 void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
 {
@@ -820,6 +960,9 @@ QJsonObject CoreService::settingsMessage() const
     dss::SettingsInfo info{m_settings->settings(), dss::kPortMin, dss::kPortMax, m_settings->path(),
                            m_settings->fileError()};
     info.obsPasswordSet = m_obsSecrets && m_obsSecrets->isSet();
+#if DSS_CORE_TWITCH
+    info.twitchClientSecretSet = m_twitch && m_twitch->clientSecretSet();
+#endif
     return dss::settingsMessage(info);
 }
 
@@ -844,8 +987,13 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
                                                QString::fromLatin1(dss::err::kRejected), text}));
     };
     // P10c: Das Passwort wird zuerst geschrieben; eine Abweisung muss also vorher feststehen.
-    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
-                                         update.obsHost, update.obsPort,     update.audioRoutes};
+    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
+                                         update.obsHost,      update.obsPort,     update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId};
+    if (update.twitchClientSecret && !m_twitch) {
+        reject(QStringLiteral("Der Kern kann das Client Secret nicht ablegen (ohne Twitch gebaut)."));
+        return;
+    }
     if (!change.isEmpty()) {
         if (const QString e = m_settings->checkChange(change); !e.isEmpty()) {
             reject(e);
@@ -856,7 +1004,7 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
         return;
     }
     if (!update.obsPassword) {
-        finishSettingsUpdate(socket, update, false);
+        writeTwitchSecret(socket, update, false);
         return;
     }
     if (!m_obsSecrets) {
@@ -869,7 +1017,7 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
             return;
         }
         qInfo("OBS: Passwort gelöscht");
-        finishSettingsUpdate(socket, update, true);
+        writeTwitchSecret(socket, update, true);
         return;
     }
     // systemd-creds läuft als eigener Prozess: Die Antwort kommt später (Abschnitt «Einstellungen»).
@@ -884,19 +1032,57 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
             return;
         }
         qInfo("OBS: Passwort verschlüsselt gespeichert");
-        finishSettingsUpdate(connected, update, true);
+        writeTwitchSecret(connected, update, true);
     });
 }
 
+void CoreService::writeTwitchSecret(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged)
+{
+#if DSS_CORE_TWITCH
+    if (update.twitchClientSecret && m_twitch) {
+        const auto reject = [this](QLocalSocket *target, qint64 requestId, const QString &text) {
+            qWarning("Einstellungen abgelehnt: %s", qPrintable(text));
+            if (target)
+                send(target, dss::changeResultMessage({requestId, false, QUuid(),
+                                                       QString::fromLatin1(dss::err::kRejected), text}));
+        };
+        if (update.twitchClientSecret->isEmpty()) {
+            QString error;
+            if (!m_twitch->removeClientSecret(&error)) {
+                reject(socket, update.requestId, error);
+                return;
+            }
+            finishSettingsUpdate(socket, update, passwordChanged, true);
+            return;
+        }
+        // systemd-creds läuft als eigener Prozess: Die Antwort kommt später.
+        QPointer<QLocalSocket> target(socket);
+        m_twitch->writeClientSecret(*update.twitchClientSecret,
+                                    [this, target, update, passwordChanged, reject](const QString &failure) {
+                                        QLocalSocket *connected =
+                                            target && m_clients.contains(target.data()) ? target.data() : nullptr;
+                                        if (!failure.isEmpty()) {
+                                            reject(connected, update.requestId, failure);
+                                            return;
+                                        }
+                                        finishSettingsUpdate(connected, update, passwordChanged, true);
+                                    });
+        return;
+    }
+#endif
+    finishSettingsUpdate(socket, update, passwordChanged);
+}
+
 void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update,
-                                       bool passwordChanged)
+                                       bool passwordChanged, bool secretChanged)
 {
     const auto reply = [this, socket](const dss::ChangeResult &result) {
         if (socket)
             send(socket, dss::changeResultMessage(result));
     };
-    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
-                                         update.obsHost, update.obsPort,     update.audioRoutes};
+    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
+                                         update.obsHost,      update.obsPort,     update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId};
     const dss::CoreSettings before = m_settings->settings();
     QString error;
     if (!change.isEmpty() && !m_settings->change(change, &error)) {
@@ -906,10 +1092,11 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
     }
     if (!(m_settings->settings() == before))
         settingsApplied();
-    else if (passwordChanged)
-        broadcast(settingsMessage()); // obs_password_set
+    else if (passwordChanged || secretChanged)
+        broadcast(settingsMessage()); // obs_password_set, twitch_client_secret_set
     // Auch bei gleichen Werten: «OK» im Dialog versucht es nach 4009, 4010, 4011 wieder (Plan 1.7).
     applyObsSettings(passwordChanged);
+    applyTwitchSettings();
     // P12b b3: ebenso ein durch eine fremde Verbindung gesperrter Ausgang
     if (!update.audioRoutes.isEmpty())
         applyAudioSettings();
@@ -937,6 +1124,7 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
         qInfo("%s", qPrintable(line));
     settingsApplied();
     applyObsSettings();
+    applyTwitchSettings();
     applyAudioSettings();
     send(socket, dss::changeResultMessage(
                      {requestId, true, QUuid(), QString(), QString(),
@@ -953,6 +1141,8 @@ void CoreService::settingsApplied()
     for (auto it = after.audioRoutes.constBegin(); it != after.audioRoutes.constEnd(); ++it)
         qInfo("Einstellungen Ton %s: Ausgang %s, Versatz %d ms", qPrintable(it.key()),
               it.value().output.isEmpty() ? "keiner" : qPrintable(it.value().output), it.value().offsetMs);
+    qInfo("Einstellungen Twitch: %s, Client-ID %s", after.twitchEnabled ? "ein" : "aus",
+          after.twitchClientId.isEmpty() ? "leer" : "gesetzt");
     broadcast(settingsMessage());
     updateBrowserSources();
     updateObsSources();

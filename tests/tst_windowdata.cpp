@@ -1,8 +1,11 @@
 // Prüft die Aufbereitung der Daten vom Kern für das Fenster ohne Qt Gui (P07, Teil F).
 
+#include "eventtypes.h"
 #include "windowdata.h"
 
+#include <QJsonValue>
 #include <QTest>
+#include <QTimeZone>
 
 using namespace dss;
 
@@ -156,6 +159,238 @@ private slots:
         QVERIFY(obsPasswordPlaceholder(info, false).contains(QStringLiteral("kein Passwort")));
         // Ohne Einstellungen vom Kern ist es nicht bekannt
         QVERIFY(obsPasswordPlaceholder(std::nullopt, false).isEmpty());
+    }
+
+    // P13: Bereich «Twitch»; Client-ID und Secret sind Platzhalter, keine echten Werte.
+    void settingsFormTwitch()
+    {
+        CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        SettingsForm f;
+        f.port = 8081;
+        f.address = QStringLiteral("192.168.1.9");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        f.twitchEnabled = true;
+        f.twitchClientId = QStringLiteral(" testclientid ");
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && !u->port && !u->obsEnabled && !u->twitchClientSecret);
+        QCOMPARE(u->twitchEnabled, std::optional<bool>(true));
+        QCOMPARE(u->twitchClientId, std::optional<QString>(QStringLiteral("testclientid")));
+        current.twitchEnabled = true;
+        current.twitchClientId = QStringLiteral("testclientid");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        // Leer = behalten; «Secret löschen» schickt leer; ein neues Secret geht vor
+        f.deleteTwitchClientSecret = true;
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && u->twitchClientSecret && u->twitchClientSecret->isEmpty());
+        QVERIFY(!u->twitchEnabled && !u->twitchClientId);
+        f.twitchClientSecret = QStringLiteral("testsecret");
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u);
+        QCOMPARE(u->twitchClientSecret, std::optional<QString>(QStringLiteral("testsecret")));
+
+        SettingsInfo info;
+        info.twitchClientSecretSet = true;
+        QVERIFY(twitchSecretPlaceholder(info, false).contains(QStringLiteral("behalten")));
+        QVERIFY(twitchSecretPlaceholder(info, true).contains(QStringLiteral("gelöscht")));
+        info.twitchClientSecretSet = false;
+        QCOMPARE(twitchSecretPlaceholder(info, false), QStringLiteral("kein Secret gespeichert"));
+        QVERIFY(twitchSecretPlaceholder(std::nullopt, false).isEmpty());
+    }
+
+    void twitchAccountRows()
+    {
+        // Ohne Status vom Kern: nichts bedienbar
+        TwitchAccountView v = twitchAccountView(std::nullopt, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("–"));
+        QVERIFY(!v.loginEnabled && !v.logoutEnabled && !v.loginPending);
+
+        TwitchStatusInfo s;
+        s.enabled = true;
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("nicht angemeldet"));
+        QVERIFY(v.loginEnabled && !v.logoutEnabled);
+        // Kern ohne Twitch gebaut: «Anmelden …» grau
+        s.enabled = false;
+        QVERIFY(!twitchAccountView(s, QStringLiteral("channel")).loginEnabled);
+        s.enabled = true;
+
+        s.channel.state = QStringLiteral("ok");
+        s.channel.login = QStringLiteral("testkanal");
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("angemeldet als testkanal"));
+        QVERIFY(!v.loginEnabled && v.logoutEnabled);
+        s.channel.state = QStringLiteral("checking");
+        QCOMPARE(twitchAccountView(s, QStringLiteral("channel")).text,
+                 QStringLiteral("angemeldet als testkanal, wird geprüft …"));
+        // Abgelaufen: neu anmelden geht, Meldung und fehlende Rechte darunter
+        s.channel.state = QStringLiteral("expired");
+        s.channel.message = QStringLiteral("Anmeldung abgelaufen");
+        s.channel.missingScopes = {QStringLiteral("channel:bot"), QStringLiteral("user:read:chat")};
+        v = twitchAccountView(s, QStringLiteral("channel"));
+        QCOMPARE(v.text, QStringLiteral("angemeldet als testkanal\nAnmeldung abgelaufen\n"
+                                        "Es fehlen Rechte: channel:bot, user:read:chat"));
+        QVERIFY(v.loginEnabled && v.logoutEnabled);
+
+        // Bot getrennt vom Kanal; Anmeldung unterwegs mit Code und Adresse
+        const QDateTime expires(QDate(2026, 11, 15), QTime(12, 10), QTimeZone::UTC);
+        s.bot.loginPending = TwitchLoginPending{QStringLiteral("ABCD-EFGH"),
+                                                QStringLiteral("https://www.twitch.tv/activate"), expires};
+        v = twitchAccountView(s, QStringLiteral("bot"));
+        QVERIFY(v.loginPending);
+        QCOMPARE(v.userCode, QStringLiteral("ABCD-EFGH"));
+        QCOMPARE(v.verificationUri, QStringLiteral("https://www.twitch.tv/activate"));
+        QCOMPARE(v.expiresAt, expires);
+        QCOMPARE(v.text, QStringLiteral("nicht angemeldet"));
+        QVERIFY(!twitchAccountView(s, QStringLiteral("channel")).loginPending);
+
+        // Restzeit
+        QCOMPARE(twitchCodeRemainingText(expires, expires.addSecs(-245)), QStringLiteral("Gültig noch 4:05"));
+        QCOMPARE(twitchCodeRemainingText(expires, expires.addSecs(-1)), QStringLiteral("Gültig noch 0:01"));
+        QCOMPARE(twitchCodeRemainingText(expires, expires), QStringLiteral("Code abgelaufen, neu anmelden"));
+        QCOMPARE(twitchCodeRemainingText(QDateTime(), expires), QStringLiteral("Code abgelaufen, neu anmelden"));
+        QVERIFY(twitchBotLoginHint().contains(QStringLiteral("privates Fenster")));
+    }
+
+    void twitchStatusTexts()
+    {
+        QVERIFY(twitchStatusText(std::nullopt).isEmpty());
+        TwitchStatusInfo s;
+        QCOMPARE(twitchStatusText(s), QStringLiteral("Kern ohne Anbindung an Twitch gebaut."));
+        s.enabled = true;
+        QVERIFY(twitchStatusText(s).isEmpty());
+        s.message = QStringLiteral("Verbinde …");
+        s.subscriptions = {{QStringLiteral("channel.follow"), true, QString()},
+                           {QStringLiteral("channel.raid"), false, QStringLiteral("Rechte fehlen")},
+                           {QStringLiteral("channel.cheer"), false, QString()}};
+        s.badgeProblem = QStringLiteral("Abzeichen nicht aktiv: kein Client Secret");
+        QCOMPARE(twitchStatusText(s), QStringLiteral("Verbinde …\nAbos: 1 von 3 aktiv; nicht aktiv: "
+                                                     "channel.raid (Rechte fehlen), channel.cheer\n"
+                                                     "Abzeichen nicht aktiv: kein Client Secret"));
+    }
+
+    void twitchBotAndHeader()
+    {
+        // Ohne Stand vom Kern
+        QCOMPARE(twitchToolTip(ConnectionState::Off, std::nullopt), QStringLiteral("Twitch: nicht eingerichtet oder abgeschaltet"));
+        ChatBotHeaderView h = chatBotHeaderView(ConnectionState::Off, std::nullopt);
+        QCOMPARE(h.text, QStringLiteral("Twitch: –"));
+        QCOMPARE(h.state, QStringLiteral("off"));
+        TwitchStatusInfo s;
+        QCOMPARE(chatBotHeaderView(ConnectionState::Off, s).text, QStringLiteral("Twitch: im Kern nicht gebaut"));
+        QVERIFY(twitchBotProblem(s).isEmpty());
+
+        // Kanal verbunden, Bot fehlt: gelb, Problem auch im Tooltip
+        s.enabled = true;
+        s.channel.state = QStringLiteral("ok");
+        s.channel.login = QStringLiteral("testkanal");
+        QCOMPARE(twitchBotProblem(s), QStringLiteral("Bot nicht angemeldet, der Kanal sendet ersatzweise"));
+        QCOMPARE(twitchToolTip(ConnectionState::Connected, s),
+                 QStringLiteral("Twitch: verbunden\nBot nicht angemeldet, der Kanal sendet ersatzweise"));
+        h = chatBotHeaderView(ConnectionState::Connected, s);
+        QCOMPARE(h.text, QStringLiteral("Twitch: verbunden · liest als testkanal · "
+                                        "Bot nicht angemeldet, der Kanal sendet ersatzweise"));
+        QCOMPARE(h.state, QStringLiteral("warning"));
+
+        // Bot angemeldet: grün, Tooltip ohne zweite Zeile
+        s.bot.state = QStringLiteral("ok");
+        s.bot.login = QStringLiteral("testbot");
+        QVERIFY(twitchBotProblem(s).isEmpty());
+        QCOMPARE(twitchToolTip(ConnectionState::Connected, s), QStringLiteral("Twitch: verbunden"));
+        h = chatBotHeaderView(ConnectionState::Connected, s);
+        QCOMPARE(h.text, QStringLiteral("Twitch: verbunden · liest als testkanal · sendet als testbot"));
+        QCOMPARE(h.state, QStringLiteral("ok"));
+
+        // Bot abgelaufen, Kanal mit Fehler: rot, Meldung des Kerns im Tooltip
+        s.bot.state = QStringLiteral("expired");
+        s.bot.message = QStringLiteral("Anmeldung abgelaufen");
+        s.channel.state = QStringLiteral("error");
+        s.message = QStringLiteral("Netz nicht erreichbar");
+        QCOMPARE(twitchBotProblem(s), QStringLiteral("Bot: Anmeldung abgelaufen"));
+        QCOMPARE(twitchToolTip(ConnectionState::Error, s), QStringLiteral("Netz nicht erreichbar\nBot: Anmeldung abgelaufen"));
+        h = chatBotHeaderView(ConnectionState::Error, s);
+        QCOMPARE(h.text, QStringLiteral("Twitch: eingerichtet, aber nicht verbunden · Kanal nicht angemeldet · "
+                                        "Bot: Anmeldung abgelaufen"));
+        QCOMPARE(h.state, QStringLiteral("error"));
+        QCOMPARE(h.toolTip, twitchStatusText(s));
+    }
+
+    void chatBotEvents()
+    {
+        // Bestellung: nur gültige Filter, ohne Chat-Nachrichten
+        const QStringList filters = chatBotEventFilters();
+        QVERIFY(!filters.isEmpty());
+        for (const QString &f : filters)
+            QVERIFY2(events::isValidFilter(f), qPrintable(f));
+        QVERIFY(!filters.contains(QStringLiteral("twitch.chat_message")));
+
+        const QDateTime time(QDate(2026, 11, 15), QTime(19, 7, 31), QTimeZone::UTC);
+        const QString localTime = time.toLocalTime().toString(QStringLiteral("HH:mm:ss"));
+        const auto event = [&](const char *type, const QJsonObject &data) {
+            events::Event e;
+            e.type = QString::fromLatin1(type);
+            e.time = time;
+            e.data = data;
+            return e;
+        };
+        const QJsonValue null(QJsonValue::Null);
+        QCOMPARE(eventRow(event("twitch.stream_online", {})),
+                 (EventRow{localTime, QStringLiteral("Stream online"), QStringLiteral("—"), QString()}));
+        QCOMPARE(eventRow(event("twitch.follow", {{"user_name", "Zuschauer42"}, {"user_login", "zuschauer42"}})),
+                 (EventRow{localTime, QStringLiteral("Follow"), QStringLiteral("Zuschauer42"), QString()}));
+        QCOMPARE(eventRow(event("twitch.resubscribe", {{"user_name", "Zuschauer42"}, {"tier", 1000}, {"months", 3}})).details,
+                 QStringLiteral("Stufe 1, 3. Monat"));
+        QCOMPARE(eventRow(event("twitch.subscribe", {{"user_name", "Zuschauer42"}, {"tier", 2000}})).details,
+                 QStringLiteral("Stufe 2"));
+        const EventRow gift = eventRow(event("twitch.gift_bomb", {{"user_name", null}, {"is_anonymous", true},
+                                                                  {"total", 2}, {"tier", 1000}}));
+        QCOMPARE(gift.kind, QStringLiteral("Geschenk-Sub"));
+        QCOMPARE(gift.name, QStringLiteral("anonym"));
+        QCOMPARE(gift.details, QStringLiteral("2 × Stufe 1"));
+        QCOMPARE(eventRow(event("twitch.cheer", {{"user_name", "Zuschauer42"}, {"bits", 100}})).details,
+                 QStringLiteral("100 Bits"));
+        const EventRow raid = eventRow(event("twitch.raid", {{"from_user_name", "Zuschauer7"}, {"viewers", 23}}));
+        QCOMPARE(raid.name, QStringLiteral("Zuschauer7"));
+        QCOMPARE(raid.details, QStringLiteral("23 Zuschauer"));
+        QCOMPARE(eventRow(event("twitch.first_message", {{"user_name", "Zuschauer42"}})).kind,
+                 QStringLiteral("Erste Nachricht"));
+        QCOMPARE(eventRow(event("obs.scene_changed", {{"scene_name", "Live"}})).kind, QStringLiteral("obs.scene_changed"));
+        QCOMPARE(eventRow(events::Event()).time, QStringLiteral("–"));
+
+        // Höchstens 200 Zeilen, älteste fallen vorne weg
+        QList<events::Event> history;
+        for (int i = 0; i < 250; ++i)
+            history.append(event("twitch.raid", {{"from_user_name", QStringLiteral("Zuschauer%1").arg(i)}, {"viewers", i}}));
+        EventRows rows;
+        rows.reset(history.mid(0, 3));
+        QCOMPARE(rows.rows().size(), 3);
+        rows.reset(history);
+        QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
+        QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer50"));
+        QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer249"));
+        QCOMPARE(rows.append(history.first()), 1);
+        QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
+        QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer51"));
+        QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer0"));
+        rows.reset({});
+        QCOMPARE(rows.append(history.first()), 0);
+        QCOMPARE(rows.rows().size(), 1);
+        QCOMPARE(eventsDroppedText(5), QStringLiteral("5 Ereignisse nicht angezeigt: Das Fenster kam nicht nach."));
+    }
+
+    void moduleDocks()
+    {
+        ModuleDocks docks;
+        // Im Reiter «Overlays» nichts ändern
+        QVERIFY(docks.switchTo(true, {true, false, true}).isEmpty());
+        QVERIFY(!docks.docksHidden());
+        // Zum «Chat-Bot»: alle aus, zweimal wechseln ändert nichts mehr
+        QCOMPARE(docks.switchTo(false, {true, false, true}), (QList<bool>{false, false, false}));
+        QVERIFY(docks.docksHidden());
+        QVERIFY(docks.switchTo(false, {false, false, false}).isEmpty());
+        // Zurück: genau die vorher offenen
+        QCOMPARE(docks.switchTo(true, {false, false, false}), (QList<bool>{true, false, true}));
+        QVERIFY(!docks.docksHidden());
+        QVERIFY(docks.switchTo(true, {true, false, true}).isEmpty());
     }
 
     void obsToolTipTexts()

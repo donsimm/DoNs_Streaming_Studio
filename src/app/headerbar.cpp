@@ -98,15 +98,6 @@ private:
     QList<QLayoutItem *> m_items;
 };
 
-QToolButton *moduleButton(const QString &text, QWidget *parent)
-{
-    auto *button = new QToolButton(parent);
-    button->setText(text);
-    button->setCheckable(true);
-    button->setFocusPolicy(Qt::NoFocus);
-    return button;
-}
-
 // Verbindungsknopf; Zustand über die Eigenschaft «state», Farben im Theme. Der Rahmen des Knopfes
 // (2 px in der Farbe des Zustands) ist die einzige Umrandung; das Logo steht ohne eigenen Rand
 // darin, seit P10a (Teil A 1) 19 statt 28 Pixel gross (etwa zwei Drittel).
@@ -154,6 +145,15 @@ QWidget *gauge(const QString &title, const QColor &line, QLabel **value, GaugeGr
 }
 
 } // namespace
+
+QToolButton *moduleButton(const QString &text, QWidget *parent)
+{
+    auto *button = new QToolButton(parent);
+    button->setText(text);
+    button->setCheckable(true);
+    button->setFocusPolicy(Qt::NoFocus);
+    return button;
+}
 
 HeaderBar::HeaderBar(const Theme &theme, QWidget *parent)
     : QFrame(parent)
@@ -206,6 +206,8 @@ HeaderBar::HeaderBar(const Theme &theme, QWidget *parent)
         setConnectionState(connection, dss::ConnectionState::Off);
         if (connection == dss::Connection::Obs)
             connect(button, &QToolButton::clicked, this, &HeaderBar::obsClicked);
+        else if (connection == dss::Connection::Twitch)
+            connect(button, &QToolButton::clicked, this, &HeaderBar::twitchClicked);
     }
     // Anzeigen rechts in fester Breite (Entscheid 2 in P09b).
     const QList<std::tuple<QString, QColor, const char *>> gauges = {

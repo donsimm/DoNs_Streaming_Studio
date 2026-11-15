@@ -104,6 +104,16 @@ public:
     // obsRequestFinished. 0 = nicht verbunden.
     qint64 sendObsCreateSource(const QUuid &overlayId, const QString &sceneUuid, const QString &name);
     qint64 sendObsAddToScene(const QUuid &overlayId, const QString &sceneUuid);
+    // Anbindung an Twitch (P13), nach hello und bei jeder Änderung; ohne Verbindung leer.
+    std::optional<TwitchStatusInfo> twitchStatus() const { return m_twitchStatus; }
+    // Schickt twitch_login_start, twitch_login_cancel oder twitch_logout (type aus msg) für das Konto
+    // «channel» oder «bot»; requestId wird hier vergeben. Antwort über twitchRequestFinished.
+    // 0 = nicht verbunden.
+    qint64 sendTwitchAccountRequest(const char *type, const QString &account);
+    // P13 (Plan 1.5): Ereignisse bestellen (Filter wie in subscribe_events, leer = abbestellen).
+    // Gilt auch für spätere Verbindungen: nach hello geht die Bestellung mit Verlauf erneut los.
+    // Antworten über eventHistoryReceived, eventReceived und eventsDropped.
+    void subscribeEvents(const QStringList &filters);
 
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
@@ -167,6 +177,13 @@ signals:
     // Antwort auf sendObsCreateSource und sendObsAddToScene, nur hier (nicht in changeFinished): Das
     // Anlegen-Fenster zeigt eine Abweisung selbst und bleibt offen.
     void obsRequestFinished(const dss::ChangeResult &result);
+    // twitchStatus() hat sich geändert bzw. Antwort auf sendTwitchAccountRequest (P13), nur hier.
+    void twitchStatusChanged();
+    void twitchRequestFinished(const dss::ChangeResult &result);
+    // P13: Verlauf nach einer Bestellung (älteste zuerst), neues Ereignis, verworfene Ereignisse.
+    void eventHistoryReceived(const QList<dss::events::Event> &events);
+    void eventReceived(const dss::events::Event &event);
+    void eventsDropped(qint64 count);
     // P10b: mediaList() bzw. imports() hat sich geändert.
     void mediaListChanged();
     void importProgressChanged();
@@ -217,6 +234,9 @@ private:
     std::optional<AudioOutputsInfo> m_audioOutputs;
     QList<ObsSourceInfo> m_obsSources;
     QSet<qint64> m_obsRequests;
+    std::optional<TwitchStatusInfo> m_twitchStatus;
+    QSet<qint64> m_twitchRequests;
+    QStringList m_eventFilters;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;

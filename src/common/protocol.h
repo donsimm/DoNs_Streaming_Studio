@@ -133,6 +133,11 @@ inline constexpr char kSubscribeEvents[] = "subscribe_events";
 inline constexpr char kEventHistory[] = "event_history";
 inline constexpr char kEvent[] = "event";
 inline constexpr char kEventsDropped[] = "events_dropped";
+// P13: Anbindung an Twitch
+inline constexpr char kTwitchStatus[] = "twitch_status";
+inline constexpr char kTwitchLoginStart[] = "twitch_login_start";
+inline constexpr char kTwitchLoginCancel[] = "twitch_login_cancel";
+inline constexpr char kTwitchLogout[] = "twitch_logout";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -348,6 +353,8 @@ struct SettingsInfo
     // P12b b3: gültiger Bereich des Versatzes (settings.audioRoutes)
     int audioOffsetMinMs = kAudioOffsetMinMs;
     int audioOffsetMaxMs = kAudioOffsetMaxMs;
+    // P13: nur, ob ein Client Secret von Twitch gespeichert ist, nie das Secret (Regel 12).
+    bool twitchClientSecretSet = false;
 
     bool operator==(const SettingsInfo &) const = default;
 };
@@ -369,6 +376,11 @@ struct SettingsUpdate
     std::optional<QString> obsPassword;
     // P12b b3: je Zweck (audioPurposeIds) Ausgang und/oder Versatz; Zweck und Bereich prüft der Kern.
     QMap<QString, AudioRouteChange> audioRoutes = {};
+    // P13: Anbindung an Twitch. twitchClientSecret wie obsPassword: fehlt = behalten, leer =
+    // löschen, sonst neu; nie zurück, nie ins Protokoll.
+    std::optional<bool> twitchEnabled = {};
+    std::optional<QString> twitchClientId = {};
+    std::optional<QString> twitchClientSecret = {};
 
     bool operator==(const SettingsUpdate &) const = default;
 };
@@ -460,6 +472,65 @@ struct ObsStatusInfo
 };
 QJsonObject obsStatusMessage(const ObsStatusInfo &info);
 bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *error);
+
+// twitch_status (P13, Plan 2.7): Einzelheiten der Anbindung an Twitch, nach hello und nach jeder
+// Änderung an alle. Der Zustand des Kanals (Farbe des Knopfes) steht in connections. Ohne Token und
+// ohne device_code; user_code nur während einer Anmeldung (das Fenster zeigt ihn an).
+struct TwitchLoginPending
+{
+    QString userCode;
+    QString verificationUri;
+    QDateTime expiresAt; // UTC
+
+    bool operator==(const TwitchLoginPending &) const = default;
+};
+// Zustand eines Kontos
+QStringList twitchAccountStates(); // off, checking, ok, expired, error
+struct TwitchAccountInfo
+{
+    QString state = QStringLiteral("off");
+    QString message; // auf Deutsch; leer, wenn alles gut
+    QString login;
+    QString userId;
+    QStringList missingScopes;
+    std::optional<TwitchLoginPending> loginPending;
+
+    bool operator==(const TwitchAccountInfo &) const = default;
+};
+struct TwitchSubscriptionInfo
+{
+    QString type;
+    bool ok = false;
+    QString problem; // leer, wenn aktiv
+
+    bool operator==(const TwitchSubscriptionInfo &) const = default;
+};
+struct TwitchStatusInfo
+{
+    bool enabled = false;  // false: Kern ohne Twitch gebaut (Schalter DSS_CORE_TWITCH)
+    QString message;       // Zustand des Kanals und von EventSub auf Deutsch; leer, wenn verbunden
+    bool live = false;
+    QList<TwitchSubscriptionInfo> subscriptions;
+    TwitchAccountInfo channel;
+    TwitchAccountInfo bot;
+    QString badgeProblem;  // «Abzeichen nicht aktiv: …»; leer, wenn der Bot mit Abzeichen sendet
+
+    bool operator==(const TwitchStatusInfo &) const = default;
+};
+QJsonObject twitchStatusMessage(const TwitchStatusInfo &info);
+bool parseTwitchStatus(const QJsonObject &message, TwitchStatusInfo *info, QString *error);
+
+// twitch_login_start, twitch_login_cancel, twitch_logout (P13): Konto «channel» oder «bot». Antwort
+// change_result (ok false, code rejected: Twitch aus oder nicht gebaut).
+struct TwitchAccountRequest
+{
+    qint64 requestId = 0;
+    QString account; // channel, bot
+
+    bool operator==(const TwitchAccountRequest &) const = default;
+};
+QJsonObject twitchAccountRequestMessage(const char *type, const TwitchAccountRequest &request);
+bool parseTwitchAccountRequest(const QJsonObject &message, TwitchAccountRequest *request, QString *error);
 
 // obs_sources (P10c, E-29): Quelle in OBS je Overlay, nach hello und nach jeder Änderung an alle.
 // Ohne URL und ohne Token. none: keine Zuordnung, present: Quelle da, missing: Zuordnung da, Quelle

@@ -112,6 +112,16 @@ void CoreClient::requestSettings()
         send(simpleMessage(msg::kGetSettings));
 }
 
+void CoreClient::subscribeEvents(const QStringList &filters)
+{
+    if (filters == m_eventFilters)
+        return;
+    m_eventFilters = filters;
+    // Leer = abbestellen; sonst mit Verlauf, die Antwort ersetzt die Liste im Fenster.
+    if (m_connected)
+        send(subscribeEventsMessage({filters, !filters.isEmpty()}));
+}
+
 void CoreClient::requestBrowserSource(const QUuid &id)
 {
     if (id == m_browserSourceWanted)
@@ -171,6 +181,16 @@ qint64 CoreClient::sendObsAddToScene(const QUuid &overlayId, const QString &scen
     const qint64 id = m_nextRequestId++;
     m_obsRequests.insert(id);
     send(obsAddToSceneMessage({id, overlayId, sceneUuid, QString()}));
+    return id;
+}
+
+qint64 CoreClient::sendTwitchAccountRequest(const char *type, const QString &account)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    m_twitchRequests.insert(id);
+    send(twitchAccountRequestMessage(type, {id, account}));
     return id;
 }
 
@@ -368,6 +388,9 @@ void CoreClient::handleMessage(const QJsonObject &message)
         setStatus(QStringLiteral("Mit dem Kern verbunden (%1 %2)").arg(hello.program, hello.version));
         if (!m_browserSourceWanted.isNull())
             send(getBrowserSourceMessage(m_browserSourceWanted));
+        // P13: Bestellung nach jeder neuen Verbindung wiederholen, mit Verlauf (Plan 1.5)
+        if (!m_eventFilters.isEmpty())
+            send(subscribeEventsMessage({m_eventFilters, true}));
         return;
     }
     if (!m_connected) {
@@ -508,6 +531,35 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_audioOutputs = info;
         emit audioOutputsChanged();
+    } else if (type == QLatin1String(msg::kTwitchStatus)) {
+        TwitchStatusInfo info;
+        if (!parseTwitchStatus(message, &info, &error)) {
+            qWarning("Kern: twitch_status ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_twitchStatus = info;
+        emit twitchStatusChanged();
+    } else if (type == QLatin1String(msg::kEventHistory)) {
+        QList<events::Event> list;
+        if (!parseEventHistory(message, &list, &error)) {
+            qWarning("Kern: event_history ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventHistoryReceived(list);
+    } else if (type == QLatin1String(msg::kEvent)) {
+        events::Event event;
+        if (!parseEventMessage(message, &event, &error)) {
+            qWarning("Kern: event ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventReceived(event);
+    } else if (type == QLatin1String(msg::kEventsDropped)) {
+        qint64 count = 0;
+        if (!parseEventsDropped(message, &count, &error)) {
+            qWarning("Kern: events_dropped ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventsDropped(count);
     } else if (type == QLatin1String(msg::kObsSources)) {
         QList<ObsSourceInfo> sources;
         if (!parseObsSources(message, &sources, &error)) {
@@ -539,6 +591,10 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         if (m_obsRequests.remove(result.requestId)) {
             emit obsRequestFinished(result);
+            return;
+        }
+        if (m_twitchRequests.remove(result.requestId)) {
+            emit twitchRequestFinished(result);
             return;
         }
         const QString key = m_keyOfRequest.take(result.requestId);
@@ -600,6 +656,7 @@ void CoreClient::clearData()
     m_heldChanges.clear();
     m_settingsRequests.clear();
     m_obsRequests.clear();
+    m_twitchRequests.clear();
     const bool hadImports = !m_importNames.isEmpty();
     m_importNames.clear();
     if (hadImports)
@@ -624,6 +681,10 @@ void CoreClient::clearData()
     if (m_audioOutputs) {
         m_audioOutputs.reset();
         emit audioOutputsChanged();
+    }
+    if (m_twitchStatus) {
+        m_twitchStatus.reset();
+        emit twitchStatusChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();

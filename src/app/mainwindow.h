@@ -15,7 +15,9 @@
 #include <optional>
 
 class CanvasWidget;
+class ChatBotPage;
 class HeaderBar;
+class QDockWidget;
 class ObsSourceDialog;
 class SettingsDialog;
 class SourceRenderer;
@@ -89,6 +91,12 @@ private:
     void saveLayout();
     void showAbout();
     void showSettings(); // P10-vor: Werkzeuge → Einstellungen …
+    // P13: Reiter wechseln (Docks des Editors nur bei «Overlays»), Reiter «Chat-Bot» nachführen
+    void onModuleSelected(int module);
+    void showTwitchSettings(); // Klick auf den Twitch-Knopf: Dialog beim Bereich «Twitch»
+    QList<QDockWidget *> editorDocks() const;
+    void refreshChatBotHeader();
+    void connectChatBot();
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -201,6 +209,10 @@ private:
     ObsSourceDialog *m_obsSourceDialog = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
+    ChatBotPage *m_chatBot = nullptr;  // P13
+    dss::EventRows m_eventRows;        // P13: Bereich «Ereignisse»
+    dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
+    QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;
     SourceRenderer *m_renderer = nullptr; // P09, nur mit DSS_APP_RENDERER
     OverlaysDock m_overlaysDock;

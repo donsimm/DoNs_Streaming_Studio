@@ -643,6 +643,19 @@ void TwitchAuth::logout()
     emit changed();
 }
 
+void TwitchAuth::unload()
+{
+    ++m_generation;
+    stopLogin();
+    stopTimers();
+    m_refreshing = false;
+    m_newToken.reset();
+    finishRenewals(false);
+    m_token = Token();
+    setState(State::Off, QString());
+    emit changed();
+}
+
 // --- Ablage --------------------------------------------------------------------------------------
 
 void TwitchAuth::save(const Token &token, std::function<void(bool)> done)

@@ -44,6 +44,9 @@ option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
 # Schalter, weil der Bot selbständig öffentlich handelt (Plan 5). Aus: Kern ohne ActionService,
 # actions_status «unavailable», Anfragen des Aktionssystems werden abgewiesen.
 option(DSS_CORE_ACTIONS "Aktionssystem (Chat-Bot) im Kern (P14 b3)" ON)
+# P13 (Plan 2.7): Anbindung an Twitch im Kern (EventSub, Anmeldung, Helix; neue externe Verbindung
+# mit TLS und Token). Aus: Kern ohne Twitch, der Knopf bleibt grau, twitch_status mit enabled false.
+option(DSS_CORE_TWITCH "Anbindung an Twitch im Kern (P13)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html

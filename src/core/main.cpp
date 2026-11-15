@@ -26,6 +26,9 @@
 #include "nulloutput.h"
 #include "pwoutput.h"
 #endif
+#if DSS_CORE_TWITCH
+#include "twitchservice.h"
+#endif
 #include "systemdnotify.h"
 #include "unixsignals.h"
 #include "version.h"
@@ -37,10 +40,12 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QTimer>
+#include <QUrl>
 
 #include <algorithm>
 #include <csignal>
 #include <memory>
+#include <optional>
 
 namespace {
 
@@ -165,6 +170,16 @@ int main(int argc, char *argv[])
                        "(nur für Tests)."));
     parser.addOption(inUseOption);
     parser.addOption(testEventsOption);
+#if DSS_CORE_TWITCH
+    // P13 (Plan 2.6): Testserver statt id.twitch.tv, api.twitch.tv und eventsub.wss.twitch.tv. Nur
+    // http://127.0.0.1:PORT, damit die Option kein Token an einen fremden Rechner schicken kann.
+    const QCommandLineOption twitchTestServerOption(
+        QStringLiteral("twitch-testserver"),
+        QStringLiteral("Adressen von Twitch durch einen Testserver ersetzen, nur http://127.0.0.1:PORT "
+                       "(für Tests)."),
+        QStringLiteral("ADRESSE"));
+    parser.addOption(twitchTestServerOption);
+#endif
     parser.addOption(versionOption);
     parser.addOption(defaultPortOption);
     parser.addOption(dataDirOption);
@@ -185,6 +200,22 @@ int main(int argc, char *argv[])
 
     dss::setupLogging();
     qInfo().noquote() << dss::startLine(name);
+
+#if DSS_CORE_TWITCH
+    std::optional<QUrl> twitchTestServer;
+    if (parser.isSet(twitchTestServerOption)) {
+        const QUrl url(parser.value(twitchTestServerOption), QUrl::StrictMode);
+        if (!url.isValid() || url.scheme() != QLatin1String("http") || url.host() != QLatin1String("127.0.0.1")
+            || url.port() <= 0 || !url.userInfo().isEmpty() || (!url.path().isEmpty() && url.path() != QLatin1String("/"))
+            || url.hasQuery() || url.hasFragment()) {
+            qCritical("Kern startet nicht: --twitch-testserver %s ungültig, erlaubt ist nur http://127.0.0.1:PORT",
+                      qPrintable(parser.value(twitchTestServerOption)));
+            return kExitError;
+        }
+        twitchTestServer = url.adjusted(QUrl::StripTrailingSlash);
+        qWarning("Twitch: Testserver %s statt Twitch (--twitch-testserver)", qPrintable(twitchTestServer->toString()));
+    }
+#endif
 
     const QString dataDir = parser.isSet(dataDirOption) ? parser.value(dataDirOption)
                                                         : dss::defaultDataDir();
@@ -299,6 +330,18 @@ int main(int argc, char *argv[])
     });
     dss::obs::ObsSources obsSources(&obsConnection, dataDir + QStringLiteral("/obs-quellen.json"));
     service.setObsConnection(&obsConnection, &obsSecrets, &obsSources);
+
+#if DSS_CORE_TWITCH
+    // Anbindung an Twitch (P13): standardmässig aus (kern.ini, Abschnitt [twitch]). Token und Client
+    // Secret liegen verschlüsselt neben kern.ini, je Version getrennt.
+    dss::twitch::TwitchService::Options twitchOptions;
+    twitchOptions.settingsDir = QFileInfo(settings.path()).absolutePath();
+    twitchOptions.dataDir = dataDir;
+    if (twitchTestServer)
+        twitchOptions.endpoints = dss::twitch::Endpoints::testServer(*twitchTestServer);
+    dss::twitch::TwitchService twitch(service.eventBus(), twitchOptions);
+    service.setTwitchService(&twitch);
+#endif
 
 #if DSS_CORE_ACTIONS
     // Aktionssystem (P14 b3). Nach service angelegt, also vor ihm zerstört (speichert dabei).

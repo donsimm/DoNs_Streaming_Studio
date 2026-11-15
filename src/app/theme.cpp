@@ -16,6 +16,7 @@ Theme darkTheme()
     t.fontFamily = QStringLiteral("Open Sans");
     t.fontSize = 10;
     t.fontSizeSmall = 8;
+    t.fontSizeLarge = 16;
     t.window = QColor(0x1d, 0x1f, 0x26);
     t.base = QColor(0x27, 0x2a, 0x33);
     t.text = QColor(0xff, 0xff, 0xff);
@@ -268,14 +269,15 @@ QCheckBox::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-au
 
 /* Eigene Bereiche (in OBS nicht vorhanden), mit den Werten von Yami gestaltet. */
 #headerBar { background: @base@; border: 1px solid @border@; border-radius: 4px; }
-#moduleTabs { background: transparent; border: none; }
-/* Modul-Reiter wie QTabBar::tab in Yami.obt (--tab_bg = --button_bg_disabled). */
-#moduleTabs QToolButton { background: @buttonDisabled@; color: @textMuted@;
+#moduleTabs, #chatBotTabs { background: transparent; border: none; }
+/* Modul-Reiter wie QTabBar::tab in Yami.obt (--tab_bg = --button_bg_disabled); die Unterreiter
+   im Reiter «Chat-Bot» (P13) ebenso. */
+#moduleTabs QToolButton, #chatBotTabs QToolButton { background: @buttonDisabled@; color: @textMuted@;
     border: 1px solid @buttonDisabled@; padding: 4px 16px; min-width: 50px; border-radius: 4px; }
-#moduleTabs QToolButton:hover { background: @buttonHover@; border-color: @inputBorderHover@;
-                                color: @text@; }
-#moduleTabs QToolButton:checked { background: @primary@; color: @text@;
-                                  border: 1px solid @primaryLight@; }
+#moduleTabs QToolButton:hover, #chatBotTabs QToolButton:hover { background: @buttonHover@;
+    border-color: @inputBorderHover@; color: @text@; }
+#moduleTabs QToolButton:checked, #chatBotTabs QToolButton:checked { background: @primary@;
+    color: @text@; border: 1px solid @primaryLight@; }
 
 QToolButton#connectionButton { border: 2px solid @stateOff@; border-radius: 4px;
                                background: @input@; color: @text@; font-weight: bold; }
@@ -290,8 +292,20 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #gaugeValue { color: @text@; font-weight: bold; }
 #gaugeGraph { background: @base@; border: 1px solid @graph@; }
 
-#chatBotPage { background: @preview@; }
-#chatBotPage QLabel { color: @textMuted@; }
+#chatBotPage { background: @window@; }
+/* P13: Zustand rechts in der Kopfzeile, Farben wie die Verbindungsknöpfe (state aus
+   windowdata.h, chatBotHeaderView). */
+#chatBotState { color: @textMuted@; }
+#chatBotState[state="ok"] { color: @stateConnected@; font-weight: bold; }
+#chatBotState[state="warning"] { color: @stateConnecting@; font-weight: bold; }
+#chatBotState[state="error"] { color: @stateError@; font-weight: bold; }
+/* Bereiche im Unterreiter «Live» wie ein Dock: Titel wie QDockWidget::title, Inhalt wie
+   QDockWidget > QWidget. */
+#chatBotPanelTitle { background-color: @dockTitle@; border: 1px solid @border@; color: @text@;
+    padding: 2px 4px; font-size: @fontSizeSmall@pt; font-weight: bold;
+    border-top-left-radius: 4px; border-top-right-radius: 4px; }
+#chatBotPanelBody { background: @base@; border: 1px solid @border@; border-top: none;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
 
 /* P08: Baum der Overlays wie die Listen, mehrzeiliges Textfeld wie QLineEdit. */
 /* P09, Punkt 48: Den Einzug links vom gewählten Eintrag füllt OverlayTree::drawBranches
@@ -312,7 +326,9 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 /* P10b: Dock «Medien» mit Spalten wie im Dateimanager: Zeilen ohne Rundung je Zelle (sonst
    jede Spalte ein eigenes Kästchen), Spaltenkopf wie die Dock-Titel, Zeile zur Auswahl gedämpft. */
 #mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
-#mediaTree::item:selected:hover { border-radius: 0px; border: none; padding: 2px 2px; }
+#mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
+#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover { border-radius: 0px;
+    border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
                        border-right: 1px solid @border@; padding: 3px 6px; }
@@ -330,6 +346,8 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
 #obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+/* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
+#settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},
@@ -370,5 +388,6 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
     css.replace(QStringLiteral("@fontFamily@"), t.fontFamily);
     css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
     css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));
+    css.replace(QStringLiteral("@fontSizeLarge@"), QString::number(t.fontSizeLarge));
     return css;
 }

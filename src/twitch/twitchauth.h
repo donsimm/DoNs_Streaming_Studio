@@ -116,6 +116,12 @@ public:
     void startLogin();
     void cancelLogin();
     void logout();
+    // Commit 7: Twitch aus oder neue Client-ID: alles anhalten und das Token aus dem Speicher nehmen,
+    // die Datei bleibt (Zustand Off). load() liest sie wieder.
+    void unload();
+    // Commit 7: Die Freigabe wurde bei Twitch entzogen (revocation authorization_revoked): wie ein
+    // abgewiesenes Erneuern, Zustand Expired.
+    void markExpired() { expire(); }
 
     Account account() const { return m_account; }
     State state() const { return m_state; }

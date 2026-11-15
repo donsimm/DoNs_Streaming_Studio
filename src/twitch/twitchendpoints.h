@@ -4,7 +4,7 @@
 #include <QUrl>
 
 // Adressen von Twitch (P13, Plan 2.6). Für Tests lassen sie sich durch einen Testserver ersetzen;
-// die Prüfung «nur 127.0.0.1» macht der Kern bei --twitch-testserver (Commit 7).
+// die Prüfung «nur 127.0.0.1» macht der Kern bei --twitch-testserver (src/core/main.cpp).
 //
 // Quellen: https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/ (id.twitch.tv/oauth2/…),
 // https://dev.twitch.tv/docs/api/reference/ (api.twitch.tv/helix/…),

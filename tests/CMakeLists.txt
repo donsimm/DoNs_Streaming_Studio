@@ -370,6 +370,16 @@ qt_add_executable(tst_twitchverbindung tst_twitchverbindung.cpp twitchtestserver
 target_link_libraries(tst_twitchverbindung PRIVATE dss_twitch dss_warnings Qt6::Test)
 target_compile_definitions(tst_twitchverbindung PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
 add_test(NAME tst_twitchverbindung COMMAND tst_twitchverbindung)
+# P13, Commit 7: Anbindung an Twitch im Kern (dss-core als eigener Prozess gegen den Testserver,
+# --twitch-testserver), nur mit dem Schalter DSS_CORE_TWITCH.
+if(DSS_CORE_TWITCH)
+  qt_add_executable(tst_kerntwitch tst_kerntwitch.cpp twitchtestserver.h prozesshilfe.h)
+  target_link_libraries(tst_kerntwitch PRIVATE dss_common dss_warnings Qt6::Test Qt6::Network Qt6::WebSockets)
+  target_compile_definitions(tst_kerntwitch PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
+  add_dependencies(tst_kerntwitch dss-core)
+  add_test(NAME tst_kerntwitch COMMAND tst_kerntwitch)
+endif()
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.

@@ -7,6 +7,7 @@ add_library(dss_app_ui STATIC
   symbols.h symbols.cpp
   fonts.h fonts.cpp
   headerbar.h headerbar.cpp
+  chatbotpage.h chatbotpage.cpp
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp

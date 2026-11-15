@@ -33,8 +33,13 @@
 //   [ton-video]
 //   ausgang=alsa_output.usb-…
 //   versatz_ms=0
+//   [twitch]
+//   aktiv=nein
+//   client-id=…
 //
 // Das Passwort von OBS steht nie hier, sondern verschlüsselt in obs-passwort.cred (P10c, Regel 12).
+// P13: Token und Client Secret von Twitch ebenso nie (twitch-token.cred, twitch-bot-token.cred,
+// twitch-client-secret.cred).
 // P12b b3: Ausgang je Zweck, ein Abschnitt je Zweck (kAudioPurposes); zuerst [ton-video] für den Ton
 // der Videos. ausgang: node.name des Ausgangs in PipeWire, leer = kein Ausgang (kein Ton);
 // versatz_ms: Weg des Tons hinter dem Ausgang (Mischpult, OBS), der Kern spielt so viel früher.
@@ -104,6 +109,9 @@ struct CoreSettings
     // P12b b3: je Zweck (Kennung aus kAudioPurposes) ein Ausgang; fehlt ein Abschnitt, gilt
     // AudioRoute() (kein Ausgang, Versatz 0). Enthält immer alle Zwecke.
     QMap<QString, AudioRoute> audioRoutes = defaultAudioRoutes();
+    // P13, Abschnitt [twitch]: standardmässig aus. Die Client-ID ist kein Geheimnis (Plan 2.2).
+    bool twitchEnabled = false;
+    QString twitchClientId = {};
 
     static QMap<QString, AudioRoute> defaultAudioRoutes();
     bool operator==(const CoreSettings &) const = default;
@@ -118,10 +126,13 @@ struct CoreSettingsChange
     std::optional<QString> obsHost;
     std::optional<int> obsPort;
     QMap<QString, AudioRouteChange> audioRoutes = {}; // P12b b3, je Zweck
+    std::optional<bool> twitchEnabled = {};          // P13
+    std::optional<QString> twitchClientId = {};
 
     bool isEmpty() const
     {
-        return !port && !homeAddress && !obsEnabled && !obsHost && !obsPort && audioRoutes.isEmpty();
+        return !port && !homeAddress && !obsEnabled && !obsHost && !obsPort && audioRoutes.isEmpty()
+               && !twitchEnabled && !twitchClientId;
     }
 };
 
@@ -148,6 +159,11 @@ QString validateObsCombination(bool enabled, const QString &host);
 // kAudioOutputMaxLength Zeichen, ohne Steuerzeichen und ohne Leerzeichen am Anfang oder Ende.
 QString validateAudioOutput(const QString &output);
 QString validateAudioOffset(int offsetMs);
+// P13: Client-ID von Twitch: leer erlaubt (nur solange Twitch aus ist), sonst höchstens
+// kTwitchClientIdMaxLength Buchstaben und Ziffern.
+inline constexpr int kTwitchClientIdMaxLength = 64;
+QString validateTwitchClientId(const QString &clientId);
+QString validateTwitchCombination(bool enabled, const QString &clientId);
 
 // Text der Datei lesen bzw. schreiben. Fehlende Angaben gelten mit dem Standardwert; eine
 // unbekannte Angabe, ein Abschnitt ausser [overlay-server], [obs] und denen aus kAudioPurposes, eine
