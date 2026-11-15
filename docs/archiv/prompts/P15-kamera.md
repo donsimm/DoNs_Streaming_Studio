@@ -26,6 +26,7 @@ Plan des Projektleiter-Agenten vom 2026-11-15. Gebaut wird erst nach dem Go des 
 2. **Preset:** **A)** Position und Zoom, Kästchen «Bildwerte mitspeichern» (Standard aus).
 3. **Schutz:** **A)** ohne Anmeldung, drei Schichten (Abschnitt 5).
 4. **Go:** **A)** Schritt 0 und Abschnitte a bis c parallel zu P13/P14, wenn Platz ist, ohne P13/P14 zu verschieben; d bis f nach der Abnahme von P14. Rechte für Lotse am Streaming-PC wie in Frage 4 A (nie während eines Streams; bleibende Werte nur mit OK in der Sitzung). Grenze: Bau.
+5. **Aufteilung des Reiters** (Entwurf `lotse/entwurf-kamera` 90e0316, `entwuerfe/kameras/`, Fotos bei Lotse): **Variante 1B «Alles sichtbar»**, ohne Unterreiter, drei Spalten: links Steuerung (Steuerkreuz, Zoom, Tempo, Schritt, KI-Verfolgung) und Positionen, Mitte Bildwerte mit Bildlauf, rechts Licht (Lampen, Licht-Presets). Kopfzeile mit Kamera-Auswahl, Wecken/Schlafen, «Einrichten …», Zustand des Dienstes. Dialoge und Zustände wie Entwurf Seiten 4 und 5.
 
 ## Ergebnis Schritt 0 (Lotse am Gerät, 2026-11-15, 21:55–22:12, Nutzer schaute zu)
 
