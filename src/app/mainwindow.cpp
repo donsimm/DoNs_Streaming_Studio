@@ -2,6 +2,7 @@
 
 #include "canvasimage.h"
 #include "canvaswidget.h"
+#include "chatbotpage.h"
 #include "configpaths.h"
 #include "coreclient.h"
 #include "dockviews.h"
@@ -180,17 +181,42 @@ void MainWindow::createCentralArea()
     m_canvas->setRenderer(m_renderer);
 #endif
 
-    auto *chatBotPage = new QWidget(m_modules);
-    chatBotPage->setObjectName(QStringLiteral("chatBotPage"));
-    chatBotPage->setAttribute(Qt::WA_StyledBackground);
-    auto *chatBotLayout = new QVBoxLayout(chatBotPage);
-    chatBotLayout->addWidget(new QLabel(QStringLiteral("Noch nicht vorhanden"), chatBotPage), 0,
-                             Qt::AlignCenter);
-    m_modules->addWidget(chatBotPage);
+    // P13: Reiter «Chat-Bot» (chatbotpage.h); ohne Kern zeigt die Kopfzeile «Twitch: –».
+    m_chatBot = new ChatBotPage(m_modules);
+    m_chatBot->setHeader(dss::chatBotHeaderView(dss::ConnectionState::Off, std::nullopt));
+    m_modules->addWidget(m_chatBot);
     column->addWidget(m_modules, 1);
 
-    connect(m_header, &HeaderBar::moduleSelected, m_modules, &QStackedWidget::setCurrentIndex);
+    connect(m_header, &HeaderBar::moduleSelected, this, &MainWindow::onModuleSelected);
     setCentralWidget(central);
+}
+
+void MainWindow::onModuleSelected(int module)
+{
+    m_modules->setCurrentIndex(module);
+    // P13 (Entscheid 2026-11-15): Docks des Editors nur im Reiter «Overlays». Die Anordnung beim
+    // Verlassen gilt fürs Speichern, solange die Docks ausgeblendet sind.
+    const bool editor = module == HeaderBar::Overlays;
+    const QList<QDockWidget *> docks = editorDocks();
+    QList<bool> visible;
+    for (QDockWidget *d : docks)
+        visible.append(!d->isHidden()); // isVisible wäre vor show() immer false
+    if (!editor && !m_moduleDocks.docksHidden())
+        m_editorLayout = saveState(kLayoutVersion);
+    const QList<bool> next = m_moduleDocks.switchTo(editor, visible);
+    for (qsizetype i = 0; i < next.size(); ++i)
+        docks.at(i)->setVisible(next.at(i));
+    // Im Reiter «Chat-Bot» kein Dock über das Menü einblenden.
+    m_docksMenu->setEnabled(editor);
+}
+
+QList<QDockWidget *> MainWindow::editorDocks() const
+{
+    QList<QDockWidget *> docks = {m_overlaysDock.dock, m_sourcesDock.dock, m_propertiesDock.dock,
+                                  m_controlDock.dock};
+    if (m_mediaDock.dock)
+        docks.append(m_mediaDock.dock);
+    return docks;
 }
 
 void MainWindow::setConnectionState(dss::Connection connection, dss::ConnectionState state)
@@ -283,7 +309,9 @@ void MainWindow::saveLayout()
     QDir().mkpath(QFileInfo(layoutFile()).absolutePath());
     QSettings settings(layoutFile(), QSettings::IniFormat);
     settings.setValue(QStringLiteral("fenster/geometrie"), saveGeometry());
-    settings.setValue(QStringLiteral("fenster/anordnung"), saveState(kLayoutVersion));
+    // P13: Im Reiter «Chat-Bot» sind die Docks ausgeblendet; gespeichert wird die Anordnung von «Overlays».
+    settings.setValue(QStringLiteral("fenster/anordnung"),
+                      m_moduleDocks.docksHidden() ? m_editorLayout : saveState(kLayoutVersion));
     // P10b: Enthält die Anordnung das Dock «Medien»? (restoreLayout)
     settings.setValue(QStringLiteral("fenster/medien"), m_mediaDock.dock != nullptr);
     settings.sync();
@@ -323,6 +351,7 @@ void MainWindow::connectCore()
         if (m_settingsAction)
             m_settingsAction->trigger();
     });
+    connectChatBot();
     connect(m_client, &dss::CoreClient::overlayListChanged, this, &MainWindow::refreshOverlayList);
     connect(m_client, &dss::CoreClient::overlayChanged, this, [this](const QUuid &id) {
         if (id == m_selectedOverlay)
@@ -412,6 +441,45 @@ void MainWindow::showSettings()
         m_settingsDialog = new SettingsDialog(m_client, this);
     m_settingsDialog->showFromCore();
 #endif
+}
+
+void MainWindow::showTwitchSettings()
+{
+#if DSS_APP_SETTINGS_DIALOG
+    // Wie der OBS-Knopf: ohne Verbindung zum Kern gesperrt.
+    if (!m_settingsAction || !m_settingsAction->isEnabled())
+        return;
+    showSettings();
+    m_settingsDialog->focusTwitchSection();
+#endif
+}
+
+void MainWindow::connectChatBot()
+{
+    // P13: Twitch-Knopf, Kopfzeile des Reiters «Chat-Bot» und Bereich «Ereignisse» (Plan 1.5, 2.7)
+    connect(m_header, &HeaderBar::twitchClicked, this, &MainWindow::showTwitchSettings);
+    connect(m_client, &dss::CoreClient::twitchStatusChanged, this, &MainWindow::refreshConnections);
+    connect(m_client, &dss::CoreClient::connectedChanged, this, &MainWindow::refreshChatBotHeader);
+    connect(m_client, &dss::CoreClient::eventHistoryReceived, this, [this](const QList<dss::events::Event> &events) {
+        m_eventRows.reset(events);
+        m_chatBot->resetEvents(m_eventRows.rows());
+    });
+    connect(m_client, &dss::CoreClient::eventReceived, this, [this](const dss::events::Event &event) {
+        const int removed = m_eventRows.append(event);
+        m_chatBot->appendEvent(m_eventRows.rows().last(), removed);
+    });
+    connect(m_client, &dss::CoreClient::eventsDropped, this,
+            [this](qint64 count) { showStatus(dss::eventsDroppedText(count)); });
+    m_client->subscribeEvents(dss::chatBotEventFilters());
+}
+
+void MainWindow::refreshChatBotHeader()
+{
+    const bool connected = m_client->isConnected();
+    const dss::ConnectionState channel = connected
+        ? m_client->connectionStates().value(dss::Connection::Twitch, dss::ConnectionState::Off)
+        : dss::ConnectionState::Off;
+    m_chatBot->setHeader(dss::chatBotHeaderView(channel, connected ? m_client->twitchStatus() : std::nullopt));
 }
 
 void MainWindow::saveCanvasImage()
@@ -504,6 +572,11 @@ void MainWindow::refreshConnections()
     m_header->setConnectionToolTip(dss::Connection::Obs,
                                    dss::obsToolTip(states.value(dss::Connection::Obs, dss::ConnectionState::Off),
                                                    m_client->obsStatus()));
+    // P13: Problem des Bots im Tooltip, Zustand von Kanal und Bot in der Kopfzeile «Chat-Bot»
+    m_header->setConnectionToolTip(dss::Connection::Twitch,
+                                   dss::twitchToolTip(states.value(dss::Connection::Twitch, dss::ConnectionState::Off),
+                                                      m_client->twitchStatus()));
+    refreshChatBotHeader();
 }
 
 void MainWindow::refreshOverlayList()

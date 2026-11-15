@@ -320,6 +320,11 @@ void SettingsDialog::showFromCore()
     open();
 }
 
+void SettingsDialog::focusTwitchSection()
+{
+    m_twitchEnabled->setFocus(Qt::OtherFocusReason);
+}
+
 void SettingsDialog::accept()
 {
     const std::optional<dss::SettingsInfo> info = m_client->settings();

@@ -112,6 +112,16 @@ void CoreClient::requestSettings()
         send(simpleMessage(msg::kGetSettings));
 }
 
+void CoreClient::subscribeEvents(const QStringList &filters)
+{
+    if (filters == m_eventFilters)
+        return;
+    m_eventFilters = filters;
+    // Leer = abbestellen; sonst mit Verlauf, die Antwort ersetzt die Liste im Fenster.
+    if (m_connected)
+        send(subscribeEventsMessage({filters, !filters.isEmpty()}));
+}
+
 void CoreClient::requestBrowserSource(const QUuid &id)
 {
     if (id == m_browserSourceWanted)
@@ -378,6 +388,9 @@ void CoreClient::handleMessage(const QJsonObject &message)
         setStatus(QStringLiteral("Mit dem Kern verbunden (%1 %2)").arg(hello.program, hello.version));
         if (!m_browserSourceWanted.isNull())
             send(getBrowserSourceMessage(m_browserSourceWanted));
+        // P13: Bestellung nach jeder neuen Verbindung wiederholen, mit Verlauf (Plan 1.5)
+        if (!m_eventFilters.isEmpty())
+            send(subscribeEventsMessage({m_eventFilters, true}));
         return;
     }
     if (!m_connected) {
@@ -526,6 +539,27 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_twitchStatus = info;
         emit twitchStatusChanged();
+    } else if (type == QLatin1String(msg::kEventHistory)) {
+        QList<events::Event> list;
+        if (!parseEventHistory(message, &list, &error)) {
+            qWarning("Kern: event_history ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventHistoryReceived(list);
+    } else if (type == QLatin1String(msg::kEvent)) {
+        events::Event event;
+        if (!parseEventMessage(message, &event, &error)) {
+            qWarning("Kern: event ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventReceived(event);
+    } else if (type == QLatin1String(msg::kEventsDropped)) {
+        qint64 count = 0;
+        if (!parseEventsDropped(message, &count, &error)) {
+            qWarning("Kern: events_dropped ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit eventsDropped(count);
     } else if (type == QLatin1String(msg::kObsSources)) {
         QList<ObsSourceInfo> sources;
         if (!parseObsSources(message, &sources, &error)) {

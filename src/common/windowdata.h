@@ -122,6 +122,68 @@ QString twitchCodeRemainingText(const QDateTime &expiresAt, const QDateTime &now
 QString twitchStatusText(const std::optional<TwitchStatusInfo> &status);
 // Hinweis beim Bot während der Anmeldung (Plan P13, 2.1).
 QString twitchBotLoginHint();
+// P13: Problem des Bots in einem Satz (fehlt, abgelaufen, Fehler); leer, wenn der Bot angemeldet ist
+// oder Twitch aus. Ohne Bot sendet der Kanal ersatzweise (Plan 2.7), die Farbe bleibt beim Kanal.
+QString twitchBotProblem(const std::optional<TwitchStatusInfo> &status);
+// Tooltip des Twitch-Knopfes: wie obsToolTip, dazu das Problem des Bots in einer zweiten Zeile.
+QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInfo> &status);
+
+// P13, Reiter «Chat-Bot»: Kopfzeile rechts. state für die Farbe im Theme: «ok» (Kanal verbunden,
+// Bot angemeldet), «warning» (Kanal verbunden, Bot fehlt), «error» (Kanal mit Fehler), «off».
+struct ChatBotHeaderView
+{
+    QString text;
+    QString toolTip; // Einzelheiten wie im Bereich «Twitch» (twitchStatusText)
+    QString state = QStringLiteral("off");
+};
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status);
+
+// P13, Bereich «Ereignisse» im Unterreiter «Live»: was das Fenster bestellt (subscribe_events). Ohne
+// Chat-Nachrichten (die zeigt P14 im Bereich «Chat») und ohne Kanalpunkte und OBS (nicht im Entwurf).
+QStringList chatBotEventFilters();
+// Eine Zeile: Zeit (lokal, hh:mm:ss), Art, Name, Details.
+struct EventRow
+{
+    QString time;
+    QString kind;
+    QString name;
+    QString details;
+
+    bool operator==(const EventRow &) const = default;
+};
+EventRow eventRow(const events::Event &event);
+// Liste der Zeilen, älteste zuerst, höchstens kMaxRows (Plan 2.7).
+class EventRows
+{
+public:
+    static constexpr int kMaxRows = 200;
+    // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten.
+    void reset(const QList<events::Event> &events);
+    // Hängt eine Zeile an; Rückgabe: wie viele alte Zeilen vorne dafür wegfallen (0 oder 1).
+    int append(const events::Event &event);
+    const QList<EventRow> &rows() const { return m_rows; }
+
+private:
+    QList<EventRow> m_rows;
+};
+// Statuszeile bei events_dropped (Gegendruck im Kern).
+QString eventsDroppedText(qint64 count);
+
+// P13 (Entscheid 2026-11-15): Die Docks des Overlay-Editors sind nur im Reiter «Overlays» zu sehen.
+// Beim Verlassen merkt sich das Fenster, welche Docks offen waren, und blendet alle aus; bei der
+// Rückkehr kommen genau diese wieder.
+class ModuleDocks
+{
+public:
+    // visible: Sichtbarkeit je Dock jetzt. Rückgabe: neue Sichtbarkeit je Dock, leer = nichts ändern.
+    QList<bool> switchTo(bool editorModule, const QList<bool> &visible);
+    // true im Reiter «Chat-Bot»: Die Anordnung zum Speichern ist die vom Verlassen von «Overlays».
+    bool docksHidden() const { return m_hidden; }
+
+private:
+    bool m_hidden = false;
+    QList<bool> m_remembered;
+};
 // P10c: Tooltip des OBS-Knopfes: «OBS: verbunden (OBS 33.0.1, Szene «Live»)», bei einem Problem die
 // Meldung des Kerns, sonst wie die anderen Knöpfe.
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status);

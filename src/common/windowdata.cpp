@@ -254,6 +254,198 @@ QString twitchBotLoginHint()
     return QStringLiteral("Im Browser zuerst vom Kanal-Konto abmelden oder ein privates Fenster nutzen.");
 }
 
+namespace {
+
+bool twitchAccountValid(const TwitchAccountInfo &a)
+{
+    return !a.login.isEmpty() && (a.state == QLatin1String("ok") || a.state == QLatin1String("checking"));
+}
+
+} // namespace
+
+QString twitchBotProblem(const std::optional<TwitchStatusInfo> &status)
+{
+    if (!status || !status->enabled || twitchAccountValid(status->bot))
+        return {};
+    QString problem;
+    if (status->bot.login.isEmpty())
+        problem = QStringLiteral("Bot nicht angemeldet");
+    else if (!status->bot.message.isEmpty())
+        problem = QStringLiteral("Bot: %1").arg(status->bot.message);
+    else
+        problem = QStringLiteral("Bot: Anmeldung ungültig");
+    if (twitchAccountValid(status->channel))
+        problem += QStringLiteral(", der Kanal sendet ersatzweise");
+    return problem;
+}
+
+QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInfo> &status)
+{
+    const QString plain = connectionStateText(Connection::Twitch, state);
+    if (!status || !status->enabled)
+        return plain;
+    QStringList lines;
+    lines.append(state == ConnectionState::Connected || status->message.isEmpty() ? plain : status->message);
+    const QString bot = twitchBotProblem(status);
+    if (!bot.isEmpty())
+        lines.append(bot);
+    return lines.join(QLatin1Char('\n'));
+}
+
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status)
+{
+    ChatBotHeaderView v;
+    v.toolTip = twitchStatusText(status);
+    if (!status) {
+        v.text = QStringLiteral("Twitch: –");
+        return v;
+    }
+    if (!status->enabled) {
+        v.text = QStringLiteral("Twitch: im Kern nicht gebaut");
+        return v;
+    }
+    QStringList parts;
+    parts.append(connectionStateText(Connection::Twitch, channelState));
+    if (twitchAccountValid(status->channel))
+        parts.append(QStringLiteral("liest als %1").arg(status->channel.login));
+    else
+        parts.append(QStringLiteral("Kanal nicht angemeldet"));
+    const QString botProblem = twitchBotProblem(status);
+    if (botProblem.isEmpty())
+        parts.append(QStringLiteral("sendet als %1").arg(status->bot.login));
+    else
+        parts.append(botProblem);
+    v.text = parts.join(QStringLiteral(" · "));
+    if (channelState == ConnectionState::Error)
+        v.state = QStringLiteral("error");
+    else if (channelState == ConnectionState::Connected)
+        v.state = botProblem.isEmpty() ? QStringLiteral("ok") : QStringLiteral("warning");
+    return v;
+}
+
+QStringList chatBotEventFilters()
+{
+    // twitch.gift_sub nicht: Jedes Geschenk kommt schon als twitch.gift_bomb (mit Anzahl), sonst
+    // stünde ein Geschenk doppelt in der Liste.
+    return {QStringLiteral("twitch.stream_online"), QStringLiteral("twitch.stream_offline"),
+            QStringLiteral("twitch.first_message"), QStringLiteral("twitch.follow"),
+            QStringLiteral("twitch.subscribe"),     QStringLiteral("twitch.resubscribe"),
+            QStringLiteral("twitch.gift_bomb"),     QStringLiteral("twitch.cheer"),
+            QStringLiteral("twitch.raid")};
+}
+
+namespace {
+
+// Anzeigename eines Zuschauers aus data (prefix «user» oder «from_user»); anonym oder leer: Ersatz
+QString viewerName(const QJsonObject &data, const QString &prefix)
+{
+    QString name = data.value(prefix + QStringLiteral("_name")).toString();
+    if (name.isEmpty())
+        name = data.value(prefix + QStringLiteral("_login")).toString();
+    if (!name.isEmpty())
+        return name;
+    return data.value(QStringLiteral("is_anonymous")).toBool() ? QStringLiteral("anonym") : QStringLiteral("—");
+}
+
+// tier 1000, 2000, 3000 (Twitch) → «Stufe 1» …
+QString tierText(const QJsonObject &data)
+{
+    const int tier = data.value(QStringLiteral("tier")).toInt();
+    return tier >= 1000 ? QStringLiteral("Stufe %1").arg(tier / 1000) : QString();
+}
+
+} // namespace
+
+EventRow eventRow(const events::Event &event)
+{
+    EventRow row;
+    row.time = event.time.isValid() ? event.time.toLocalTime().toString(QStringLiteral("HH:mm:ss"))
+                                    : QStringLiteral("–");
+    const QJsonObject &d = event.data;
+    const QString user = QStringLiteral("user");
+    const QString &t = event.type;
+    if (t == QLatin1String("twitch.stream_online")) {
+        row.kind = QStringLiteral("Stream online");
+        row.name = QStringLiteral("—");
+    } else if (t == QLatin1String("twitch.stream_offline")) {
+        row.kind = QStringLiteral("Stream offline");
+        row.name = QStringLiteral("—");
+    } else if (t == QLatin1String("twitch.first_message")) {
+        row.kind = QStringLiteral("Erste Nachricht");
+        row.name = viewerName(d, user);
+    } else if (t == QLatin1String("twitch.follow")) {
+        row.kind = QStringLiteral("Follow");
+        row.name = viewerName(d, user);
+    } else if (t == QLatin1String("twitch.subscribe")) {
+        row.kind = QStringLiteral("Sub");
+        row.name = viewerName(d, user);
+        row.details = tierText(d);
+    } else if (t == QLatin1String("twitch.resubscribe")) {
+        row.kind = QStringLiteral("Sub");
+        row.name = viewerName(d, user);
+        row.details = QStringLiteral("%1, %2. Monat").arg(tierText(d)).arg(d.value(QStringLiteral("months")).toInt());
+    } else if (t == QLatin1String("twitch.gift_bomb")) {
+        row.kind = QStringLiteral("Geschenk-Sub");
+        row.name = viewerName(d, user);
+        row.details = QStringLiteral("%1 × %2").arg(d.value(QStringLiteral("total")).toInt()).arg(tierText(d));
+    } else if (t == QLatin1String("twitch.gift_sub")) {
+        row.kind = QStringLiteral("Geschenk-Sub");
+        row.name = viewerName(d, QStringLiteral("recipient_user"));
+        row.details = QStringLiteral("erhalten, %1").arg(tierText(d));
+    } else if (t == QLatin1String("twitch.cheer")) {
+        row.kind = QStringLiteral("Cheer");
+        row.name = viewerName(d, user);
+        row.details = QStringLiteral("%1 Bits").arg(d.value(QStringLiteral("bits")).toInt());
+    } else if (t == QLatin1String("twitch.raid")) {
+        row.kind = QStringLiteral("Raid");
+        row.name = viewerName(d, QStringLiteral("from_user"));
+        row.details = QStringLiteral("%1 Zuschauer").arg(d.value(QStringLiteral("viewers")).toInt());
+    } else {
+        // Typen ohne eigene Zeile (später bestellt): Typ als Art
+        row.kind = t;
+        row.name = d.contains(QStringLiteral("user_name")) ? viewerName(d, user) : QStringLiteral("—");
+    }
+    return row;
+}
+
+void EventRows::reset(const QList<events::Event> &events)
+{
+    m_rows.clear();
+    for (qsizetype i = std::max<qsizetype>(0, events.size() - kMaxRows); i < events.size(); ++i)
+        m_rows.append(eventRow(events.at(i)));
+}
+
+int EventRows::append(const events::Event &event)
+{
+    m_rows.append(eventRow(event));
+    if (m_rows.size() <= kMaxRows)
+        return 0;
+    m_rows.removeFirst();
+    return 1;
+}
+
+QString eventsDroppedText(qint64 count)
+{
+    return QStringLiteral("%1 Ereignisse nicht angezeigt: Das Fenster kam nicht nach.").arg(count);
+}
+
+QList<bool> ModuleDocks::switchTo(bool editorModule, const QList<bool> &visible)
+{
+    if (!editorModule) {
+        if (m_hidden)
+            return {};
+        m_hidden = true;
+        m_remembered = visible;
+        return QList<bool>(visible.size(), false);
+    }
+    if (!m_hidden)
+        return {};
+    m_hidden = false;
+    QList<bool> restored = m_remembered;
+    m_remembered.clear();
+    return restored.size() == visible.size() ? restored : QList<bool>();
+}
+
 QString obsToolTip(ConnectionState state, const std::optional<ObsStatusInfo> &status)
 {
     const QString plain = connectionStateText(Connection::Obs, state);

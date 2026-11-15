@@ -74,6 +74,8 @@
 #include <QWindow>
 #include <QTimer>
 #include <QToolButton>
+#include <QMenuBar>
+#include <QTreeWidget>
 
 #include <algorithm>
 #include <functional>
@@ -2001,6 +2003,79 @@ private slots:
         QTest::mouseClick(ok, Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(m_check->settings()->settings.twitchClientId.isEmpty(), 3000);
+    }
+
+    // P13: Reiter «Chat-Bot» mit Kopfzeile, Unterreiter «Live» und Bereich «Ereignisse»; die Docks
+    // des Editors nur im Reiter «Overlays». Twitch bleibt aus (Kern ohne Twitch-Testserver).
+    void chatBotTab()
+    {
+        QToolButton *overlaysTab = nullptr;
+        QToolButton *chatBotTab = nullptr;
+        for (QToolButton *b : m_window->findChild<QFrame *>(QStringLiteral("moduleTabs"))->findChildren<QToolButton *>()) {
+            if (b->text() == QStringLiteral("Overlays"))
+                overlaysTab = b;
+            else if (b->text() == QStringLiteral("Chat-Bot"))
+                chatBotTab = b;
+        }
+        QVERIFY(overlaysTab && chatBotTab);
+        auto *page = m_window->findChild<QWidget *>(QStringLiteral("chatBotPage"));
+        auto *header = m_window->findChild<QWidget *>(QStringLiteral("chatBotHeader"));
+        auto *state = m_window->findChild<QLabel *>(QStringLiteral("chatBotState"));
+        auto *live = m_window->findChild<QToolButton *>(QStringLiteral("chatBotTab0"));
+        auto *events = m_window->findChild<QTreeWidget *>(QStringLiteral("chatBotEvents"));
+        QVERIFY(page && header && state && live && events);
+        QCOMPARE(header->sizePolicy().verticalPolicy(), QSizePolicy::Fixed);
+        QCOMPARE(live->text(), QStringLiteral("Live"));
+        QVERIFY(live->isChecked());
+        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 1);
+        QCOMPARE(events->columnCount(), 4);
+        const QTreeWidgetItem *labels = events->headerItem();
+        QCOMPARE(QStringList({labels->text(0), labels->text(1), labels->text(2), labels->text(3)}),
+                 QStringList({QStringLiteral("Zeit"), QStringLiteral("Art"), QStringLiteral("Name"), QStringLiteral("Details")}));
+        bool panelTitle = false;
+        for (QLabel *l : page->findChildren<QLabel *>(QStringLiteral("chatBotPanelTitle")))
+            panelTitle = panelTitle || l->text() == QStringLiteral("Ereignisse");
+        QVERIFY(panelTitle);
+        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("Twitch: ")) && state->text() != QStringLiteral("Twitch: –"), 3000);
+
+        // Reiter wechseln: alle Docks aus, Menü «Docks» gesperrt; zurück: die vorher offenen wieder
+        const QList<QDockWidget *> docks = m_window->findChildren<QDockWidget *>();
+        QVERIFY(docks.size() >= 4); // fünf mit DSS_APP_MEDIA_DOCK
+        QDockWidget *closed = m_window->findChild<QDockWidget *>(QStringLiteral("propertiesDock"));
+        QVERIFY(closed);
+        closed->close();
+        QTest::mouseClick(chatBotTab, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        for (QDockWidget *d : docks)
+            QVERIFY2(d->isHidden(), qPrintable(d->objectName()));
+        QAction *docksMenu = nullptr;
+        for (QAction *a : m_window->findChild<QMenuBar *>()->actions())
+            if (a->text() == QStringLiteral("D&ocks"))
+                docksMenu = a;
+        QVERIFY(docksMenu && !docksMenu->isEnabled());
+        QTest::mouseClick(overlaysTab, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!page->isVisible(), 3000);
+        for (QDockWidget *d : docks)
+            QVERIFY2(d->isHidden() == (d == closed), qPrintable(d->objectName()));
+        QVERIFY(docksMenu->isEnabled());
+        closed->show();
+
+        // Klick auf den Twitch-Knopf: Einstellungen beim Bereich «Twitch»
+        QToolButton *twitchButton = nullptr;
+        for (QToolButton *b : m_window->findChildren<QToolButton *>(QStringLiteral("connectionButton")))
+            if (b->text() == QStringLiteral("TW"))
+                twitchButton = b;
+        QVERIFY(twitchButton);
+        QVERIFY(twitchButton->toolTip().startsWith(QStringLiteral("Twitch: ")));
+        QTest::mouseClick(twitchButton, Qt::LeftButton);
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
+                                     && dialog->isVisible(), 3000);
+        auto *enabled = dialog->findChild<QCheckBox *>(QStringLiteral("settingsTwitchEnabled"));
+        QVERIFY(enabled);
+        QTRY_COMPARE_WITH_TIMEOUT(dialog->focusWidget(), static_cast<QWidget *>(enabled), 3000);
+        dialog->reject();
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
     }
 
     // P10, Punkt 77: Dialog mit einem eigenen Kern, dessen kern.ini ungültig ist: «OK» ausgegraut,

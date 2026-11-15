@@ -30,6 +30,8 @@ public:
 
     // Fragt die Werte neu beim Kern an und zeigt den Dialog.
     void showFromCore();
+    // P13: Fokus auf den Bereich «Twitch» («Mit Twitch verbinden»), nach showFromCore.
+    void focusTwitchSection();
 
 private:
     void accept() override;
