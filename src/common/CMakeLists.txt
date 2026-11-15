@@ -49,7 +49,8 @@ else()
 endif()
 target_compile_definitions(dss_common PRIVATE DSS_VERSION="${PROJECT_VERSION}"
   DSS_COMMIT="${DSS_COMMIT}" DSS_BUILTIN_FONT_DIR="${DSS_BUILTIN_FONT_DIR}")
-target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network PRIVATE dss_warnings)
+# dss_actions (P14 a): nur für das Prüfen der Datenformate (dataformat.cpp)
+target_link_libraries(dss_common PUBLIC Qt6::Core Qt6::Network PRIVATE dss_warnings dss_actions)
 # Version in Arbeit oder im Einsatz (P10a, Teil B, Schalter in der obersten CMakeLists.txt)
 target_compile_definitions(dss_common PRIVATE
   DSS_INSTALLED_EDITION=$<BOOL:${DSS_INSTALLED_EDITION}>)

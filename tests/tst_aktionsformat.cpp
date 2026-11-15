@@ -1,16 +1,22 @@
 // Prüft das Modell der Aktionen ohne Qt Gui (P14 a, Plan 2.2 bis 2.8 und 2.11): Lesen und
 // Schreiben von aktionen.json mit den erfundenen Testdaten tests/daten/aktionen/, unbekannte
-// Felder (extra), script und unsupported, Typtabellen, ungültige Dateien, Verweise.
+// Felder (extra), script und unsupported, Typtabellen, ungültige Dateien, Verweise, und
+// dss-core --format-pruefen mit allen Dateien des Aktionssystems.
 
 #include "actionjson.h"
 #include "actionrefs.h"
+#include "dataformat.h"
 #include "steptypes.h"
 #include "triggertypes.h"
+#include "variables.h"
+#include "viewerdata.h"
 
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QProcess>
 #include <QSet>
+#include <QTemporaryDir>
 #include <QTest>
 
 #include <optional>
@@ -546,6 +552,95 @@ private slots:
         QStringList got = messages(checkReferences(c, fullContext()));
         got.removeAll(QString::fromUtf8(kRegexWarning));
         QCOMPARE(got, expected);
+    }
+
+    // Plan 2.11: dss-core --format-pruefen kennt alle neuen Dateien; format_version > 1 heisst
+    // neueres Format (Exit-Code 5), eine ungültige Datei wird gemeldet und nicht geändert.
+    void formatCheck()
+    {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const QString dir = temp.path();
+        const auto write = [&](const QString &name, const QByteArray &data) {
+            QFile f(dir + QLatin1Char('/') + name);
+            return f.open(QIODevice::WriteOnly) && f.write(data) == data.size();
+        };
+        const auto read = [&](const QString &name) {
+            QFile f(dir + QLatin1Char('/') + name);
+            return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+        };
+        ViewersData viewers;
+        noteViewer(&viewers, QStringLiteral("100000001"), QStringLiteral("testzuschauer"), QStringLiteral("Test"));
+        QVERIFY(write(QStringLiteral("aktionen.json"), readFile(QStringLiteral("vollstaendig.json"))));
+        QVERIFY(write(QStringLiteral("variablen.json"), serializeVariables(VariablesData())));
+        QVERIFY(write(QStringLiteral("zuschauer.json"), serializeViewers(viewers)));
+        QVERIFY(write(QStringLiteral("zitate.json"), serializeQuotes(QuotesData())));
+        QVERIFY(write(QStringLiteral("streamerbot-archiv.json"), serializeArchive(ArchiveData())));
+
+        dss::DataFormatStatus s = dss::checkDataFormat(dir);
+        QVERIFY2(s.unreadable.isEmpty(), qPrintable(s.unreadable.join(QLatin1Char('\n'))));
+        QVERIFY(s.newer.isEmpty());
+        QVERIFY(!s.needsConversion());
+
+        const auto runCore = [&](int *exitCode, QString *out, QString *err) {
+            QProcess p;
+            p.start(QStringLiteral(DSS_CORE_BIN), {QStringLiteral("--datenordner"), dir, QStringLiteral("--format-pruefen")});
+            if (!p.waitForFinished(30000) || p.exitStatus() != QProcess::NormalExit)
+                return false;
+            *exitCode = p.exitCode();
+            *out = QString::fromUtf8(p.readAllStandardOutput());
+            *err = QString::fromUtf8(p.readAllStandardError());
+            return true;
+        };
+        int exitCode = -1;
+        QString out;
+        QString err;
+        QVERIFY(runCore(&exitCode, &out, &err));
+        QCOMPARE(exitCode, 0);
+        QVERIFY2(out.startsWith(QStringLiteral("Format aktuell")), qPrintable(out));
+
+        // Ungültig: gemeldet, nicht geändert
+        QByteArray broken = readFile(QStringLiteral("vollstaendig.json"));
+        broken.replace("\"interval_s\": 1200", "\"interval_s\": 5");
+        QVERIFY(write(QStringLiteral("aktionen.json"), broken));
+        s = dss::checkDataFormat(dir);
+        QCOMPARE(s.unreadable, QStringList{QStringLiteral(
+                                   "aktionen.json: Feld «timers[0].interval_s»: muss eine ganze Zahl ab 60 sein")});
+        QVERIFY(runCore(&exitCode, &out, &err));
+        QCOMPARE(exitCode, 0);
+        QVERIFY2(err.contains(QStringLiteral("nicht lesbar, bleibt unverändert: aktionen.json")), qPrintable(err));
+        QCOMPARE(read(QStringLiteral("aktionen.json")), broken);
+
+        // Neueres Format: Exit-Code 5, Umwandeln lehnt ab
+        for (const QString &name : {QStringLiteral("variablen.json"), QStringLiteral("zuschauer.json"),
+                                    QStringLiteral("zitate.json"), QStringLiteral("streamerbot-archiv.json")}) {
+            const QByteArray before = read(name);
+            QByteArray newer = before;
+            newer.replace("\"format_version\": 1", "\"format_version\": 2");
+            QVERIFY(write(name, newer));
+            s = dss::checkDataFormat(dir);
+            QCOMPARE(s.newer, QStringList{name + QStringLiteral(" (Format 2)")});
+            QVERIFY(runCore(&exitCode, &out, &err));
+            QCOMPARE(exitCode, 5);
+            QVERIFY2(err.contains(name + QStringLiteral(" (Format 2)")), qPrintable(err));
+            QStringList converted;
+            QString error;
+            QVERIFY(!dss::convertDataFormat(dir, &converted, &error));
+            QVERIFY2(error.contains(QStringLiteral("neueres Format")), qPrintable(error));
+            QCOMPARE(read(name), newer);
+            QVERIFY(write(name, before));
+        }
+        // aktionen.json in neuerem Format: neuer, nicht «nicht lesbar»
+        broken.replace("\"format_version\": 1", "\"format_version\": 3");
+        QVERIFY(write(QStringLiteral("aktionen.json"), broken));
+        s = dss::checkDataFormat(dir);
+        QCOMPARE(s.newer, QStringList{QStringLiteral("aktionen.json (Format 3)")});
+        QVERIFY(s.unreadable.isEmpty());
+        // kein JSON
+        QVERIFY(write(QStringLiteral("zitate.json"), "{ kaputt"));
+        s = dss::checkDataFormat(dir);
+        QCOMPARE(s.unreadable.size(), 1);
+        QVERIFY2(s.unreadable.first().startsWith(QStringLiteral("zitate.json: ")), qPrintable(s.unreadable.first()));
     }
 };
 

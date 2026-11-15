@@ -17,6 +17,9 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
 ├── aktionen.json             Aktionen, Befehle, Zeitnachrichten des Chat-Bots (P14), siehe «Aktionen»
 ├── variablen.json            dauerhafte Variablen und Zähler der Befehle (P14), siehe «Variablen»
+├── zuschauer.json            Login und Anzeigename je Twitch-ID (P14), siehe «Zuschauer, Zitate, Archiv»
+├── zitate.json               Zitate aus Streamer.bot (P14)
+├── streamerbot-archiv.json   übrige Daten aus Streamer.bot, unverändert aufbewahrt (P14)
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
@@ -268,6 +271,18 @@ Seit P14 (Abschnitt a). Dauerhafte Variablen und Zähler der Befehle (Plan P14, 
 - `origin` und `changed_at` (UTC, ISO 8601 mit Millisekunden) je Wert: Jede Änderung im Studio setzt `studio` und den Zeitpunkt; so erkennt ein erneuter Import, was seither geändert wurde.
 - Zähler der Befehle sind ganze Zahlen ab 0. Erhöhen einer fehlenden Variable beginnt bei 0; ein Text, der ganz eine Zahl ist, zählt als Zahl.
 - Streng gelesen wie `liste.json`: unbekannte oder fehlende Felder machen die Datei ungültig (die Datei gehört nur dem Kern).
+
+## Zuschauer, Zitate, Archiv (`zuschauer.json`, `zitate.json`, `streamerbot-archiv.json`)
+
+Seit P14 (Abschnitt a), gefüllt vom Import aus Streamer.bot (Plan P14, Abschnitte 2.10 und 9). Massgebend ist `src/actions/viewerdata.h/.cpp`. Datenschutz wie bei `variablen.json`. Die Felder aus Streamer.bot stehen erst nach der Prüfung der Struktur (Abschnitt z0) fest; Pflicht sind darum nur die hier genannten, alle weiteren bleiben unverändert erhalten.
+
+| Datei | Inhalt |
+|---|---|
+| `zuschauer.json` | `{"format_version": 1, "viewers": {"<Twitch-ID>": {"login": …, "display_name": …, weitere Felder}}}`; `login` nicht leer. Im Betrieb nachgeführt (nur Login und Anzeigename) |
+| `zitate.json` | `{"format_version": 1, "quotes": [{…}, …]}`, jedes Zitat ein Objekt mit den Feldern aus `quotes.dat` |
+| `streamerbot-archiv.json` | `{"format_version": 1, "files": {"<Datei>": {"<Sammlung>": <JSON>}}}`, unverändert, nicht sichtbar |
+
+**Prüfen beim Installieren:** `dss-core --format-pruefen` liest alle fünf Dateien des Chat-Bots streng (`aktionen.json`, `variablen.json` und die drei oben). Eine ungültige Datei meldet es als «nicht lesbar, bleibt unverändert», eine `format_version` über 1 als neueres Format (Exit-Code 5). Ein älteres Format gibt es noch nicht.
 
 ## Versionen
 

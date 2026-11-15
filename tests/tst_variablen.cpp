@@ -1,9 +1,12 @@
 // Prüft Variablen und Zähler der Befehle ohne Qt Gui (P14 a, Plan 2.9): Datei variablen.json mit
 // Herkunft und Zeitpunkt, flüchtig und dauerhaft, je Zuschauer über die Twitch-ID, Erhöhen und
-// Verringern, Zähler der Befehle. Erfundene Namen, IDs und Werte (Plan 2.10).
+// Verringern, Zähler der Befehle. Dazu die weiteren Dateien mit Zuschauer-Daten (Plan 2.10):
+// zuschauer.json, zitate.json, streamerbot-archiv.json. Erfundene Namen, IDs und Werte.
 
 #include "variables.h"
+#include "viewerdata.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTest>
@@ -281,6 +284,89 @@ private slots:
         VariablesData again;
         QVERIFY2(parseVariables(serializeVariables(loaded.data()), &again, &error), qPrintable(error));
         QCOMPARE(again, loaded.data());
+    }
+
+    // zuschauer.json: weitere Felder aus Streamer.bot bleiben unverändert (Plan 2.10)
+    void viewers()
+    {
+        const QByteArray data = R"({"format_version": 1, "viewers": {
+            "100000001": {"login": "testzuschauer", "display_name": "TestZuschauer",
+                          "test_feld_aus_streamerbot": {"a": [1, 2]}, "lastActive": "2026-11-01"},
+            "100000002": {"login": "zweiter", "display_name": ""}}})";
+        ViewersData d;
+        QString error;
+        QVERIFY2(parseViewers(data, &d, &error), qPrintable(error));
+        QCOMPARE(d.viewers.size(), 2);
+        const Viewer v = d.viewers.value(kViewer);
+        QCOMPARE(v.login, QStringLiteral("testzuschauer"));
+        QCOMPARE(v.displayName, QStringLiteral("TestZuschauer"));
+        QCOMPARE(v.extra.value(QStringLiteral("lastActive")).toString(), QStringLiteral("2026-11-01"));
+        QCOMPARE(QJsonDocument::fromJson(serializeViewers(d)).object(), QJsonDocument::fromJson(data).object());
+
+        // Nachführen: nur Login und Anzeigename, weitere Felder bleiben
+        QVERIFY(!noteViewer(&d, kViewer, QStringLiteral("testzuschauer"), QStringLiteral("TestZuschauer")));
+        QVERIFY(noteViewer(&d, kViewer, QStringLiteral("neuername"), QStringLiteral("NeuerName")));
+        QCOMPARE(d.viewers.value(kViewer).login, QStringLiteral("neuername"));
+        QCOMPARE(d.viewers.value(kViewer).extra, v.extra);
+        QVERIFY(noteViewer(&d, QStringLiteral("100000003"), QStringLiteral("dritter"), QStringLiteral("Dritter")));
+        QCOMPARE(d.viewers.size(), 3);
+        QVERIFY(!noteViewer(&d, QString(), QStringLiteral("x"), QStringLiteral("X")));
+        QVERIFY(!noteViewer(&d, QStringLiteral("100000004"), QString(), QStringLiteral("X")));
+        QCOMPARE(d.viewers.size(), 3);
+
+        for (const QByteArray &bad : {QByteArray(R"({"format_version": 1, "viewers": {"1": {"display_name": "x"}}})"),
+                                      QByteArray(R"({"format_version": 1, "viewers": {"1": {"login": "", "display_name": "x"}}})"),
+                                      QByteArray(R"({"format_version": 1, "viewers": {"1": {"login": "a", "display_name": 3}}})"),
+                                      QByteArray(R"({"format_version": 1, "viewers": {"": {"login": "a", "display_name": ""}}})"),
+                                      QByteArray(R"({"format_version": 1, "viewers": []})"),
+                                      QByteArray(R"({"format_version": 1, "viewers": {}, "x": 1})"),
+                                      QByteArray(R"({"format_version": 2, "viewers": {}})"),
+                                      QByteArray(R"({"viewers": {}})")}) {
+            ViewersData unchanged = d;
+            QVERIFY2(!parseViewers(bad, &unchanged, &error), bad.constData());
+            QCOMPARE(unchanged, d);
+        }
+    }
+
+    void quotesAndArchive()
+    {
+        const QByteArray quotes = R"({"format_version": 1, "quotes": [
+            {"id": 1, "quote": "Erfundenes Zitat", "user": "testzuschauer"}, {"id": 2}]})";
+        QuotesData q;
+        QString error;
+        QVERIFY2(parseQuotes(quotes, &q, &error), qPrintable(error));
+        QCOMPARE(q.quotes.size(), 2);
+        QCOMPARE(q.quotes.at(0).value(QStringLiteral("quote")).toString(), QStringLiteral("Erfundenes Zitat"));
+        QCOMPARE(QJsonDocument::fromJson(serializeQuotes(q)).object(), QJsonDocument::fromJson(quotes).object());
+        QVERIFY(!parseQuotes(R"({"format_version": 1, "quotes": [1]})", &q, &error));
+        QCOMPARE(error, QStringLiteral("Feld «quotes[0]»: muss ein Objekt sein"));
+        QVERIFY(!parseQuotes(R"({"format_version": 1})", &q, &error));
+        QCOMPARE(error, QStringLiteral("Feld «quotes»: fehlt"));
+
+        const QByteArray archive = R"({"format_version": 1, "files": {
+            "kick_data.db": {"users": [{"_id": "k1", "name": "erfunden"}]},
+            "globals.db": {"settings": {"paket": {"verschachtelt": true}}, "leer": null}}})";
+        ArchiveData a;
+        QVERIFY2(parseArchive(archive, &a, &error), qPrintable(error));
+        QCOMPARE(a.files.size(), 2);
+        QCOMPARE(a.files.value(QStringLiteral("kick_data.db")).value(QStringLiteral("users")).toArray().size(), 1);
+        QCOMPARE(QJsonDocument::fromJson(serializeArchive(a)).object(), QJsonDocument::fromJson(archive).object());
+        QVERIFY(!parseArchive(R"({"format_version": 1, "files": {"x.db": []}})", &a, &error));
+        QVERIFY2(error.startsWith(QStringLiteral("Feld «files.x.db»")), qPrintable(error));
+    }
+
+    void dataFileList()
+    {
+        QStringList names;
+        for (const DataFileFormat &f : actionDataFiles()) {
+            names.append(f.fileName);
+            QCOMPARE(f.version, 1);
+            QString error;
+            QVERIFY(!f.check("{}", &error));
+        }
+        QCOMPARE(names, (QStringList{QStringLiteral("aktionen.json"), QStringLiteral("variablen.json"),
+                                     QStringLiteral("zuschauer.json"), QStringLiteral("zitate.json"),
+                                     QStringLiteral("streamerbot-archiv.json")}));
     }
 };
 
