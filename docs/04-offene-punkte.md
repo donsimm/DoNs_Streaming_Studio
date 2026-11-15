@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-14 (P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 113 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-15 (Punkt 3: Umfang des Chat-Bots entschieden; davor P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 113 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -25,7 +25,7 @@ Stand: 2026-11-14 (P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und in
 ## Später zu klären
 
 2. NDI-SDK: Lizenzbedingungen für die private Nutzung und der Bezug für Linux sind nicht geprüft.
-3. Chat-Bot: Umfang und Streamer.bot-Import werden geklärt, wenn das Modul an der Reihe ist. Die Daten der alten Installation sind vorhanden.
+3. Chat-Bot: **Umfang entschieden (Nutzer, 2026-11-15):** Aktionssystem wie Streamer.bot mit Editor im Studio, mitgelieferte Aktionen für die ersten Streams, kein Skript-Schritt (Plan `docs/archiv/prompts/P14-chatbot.md`). Offen bleibt der Streamer.bot-Import: eigener Baustein nach P14, das Datenmodell von P14 ist dafür angelegt. Die Daten der alten Installation sind vorhanden und dürfen gelesen werden (ohne Zugangsdaten).
 4. Live-Modul: Inhalt wird später geklärt.
 5. Funktionsprioritäten (MUSS, SOLL, KANN) der übrigen Module: pro Modul festlegen, wenn es an der Reihe ist. Editor und Quelle Text sind entschieden (`docs/03-funktionen-entwurf.md`).
 13. Aus P02: Für NDI offen sind Farbmatrix und Bereich bei UYVY, Vormultiplikation bei UYVA und ob die Umwandlung besser das NDI-SDK übernimmt (laut NDI-Dokumentation empfohlen). Alpha im Abgriff bei transparenter Seite nicht geprüft.

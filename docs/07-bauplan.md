@@ -1,8 +1,8 @@
 # 07 – Bauplan
 
-Stand: 2026-11-09. Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
+Stand: 2026-11-15. Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
 
-Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02), P12 bis P14 vom Nutzer entschieden (2026-11-09). Was danach kommt, ist noch offen.
+Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02), P12 bis P14 vom Nutzer entschieden (2026-11-09), Umfang von P14 und die Kamerasteuerung danach entschieden (2026-11-15). Was danach kommt, ist sonst noch offen.
 
 ## Erledigt
 
@@ -31,11 +31,15 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 | Nr. | Baustein | Inhalt | Braucht | Editor-Punkte |
 |---|---|---|---|---|
 | P12 | Ton von Videos | Ton über eine Audiokarte des Studio-PCs, Audioausgang wählbar. Entscheid des Nutzers 2026-11-09 zur Reihenfolge | P09 | E-20, E-21 |
-| P13 | Twitch-Anbindung mit Ereignisfluss | Verbindung zu Twitch und Ereignisfluss (Regel 14, Punkt 92: Felder eines Ereignisses, Abonnieren, ob Ereignisse über den Socket zum Fenster gehen). Zugangsdaten nie im Klartext (Regel 12). Entscheid des Nutzers 2026-11-09 | P10c | |
-| P14 | Basisfunktion Chat-Bot | Chat-Bot-Modul mit Chat und Commands; Umfang und Streamer.bot-Import werden vor dem Baustein geklärt (`docs/04-offene-punkte.md`, Frage 3). Entscheid des Nutzers 2026-11-09 | P13 | |
+| P13 | Twitch-Anbindung mit Ereignisfluss | Ereignisfluss (Regel 14, Punkt 92) und Verbindung zu Twitch: Anmeldung mit Code für zwei Konten (Kanal und Bot), Rechte zum Lesen und Schreiben, Ereignisse als Auslöser für P14 (Chat-Nachricht, erste Nachricht, Follow, Sub, Resub, Geschenke, Cheer, Raid, Stream online/offline), Bereich «Twitch» in den Einstellungen, Liste «Ereignisse». Zugangsdaten nie im Klartext (Regel 12). Plan `docs/archiv/prompts/P13-twitch.md` (angepasst 2026-11-15). Entscheide des Nutzers 2026-11-09 und 2026-11-15 | P10c | |
+| P14 | Chat-Bot als Aktionssystem | Aktionssystem wie Streamer.bot mit Editor im Reiter «Chat-Bot»: Aktionen mit Schritten, Auslöser, Befehle, Zeitnachrichten, Warteschlangen, Variablen; Grundschritte (Chat als Kanal oder Bot, Pause, Ton über eigenen Ausgang, Overlay-Quelle zeigen/verstecken, OBS-Quelle ein/aus, Variable/Zähler, Wenn/Dann, Benutzerinfo, Shoutout); mitgelieferte, veränderbare Aktionen für die ersten Streams; Dock «Chat». Kein Skript-Schritt. Sechs Abschnitte a bis f, Plan `docs/archiv/prompts/P14-chatbot.md` (2026-11-15). Entscheide des Nutzers 2026-11-09 und 2026-11-15 | P13, P12 | E-17 (Alerts als Overlay, teilweise) |
 
-Danach (Reihenfolge noch offen): SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); NDI (E-19, T-03). Weitere Chat-Bot-Funktionen (später Streamer.bot-Funktionen) nach P14.
+Danach:
+- **Kamerasteuerung** (Entscheid des Nutzers 2026-11-15: direkt nach P14): Kamera-Dienst auf dem Streaming-PC, Dock «Kameras», Licht (Key Light) mit Presets. Plan folgt.
+- **Später als feste Bausteine des Chat-Bots** (Entscheid 2026-11-15): Countdown-Timer, Watchtime; Streamer.bot-Import als eigener Baustein.
+- **Später, nicht für die ersten Streams** (Entscheid 2026-11-15): Kanalpunkte-Effekte, Kamera-Fernbedienung per Chat, Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe. **Vorerst nicht:** Subathon, YouTube Music, Golf, Hugs, Q&A.
+- Reihenfolge noch offen: SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); NDI (E-19, T-03).
 
 ## Offene Fragen zur Reihenfolge
 
-Keine zu P12 bis P14. Die frühere Frage «Chat-Bot zuerst» ist entschieden (Nutzer, 2026-11-09): Reihenfolge P12 Ton, P13 Twitch-Anbindung, P14 Basisfunktion Chat-Bot. Offen bleibt, ob nach P14 zuerst SOLL-Punkte des Editors oder NDI kommen.
+Keine zu P12 bis P14. Die frühere Frage «Chat-Bot zuerst» ist entschieden (Nutzer, 2026-11-09): Reihenfolge P12 Ton, P13 Twitch-Anbindung, P14 Chat-Bot; nach P14 die Kamerasteuerung (Nutzer, 2026-11-15). Offen bleibt, wann die SOLL-Punkte des Editors, NDI und die späteren Chat-Bot-Bausteine kommen.
