@@ -15,6 +15,7 @@
 #include "twitchtestserver.h"
 #include "version.h"
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -22,7 +23,13 @@
 #include <QLocalSocket>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <QUuid>
+
+#include <unistd.h>
+
+#include <algorithm>
+#include <functional>
 
 using namespace dss;
 using testhelp::TwitchTestServer;
@@ -111,6 +118,8 @@ public:
     QByteArray traffic() const { return m_received + m_sent; }
     QByteArray received() const { return m_received; }
     void close() { m_socket.abort(); }
+    // Wird für jede eingelesene Nachricht gleich beim Lesen aufgerufen (Lastprobe: Antwortzeit).
+    std::function<void(const QJsonObject &)> onMessage;
 
 private:
     void read()
@@ -122,8 +131,11 @@ private:
         while (m_lines.next(&line) == LineSplitter::Result::Line) {
             QJsonObject message;
             QString error;
-            if (decodeMessage(line, &message, &error))
+            if (decodeMessage(line, &message, &error)) {
                 m_messages.append(message);
+                if (onMessage)
+                    onMessage(message);
+            }
         }
     }
 
@@ -157,6 +169,7 @@ public:
         return ok;
     }
     QString log() const { return m_log; }
+    qint64 pid() const { return m_process->processId(); }
 
 private:
     std::unique_ptr<QProcess> m_process;
@@ -171,6 +184,24 @@ QString twitchConfigHome()
     if (ini.open(QIODevice::Append))
         ini.write("[twitch]\naktiv=ja\nclient-id=testclient\n");
     return home;
+}
+
+// Verbrauchte CPU-Zeit eines Prozesses in Ticks (utime + stime, Felder 14 und 15 von
+// /proc/<pid>/stat, man 5 proc); -1 bei Fehler.
+qint64 cpuTicks(qint64 pid)
+{
+    QFile f(QStringLiteral("/proc/%1/stat").arg(pid));
+    if (!f.open(QIODevice::ReadOnly))
+        return -1;
+    const QByteArray stat = f.readAll();
+    const qsizetype end = stat.lastIndexOf(')');
+    if (end < 0)
+        return -1;
+    // Nach dem Namen beginnt Feld 3 (state); utime ist Feld 14, stime Feld 15.
+    const QList<QByteArray> fields = stat.mid(end + 2).split(' ');
+    if (fields.size() < 13)
+        return -1;
+    return fields[11].toLongLong() + fields[12].toLongLong();
 }
 
 } // namespace
@@ -319,6 +350,153 @@ private slots:
             else
                 QVERIFY2(!traffic.contains(s.toUtf8()), qPrintable(QStringLiteral("im Socket: %1").arg(s.left(8))));
         }
+    }
+
+    // Lastprobe (Plan P13, Prüfstufe «Baustein»): Der Testserver schickt 60 s lang 50 Chat-Nachrichten
+    // pro Sekunde, ein Fenster hat bestellt. Ziele: alle Ereignisse in Reihenfolge beim Fenster,
+    // Antwort auf get_overlay_list höchstens 25 ms; CPU des Kerns je Sekunde als Messwert. Nur mit
+    // DSS_LASTPROBE=1, sonst sofort bestanden (ohne QSKIP: ctest verlangt 0 übersprungen, bleibt kurz).
+    // Aufruf: ctest --test-dir build -C Lastprobe -R '^tst_kerntwitch_last$' -V
+    void chatLoad()
+    {
+        if (qEnvironmentVariable("DSS_LASTPROBE") != QLatin1String("1"))
+            return;
+        constexpr int kRate = 50;
+        constexpr int kSeconds = 60;
+        constexpr int kTotal = kRate * kSeconds;
+        constexpr qint64 kMaxAnswerMs = 25;
+
+        TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        QTemporaryDir data;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && runtime->isValid());
+        const QString socketPath = runtime->filePath(QStringLiteral("kern.sock"));
+        Core core(data.path(), socketPath, twitchConfigHome(),
+                  {QStringLiteral("--twitch-testserver"), server.baseUrl().toString()});
+        QVERIFY2(core.waitForLog(QStringLiteral("Twitch: eingeschaltet")), qPrintable(core.log()));
+        Window window;
+        QVERIFY(QTest::qWaitFor([&] { return window.open(socketPath); }, kWait));
+
+        // Nur der Kanal: channel.chat.message liest als Kanal (eventsubprotocol.cpp)
+        window.send(twitchAccountRequestMessage(msg::kTwitchLoginStart, {1, QStringLiteral("channel")}));
+        QTRY_VERIFY_WITH_TIMEOUT(window.status() && window.status()->channel.loginPending.has_value(), kWait);
+        QVERIFY(server.approveLatest(kChannelUser));
+        QTRY_COMPARE_WITH_TIMEOUT(window.twitchConnection(), QStringLiteral("connected"), kWait);
+        QVERIFY(server.latestSession());
+        window.send(subscribeEventsMessage({{QStringLiteral("twitch.chat_message")}, false}));
+
+        // Ankunft der Ereignisse und Antworten gleich beim Lesen festhalten
+        QElapsedTimer clock;
+        clock.start();
+        QStringList arrived;
+        qint64 dropped = 0;
+        qint64 lastEventMs = 0;
+        qint64 askedAt = -1;
+        QList<qint64> answers;
+        window.onMessage = [&](const QJsonObject &m) {
+            const QString type = messageType(m);
+            if (type == QLatin1String(msg::kEvent)) {
+                const QJsonObject event = m.value(QStringLiteral("event")).toObject();
+                if (event.value(QStringLiteral("type")).toString() == QLatin1String("twitch.chat_message")) {
+                    arrived << event.value(QStringLiteral("origin_id")).toString();
+                    lastEventMs = clock.elapsed();
+                }
+            } else if (type == QLatin1String(msg::kEventsDropped)) {
+                qint64 n = 0;
+                QString error;
+                if (parseEventsDropped(m, &n, &error))
+                    dropped += n;
+            } else if (type == QLatin1String(msg::kOverlayList) && askedAt >= 0) {
+                answers << clock.elapsed() - askedAt;
+                askedAt = -1;
+            }
+        };
+
+        const QJsonObject chat = testFile(QStringLiteral("chat_message.json"));
+        QVERIFY(!chat.isEmpty());
+        auto id = [](int i) { return QStringLiteral("last-%1").arg(i, 6, 10, QLatin1Char('0')); };
+        int sent = 0;
+        QTimer sender;
+        sender.setTimerType(Qt::PreciseTimer);
+        QObject::connect(&sender, &QTimer::timeout, [&] {
+            // Nachholen, falls ein Takt zu spät kommt: Soll ist kRate je Sekunde ab Beginn
+            const qint64 due = std::min<qint64>(kTotal, clock.elapsed() * kRate / 1000);
+            while (sent < due) {
+                server.sendNotification(server.latestSession(), chat, id(sent));
+                ++sent;
+            }
+        });
+        QTimer asker;
+        QObject::connect(&asker, &QTimer::timeout, [&] {
+            if (askedAt >= 0)
+                return; // vorige Antwort fehlt noch; zählt unten über die Anzahl
+            askedAt = clock.elapsed();
+            window.send(simpleMessage(msg::kGetOverlayList));
+        });
+        QList<double> cpu; // % eines Kerns je Sekunde
+        const double ticksPerSecond = double(sysconf(_SC_CLK_TCK));
+        qint64 lastTicks = cpuTicks(core.pid());
+        qint64 lastCpuMs = 0;
+        QVERIFY(lastTicks >= 0);
+        QTimer sampler;
+        sampler.setTimerType(Qt::PreciseTimer);
+        QObject::connect(&sampler, &QTimer::timeout, [&] {
+            const qint64 ticks = cpuTicks(core.pid());
+            const qint64 now = clock.elapsed();
+            if (ticks >= 0 && now > lastCpuMs)
+                cpu << 100.0 * double(ticks - lastTicks) / ticksPerSecond / (double(now - lastCpuMs) / 1000.0);
+            lastTicks = ticks;
+            lastCpuMs = now;
+        });
+
+        clock.restart();
+        sender.start(20);
+        asker.start(200);
+        sampler.start(1000);
+        QTRY_VERIFY_WITH_TIMEOUT(sent == kTotal, (kSeconds + 5) * 1000);
+        const qint64 sendMs = clock.elapsed();
+        QTRY_VERIFY_WITH_TIMEOUT(arrived.size() >= kTotal, kWait);
+        sender.stop();
+        asker.stop();
+        sampler.stop();
+        QTest::qWait(300);
+
+        // Reihenfolge und Vollständigkeit
+        QCOMPARE(dropped, 0);
+        QCOMPARE(arrived.size(), kTotal);
+        for (int i = 0; i < kTotal; ++i)
+            QVERIFY2(arrived[i] == id(i), qPrintable(QStringLiteral("Stelle %1: %2").arg(i).arg(arrived[i])));
+
+        window.onMessage = nullptr;
+        std::sort(answers.begin(), answers.end());
+        QVERIFY2(answers.size() >= kSeconds * 4, qPrintable(QStringLiteral("nur %1 Antworten").arg(answers.size())));
+        QVERIFY2(cpu.size() >= kSeconds - 2, qPrintable(QStringLiteral("nur %1 CPU-Werte").arg(cpu.size())));
+        QList<double> cpuSorted = cpu;
+        std::sort(cpuSorted.begin(), cpuSorted.end());
+        double cpuSum = 0;
+        for (double v : cpu)
+            cpuSum += v;
+        auto pct = [](const auto &list, double p) { return list.at(std::min<qsizetype>(list.size() - 1, qsizetype(p * list.size()))); };
+        qInfo("Lastprobe: %d Nachrichten in %lld ms gesendet, %lld angekommen, letzte nach %lld ms, 0 verworfen",
+              kTotal, static_cast<long long>(sendMs), static_cast<long long>(arrived.size()),
+              static_cast<long long>(lastEventMs));
+        qInfo("get_overlay_list: %lld Antworten, min %lld / Median %lld / p95 %lld / max %lld ms",
+              static_cast<long long>(answers.size()), static_cast<long long>(answers.first()),
+              static_cast<long long>(pct(answers, 0.5)), static_cast<long long>(pct(answers, 0.95)),
+              static_cast<long long>(answers.last()));
+        qInfo("CPU dss-core (%% eines Kerns, %lld Werte je 1 s): Mittel %.2f / Median %.1f / p95 %.1f / max %.1f",
+              static_cast<long long>(cpu.size()), cpu.isEmpty() ? 0.0 : cpuSum / double(cpu.size()),
+              pct(cpuSorted, 0.5), pct(cpuSorted, 0.95), cpuSorted.last());
+        QStringList perSecond;
+        for (double v : cpu)
+            perSecond << QString::number(v, 'f', 1);
+        qInfo("CPU je Sekunde: %s", qPrintable(perSecond.join(QLatin1Char(' '))));
+        QVERIFY2(answers.last() <= kMaxAnswerMs, qPrintable(QStringLiteral("Antwort nach %1 ms").arg(answers.last())));
+
+        window.close();
+        QVERIFY2(core.stop(), qPrintable(core.log()));
     }
 
     // Plan 2.6: nur http://127.0.0.1:PORT, sonst Abbruch mit Exit-Code 1.

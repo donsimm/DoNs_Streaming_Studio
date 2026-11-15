@@ -342,6 +342,10 @@ if(DSS_CORE_TWITCH)
     DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
   add_dependencies(tst_kerntwitch dss-core)
   add_test(NAME tst_kerntwitch COMMAND tst_kerntwitch)
+  # Lastprobe der Prüfstufe «Baustein» (60 s, 50 Chat-Nachrichten pro Sekunde): nur mit
+  # ctest -C Lastprobe, nicht im normalen ctest.
+  add_test(NAME tst_kerntwitch_last CONFIGURATIONS Lastprobe COMMAND tst_kerntwitch chatLoad)
+  set_tests_properties(tst_kerntwitch_last PROPERTIES ENVIRONMENT DSS_LASTPROBE=1 TIMEOUT 300)
 endif()
 
 # P13, Commit 9: scripts/twitch-einrichten.sh gegen einen Testkern (eigener Datenordner, eigene
