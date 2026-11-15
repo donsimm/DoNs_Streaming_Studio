@@ -68,16 +68,8 @@ QString pathText(const QList<int> &path)
 
 } // namespace
 
-// Bis Abschnitt c1: Chat und Twitch melden «Twitch nicht verbunden»
-class ActionService::NotConnectedChat : public dss::actions::ChatSender
-{
-public:
-    void sendChat(const dss::actions::ChatRequest &, dss::actions::StepDone done) override
-    {
-        done(dss::actions::StepResult::failure(kTwitchNotConnected));
-    }
-};
-
+// Bis Abschnitt c1b: Benutzerinfo, Shoutout und Ansage melden «Twitch nicht verbunden» (Chat senden
+// geht seit c1a über ChatOutbox).
 class ActionService::NotConnectedTwitch : public dss::actions::TwitchApi
 {
 public:
@@ -101,7 +93,7 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     , m_options(options)
     , m_engine(std::make_unique<dss::actions::ActionEngine>(&m_clock, &m_variables))
     , m_dispatcher(std::make_unique<dss::actions::TriggerDispatcher>(&m_clock, &m_variables))
-    , m_chat(std::make_unique<NotConnectedChat>())
+    , m_chat(std::make_unique<dss::actions::ChatOutbox>(&m_clock, options.chatTransport))
     , m_twitch(std::make_unique<NotConnectedTwitch>())
     , m_saver(new dss::SaveScheduler(this))
 {
@@ -109,6 +101,7 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     services.chat = m_chat.get();
     services.twitch = m_twitch.get();
     m_engine->setServices(services);
+    m_chat->setResultHandler([this](const dss::actions::ChatOutcome &outcome) { publishChat(outcome); });
     m_engine->setBaseArguments([this] {
         return dss::actions::Arguments{{QStringLiteral("isLive"), m_dispatcher->isLive()}};
     });
@@ -123,7 +116,7 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
         if (!savePending(&error))
             qCritical("Aktionen: Speichern fehlgeschlagen: %s", qPrintable(error));
     });
-    // Twitch-Ereignisse vom Fluss (P13); die Anbindung an Twitch selbst kommt mit c1
+    // Twitch-Ereignisse vom Fluss (P13)
     m_subscription = m_bus->subscribe(this, {QStringLiteral("twitch.")},
                                       [this](const dss::events::Event &event) { onEvent(event); });
 
@@ -281,9 +274,11 @@ dss::ActionsStatus ActionService::status() const
     for (const dss::actions::Queue &q : m_config.queues)
         s.queues.append(queueStatus(q.id, q.name, q.blocking));
     s.running = m_engine->runningCount();
-    // Konten «kann senden» (Plan 5); die Anmeldung bei Twitch kommt mit c1
-    s.accounts = {{QStringLiteral("bot"), false, kTwitchNotConnected},
-                  {QStringLiteral("broadcaster"), false, kTwitchNotConnected}};
+    // Konten «kann senden» (Plan 5)
+    for (const dss::actions::ChatAccount account : {dss::actions::ChatAccount::Bot, dss::actions::ChatAccount::Broadcaster}) {
+        const QString reason = m_chat->unavailableReason(account);
+        s.accounts.append({dss::actions::chatAccountKey(account), reason.isEmpty(), reason});
+    }
     return s;
 }
 
@@ -554,8 +549,14 @@ void ActionService::onEvent(const dss::events::Event &event)
     }
     m_dispatcher->setMuted(m_muted);
     const dss::actions::TriggerEvent trigger{event.type, event.time, event.originId, event.data};
-    // Eigener Kanal und «vom Studio gesendet» kommen mit c1 (TwitchService)
-    const dss::actions::TriggerResult r = m_dispatcher->handleEvent(trigger, {});
+    // Eigener Kanal und «vom Studio gesendet» (Plan 4.1, c1a)
+    dss::actions::TriggerContext context;
+    if (m_options.broadcasterId)
+        context.broadcasterId = m_options.broadcasterId();
+    context.internal = m_chat->isInternal(event.data.value(QStringLiteral("message_id")).toString(),
+                                          event.data.value(QStringLiteral("user_id")).toString(),
+                                          event.data.value(QStringLiteral("text")).toString());
+    const dss::actions::TriggerResult r = m_dispatcher->handleEvent(trigger, context);
     dss::actions::submit(*m_engine, r);
     noteVariablesChanged();
 }
@@ -566,6 +567,28 @@ void ActionService::publishRun(const char *type, const dss::actions::RunRecord &
     event.type = QString::fromLatin1(type);
     event.data = dss::runEventData(record);
     m_bus->publish(event);
+}
+
+// Ergebnis von «Chat senden» auf dem Fluss (Plan 4.1). Nur an die Fenster, nicht ins Journal.
+void ActionService::publishChat(const dss::actions::ChatOutcome &outcome)
+{
+    dss::events::Event event;
+    event.type = outcome.sent ? QStringLiteral("twitch.chat_sent") : QStringLiteral("twitch.chat_dropped");
+    event.data = {{QStringLiteral("account"), dss::actions::chatAccountKey(outcome.account)},
+                  {QStringLiteral("user_id"), outcome.senderId},
+                  {QStringLiteral("text"), outcome.text},
+                  {QStringLiteral("reply_to"), outcome.replyTo.isEmpty() ? QJsonValue() : QJsonValue(outcome.replyTo)},
+                  {QStringLiteral("truncated"), outcome.truncated}};
+    if (outcome.sent) {
+        event.data.insert(QStringLiteral("message_id"), outcome.messageId);
+    } else {
+        event.data.insert(QStringLiteral("code"), outcome.code);
+        event.data.insert(QStringLiteral("message"), outcome.message);
+        qInfo("Chat nicht gesendet (%s): %s", qPrintable(event.data.value(QStringLiteral("account")).toString()),
+              qPrintable(outcome.code));
+    }
+    if (!m_bus->publish(event))
+        qWarning("Aktionen: %s abgewiesen: %s", qPrintable(event.type), qPrintable(dss::events::EventBus::validate(event)));
 }
 
 void ActionService::onRunStarted(const dss::actions::RunRecord &record)

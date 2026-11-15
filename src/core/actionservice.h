@@ -5,6 +5,7 @@
 #include "actionmodel.h"
 #include "actionprotocol.h"
 #include "actionservices.h"
+#include "chatoutbox.h"
 #include "eventbus.h"
 #include "triggerdispatcher.h"
 #include "variables.h"
@@ -37,8 +38,11 @@ class SaveScheduler;
 //   Kern keine Läufe aus Ereignissen, Befehlen und Zeitnachrichten; Probeläufe gehen weiter.
 // - Journal (Plan 3.5): nur Name der Aktion, Ergebnis und Fehler, keine Chat-Texte und keine Namen
 //   von Zuschauern.
-// - Twitch (Chat senden, Benutzerinfo, Shoutout, Ansage) meldet bis Abschnitt c1 «Twitch nicht
-//   verbunden»; Ton, Overlay und OBS sind «nicht verfügbar» (c2, P14-2).
+// - Chat senden (c1a): ChatOutbox über Options::chatTransport (Kern mit Twitch); Ergebnis als
+//   twitch.chat_sent und twitch.chat_dropped auf dem Fluss. Eigene Nachrichten gelten bei den
+//   Auslösern als «intern» (Plan 4.1), broadcasterId kommt vom eigenen Kanal.
+// - Benutzerinfo, Shoutout und Ansage melden bis Abschnitt c1b «Twitch nicht verbunden»; Ton,
+//   Overlay und OBS sind «nicht verfügbar» (c2, P14-2).
 class ActionService : public QObject
 {
     Q_OBJECT
@@ -52,6 +56,10 @@ public:
         int probeIntervalMs = 2000;
         // dss-core --testereignisse: test_event legt Ereignisse auf den Fluss (nur Tests)
         bool testEvents = false;
+        // c1a: Senden in den Chat; nullptr = Twitch nicht eingebaut. Lebt länger als der Dienst.
+        dss::actions::ChatTransport *chatTransport = nullptr;
+        // Twitch-ID des eigenen Kanals (geteilter Chat, Kanal darf Befehle immer); leer = unbekannt
+        std::function<QString()> broadcasterId;
     };
 
     ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent = nullptr);
@@ -68,13 +76,14 @@ public:
     void handleRequest(const QJsonObject &message, const std::function<void(const QJsonObject &)> &reply);
 
     bool isMuted() const { return m_muted; }
+    // Anmeldung bei Twitch geändert: Konten «kann senden» in actions_status nachführen.
+    void accountsChanged() { broadcastStatusIfChanged(); }
 
 signals:
     // An alle Fenster
     void broadcastRequested(const QJsonObject &message);
 
 private:
-    class NotConnectedChat;
     class NotConnectedTwitch;
 
     using Reply = std::function<void(const QJsonObject &)>;
@@ -90,6 +99,7 @@ private:
     void onRunChanged(const dss::actions::RunRecord &record);
     void onRunFinished(const dss::actions::RunRecord &record);
     void publishRun(const char *type, const dss::actions::RunRecord &record);
+    void publishChat(const dss::actions::ChatOutcome &outcome);
 
     // aktionen.json atomar schreiben
     bool writeConfig(const dss::actions::ActionsConfig &config, QString *error);
@@ -111,7 +121,7 @@ private:
     dss::actions::VariableStore m_variables;
     std::unique_ptr<dss::actions::ActionEngine> m_engine;
     std::unique_ptr<dss::actions::TriggerDispatcher> m_dispatcher;
-    std::unique_ptr<NotConnectedChat> m_chat;
+    std::unique_ptr<dss::actions::ChatOutbox> m_chat;
     std::unique_ptr<NotConnectedTwitch> m_twitch;
     dss::events::Subscription m_subscription;
 

@@ -3,7 +3,7 @@
 // Testserver für die Anbindung an Twitch (P13, Plan 4 «Testserver statt Twitch CLI»): ein kleiner
 // HTTP-Teil auf QTcpServer für /oauth2/* und /helix/* und EventSub über WebSocket unter /ws, alles
 // auf demselben Port von 127.0.0.1, ohne Netz, ohne Konto, ohne TLS. Vom Test gesteuert, Muster wie
-// tests/obstestserver.h. Die schreibenden Aufrufe kommen mit P14.
+// tests/obstestserver.h. Schreibende Aufrufe: P14 c1a POST /helix/chat/messages (c1b folgt).
 //
 // Verhalten nach der Doku von Twitch (Quellen in src/twitch/twitchauth.h und helixclient.h):
 // - POST /oauth2/device: device_code, user_code, verification_uri, expires_in, interval
@@ -176,6 +176,17 @@ public:
     QList<Device> devices;
     QList<Token> tokens;
     QList<TwitchHttpRequest> log;
+
+    // P14 c1a: Nachrichten an /helix/chat/messages
+    struct ChatRecord
+    {
+        QJsonObject body;      // broadcaster_id, sender_id, message, reply_parent_message_id
+        bool appToken = false; // mit App-Token gesendet (Abzeichen «Chat Bot»)
+        QString messageId;
+        bool sent = true;
+    };
+    QList<ChatRecord> chatMessages;
+    QString dropNextChat; // gesetzt: nächste Nachricht mit is_sent false und diesem drop_reason.code
 
     // Bestätigt den neuesten offenen Gerätecode mit diesem Konto (wie der Nutzer im Browser).
     bool approveLatest(const TwitchTestUser &user, const QStringList &grantedScopes = {})
@@ -699,9 +710,43 @@ private:
                                 {QStringLiteral("total"), 1},
                                 {QStringLiteral("total_cost"), 0},
                                 {QStringLiteral("max_total_cost"), 10000}});
+        } else if (request.path == QLatin1String("/helix/chat/messages") && request.method == "POST") {
+            handleChatMessage(socket, request, *token);
         } else {
             error(socket, 404, QStringLiteral("not found"));
         }
+    }
+
+    // P14 c1a: Send Chat Message (https://dev.twitch.tv/docs/api/reference/#send-chat-message).
+    // sender_id muss das Konto des Tokens sein; ein App-Token (ohne Konto) darf für jedes senden.
+    void handleChatMessage(QTcpSocket *socket, const TwitchHttpRequest &request, const Token &token)
+    {
+        const QJsonObject body = QJsonDocument::fromJson(request.body).object();
+        const QString sender = body.value(QStringLiteral("sender_id")).toString();
+        const QString text = body.value(QStringLiteral("message")).toString();
+        if (body.value(QStringLiteral("broadcaster_id")).toString().isEmpty() || sender.isEmpty() || text.isEmpty()) {
+            error(socket, 400, QStringLiteral("Missing required parameter"));
+            return;
+        }
+        if (!token.user.id.isEmpty() && token.user.id != sender) {
+            error(socket, 401, QStringLiteral("The sender must match the user ID in the access token"));
+            return;
+        }
+        if (text.size() > 500) { // Zählung von Twitch nicht belegt; hier UTF-16-Einheiten (Plan 4.1)
+            error(socket, 400, QStringLiteral("message too long"));
+            return;
+        }
+        ChatRecord record{body, token.user.id.isEmpty(), random("nachricht-"), dropNextChat.isEmpty()};
+        chatMessages.append(record);
+        QJsonObject data{{QStringLiteral("message_id"), record.messageId},
+                         {QStringLiteral("is_sent"), record.sent},
+                         {QStringLiteral("drop_reason"), QJsonValue::Null}};
+        if (!record.sent) {
+            data.insert(QStringLiteral("drop_reason"), QJsonObject{{QStringLiteral("code"), dropNextChat},
+                                                                    {QStringLiteral("message"), QStringLiteral("Test")}});
+            dropNextChat.clear();
+        }
+        reply(socket, 200, {{QStringLiteral("data"), QJsonArray{data}}});
     }
 
     QTcpServer *m_server = nullptr;

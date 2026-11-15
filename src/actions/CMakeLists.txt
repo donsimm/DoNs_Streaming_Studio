@@ -21,6 +21,7 @@ add_library(dss_actions STATIC
   triggerevent.h triggerevent.cpp
   triggerdispatcher.h triggerdispatcher.cpp
   actionedit.h actionedit.cpp # b3: Änderungen an aktionen.json (Kern)
+  chatoutbox.h chatoutbox.cpp # c1a: Chat senden (Grenzen, Kürzen, Schleifen), ohne Netz
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_actions PUBLIC Qt6::Core PRIVATE dss_warnings)

@@ -177,6 +177,19 @@ inline constexpr EventField kActionRun[] = {
     {"step_count", "stepCount"},
 };
 
+// P14 c1a: Ergebnis von «Chat senden» (Plan 4.1), Herkunft «twitch», kein Auslöser. account: bot oder
+// broadcaster; user_id: Absender (leer, wenn das Konto nicht angemeldet ist); text wie gesendet
+// (gekürzt); reply_to: message_id oder null. Eigene Namen.
+inline constexpr EventField kChatSent[] = {
+    {"message_id", "msgId"}, {"account", "account"}, {"user_id", "userId"}, {"text", "message"},
+    {"reply_to", "replyTo"}, {"truncated", "isTruncated"},
+};
+// code: unavailable, queue_full, expired, failed oder drop_reason.code von Twitch; message: Grund
+inline constexpr EventField kChatDropped[] = {
+    {"account", "account"}, {"user_id", "userId"}, {"text", "message"}, {"reply_to", "replyTo"},
+    {"truncated", "isTruncated"}, {"code", "dropCode"}, {"message", "dropMessage"},
+};
+
 #undef DSS_EVENT_CHAT_FIELDS
 #undef DSS_EVENT_TIER_FIELDS
 #undef DSS_EVENT_USER_FIELDS
@@ -197,6 +210,8 @@ inline constexpr EventType kEventTypes[] = {
     {"twitch.reward_redeemed", "twitch", false, detail::kRewardRedeemed},
     {"twitch.stream_online", "twitch", true, detail::kStreamOnline},
     {"twitch.stream_offline", "twitch", true, detail::kStreamOffline},
+    {"twitch.chat_sent", "twitch", false, detail::kChatSent},
+    {"twitch.chat_dropped", "twitch", false, detail::kChatDropped},
     {"obs.scene_changed", "obs", false, detail::kObsSceneChanged},
     {"actions.run_started", "actions", false, detail::kActionRun},
     {"actions.run_changed", "actions", false, detail::kActionRun},

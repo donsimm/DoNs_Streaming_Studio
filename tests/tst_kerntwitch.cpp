@@ -5,11 +5,18 @@
 // - Neustart behält beide Anmeldungen, Abmelden löscht die Datei des Kontos;
 // - kein Testtoken, kein device_code und kein Secret in Protokoll oder Socket (user_code nur im Socket);
 // - --twitch-testserver mit anderer Adresse als http://127.0.0.1:PORT bricht mit Exit-Code 1 ab.
+// - P14 c1a: Chat senden aus einer Aktion (Ersatz Kanal, Bot, Antwort), Konten in actions_status,
+//   eigene Nachrichten lösen keinen Befehl aus, kein Testtoken und kein Chat-Text im Protokoll.
+//   Die Chat-Nachrichten kommen über test_event (dss-core --testereignisse).
 // Eigener Datenordner, eigener Ordner der Einstellungen; die Geheimnisse legt systemd-creds --user ab
 // (wie tst_kernverbindung).
 
+#include "actionjson.h"
+#include "actionprotocol.h"
 #include "configpaths.h"
 #include "coresettings.h"
+#include "steptypes.h"
+#include "triggertypes.h"
 #include "prozesshilfe.h"
 #include "protocol.h"
 #include "twitchtestserver.h"
@@ -162,6 +169,50 @@ private:
     std::unique_ptr<QProcess> m_process;
     QString m_log;
 };
+
+// twitch.chat_message mit allen Feldern der Typenliste (eventtypes.h), als test_event
+QJsonObject chatEvent(const QString &messageId, const TwitchTestUser &user, const QString &text, bool broadcaster)
+{
+    const QJsonObject data{{QStringLiteral("message_id"), messageId},
+                           {QStringLiteral("user_id"), user.id},
+                           {QStringLiteral("user_login"), user.login},
+                           {QStringLiteral("user_name"), user.login},
+                           {QStringLiteral("text"), text},
+                           {QStringLiteral("fragments"), QJsonArray()},
+                           {QStringLiteral("color"), QString()},
+                           {QStringLiteral("badges"), QJsonArray()},
+                           {QStringLiteral("role"), broadcaster ? 4 : 1},
+                           {QStringLiteral("is_subscriber"), false},
+                           {QStringLiteral("is_vip"), false},
+                           {QStringLiteral("is_moderator"), false},
+                           {QStringLiteral("is_broadcaster"), broadcaster},
+                           {QStringLiteral("is_bot_account"), false},
+                           {QStringLiteral("bits"), 0},
+                           {QStringLiteral("reply_to"), QJsonValue::Null},
+                           {QStringLiteral("reward_id"), QJsonValue::Null},
+                           {QStringLiteral("message_type"), QStringLiteral("text")},
+                           {QStringLiteral("is_highlight"), false},
+                           {QStringLiteral("source_broadcaster_id"), QJsonValue::Null}};
+    return {{QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)},
+            {QStringLiteral("type"), QStringLiteral("twitch.chat_message")},
+            {QStringLiteral("origin"), QStringLiteral("twitch")},
+            {QStringLiteral("time"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+            {QStringLiteral("origin_id"), QString()},
+            {QStringLiteral("data"), data}};
+}
+
+// Konto → Grund aus dem neuesten actions_status (leer = kann senden); leer ohne Status
+QHash<QString, QString> accounts(const Window &window)
+{
+    QHash<QString, QString> result;
+    ActionsStatus status;
+    QString error;
+    if (!parseActionsStatus(window.latest(msg::kActionsStatus), &status, &error))
+        return result;
+    for (const ActionsAccountStatus &a : status.accounts)
+        result.insert(a.account, a.canSend ? QString() : a.message);
+    return result;
+}
 
 // Ordner der Einstellungen mit kern.ini und [twitch] eingeschaltet
 QString twitchConfigHome()
@@ -319,6 +370,125 @@ private slots:
             else
                 QVERIFY2(!traffic.contains(s.toUtf8()), qPrintable(QStringLiteral("im Socket: %1").arg(s.left(8))));
         }
+    }
+
+    // P14 c1a (Plan 4.1): Befehl «!dsstest» mit zwei Schritten «Chat senden»: als Bot mit Ersatz und
+    // Antwort, danach als Kanal. Die Antwort beginnt selbst mit «!dsstest» (Schleife, wenn das Echo
+    // nicht als «intern» erkannt würde).
+    void chatFromAction()
+    {
+#if !DSS_CORE_ACTIONS
+        QSKIP("Aktionssystem nicht eingebaut (DSS_CORE_ACTIONS aus)");
+#else
+        using namespace dss::actions;
+        TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        QTemporaryDir data;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && runtime->isValid());
+        const QString socketPath = runtime->filePath(QStringLiteral("kern.sock"));
+        // Version im Einsatz: Verbindung ohne Kern, sonst wäre dieser Kern stumm
+        const QStringList args{QStringLiteral("--twitch-testserver"), server.baseUrl().toString(),
+                               QStringLiteral("--testereignisse"), QStringLiteral("--einsatz-verbindung"),
+                               runtime->filePath(QStringLiteral("einsatz.sock"))};
+        const TwitchTestUser viewer{QStringLiteral("900000001"), QStringLiteral("zuschauer_geheim_4711")};
+        const QString replyText = QStringLiteral("!dsstest Antwort-Geheimtext-5521");
+        Core core(data.path(), socketPath, twitchConfigHome(), args);
+        QVERIFY2(core.waitForLog(QStringLiteral("Twitch: eingeschaltet")), qPrintable(core.log()));
+        Window window;
+        QVERIFY(QTest::qWaitFor([&] { return window.open(socketPath); }, kWait));
+        window.send(subscribeEventsMessage({{QStringLiteral("twitch."), QStringLiteral("actions.")}, false}));
+        const auto count = [&](const QString &type) { return window.eventTypes().count(type); };
+        const auto login = [&](qint64 id, const QString &account, const TwitchTestUser &user) {
+            window.send(twitchAccountRequestMessage(msg::kTwitchLoginStart, {id, account}));
+            return QTest::qWaitFor([&] { return server.approveLatest(user); }, kWait);
+        };
+        const auto request = [&](qint64 id, const char *type, const QJsonObject &fields) {
+            window.send(actionsRequestMessage({id, QString::fromLatin1(type), fields}));
+            return QTest::qWaitFor([&] { return window.result(id).has_value(); }, kWait) && window.result(id)->ok;
+        };
+
+        // Ohne Anmeldung kann kein Konto senden
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("bot")), QStringLiteral("Kanal nicht angemeldet"), kWait);
+        QVERIFY(login(2, QStringLiteral("channel"), kChannelUser));
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("broadcaster"), QStringLiteral("x")), QString(), kWait);
+        QCOMPARE(accounts(window).value(QStringLiteral("bot")), QStringLiteral("Bot nicht angemeldet"));
+
+        Command command;
+        command.id = QUuid::createUuid();
+        command.name = QStringLiteral("DSS-Test");
+        command.commands = {QStringLiteral("!dsstest")};
+        Action action;
+        action.id = QUuid::createUuid();
+        action.name = QStringLiteral("DSS-Test Chat");
+        Trigger trigger = newTrigger(QString::fromLatin1(kTriggerCommand));
+        trigger.fields.insert(QStringLiteral("command_id"), command.id.toString(QUuid::WithoutBraces));
+        action.triggers.append(trigger);
+        Step asBot = newStep(QString::fromLatin1(kStepChatSend));
+        asBot.fields.insert(QStringLiteral("text"), replyText + QStringLiteral(" %user%"));
+        asBot.fields.insert(QStringLiteral("reply"), true);
+        action.steps.append(asBot);
+        Step asChannel = newStep(QString::fromLatin1(kStepChatSend));
+        asChannel.fields.insert(QStringLiteral("text"), replyText);
+        asChannel.fields.insert(QStringLiteral("use_bot"), false);
+        action.steps.append(asChannel);
+        QVERIFY(request(10, msg::kCommandPut, {{QStringLiteral("command"), commandToJson(command)}}));
+        QVERIFY(request(11, msg::kActionPut, {{QStringLiteral("action"), actionToJson(action)}}));
+        QVERIFY(request(12, msg::kActionsSetEnabled, {{QStringLiteral("enabled"), true}}));
+
+        // 1. Bot nicht angemeldet: der Kanal sendet beide (Ersatz), die erste als Antwort
+        QVERIFY(request(13, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(QStringLiteral("eins"), viewer, QStringLiteral("!dsstest eins"), false)}}));
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 2, kWait);
+        QTRY_COMPARE_WITH_TIMEOUT(count(QStringLiteral("twitch.chat_sent")), 2, kWait);
+        const QJsonObject first = server.chatMessages[0].body;
+        QCOMPARE(first.value(QStringLiteral("broadcaster_id")).toString(), kChannelUser.id);
+        QCOMPARE(first.value(QStringLiteral("sender_id")).toString(), kChannelUser.id);
+        QCOMPARE(first.value(QStringLiteral("message")).toString(), replyText + QLatin1Char(' ') + viewer.login);
+        QCOMPARE(first.value(QStringLiteral("reply_parent_message_id")).toString(), QStringLiteral("eins"));
+        QCOMPARE(server.chatMessages[1].body.value(QStringLiteral("sender_id")).toString(), kChannelUser.id);
+        QVERIFY(!server.chatMessages[1].body.contains(QStringLiteral("reply_parent_message_id")));
+
+        // 2. Bot angemeldet: der Bot sendet die erste (ohne Secret mit seinem Token, ohne Abzeichen)
+        QVERIFY(login(3, QStringLiteral("bot"), kBotUser));
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("bot"), QStringLiteral("x")), QString(), kWait);
+        QVERIFY(request(14, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(QStringLiteral("zwei"), viewer, QStringLiteral("!dsstest zwei"), false)}}));
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 4, kWait);
+        QCOMPARE(server.chatMessages[2].body.value(QStringLiteral("sender_id")).toString(), kBotUser.id);
+        QVERIFY(!server.chatMessages[2].appToken);
+        QCOMPARE(server.chatMessages[3].body.value(QStringLiteral("sender_id")).toString(), kChannelUser.id);
+        QTRY_COMPARE_WITH_TIMEOUT(count(QStringLiteral("twitch.chat_sent")), 4, kWait);
+
+        // 3. Echo der eigenen Nachrichten löst den Befehl nicht aus: message_id aus der Antwort, und
+        //    Absender mit gleichem Text innerhalb von 10 s. Danach ein Zuschauer: genau ein neuer Lauf.
+        const int runs = count(QStringLiteral("actions.run_started"));
+        QCOMPARE(runs, 2);
+        QVERIFY(request(15, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(server.chatMessages[3].messageId, kChannelUser,
+                                                                                    QStringLiteral("!dsstest anders"), true)}}));
+        QVERIFY(request(16, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(QStringLiteral("echo-ohne-id"), kChannelUser,
+                                                                                    replyText, true)}}));
+        QVERIFY(request(17, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(QStringLiteral("drei"), viewer, QStringLiteral("!dsstest drei"), false)}}));
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 6, kWait);
+        QCOMPARE(count(QStringLiteral("actions.run_started")), runs + 1);
+        QTRY_COMPARE_WITH_TIMEOUT(count(QStringLiteral("actions.run_finished")), 3, kWait);
+
+        const QByteArray traffic = window.traffic();
+        window.close();
+        QVERIFY2(core.stop(), qPrintable(core.log()));
+
+        // Kein Testtoken im Protokoll oder an das Fenster; keine Chat-Texte und Zuschauernamen im
+        // Protokoll (Plan 3.5)
+        const QStringList secrets = server.secrets();
+        QVERIFY(secrets.size() >= 4);
+        for (const QString &s : secrets) {
+            QVERIFY2(!core.log().contains(s), qPrintable(QStringLiteral("im Protokoll: %1").arg(s.left(8))));
+            if (!s.startsWith(QLatin1String("NUTZER")))
+                QVERIFY2(!traffic.contains(s.toUtf8()), qPrintable(QStringLiteral("im Socket: %1").arg(s.left(8))));
+        }
+        for (const QString &text : {QStringLiteral("Geheimtext"), viewer.login})
+            QVERIFY2(!core.log().contains(text), qPrintable(text));
+        QVERIFY2(core.log().contains(QStringLiteral("Lauf «DSS-Test Chat»: ok")), qPrintable(core.log()));
+#endif
     }
 
     // Plan 2.6: nur http://127.0.0.1:PORT, sonst Abbruch mit Exit-Code 1.

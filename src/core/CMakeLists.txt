@@ -43,6 +43,8 @@ endif()
 if(DSS_CORE_TWITCH)
   target_link_libraries(dss-core PRIVATE dss_twitch)
   target_compile_definitions(dss-core PRIVATE DSS_CORE_TWITCH=1)
+  # P14 c1a: Chat senden aus dem Aktionssystem über Twitch
+  target_sources(dss-core PRIVATE twitchchat.h twitchchat.cpp)
 else()
   target_compile_definitions(dss-core PRIVATE DSS_CORE_TWITCH=0)
 endif()

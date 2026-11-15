@@ -27,6 +27,7 @@
 #include "pwoutput.h"
 #endif
 #if DSS_CORE_TWITCH
+#include "twitchchat.h"
 #include "twitchservice.h"
 #endif
 #include "systemdnotify.h"
@@ -354,9 +355,18 @@ int main(int argc, char *argv[])
     if (QFileInfo(actionOptions.inUseSocket).absoluteFilePath() == QFileInfo(socketPath).absoluteFilePath())
         actionOptions.inUseSocket.clear(); // nie sich selbst prüfen
     actionOptions.testEvents = parser.isSet(testEventsOption);
+#if DSS_CORE_TWITCH
+    // c1a: Chat senden über Twitch; nach twitch angelegt, also vor ihm zerstört
+    TwitchChatTransport chatTransport(&twitch);
+    actionOptions.chatTransport = &chatTransport;
+    actionOptions.broadcasterId = [&chatTransport] { return chatTransport.broadcasterId(); };
+#endif
     ActionService actions(service.eventBus(), actionOptions);
     actions.load();
     service.setActionService(&actions);
+#if DSS_CORE_TWITCH
+    QObject::connect(&twitch, &dss::twitch::TwitchService::stateChanged, &actions, &ActionService::accountsChanged);
+#endif
 #else
     if (parser.isSet(testEventsOption))
         qWarning("--testereignisse ohne Aktionssystem (DSS_CORE_ACTIONS aus)");

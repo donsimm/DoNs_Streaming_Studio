@@ -534,6 +534,8 @@ Typen in Version 14: die Typen von Twitch aus `docs/archiv/prompts/P13-twitch.md
 
 Seit Version 15 (P14 b3): `actions.run_started`, `actions.run_changed` und `actions.run_finished` (Herkunft `actions`) mit `run_id`, `action_id`, `action_name`, `trigger_type`, `queue_name`, `dry_run`, `state`, `message`, `step_index`, `step_count`, ohne Chat-Texte und ohne Zuschauernamen. Sie bleiben **nicht** im Verlauf des Flusses (ein Lauf mit vielen Schritten würde die Ereignisse von Twitch verdrängen); die letzten Läufe gibt `get_action_runs`.
 
+Seit P14 c1a (Version unverändert, nur neue Typen): Ergebnis des Schritts «Chat senden» (Plan 4.1), Herkunft `twitch`, kein Auslöser. `twitch.chat_sent` mit `message_id`, `account` (`bot` oder `broadcaster`), `user_id` (Absender), `text` (wie gesendet, nach dem Kürzen auf 500), `reply_to` (`message_id` oder `null`), `truncated`; `twitch.chat_dropped` mit `account`, `user_id` (leer, wenn das Konto nicht angemeldet ist), `text`, `reply_to`, `truncated`, `code` (`unavailable`, `queue_full`, `expired`, `failed` oder `drop_reason.code` von Twitch) und `message` (Grund). Ins Journal kommt nur Konto und `code`, kein Text.
+
 **Bestellen:** Ohne `subscribe_events` schickt der Kern einer Verbindung keine Ereignisse. Filter sind genaue Typen oder Vorsilben mit Punkt am Ende (`twitch.`); ein Filter, zu dem es keinen Typ gibt, wird abgewiesen. Eine neue Bestellung ersetzt die alte. Mit `history: true` kommt zuerst `event_history` mit den passenden Ereignissen aus dem Verlauf (älteste zuerst); ein Ereignis aus diesem Verlauf kommt danach nicht noch einmal als `event`.
 
 **Gegendruck:** Liegen bei einer Verbindung mehr als 1 MiB ungesendet (`bytesToWrite`), verwirft der Kern weitere Ereignisse für sie und schreibt «Ereignisse: <Programm> liest nicht …» ins Protokoll. Sobald sie wieder unter 1 MiB ist, schickt er einmal `events_dropped` mit der Anzahl und danach wieder `event`. Ein hängendes Fenster bremst den Kern so nicht. Andere Nachrichten (`overlay_changed`, `stats`, …) verwirft er nicht.
@@ -555,7 +557,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 | Nachricht | Felder |
 |---|---|
 | `actions_config` | `config` (ganzer Inhalt von `aktionen.json`, Format `docs/06`; `null` bei ungültiger Datei), `file_error` (Text oder `null`) |
-| `actions_status` | `state` (`unavailable`, `file_error`, `muted`, `off`, `on`), `message` (zum Beispiel «stumm: Version im Einsatz läuft»), `running`, `queues` (je `id` oder `null` für «Standard», `name`, `blocking`, `paused`, `waiting`, `running`), `accounts` (je `account` `bot` oder `broadcaster`, `can_send`, `message`; bis Abschnitt c1 immer «Twitch nicht verbunden») |
+| `actions_status` | `state` (`unavailable`, `file_error`, `muted`, `off`, `on`), `message` (zum Beispiel «stumm: Version im Einsatz läuft»), `running`, `queues` (je `id` oder `null` für «Standard», `name`, `blocking`, `paused`, `waiting`, `running`), `accounts` (je `account` `bot` oder `broadcaster`, `can_send`, `message` mit dem Grund, zum Beispiel «Twitch nicht verbunden», «Kanal nicht angemeldet», «Bot nicht angemeldet»; neu gesendet bei jeder Änderung der Anmeldung) |
 
 **Fenster → Kern**, jede mit `request_id`. Antwort `change_result` (`ok`, `code`, `message`, `id`) nur an die fragende Verbindung; Abfragen bekommen eine eigene Nachricht mit derselben `request_id`, bei einem Fehler `change_result`.
 

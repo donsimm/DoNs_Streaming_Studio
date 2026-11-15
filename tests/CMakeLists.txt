@@ -106,6 +106,9 @@ target_compile_definitions(tst_aktionsablauf PRIVATE
 # erfundenen Ereignissen nach Plan P13 1.3, Uhr aus aktionsuhr.h.
 dss_add_test(tst_ausloeser)
 target_link_libraries(tst_ausloeser PRIVATE dss_actions)
+# P14 c1a: Chat senden ohne Netz (Konto, Grenzen, Warteschlange, Kürzen, Schleifen), Uhr aus aktionsuhr.h
+dss_add_test(tst_chatsenden)
+target_link_libraries(tst_chatsenden PRIVATE dss_actions)
 # P14 b3: Aktionssystem im Kern (dss-core und dss-cli als eigene Prozesse, Ereignisse über
 # test_event mit dss-core --testereignisse, zweiter Kern als «Version im Einsatz»).
 if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
@@ -370,6 +373,10 @@ qt_add_executable(tst_twitchverbindung tst_twitchverbindung.cpp twitchtestserver
 target_link_libraries(tst_twitchverbindung PRIVATE dss_twitch dss_warnings Qt6::Test)
 target_compile_definitions(tst_twitchverbindung PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
 add_test(NAME tst_twitchverbindung COMMAND tst_twitchverbindung)
+# P14 c1a: schreibende Aufrufe an Twitch (Send Chat Message) gegen den Testserver
+qt_add_executable(tst_twitchschreiben tst_twitchschreiben.cpp twitchtestserver.h)
+target_link_libraries(tst_twitchschreiben PRIVATE dss_twitch dss_warnings Qt6::Test)
+add_test(NAME tst_twitchschreiben COMMAND tst_twitchschreiben)
 # P13, Commit 7: Anbindung an Twitch im Kern (dss-core als eigener Prozess gegen den Testserver,
 # --twitch-testserver), nur mit dem Schalter DSS_CORE_TWITCH.
 if(DSS_CORE_TWITCH)
@@ -379,6 +386,9 @@ if(DSS_CORE_TWITCH)
     DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
   add_dependencies(tst_kerntwitch dss-core)
   add_test(NAME tst_kerntwitch COMMAND tst_kerntwitch)
+  # P14 c1a: Chat senden aus einer Aktion über den Testserver (nur mit dem Aktionssystem)
+  target_link_libraries(tst_kerntwitch PRIVATE dss_actions)
+  target_compile_definitions(tst_kerntwitch PRIVATE DSS_CORE_ACTIONS=$<BOOL:${DSS_CORE_ACTIONS}>)
 endif()
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
