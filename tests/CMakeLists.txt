@@ -344,6 +344,13 @@ if(DSS_CORE_TWITCH)
   add_test(NAME tst_kerntwitch COMMAND tst_kerntwitch)
 endif()
 
+# P13, Commit 9: scripts/twitch-einrichten.sh gegen einen Testkern (eigener Datenordner, eigene
+# Verbindung, eigenes XDG_CONFIG_HOME), ohne Browser und ohne Twitch.
+find_program(DSS_PYTHON3_SKRIPT python3 REQUIRED)
+add_test(NAME tst_twitcheinrichten
+  COMMAND ${DSS_PYTHON3_SKRIPT} ${CMAKE_CURRENT_SOURCE_DIR}/twitch_einrichten_pruefen.py
+          ${PROJECT_SOURCE_DIR}/scripts/twitch-einrichten.sh $<TARGET_FILE:dss-core> $<TARGET_FILE:dss-cli>)
+
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
 if(DSS_BUILD_APP)
