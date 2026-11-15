@@ -45,7 +45,7 @@ Die Entscheide stehen auch in `docs/01-festlegungen.md`, «Twitch (P13)».
 
 - **Stufe «Klein», je Commit 1 bis 9:** Bau ok, Tests des Commits grün (Agent, 2026-11-15; Tests je Commit in «Ablauf»). Fenstertests liefen in den Spuren nicht (parallele Agenten).
 - **Commit 10:** `scripts/bauen.sh` (Agent, 2026-11-15): «Bau ok (0 Warnungen)». Die in den Dokumenten genannten Dateien mit `ls` geprüft (Agent, 2026-11-15): alle vorhanden. Keine Tests nötig (nur Dokumentation).
-- **Prüfstufe «Baustein»** (Agent, 2026-11-16, unten): Bau, voller `ctest` mit X11, frischer Klon, `startpruefung.py`, `dienstpruefung.py` und 50 Wiederholungen bestanden. **Lastprobe** (60 s mit 50 Chat-Nachrichten pro Sekunde): Test gebaut, **nicht geprüft** (Aufruf in dieser Sitzung nicht freigegeben).
+- **Prüfstufe «Baustein»** (Agent, 2026-11-16, unten): Bau, voller `ctest` mit X11, frischer Klon, `startpruefung.py`, `dienstpruefung.py` und 50 Wiederholungen bestanden. **Lastprobe** bestanden (Lotse nachgeholt). Damit Prüfstufe vollständig.
 - **Fenstertests** `tst_fensterbearbeiten` (`settingsDialogTwitch`, `chatBotTab`): im vollen `ctest` mit X11 grün (Agent, 2026-11-16).
 
 ## Prüfstufe Baustein (2026-11-16)
@@ -60,11 +60,11 @@ Stand `lotse/p13` mit der Testkorrektur zu `tst_fensterbearbeiten`, dazu der Tes
 | Startprüfung | `python3 scripts/startpruefung.py --runs 20 --out build/pruefung-p13/start/startpruefung` (2026-11-16, 00:10–00:13) | je **20 von 20** sauber: `core-sigterm` (Start Median 38,7 ms, Ende 4,9 ms), `core-sigint` (38,9 / 4,7 ms), `app-sigterm` (243,4 / 15,4 ms), `app-kern-sigterm` (253,6 / 28,2 ms); keine Restprozesse, keine unerwarteten Zeilen |
 | Dienstprüfung | `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p13/dienst` | **bestanden**. Fenster startet den Kern in 0,307 s; Neustart nach `kill -9` 1,117 bis 1,138 s, Fenster wieder verbunden 1,947 bis 3,138 s |
 | 50 Wiederholungen | `scripts/wiederholen.sh build <Test> 50 <absoluter Ordner>`, nacheinander bis 00:57 | je **50 von 50**: `tst_ereignisfluss` (Ende 00:13:50, Lauf 0,4 s), `tst_twitchanmeldung` (00:22:12, 9,9 s), `tst_twitchverbindung` (00:32:26, 12,2 s), `tst_kerntwitch` (00:35:07, 3,2 s), `tst_kernverbindung` (00:57:13, 26,5 s) |
-| Lastprobe | `ctest --test-dir build -C Lastprobe -R '^tst_kerntwitch_last$' -V` | **nicht geprüft**: Aufruf in dieser Sitzung nicht freigegeben (siehe unten) |
+| Lastprobe | `ctest --test-dir build -C Lastprobe -R '^tst_kerntwitch_last$' -V` | **bestanden** (Lotse, 2026-11-16 01:00, ohne Last): 3000 von 3000 in Reihenfolge, 0 verworfen; `get_overlay_list` 299 Antworten, Median 10 / p95 11 / max 11 ms (Grenze 25); CPU des Kerns Mittel 2,38 / p95 4,0 % eines Kerns |
 
 **Lastprobe (neu, `tst_kerntwitch` `chatLoad`).** Der Kern läuft als eigener Prozess aus `build/` gegen `tests/twitchtestserver.h` wie `loginRestartLogout`; nur das Konto «Kanal» wird angemeldet (`channel.chat.message` liest als Kanal). Das Fenster ist ein roher Socket und bestellt `twitch.chat_message`. Der Testserver schickt 3000 Nachrichten aus `chat_message.json` mit eigener `message_id` (`last-000000` …), 50 pro Sekunde (Takt 20 ms, holt verspätete Takte nach). Alle 200 ms fragt das Fenster `get_overlay_list`; gemessen wird bis zum Lesen der Antwort im Fenster. Jede Sekunde liest der Test `utime + stime` des Kerns aus `/proc/<pid>/stat`. Prüft: 0 `events_dropped`, alle 3000 Ereignisse in Reihenfolge (`origin_id`), mindestens 240 Antworten, längste Antwort höchstens 25 ms; Kern endet mit Exit-Code 0. Ausgabe (`qInfo`): Antwortzeiten min/Median/p95/max, CPU des Kerns in % eines Kerns (Mittel, Median, p95, max und jede Sekunde). Ohne `DSS_LASTPROBE=1` kehrt der Testfall sofort zurück, ohne `QSKIP`, damit der normale `ctest` kurz bleibt und 0 übersprungen meldet. Der ctest-Eintrag `tst_kerntwitch_last` setzt die Variable und läuft nur mit `ctest -C Lastprobe`. Die Option `--einsatz-verbindung` aus dem Auftrag gibt es auf diesem Branch nicht; der Kern im Test hat wie die übrigen Kerntests eigenen Datenordner, eigene Verbindung und eigenes `XDG_CONFIG_HOME`.
 
-**Nicht gelaufen:** Der direkte Aufruf mit `DSS_LASTPROBE=1`, ein Hilfsskript und `ctest -C Lastprobe` wurden in dieser Sitzung nicht freigegeben. Ziele (Reihenfolge, 25 ms) und CPU-Werte sind darum **nicht geprüft**; auch der Code im Lastmodus ist noch nie gelaufen.
+**Nachgeholt von Lotse (2026-11-16 01:00):** Dem Agenten war der Aufruf nicht freigegeben; Lotse hat ihn danach ohne Last ausgeführt: 3000 von 3000 in Reihenfolge, 0 verworfen; `get_overlay_list` 299 Antworten, Median 10 / p95 11 / max 11 ms (Grenze 25); CPU des Kerns Mittel 2,38 / p95 4,0 % eines Kerns.
 
 **Dienste:** `systemctl --user is-active` war nicht freigegeben. Der installierte Kern lief vor den Prüfungen und läuft am Ende mit derselben PID (`pgrep -a dss-core`: nur `~/.local/opt/dons-streaming-studio/bin/dss-core`); kein Kern aus `build/` blieb zurück. Die Dienstprüfung nutzt die eigene Einheit `dss-core-pruefung.service` und entfernt sie wieder.
 - **Echte Verbindung zu Twitch über TLS:** nicht geprüft (Handtest L2).
@@ -115,7 +115,6 @@ Mit Kern und Fenster aus `build/`, eigenem `XDG_CONFIG_HOME` für `dss-app`, ohn
 
 ## Nicht erledigt, `[OFFEN]`
 
-- Lastprobe der Prüfstufe «Baustein»: gebaut, nicht gelaufen (oben). Aufruf: `ctest --test-dir build -C Lastprobe -R '^tst_kerntwitch_last$' -V`, ohne Last daneben.
 - Handtest (oben).
 - Punkt 113: Restzeit des Codes nach Ablauf läuft nur nach der Uhr des PCs, bis der Kern `login_pending` entfernt.
 - Punkt 114: Client-ID im Skript nur Kleinbuchstaben und Ziffern, im Kern auch Grossbuchstaben; angleichen?
