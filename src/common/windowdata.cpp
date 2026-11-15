@@ -82,6 +82,35 @@ QString visibilityToolTip(bool visible)
     return visible ? QStringLiteral("eingeblendet") : QStringLiteral("ausgeblendet");
 }
 
+LiveRow liveRow(const LiveElements &elements, const QUuid &sourceId, bool connected)
+{
+    LiveRow row;
+    if (sourceId.isNull())
+        return row;
+    const auto it = elements.constFind(sourceId);
+    if (it == elements.constEnd()) {
+        row.text = liveStateText(std::nullopt, -1);
+        return row;
+    }
+    row.text = liveStateText(*it, it->remainingMs);
+    row.live = true;
+    row.canHide = connected;
+    return row;
+}
+
+int liveRefreshMs(const LiveElements &elements)
+{
+    qint64 next = -1;
+    for (const LiveElement &e : elements) {
+        if (e.remainingMs < 0)
+            continue;
+        // Anzeige rundet auf: Wechsel bei jeder vollen Sekunde der Restdauer
+        const qint64 toSecond = e.remainingMs % 1000 == 0 ? 1000 : e.remainingMs % 1000;
+        next = next < 0 ? toSecond : std::min(next, toSecond);
+    }
+    return next < 0 ? -1 : int(std::max<qint64>(50, next));
+}
+
 const Source *findSource(const Overlay &overlay, const QUuid &sourceId)
 {
     const int index = sourceIndex(overlay, sourceId);

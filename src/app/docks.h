@@ -87,6 +87,9 @@ struct PropertiesDock
     QSpinBox *fontSize = nullptr;
     QToolButton *color = nullptr;
     QComboBox *align = nullptr; // Daten: dss::TextAlign als int
+    // P14 d: Bereich «Chat-Bot» (für alle Arten, immer da): Zeile «Jetzt» und Knopf «Ausblenden»
+    QLabel *liveState = nullptr;
+    QPushButton *hideLive = nullptr;
     // Ausrichten auf der Leinwand: bleibt in P08 ausgegraut.
     QList<QToolButton *> alignButtons;
 

@@ -361,6 +361,12 @@ void MainWindow::connectCore()
             refreshOverlay();
     });
     connect(m_client, &dss::CoreClient::errorReceived, this, &MainWindow::onCoreError);
+    // P14 d: Laufzustand (Markierung «live», Leinwand, Bereich «Chat-Bot»)
+    m_liveTimer = new QTimer(this);
+    m_liveTimer->setSingleShot(true);
+    connect(m_liveTimer, &QTimer::timeout, this, &MainWindow::refreshLiveRow);
+    connect(m_client, &dss::CoreClient::liveChanged, this, &MainWindow::refreshOverlay);
+    connect(m_propertiesDock.hideLive, &QPushButton::clicked, this, &MainWindow::hideLive);
     connect(m_client, &dss::CoreClient::pendingImportsChanged, this, [this] {
         m_importStatus->setText(dss::importStatusText(m_client->pendingImports()));
     });
@@ -455,7 +461,7 @@ void MainWindow::showSettings()
 void MainWindow::saveCanvasImage()
 {
 #if DSS_APP_CANVAS_IMAGE
-    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const std::optional<dss::Overlay> overlay = canvasOverlay(); // wie die Leinwand, mit Laufzustand
     if (!overlay)
         return;
     QString path;
@@ -653,10 +659,15 @@ void MainWindow::refreshOverlay()
     if (overlay) {
         const QIcon shown = loadSymbol(QStringLiteral("auge.svg"), QSize(16, 16));
         const QIcon hidden = loadSymbol(QStringLiteral("auge-zu.svg"), QSize(16, 16));
+        const dss::LiveElements live = m_client ? m_client->live(m_selectedOverlay) : dss::LiveElements();
         for (const dss::SourceRow &row : dss::sourceRows(*overlay)) {
+            // Auge wie in der Datei; der Laufzustand ändert sie nicht und zeigt sich als «live»
             auto *item = new QListWidgetItem(row.visible ? shown : hidden, row.name, list);
             item->setData(SourceList::kIdRole, row.id);
-            item->setToolTip(dss::visibilityToolTip(row.visible));
+            item->setData(SourceList::kLiveRole, live.contains(row.id));
+            item->setToolTip(live.contains(row.id)
+                                 ? dss::visibilityToolTip(row.visible) + QStringLiteral(", live durch den Chat-Bot")
+                                 : dss::visibilityToolTip(row.visible));
             if (row.id == m_selectedSource)
                 selected = item;
         }
@@ -667,11 +678,13 @@ void MainWindow::refreshOverlay()
         m_selectedSource = QUuid();
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
-    m_canvas->setOverlay(overlay);
+    // P14 d: Leinwand und Zeichner zeigen den Laufzustand wie die Seite (K-07)
+    const std::optional<dss::Overlay> drawn = canvasOverlay();
+    m_canvas->setOverlay(drawn);
     m_canvas->setMediaSizes(m_client ? m_client->mediaSizes() : dss::MediaSizes());
     m_canvas->setSelectedSource(m_selectedSource);
 #if DSS_APP_RENDERER
-    m_renderer->setOverlay(overlay ? &*overlay : nullptr);
+    m_renderer->setOverlay(drawn ? &*drawn : nullptr);
 #endif
     if (m_canvasImageAction)
         m_canvasImageAction->setEnabled(overlay.has_value()); // ohne Overlay ausgegraut
@@ -689,6 +702,37 @@ void MainWindow::refreshOverlay()
     refreshBrowserSource();
 #endif
     refreshProperties();
+}
+
+std::optional<dss::Overlay> MainWindow::canvasOverlay() const
+{
+    std::optional<dss::Overlay> overlay = selectedOverlay();
+    if (overlay && m_client)
+        overlay = dss::applyLiveState(*overlay, m_client->live(overlay->id));
+    return overlay;
+}
+
+void MainWindow::refreshLiveRow()
+{
+    const dss::LiveElements live = m_client ? m_client->live(m_selectedOverlay) : dss::LiveElements();
+    const dss::LiveRow row = dss::liveRow(live, m_selectedSource, m_client && m_client->isConnected());
+    m_propertiesDock.liveState->setText(row.text);
+    m_propertiesDock.hideLive->setEnabled(row.canHide);
+    if (!m_liveTimer)
+        return;
+    const int next = dss::liveRefreshMs(live);
+    if (next < 0)
+        m_liveTimer->stop();
+    else
+        m_liveTimer->start(next);
+}
+
+void MainWindow::hideLive()
+{
+    if (!m_client || m_selectedOverlay.isNull() || m_selectedSource.isNull())
+        return;
+    if (m_client->sendLiveReset(m_selectedOverlay, {m_selectedSource}) == 0)
+        showStatus(QStringLiteral("Keine Verbindung zum Kern, Änderung nicht geschickt"));
 }
 
 void MainWindow::refreshBrowserSource()
@@ -873,6 +917,7 @@ void MainWindow::refreshProperties()
     }
     d.hint->setText(hint);
     d.kindPages->setCurrentIndex(page);
+    refreshLiveRow();
     if (source && source->kind == dss::SourceKind::Video) {
         const QSignalBlocker block(d.loop);
         d.loop->setChecked(source->loop);

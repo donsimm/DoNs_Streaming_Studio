@@ -386,6 +386,22 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     g->setRowStretch(6, 1);
     r.kindPages->addWidget(textPage);
     formColumn->addWidget(r.kindPages);
+
+    // P14 d: Bereich «Chat-Bot» (Entwurf 5): Zustand im Laufzustand, Knopf «Ausblenden». Immer da,
+    // damit der Wechsel der Quelle die Anordnung nicht ändert; ohne Quelle leer und ausgegraut.
+    QWidget *live = section(QStringLiteral("Chat-Bot"), form, &g);
+    live->setObjectName(QStringLiteral("propertyLive"));
+    r.liveState = new QLabel(live);
+    r.liveState->setTextFormat(Qt::PlainText);
+    r.hideLive = new QPushButton(QStringLiteral("Ausblenden"), live);
+    r.hideLive->setToolTip(QStringLiteral("Element wieder wie im Overlay zeigen (Laufzustand beenden)"));
+    r.hideLive->setEnabled(false);
+    nameWidgets({{r.liveState, "liveState"}, {r.hideLive, "hideLiveButton"}});
+    g->addWidget(new QLabel(QStringLiteral("Jetzt"), live), 0, 0);
+    g->addWidget(r.liveState, 0, 1);
+    g->addWidget(r.hideLive, 1, 1, Qt::AlignLeft);
+    g->setColumnStretch(1, 1);
+    formColumn->addWidget(live);
     formColumn->addStretch(1);
     scroll->setWidget(form);
     column->addWidget(scroll, 1);

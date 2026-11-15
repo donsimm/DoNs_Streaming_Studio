@@ -11,6 +11,40 @@ class TestWindowData : public QObject
     Q_OBJECT
 
 private slots:
+    // P14 d: Bereich «Chat-Bot» und Markierung «live»
+    void liveRows()
+    {
+        const QUuid shown = QUuid::createUuid();
+        const QUuid changed = QUuid::createUuid();
+        const QUuid other = QUuid::createUuid();
+        LiveElements elements;
+        elements.insert(shown, {true, std::nullopt, QString(), 5200});
+        elements.insert(changed, {std::nullopt, QStringLiteral("Hallo"), QString(), -1});
+
+        QCOMPARE(liveRow(elements, QUuid(), true).text, QString());
+        QVERIFY(!liveRow(elements, QUuid(), true).live);
+        LiveRow row = liveRow(elements, other, true);
+        QCOMPARE(row.text, QStringLiteral("nicht live"));
+        QVERIFY(!row.live && !row.canHide);
+        row = liveRow(elements, shown, true);
+        QCOMPARE(row.text, QStringLiteral("live sichtbar, noch 6 s"));
+        QVERIFY(row.live && row.canHide);
+        QVERIFY(!liveRow(elements, shown, false).canHide); // ohne Verbindung
+        QCOMPARE(liveRow(elements, changed, true).text, QStringLiteral("live geändert"));
+        elements[changed].visible = false;
+        QCOMPARE(liveRow(elements, changed, true).text, QStringLiteral("live versteckt"));
+
+        // Nächste Anzeige: bei 5200 ms nach 200 ms («noch 5 s»), ohne Dauer nie
+        QCOMPARE(liveRefreshMs(elements), 200);
+        elements[shown].remainingMs = 3000;
+        QCOMPARE(liveRefreshMs(elements), 1000);
+        elements[shown].remainingMs = 3010;
+        QCOMPARE(liveRefreshMs(elements), 50);
+        elements.remove(shown);
+        QCOMPARE(liveRefreshMs(elements), -1);
+        QCOMPARE(liveRefreshMs({}), -1);
+    }
+
     void gaugeTexts()
     {
         QCOMPARE(cpuText(std::nullopt), QStringLiteral("–"));

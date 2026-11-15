@@ -9,6 +9,7 @@
 #include <QMetaMethod>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QPaintEvent>
 #include <QPainter>
 #include <QStyle>
 #include <QStyleOptionViewItem>
@@ -156,6 +157,38 @@ SourceList::SourceList(QWidget *parent) : QListWidget(parent)
     setDropIndicatorShown(true);
     setDragDropOverwriteMode(false);
     setContextMenuPolicy(Qt::CustomContextMenu);
+}
+
+// P14 d: Markierung «live» rechts in der Zeile, wie «.pill.bot» im Entwurf 5 (Hintergrund #4a3f78,
+// Schrift klein und fett, Ecken 3 px). Nur gezeichnet, die Zeile selbst bleibt unverändert.
+void SourceList::paintEvent(QPaintEvent *event)
+{
+    QListWidget::paintEvent(event);
+    QPainter painter(viewport());
+    QFont font = this->font();
+    font.setBold(true);
+    if (font.pointSizeF() > 0)
+        font.setPointSizeF(font.pointSizeF() * 0.8);
+    painter.setFont(font);
+    const QFontMetrics metrics(font);
+    const QString text = QStringLiteral("live");
+    for (int i = 0; i < count(); ++i) {
+        const QListWidgetItem *it = item(i);
+        if (!it->data(kLiveRole).toBool())
+            continue;
+        const QRect row = visualItemRect(it);
+        if (row.isEmpty() || !row.intersects(event->rect()))
+            continue;
+        const QSize size(metrics.horizontalAdvance(text) + 10, metrics.height() + 1);
+        const QRect pill(row.right() - 6 - size.width(), row.center().y() - size.height() / 2, size.width(),
+                         size.height());
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x4a, 0x3f, 0x78));
+        painter.drawRoundedRect(pill, 3, 3);
+        painter.setPen(palette().color(QPalette::Text));
+        painter.drawText(pill, Qt::AlignCenter, text);
+    }
 }
 
 void SourceList::mousePressEvent(QMouseEvent *event)

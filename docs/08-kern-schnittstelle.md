@@ -785,6 +785,8 @@ Nach `hello` und bei jeder Änderung an alle; immer der Laufzustand aller Overla
 
 `dss-cli` (gleiche Nachrichten, `src/cli/main.cpp`): `live OVERLAY` (Tabelle Nr, Name, Jetzt, Text, Bild), `live-zeigen OVERLAY NR[,NR…] [--verstecken|--umschalten] [--dauer MS] [--text TEXT] [--bild VERWEIS|URL] [NAME=WERT …]`, `live-ausblenden OVERLAY [NR[,NR…]]`. NR wie bei `quelle-liste`. Läuft der Kern nicht: Exit-Code 4.
 
+Fenster (`dss-app`): Leinwand und Zeichner des Editors zeichnen das Overlay mit `applyLiveState` (K-07), die Felder des Docks «Eigenschaften» zeigen weiter die Datei. Dock «Quellen»: Marke «live» rechts in der Zeile, das Auge bleibt wie in der Datei. Dock «Eigenschaften», Bereich «Chat-Bot»: «Jetzt» (zum Beispiel «live sichtbar, noch 6 s», zählt selbst herunter) und «Ausblenden» (`overlay_live_reset` für die gewählte Quelle).
+
 ### Ton der Videos (P12b)
 
 Den Ton spielt der Kern, die Seite bleibt stumm (E-20). Die Seite führt (S1): Nur in OBS (`window.obsstudio` vorhanden) meldet sie, wann und wo ein Video läuft, und der Kern spielt den Ton passend dazu über den Ausgang aus `[ton-video]`. Ohne `window.obsstudio` (anderer Browser, Qt WebEngine in den Tests) bleibt alles wie vor P12b: `…/events` ohne Kennung, keine Meldungen, kein Ton. Bericht und Messungen: `docs/archiv/berichte/P12-bericht.md`, Plan `docs/archiv/prompts/P12-ton.md`.

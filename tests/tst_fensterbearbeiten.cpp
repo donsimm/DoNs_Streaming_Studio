@@ -16,6 +16,7 @@
 #include "browsersource.h"
 #include "canvaswidget.h"
 #include "coreclient.h"
+#include "coresession.h"
 #include "configpaths.h"
 #include "coresettings.h"
 #include "dockviews.h"
@@ -888,6 +889,47 @@ private slots:
         QVERIFY(name->text().isEmpty());
         selectSourceRow(0);
         QCOMPARE(name->text(), sourceAtRow(0).name);
+    }
+
+    // P14 d: Laufzustand im Fenster: Markierung «live» im Dock «Quellen», Bereich «Chat-Bot» mit
+    // «Jetzt» und «Ausblenden». Die Overlay-Datei (Auge, Text) bleibt.
+    void liveMark()
+    {
+        auto *list = child<SourceList>("sourceList");
+        auto *state = child<QLabel>("liveState");
+        auto *hide = child<QPushButton>("hideLiveButton");
+        QVERIFY(list && state && hide);
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(0);
+        const Source source = sourceAtRow(0);
+        QCOMPARE(state->text(), QStringLiteral("nicht live"));
+        QVERIFY(!hide->isEnabled());
+        QVERIFY(!list->item(0)->data(SourceList::kLiveRole).toBool());
+
+        CoreSession session;
+        QString error;
+        QVERIFY2(session.open(m_run->filePath(QStringLiteral("kern.sock")), QStringLiteral("tst_fensterbearbeiten"), &error),
+                 qPrintable(error));
+        LiveSetRequest set;
+        set.overlayId = m_scene;
+        set.mode = LiveMode::Hide;
+        set.elements = {{source.id, std::nullopt, QString()}};
+        set.durationMs = 60000;
+        const auto result = session.request(liveSetMessage(set), &error);
+        QVERIFY2(result && result->ok, qPrintable(error));
+        QTRY_VERIFY_WITH_TIMEOUT(list->item(0)->data(SourceList::kLiveRole).toBool(), 3000);
+        QVERIFY(list->item(0)->toolTip().contains(QStringLiteral("live")));
+        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("live versteckt, noch ")), 3000);
+        QVERIFY(hide->isEnabled());
+        // Datei unverändert: Auge wie vorher
+        QCOMPARE(sourceAtRow(0).visible, source.visible);
+        QCOMPARE(list->item(0)->toolTip().startsWith(visibilityToolTip(source.visible)), true);
+
+        hide->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!list->item(0)->data(SourceList::kLiveRole).toBool(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("nicht live"), 3000);
+        QVERIFY(!hide->isEnabled());
+        QCOMPARE(sourceAtRow(0).visible, source.visible);
     }
 
     void overlays()

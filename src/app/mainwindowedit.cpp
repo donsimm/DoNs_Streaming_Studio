@@ -765,7 +765,7 @@ void MainWindow::onCanvasGeometryEdited(const QUuid &id, const dss::SourceGeomet
     const dss::SourceChanges c = dss::geometryChanges(geometry);
     sendChange(dss::sourceUpdate(m_selectedOverlay, id, c), dss::changeKey(id, QStringLiteral("geometry")));
     // Sofort zeigen: Leinwand und Felder der Eigenschaften (ohne die Liste neu zu bauen).
-    m_canvas->setOverlay(selectedOverlay());
+    m_canvas->setOverlay(canvasOverlay());
     refreshProperties();
 }
 
@@ -777,7 +777,7 @@ void MainWindow::clearFinishedPreview()
             dss::changeKey(m_geometryPreview->sourceId, QStringLiteral("geometry"))))
         return;
     m_geometryPreview.reset();
-    m_canvas->setOverlay(selectedOverlay());
+    m_canvas->setOverlay(canvasOverlay());
 }
 
 void MainWindow::onNameEdited()
