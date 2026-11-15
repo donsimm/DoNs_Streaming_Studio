@@ -68,6 +68,17 @@ https://github.com/donsimm/donstv_Studio (CLAUDE.md, docs/01 bis 05)
 - EventSub per WebSocket: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
 - Streamer.bot: https://docs.streamer.bot/guide/actions und https://streamer.bot/features
 
+Seit P13 (gelesen 2026-11-09, bestätigt in Schritt 0 am 2026-11-15, Bericht `docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md`; dazu die Quellen in den Kommentaren unter `src/twitch/`, `src/events/eventtypes.h` und `src/secrets/secretstore.h`):
+
+- Anmeldung: https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/ (Gerätecode, Client Credentials), https://dev.twitch.tv/docs/authentication/refresh-tokens/, https://dev.twitch.tv/docs/authentication/validate-tokens/, https://dev.twitch.tv/docs/authentication/revoke-tokens/, https://dev.twitch.tv/docs/authentication/scopes/, https://dev.twitch.tv/docs/authentication/register-app/
+- EventSub: https://dev.twitch.tv/docs/eventsub/websocket-reference/, https://dev.twitch.tv/docs/eventsub/manage-subscriptions/, https://dev.twitch.tv/docs/eventsub/reference/ (Unterseiten `chat`, `channel`, `channel-points`, `stream`; die früheren Seiten `eventsub-subscription-types` und `eventsub-reference` sind dorthin umgezogen)
+- API (Helix): https://dev.twitch.tv/docs/api/reference/ (Get Streams, Send Chat Message), https://dev.twitch.tv/docs/api/guide/#twitch-rate-limits
+- Chat und Abzeichen «Chat Bot»: https://dev.twitch.tv/docs/chat/, https://dev.twitch.tv/docs/chat/authenticating/, https://dev.twitch.tv/docs/chat/send-receive-chat/ (im Code), https://dev.twitch.tv/docs/chat/send-receive-messages/ (in Schritt 0), https://dev.twitch.tv/docs/chat/irc-migration/
+- Twitch CLI (nicht genommen): https://dev.twitch.tv/docs/cli/websocket-event-command/
+- Argumentnamen von Streamer.bot: https://docs.streamer.bot/api/triggers/twitch/, https://docs.streamer.bot/api/triggers/core/commands/command-triggered, https://github.com/Streamerbot/docs/tree/main/streamerbot/3.api/.variables
+- Qt: https://doc.qt.io/qt-6/qoauth2deviceauthorizationflow.html (erst ab 6.9), https://packages.debian.org/trixie/qt6-networkauth-dev, https://doc.qt.io/qt-6.8/qwebsocket.html, https://doc.qt.io/qt-6.8/qsslsocket.html#supportsSsl
+- Ablage der Geheimnisse (F1): https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html
+
 ## Qt (Bau ab P03)
 
 Abgerufen in P04 (2026-11-02):

@@ -526,7 +526,7 @@ Ein Ereignis in `event` und `event_history`:
 | `origin_id` | Text | Kennung bei der Herkunft (Twitch: `message_id`), leer wenn keine |
 | `data` | Objekt | Felder je Typ, nie Rohdaten oder Token |
 
-Typen in Version 14: die Typen von Twitch aus `docs/archiv/prompts/P13-twitch.md`, Abschnitt 1.3 (noch ohne Anbindung an Twitch), und `obs.scene_changed` mit `scene_uuid` und `scene_name`. Dieser kommt beim Wechsel der aktuellen Szene in OBS, auch für die erste Szene nach dem Verbinden; ohne Szene (getrennt) kommt nichts. Der Adapter steht in `src/core/obsevents.cpp`, `dss_obs` kennt den Fluss nicht.
+Typen in Version 14: die Typen von Twitch aus `docs/archiv/prompts/P13-twitch.md`, Abschnitt 1.3, mit den Namen nach Schritt 0 (`src/events/eventtypes.h`; sie kommen von Twitch, Abschnitt «Anbindung an Twitch»), und `obs.scene_changed` mit `scene_uuid` und `scene_name`. Dieser kommt beim Wechsel der aktuellen Szene in OBS, auch für die erste Szene nach dem Verbinden; ohne Szene (getrennt) kommt nichts. Der Adapter steht in `src/core/obsevents.cpp`, `dss_obs` kennt den Fluss nicht.
 
 **Bestellen:** Ohne `subscribe_events` schickt der Kern einer Verbindung keine Ereignisse. Filter sind genaue Typen oder Vorsilben mit Punkt am Ende (`twitch.`); ein Filter, zu dem es keinen Typ gibt, wird abgewiesen. Eine neue Bestellung ersetzt die alte. Mit `history: true` kommt zuerst `event_history` mit den passenden Ereignissen aus dem Verlauf (älteste zuerst); ein Ereignis aus diesem Verlauf kommt danach nicht noch einmal als `event`.
 
@@ -687,6 +687,9 @@ port=4455
 [ton-video]
 ausgang=
 versatz_ms=0
+[twitch]
+aktiv=nein
+client-id=
 ```
 
 | Wert | Festlegung |
@@ -698,6 +701,8 @@ versatz_ms=0
 | `[obs] port` | Port von obs-websocket, 1 bis 65535, Standard 4455 |
 | `[ton-video] ausgang` | seit P12b b3: Ausgang für den Ton der Videos, `node.name` in PipeWire (wie `audio_outputs.devices[].name`); leer = kein Ausgang, kein Ton (Standard, ein neuer Kern hat «Kein Ausgang», Entscheid 6 vom 2026-11-12). Höchstens so lang wie im Code (`kAudioOutputMaxLength`), ohne Steuerzeichen und ohne Leerzeichen am Rand. Ein Name, den es gerade nicht gibt, ist erlaubt (Zustand `missing`) |
 | `[ton-video] versatz_ms` | seit P12b b3: Versatz in ms, −500 bis +500, Standard 0. Bedeutung: Weg des Tons hinter dem Ausgang (Mischpult, Streaming-PC); so viel früher spielt der Kern. Vorzeichen und Bereich sind eine Annahme bis zum Handtest H2 |
+| `[twitch] aktiv` | seit P13: `ja` oder `nein`, Standard `nein`. «Mit Twitch verbinden» im Dialog; braucht die Client-ID |
+| `[twitch] client-id` | seit P13: Client-ID der bei Twitch registrierten App, eine für Kanal und Bot. Nur Buchstaben und Ziffern, höchstens 64 Zeichen (`kTwitchClientIdMaxLength`), leer erlaubt. Eintragen mit `scripts/twitch-einrichten.sh` oder `dss-cli einstellung-twitch-client-id`; eine neue Client-ID lädt die Anbindung neu (laufende Anmeldungen enden). Das Client Secret steht nicht hier, sondern in `twitch-client-secret.cred` |
 
 Ein Abschnitt je Zweck; heute nur `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`). Weitere Zwecke (Chat-Bot, Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
 
@@ -758,6 +763,14 @@ Felder: `request_id` und `account` (`channel` oder `bot`). Antwort `change_resul
 ## Anbindung an Twitch (P13)
 
 Der Kern hält die Anbindung in `TwitchService` (`src/twitch/twitchservice.h`): Anmeldung von Kanal und Bot mit Gerätecode, Helix, EventSub und «erste Nachricht im Stream» (`twitch-sitzung.json` im Datenordner). Die Ereignisse gehen auf den Ereignisfluss. Standardmässig aus (`kern.ini [twitch] aktiv=nein`). Token und Client Secret liegen verschlüsselt neben `kern.ini` (`twitch-token.cred`, `twitch-bot-token.cred`, `twitch-client-secret.cred`, `systemd-creds --user`). Mit Client Secret holt der Kern ein App-Token (Client Credentials, nur im Speicher) für das Abzeichen «Chat Bot». Für Tests ersetzt `dss-core --twitch-testserver http://127.0.0.1:PORT` alle Adressen von Twitch; jede andere Adresse bricht den Start mit Exit-Code 1 ab.
+
+Ergänzt mit dem Bericht P13 (`docs/archiv/berichte/P13-bericht.md`); Einzelheiten und Quellen in den Kommentaren von `src/twitch/twitchauth.h`, `eventsubconnection.h` und `twitchservice.h`:
+
+- **Anmeldung (je Konto, `TwitchAuth`):** Gerätecode über `POST /oauth2/device`, danach `POST /oauth2/token` im Abstand `interval`, bis der Nutzer bestätigt, der Code abläuft oder er abbricht. Vor dem Ablegen prüft `validate` Konto und Rechte. Rechte: Kanal alle Namen aus https://dev.twitch.tv/docs/authentication/scopes/ ausser denen für IRC (Entscheid «alles lesen und schreiben»), Bot `user:write:chat`, `user:bot`, `moderator:manage:announcements`. Ist ein Client Secret gespeichert, geht es beim Tausch und beim Erneuern mit.
+- **Erneuern und Prüfen:** Erneuern 10 min vor Ablauf und nach 401 bei Helix (einmal, danach Wiederholung der Anfrage); das neue Refresh-Token wird sofort abgelegt. Abgewiesen: Zustand «abgelaufen», kein weiterer Versuch bis zur neuen Anmeldung. Netzfehler: neuer Versuch nach 2 s bis 60 s, ±20 %. `validate` beim Start und stündlich (Pflicht laut Twitch); fehlende Rechte erscheinen in `missing_scopes`. Bei 429 wartet Helix bis `Ratelimit-Reset` und wiederholt einmal.
+- **EventSub (`EventSubConnection`, nur solange der Kanal angemeldet ist):** nach `session_welcome` die 10 Abos von P13 (`channel.chat.message`, `channel.follow`, `channel.subscribe`, `channel.subscription.message`, `channel.subscription.gift`, `channel.cheer`, `channel.raid`, `channel.channel_points_custom_reward_redemption.add`, `stream.online`, `stream.offline`) parallel; dazu einmal `GET /helix/streams` für den Stream-Zustand beim Start (`twitch.stream_online` mit `at_start: true`, nur einmal je Start des Kerns). Keepalive von Twitch plus 5 s, sonst neu verbinden; bei `session_reconnect` schliesst der Kern die alte Verbindung erst nach dem Welcome der neuen. `revocation` mit `authorization_revoked` setzt die Anmeldung des Kanals auf «abgelaufen». Doppelte `message_id` (die letzten 500) werden übergangen. Verlorene Ereignisse liefert Twitch nicht nach.
+- **Abzeichen «Chat Bot»:** aktiv nur mit App-Token (Client Credentials aus Client-ID und Secret, nur im Speicher, erneuert 10 min vor Ablauf und nach 401), `user:bot` beim Bot und `channel:bot` beim Kanal; sonst nennt `badge_problem` den Grund. Gesendet wird erst mit P14.
+- **Protokoll:** nie Token, Secret, `device_code` oder `user_code`, keine Chat-Texte; Meldungen nennen nur Typ, Feld oder Grund.
 
 ## Anbindung an OBS (P10c, T-05, E-29)
 
