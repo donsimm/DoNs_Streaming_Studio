@@ -1,6 +1,6 @@
 # P13 – Twitch-Anbindung mit Ereignisfluss (Plan)
 
-Plan des Projektleiter-Agenten vom 2026-11-09, angepasst am 2026-11-15 an die Entscheide des Nutzers vom 2026-11-09 und 2026-11-15 (P14 wird ein Aktionssystem wie Streamer.bot, `docs/archiv/prompts/P14-chatbot.md`). Grundlage:
+Plan des Projektleiter-Agenten vom 2026-11-09, angepasst am 2026-11-15 (zweimal: Aktionssystem, dann Entwurf der Oberfläche) an die Entscheide des Nutzers vom 2026-11-09 und 2026-11-15 (P14 wird ein Aktionssystem wie Streamer.bot, `docs/archiv/prompts/P14-chatbot.md`). Grundlage:
 - Bauplan P13 und Punkt 92 (`docs/04-offene-punkte.md`)
 - Regeln 4, 5, 8, 9, 12 und 14 (`CLAUDE.md`)
 - `docs/01-festlegungen.md` («Module», F1)
@@ -26,6 +26,8 @@ Ausführung in drei bis vier Sitzungen des Agenten, danach Handtest. P14 (Aktion
   - Reihenfolge: P13 Twitch, dann P14 Chat-Bot, danach die Kamerasteuerung.
   - P14 ist ein Aktionssystem wie Streamer.bot. Die Ereignisse aus P13 sind direkt seine Auslöser.
   - Der Bot läuft nur, solange das Studio offen ist (Kern wie heute). Das reicht.
+  - Oberfläche nach dem Entwurf (`lotse/entwurf-chatbot`): Reiter «Chat-Bot» mit Unterreitern, die Docks des Overlay-Editors sind dort ausgeblendet.
+  - Zuschauer-Daten aus Streamer.bot werden übernommen (P14), zugeordnet über die Twitch-Benutzer-ID.
   - Nicht für die ersten Streams: Kanalpunkte-Effekte, Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe. Die Rechte dafür holt P13 trotzdem schon (Entscheid «alles lesen und schreiben»), damit später keine neue Anmeldung nötig ist.
 
 ## Was sich gegenüber dem Plan vom 2026-11-09 ändert
@@ -294,7 +296,8 @@ Qt Core, Network und WebSockets, kein Qt Gui und kein `protocol.h`, bindet `dss_
 - **Fenster** (Entscheid 2026-11-09):
   - Bereich «Twitch» im Dialog «Einstellungen»: «Mit Twitch verbinden», «Client-ID», darunter zwei Zeilen «Kanal» und «Bot» mit je «angemeldet als …» oder «nicht angemeldet», «Anmelden …» bzw. «Abmelden» und fehlenden Rechten. Während einer Anmeldung zeigt die Zeile den Code gross mit «Im Browser öffnen», «Code kopieren», Restzeit und «Abbrechen». Darunter die Liste der Abos mit Zustand.
   - Ein Klick auf den Twitch-Knopf öffnet den Bereich (wie F3).
-  - Der Reiter «Chat-Bot» zeigt bis P14 die Liste «Ereignisse» mit Zeit, Art, Name und Text, höchstens 200 Einträge. P14 übernimmt sie als Unterreiter «Ereignisse» (P14, Abschnitt 6).
+  - Der Reiter «Chat-Bot» bekommt schon in P13 die Kopfzeile mit Unterreitern (Stil der Modul-Reiter) und den Unterreiter «Live» mit dem Bereich «Ereignisse» (Zeit, Art, Name, Details, höchstens 200 Einträge), wie im Entwurf `entwuerfe/chatbot/1-gesamtansicht.html` (Branch `lotse/entwurf-chatbot`). P14 ergänzt «Live» um Chat und «Läufe der Aktionen» und fügt die weiteren Unterreiter hinzu (P14, Abschnitt 6).
+  - Farbe des Twitch-Knopfs: Der Entwurf schlägt «grün = beide Konten verbunden» vor. Der Plan bleibt bei «Farbe nach dem Kanal», weil ohne Bot alles weiterläuft (der Kanal sendet ersatzweise); ein fehlender Bot steht im Tooltip und in der Kopfzeile des Reiters «Chat-Bot».
   - Vor dem Commit «Fenster» führt der Agent die Prüfung der Oberflächenmuster durch (`ui-consistency:finding-patterns`) und hält die Checkliste im Bericht fest. Der Bereich «Twitch» folgt dem Bereich «OBS» desselben Dialogs.
 
 ## 3. Was der Nutzer selbst tun muss
@@ -358,7 +361,7 @@ Eine neue Claude-Code-Sitzung ist dafür nicht nötig.
      - Neustart behält beide Anmeldungen, Abmelden löscht die Datei des Kontos;
      - **kein Testtoken in Protokoll oder Socket**;
      - `--twitch-testserver` mit einer anderen Adresse als `127.0.0.1` wird abgewiesen.
-8. Fenster: Bereich «Twitch» mit zwei Konten, Knopf, Liste «Ereignisse». Test `tst_fensterbearbeiten`.
+8. Fenster: Bereich «Twitch» mit zwei Konten, Knopf, Reiter «Chat-Bot» mit Kopfzeile und Unterreiter «Live» (Bereich «Ereignisse»); die fünf Docks des Overlay-Editors sind im Reiter «Chat-Bot» ausgeblendet (Entscheid 2026-11-15). Test `tst_fensterbearbeiten`.
 9. `scripts/twitch-einrichten.sh`, geprüft mit eigenem `XDG_CONFIG_HOME` und Kern mit eigenem Datenordner.
 10. Dokumente:
     - `01` (Twitch, zwei Konten, F-Entscheide), `02` (TLS, Adressen von Twitch), `03`, `04` (Punkt 92 ins Archiv, neue Punkte), `05`, `06` (`twitch-token.cred`, `twitch-bot-token.cred`, `twitch-sitzung.json`), `08` (Version 14, Abschnitte «Ereignisfluss» und «Anbindung an Twitch»);
