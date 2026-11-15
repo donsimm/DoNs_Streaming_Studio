@@ -40,6 +40,9 @@ option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P
 # P12b b3: Ton der Videos über PipeWire im Kern (libpipewire-0.3, Thread von PipeWire im Dienst).
 # Aus: Kern ohne Ton und ohne libpipewire (Stand P11).
 option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
+# P13 (Plan 2.7): Anbindung an Twitch im Kern (EventSub, Anmeldung, Helix; neue externe Verbindung
+# mit TLS und Token). Aus: Kern ohne Twitch, der Knopf bleibt grau, twitch_status mit enabled false.
+option(DSS_CORE_TWITCH "Anbindung an Twitch im Kern (P13)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html

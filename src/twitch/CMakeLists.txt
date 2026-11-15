@@ -8,6 +8,7 @@ add_library(dss_twitch STATIC
   twitchauth.h twitchauth.cpp
   helixclient.h helixclient.cpp
   eventsubconnection.h eventsubconnection.cpp
+  twitchservice.h twitchservice.cpp
 )
 target_include_directories(dss_twitch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_twitch PUBLIC Qt6::Core Qt6::Network Qt6::WebSockets dss_events dss_secrets

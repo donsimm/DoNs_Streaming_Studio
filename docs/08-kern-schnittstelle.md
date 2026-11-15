@@ -8,6 +8,8 @@ Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Ände
 
 Neu ist der Ereignisfluss des Kerns (Punkt 92, Abschnitt «Ereignisfluss»): `subscribe_events`, `event_history`, `event` und `events_dropped`. Ereignisse gehen nur an Verbindungen, die sie bestellt haben; ein Fenster der Version 13 bestellt nicht und bekommt nichts. Ein Kern der Version 13 würde `subscribe_events` mit `unknown_type` beantworten. Darum stieg die Version.
 
+Ebenfalls in Version 14 (P13, Commit 7, Abschnitt «Anbindung an Twitch»): `twitch_status`, `twitch_login_start`, `twitch_login_cancel`, `twitch_logout`; `settings` trägt zusätzlich `twitch_enabled`, `twitch_client_id` und `twitch_client_secret_set`, `update_settings` zusätzlich `twitch_enabled`, `twitch_client_id` und `twitch_client_secret`. `connections.twitch` zeigt den echten Zustand des Kanals. Die endgültige Nummer vergibt Lotse beim Zusammenführen.
+
 ### Version 13 (P12b b5)
 
 `overlay` und `overlay_changed` tragen Overlays im Dateiformat 5 (Pflichtfelder `video.volume` und `video.muted`, `docs/06-overlay-format.md`), die ein Fenster der Version 12 als ungültig verwerfen würde. Dazu kommen die Felder `changes.video.volume` und `changes.video.muted` in `update_source` (ein Kern der Version 12 weist sie als unbekannt ab).
@@ -406,6 +408,25 @@ Einzelheiten der Verbindung zu OBS. Die Farbe des Knopfes steht weiter in `conne
 
 Das Passwort steht in keiner Nachricht an das Fenster, nur `obs_password_set` in `settings`.
 
+### `twitch_status` (seit Version 14, P13)
+
+Einzelheiten der Anbindung an Twitch. Die Farbe des Knopfes steht in `connections.twitch` und folgt nur dem Kanal: `off` (aus, ohne Client-ID, nicht angemeldet), `connecting` (Prüfung der Anmeldung oder Verbindung zu EventSub läuft), `connected` (alle Abos aktiv), `error` (Anmeldung abgelaufen oder ungültig, Rechte fehlen, Abo abgewiesen, Netz). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `enabled` | wahr/falsch | `false`: Kern ohne Twitch gebaut (Schalter `DSS_CORE_TWITCH`) |
+| `message` | Text oder `null` | Zustand des Kanals und von EventSub, zum Beispiel «Kanal nicht angemeldet. Im Dialog «Einstellungen» anmelden.» |
+| `live` | wahr/falsch | Stream läuft (EventSub, auch beim Start, Plan 2.5) |
+| `subscriptions` | Liste von Objekten (`type`, `ok`, `problem` Text oder `null`) | Abos von EventSub |
+| `accounts` | Objekt mit `channel` und `bot` | je `state` (`off`, `checking`, `ok`, `expired`, `error`), `message`, `login`, `user_id` (Text oder `null`), `missing_scopes` (Liste), `login_pending` (Objekt mit `user_code`, `verification_uri`, `expires_at` in UTC, oder `null`) |
+| `badge_problem` | Text oder `null` | «Abzeichen nicht aktiv: …»; `null`, wenn der Bot mit Abzeichen «Chat Bot» sendet |
+
+Token, Refresh-Token, `device_code` und Client Secret stehen in keiner Nachricht an das Fenster; `user_code` nur während einer Anmeldung.
+
+```json
+{"accounts":{"bot":{"login":null,"login_pending":null,"message":null,"missing_scopes":[],"state":"off","user_id":null},"channel":{"login":"<kanal>","login_pending":null,"message":null,"missing_scopes":[],"state":"ok","user_id":"<id>"}},"badge_problem":"Abzeichen nicht aktiv: Bot nicht angemeldet.","enabled":true,"live":false,"message":null,"subscriptions":[{"ok":true,"problem":null,"type":"channel.follow"}],"type":"twitch_status"}
+```
+
 ### `obs_sources` (seit Version 11, P10c)
 
 Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle. Die Liste enthält nur Overlays mit Zuordnung; ein Overlay ohne Eintrag hat keine Quelle in OBS. Die Adresse mit Token steht nicht darin.
@@ -699,14 +720,16 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `obs_password_set` | wahr/falsch | Ein Passwort ist gespeichert. Der Wert selbst geht nie an ein Fenster (Regel 12), seit Version 11 |
 | `audio_routes` | Objekt | seit Version 12: je Zweck (`video`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` |
 | `audio_offset_min_ms`, `audio_offset_max_ms` | ganze Zahlen | seit Version 12: gültiger Bereich des Versatzes (−500, 500); das Fenster stellt sein Feld «Versatz» danach ein |
+| `twitch_enabled`, `twitch_client_id` | wahr/falsch, Text | Abschnitt `[twitch]`, seit Version 14 |
+| `twitch_client_secret_set` | wahr/falsch | Ein Client Secret von Twitch ist gespeichert; der Wert geht nie an ein Fenster, seit Version 14 |
 
 ```json
-{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
 
-Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen), seit Version 12 `audio_routes` (je Zweck ein Objekt mit `output` und/oder `offset_ms`, mindestens eines; unbekannter Zweck: `rejected` «Unbekannter Zweck des Tons «x».»). Nur angegebene Werte ändern sich. Ein neuer Ausgang oder Versatz wirkt sofort, ohne Neustart. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
+Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen), seit Version 12 `audio_routes` (je Zweck ein Objekt mit `output` und/oder `offset_ms`, mindestens eines; unbekannter Zweck: `rejected` «Unbekannter Zweck des Tons «x».»), seit Version 14 `twitch_enabled`, `twitch_client_id` (Buchstaben und Ziffern, höchstens 64; eingeschaltet nicht leer) und `twitch_client_secret` (wie `obs_password`; verschlüsselt nach dem Passwort, vor `kern.ini`). Nur angegebene Werte ändern sich. Ein neuer Ausgang oder Versatz wirkt sofort, ohne Neustart. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
 
 ```json
 {"type":"update_settings","request_id":9,"port":8090}
@@ -722,7 +745,19 @@ Punkt 77 (Entscheid 2026-11-03): Knopf «Auf Standardwerte zurücksetzen» im Di
 {"type":"reset_settings","request_id":4}
 ```
 
-`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4). Das Passwort von OBS lässt sich über `dss-cli` nicht setzen. Ausgang und Versatz des Tons zeigt `dss-cli einstellungen` noch nicht (offen, `docs/04-offene-punkte.md`); Lautstärke und Stumm der Videos zeigt `dss-cli quelle-liste` seit P12b b6.
+`dss-cli einstellungen`, `einstellung-port PORT`, `einstellung-adresse ADRESSE` und seit Version 14 `einstellung-twitch-client-id ID` nutzen dieselben Nachrichten (`hello` mit `program` `dss-cli`, `src/common/coresession.h`). Läuft der Kern nicht, zeigt `einstellungen` die Datei an; ändern geht dann nicht (Exit-Code 4). Das Passwort von OBS lässt sich über `dss-cli` nicht setzen. Ausgang und Versatz des Tons zeigt `dss-cli einstellungen` noch nicht (offen, `docs/04-offene-punkte.md`); Lautstärke und Stumm der Videos zeigt `dss-cli quelle-liste` seit P12b b6.
+
+### `twitch_login_start`, `twitch_login_cancel`, `twitch_logout` (Fenster → Kern, seit Version 14)
+
+Felder: `request_id` und `account` (`channel` oder `bot`). Antwort `change_result`: `ok: true`, wenn angenommen (der Code kommt danach in `twitch_status`); `rejected`, wenn Twitch aus ist, die Client-ID fehlt oder der Kern ohne Twitch gebaut ist; `invalid_message` bei anderem `account`. Abmelden geht auch bei ausgeschaltetem Twitch und löscht die Datei des Kontos (`twitch-token.cred` bzw. `twitch-bot-token.cred`); beim Kanal trennt es EventSub.
+
+```json
+{"type":"twitch_login_start","request_id":5,"account":"bot"}
+```
+
+## Anbindung an Twitch (P13)
+
+Der Kern hält die Anbindung in `TwitchService` (`src/twitch/twitchservice.h`): Anmeldung von Kanal und Bot mit Gerätecode, Helix, EventSub und «erste Nachricht im Stream» (`twitch-sitzung.json` im Datenordner). Die Ereignisse gehen auf den Ereignisfluss. Standardmässig aus (`kern.ini [twitch] aktiv=nein`). Token und Client Secret liegen verschlüsselt neben `kern.ini` (`twitch-token.cred`, `twitch-bot-token.cred`, `twitch-client-secret.cred`, `systemd-creds --user`). Mit Client Secret holt der Kern ein App-Token (Client Credentials, nur im Speicher) für das Abzeichen «Chat Bot». Für Tests ersetzt `dss-core --twitch-testserver http://127.0.0.1:PORT` alle Adressen von Twitch; jede andere Adresse bricht den Start mit Exit-Code 1 ab.
 
 ## Anbindung an OBS (P10c, T-05, E-29)
 

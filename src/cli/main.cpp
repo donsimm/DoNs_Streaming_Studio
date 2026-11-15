@@ -38,7 +38,8 @@ const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringL
                                        QStringLiteral("medien-liste")};
 // Befehle für die Einstellungen des Kerns (P10-vor): ohne Datenordner und ohne Sperre.
 const QStringList kSettingsCommands = {QStringLiteral("einstellungen"), QStringLiteral("einstellung-port"),
-                                       QStringLiteral("einstellung-adresse")};
+                                       QStringLiteral("einstellung-adresse"),
+                                       QStringLiteral("einstellung-twitch-client-id")}; // P13
 // Befehle für die Medienliste (P10b, Teil A 6): Nur der Kern schreibt medien.json; dss-cli
 // schickt die Änderung an den laufenden Kern. Name → Anzahl Argumente.
 const QList<std::pair<QString, int>> kMediaCommands = {
@@ -92,6 +93,7 @@ const char *const kUsageTemplate =
     "  einstellungen\n"
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
+    "  einstellung-twitch-client-id ID\n"
     "  ereignisse [--folgen] [--typ FILTER]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
@@ -113,6 +115,8 @@ const char *const kUsageTemplate =
     "innerhalb von 2 s die Adresse der Standardroute ein, sobald es eine gibt); nur Adressen\n"
     "dieses PCs. Beides wirkt sofort (der Overlay-Server startet neu; in OBS dann die neue\n"
     "Adresse der Browserquelle eintragen).\n"
+    "einstellung-twitch-client-id: Client-ID der App bei Twitch (Buchstaben und Ziffern, \"\" = leer,\n"
+    "nur solange Twitch aus ist), über den laufenden Kern.\n"
     "medien-liste: alle Mediendateien mit Name, Ordner, Typ, Grösse und «verwendet in» (geht immer).\n"
     "Die übrigen medien- und medium-Befehle ändern die Medienliste über den laufenden Kern (nur er\n"
     "schreibt medien.json). DATEI: Nr aus medien-liste, Verweis media/… oder Name (eindeutig).\n"
@@ -661,6 +665,8 @@ int runSettings(const Arguments &args)
         update.port = port;
     } else if (command == QLatin1String("einstellung-adresse")) {
         update.homeAddress = a.at(0);
+    } else if (command == QLatin1String("einstellung-twitch-client-id")) {
+        update.twitchClientId = a.at(0);
     }
 
     const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
@@ -971,7 +977,7 @@ int main(int argc, char *argv[])
     }
     if (!args.connection.isEmpty()) {
         err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port, "
-                 "einstellung-adresse, ereignisse und die Änderungen der Medienliste.\n\n" << usageText();
+                 "einstellung-adresse, einstellung-twitch-client-id, ereignisse und die Änderungen der Medienliste.\n\n" << usageText();
         return kExitUsage;
     }
 

@@ -8,7 +8,8 @@
 // Verhalten nach der Doku von Twitch (Quellen in src/twitch/twitchauth.h und helixclient.h):
 // - POST /oauth2/device: device_code, user_code, verification_uri, expires_in, interval
 // - POST /oauth2/token: grant_type device_code (400 «authorization_pending», 400 «invalid device
-//   code») und refresh_token (Refresh-Token einmal verwendbar, sonst 400 «Invalid refresh token»).
+//   code»), refresh_token (Refresh-Token einmal verwendbar, sonst 400 «Invalid refresh token») und
+//   client_credentials (App-Token, nur mit gesetztem und mitgeschicktem Secret).
 //   client_secret: Ist eines gesetzt, muss ein mitgeschicktes stimmen; ohne wird angenommen (ob Twitch
 //   es beim Gerätecode verlangt, ist nicht belegt, Schritt 0).
 // - GET /oauth2/validate mit «Authorization: OAuth …»: client_id, login, scopes, user_id, expires_in
@@ -624,6 +625,20 @@ private:
                 return;
             }
             error(socket, 400, QStringLiteral("Invalid refresh token"));
+            return;
+        }
+        // Commit 7: App-Token (Client Credentials) nur mit Client-ID und dem gesetzten Secret; ohne
+        // Refresh-Token. https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#client-credentials-grant-flow
+        if (grant == QLatin1String("client_credentials")) {
+            if (clientSecret.isEmpty() || request.formValue(QStringLiteral("client_secret")) != clientSecret
+                || request.formValue(QStringLiteral("client_id")) != clientId) {
+                error(socket, 400, QStringLiteral("invalid client"));
+                return;
+            }
+            const Token app = issue(TwitchTestUser(), {});
+            reply(socket, 200, {{QStringLiteral("access_token"), app.access},
+                                {QStringLiteral("expires_in"), accessExpiresIn},
+                                {QStringLiteral("token_type"), QStringLiteral("bearer")}});
             return;
         }
         error(socket, 400, QStringLiteral("unsupported grant type"));

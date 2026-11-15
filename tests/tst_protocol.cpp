@@ -572,6 +572,53 @@ private slots:
         QVERIFY(!parseObsAddToScene(noScene, &parsed, &error));
     }
 
+    // P13: twitch_status und die Anfragen zu den Konten
+    void twitchMessages()
+    {
+        TwitchStatusInfo info;
+        info.enabled = true;
+        info.message = QStringLiteral("Rechte fehlen");
+        info.live = true;
+        info.subscriptions = {{QStringLiteral("channel.follow"), true, QString()},
+                              {QStringLiteral("channel.raid"), false, QStringLiteral("HTTP 403")}};
+        info.channel.state = QStringLiteral("ok");
+        info.channel.login = QStringLiteral("testkanal");
+        info.channel.userId = QStringLiteral("1");
+        info.channel.missingScopes = {QStringLiteral("bits:read")};
+        info.bot.state = QStringLiteral("off");
+        info.bot.loginPending = TwitchLoginPending{QStringLiteral("ABCD1234"), QStringLiteral("https://www.twitch.tv/activate"),
+                                                   QDateTime(QDate(2026, 11, 15), QTime(12, 0), QTimeZone::UTC)};
+        info.badgeProblem = QStringLiteral("Abzeichen nicht aktiv: Bot nicht angemeldet.");
+        const QJsonObject o = twitchStatusMessage(info);
+        QCOMPARE(messageType(o), QStringLiteral("twitch_status"));
+        TwitchStatusInfo back;
+        QString error;
+        QVERIFY2(parseTwitchStatus(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        QCOMPARE(o.value(QStringLiteral("accounts")).toObject().value(QStringLiteral("channel")).toObject()
+                     .value(QStringLiteral("login_pending")), QJsonValue(QJsonValue::Null));
+        QVERIFY2(parseTwitchStatus(twitchStatusMessage({}), &back, &error), qPrintable(error));
+        QCOMPARE(back, TwitchStatusInfo());
+        QJsonObject bad = o;
+        QJsonObject accounts = bad.value(QStringLiteral("accounts")).toObject();
+        QJsonObject channel = accounts.value(QStringLiteral("channel")).toObject();
+        channel.insert(QStringLiteral("state"), QStringLiteral("gut"));
+        accounts.insert(QStringLiteral("channel"), channel);
+        bad.insert(QStringLiteral("accounts"), accounts);
+        QVERIFY(!parseTwitchStatus(bad, &back, &error));
+
+        const TwitchAccountRequest request{4, QStringLiteral("bot")};
+        TwitchAccountRequest parsed;
+        for (const char *type : {msg::kTwitchLoginStart, msg::kTwitchLoginCancel, msg::kTwitchLogout}) {
+            const QJsonObject m = twitchAccountRequestMessage(type, request);
+            QCOMPARE(messageType(m), QLatin1String(type));
+            QVERIFY2(parseTwitchAccountRequest(m, &parsed, &error), qPrintable(error));
+            QCOMPARE(parsed, request);
+        }
+        QVERIFY(!parseTwitchAccountRequest(twitchAccountRequestMessage(msg::kTwitchLogout, {4, QStringLiteral("kanal")}),
+                                           &parsed, &error));
+    }
+
     // P10-vor: Einstellungen des Kerns
     void settingsMessages()
     {
@@ -583,6 +630,8 @@ private slots:
                                 "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
                                 "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
+                                // P13
+                                "\"twitch_client_id\":\"\",\"twitch_client_secret_set\":false,\"twitch_enabled\":false,"
                                 "\"type\":\"settings\"}\n")
                      .insert(1, QStringLiteral("\"audio_offset_max_ms\":500,\"audio_offset_min_ms\":-500,"
                                                "\"audio_routes\":{\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
@@ -625,6 +674,32 @@ private slots:
                    QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), 1},
                                                                      {QStringLiteral("offset_ms"), 0}}}});
         QVERIFY(!parseSettings(bad, &back, &error));
+
+        // P13: Twitch; das Secret geht nur hinein, zurück kommt «gesetzt»
+        SettingsInfo twitch = info;
+        twitch.settings.twitchEnabled = true;
+        twitch.settings.twitchClientId = QStringLiteral("testclient");
+        twitch.twitchClientSecretSet = true;
+        QVERIFY2(parseSettings(settingsMessage(twitch), &back, &error), qPrintable(error));
+        QCOMPARE(back, twitch);
+        for (const QString &field : {QStringLiteral("twitch_enabled"), QStringLiteral("twitch_client_id"),
+                                     QStringLiteral("twitch_client_secret_set")}) {
+            bad = o;
+            bad.remove(field);
+            QVERIFY2(!parseSettings(bad, &back, &error), qPrintable(field));
+        }
+        SettingsUpdate twitchUpdate;
+        twitchUpdate.requestId = 8;
+        twitchUpdate.twitchEnabled = false;
+        twitchUpdate.twitchClientId = QStringLiteral("abc");
+        twitchUpdate.twitchClientSecret = QString();
+        SettingsUpdate twitchParsed;
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(twitchUpdate), &twitchParsed, &error), qPrintable(error));
+        QCOMPARE(twitchParsed, twitchUpdate);
+        twitchUpdate.twitchEnabled.reset();
+        twitchUpdate.twitchClientId.reset();
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(twitchUpdate), &twitchParsed, &error), qPrintable(error));
+        QCOMPARE(twitchParsed, twitchUpdate);
 
         SettingsUpdate update;
         update.requestId = 7;

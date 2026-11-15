@@ -30,6 +30,9 @@ class ObsConnection;
 class ObsSecretStore;
 class ObsSources;
 }
+namespace dss::twitch {
+class TwitchService;
+}
 
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
 // Verbindungen von Fenstern über einen Unix-Socket an und verteilt Overlays, Leistungswerte
@@ -75,6 +78,13 @@ public:
     // sie danach auf dem Stand. Ohne Aufruf: OBS bleibt «off».
     void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
                           dss::obs::ObsSources *sources);
+
+#if DSS_CORE_TWITCH
+    // Anbindung an Twitch (P13, Plan 2.7, Schalter DSS_CORE_TWITCH): Werte aus kern.ini [twitch],
+    // twitch_status und connections.twitch an alle, Anfragen twitch_login_start, twitch_login_cancel,
+    // twitch_logout, Client Secret über update_settings. Ohne Aufruf: twitch_status mit enabled false.
+    void setTwitchService(dss::twitch::TwitchService *twitch);
+#endif
 
 #if DSS_CORE_AUDIO
     // Ton der Videos (P12b b3, Schalter DSS_CORE_AUDIO): Ausgang und Versatz aus den Einstellungen
@@ -172,8 +182,17 @@ private:
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
-    // P10c: zweiter Teil von handleSettingsUpdate, wenn das Passwort geschrieben ist.
-    void finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged);
+    // P13: nach dem Passwort von OBS das Client Secret von Twitch ablegen, dann finishSettingsUpdate.
+    void writeTwitchSecret(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged);
+    // P10c: zweiter Teil von handleSettingsUpdate, wenn das Passwort geschrieben ist. secretChanged
+    // (P13): Client Secret von Twitch gespeichert oder gelöscht.
+    void finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged,
+                              bool secretChanged = false);
+    // P13: Twitch
+    void applyTwitchSettings();
+    QJsonObject twitchStatusMessage() const;
+    void onTwitchChanged();
+    void handleTwitchRequest(QLocalSocket *socket, const QJsonObject &message);
     void handleSettingsReset(QLocalSocket *socket, const QJsonObject &message);
     // P10c: Werte aus den Einstellungen an die Verbindung zu OBS.
     void applyObsSettings(bool passwordChanged = false);
@@ -212,6 +231,8 @@ private:
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     dss::obs::ObsSources *m_obsSources = nullptr;
+    dss::twitch::TwitchService *m_twitch = nullptr; // P13; nullptr ohne DSS_CORE_TWITCH
+    QJsonObject m_lastTwitchStatus;
     dss::AudioOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
     dss::Mixer *m_mixer = nullptr;
     // P12b b4: Meldungen der Seiten an den Mischer; nullptr ohne Ton oder ohne Overlay-Server
