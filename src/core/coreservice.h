@@ -19,6 +19,7 @@ class QLocalSocket;
 class QTimer;
 
 namespace dss {
+class ActionSound;
 class AudioOutput;
 class Mixer;
 class OverlayServer;
@@ -78,9 +79,14 @@ public:
     // audio_outputs mit enabled false. P12b b4: Mit Overlay-Server gehen die Meldungen der Seiten
     // (…/clock) über VideoAudio an den Mischer; vor dem Ende von mixer stopAudio() aufrufen.
     void setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer);
+    // P14 t: Töne des Chat-Bots über einen eigenen Ausgang (Zweck «aktionen», [ton-aktionen]) mit
+    // eigenem Mischer; Zustand in audio_outputs.routes.aktionen. Wie setAudioOutput vor
+    // output->start() aufrufen. Den Schritt «Ton abspielen» bindet Abschnitt c2 an actionSound().
+    void setActionAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer);
+    dss::ActionSound *actionSound() const { return m_actionSound; }
 #endif
     // P12b b4: Ton der Videos beenden (Decoder, Stellen im Mischer), solange Mischer und Ausgang
-    // noch leben; nach der Hauptschleife. Ohne Ton nichts.
+    // noch leben; nach der Hauptschleife. Ohne Ton nichts. P14 t: ebenso die Töne des Chat-Bots.
     void stopAudio();
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
@@ -199,6 +205,10 @@ private:
     dss::obs::ObsSources *m_obsSources = nullptr;
     dss::AudioOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
     dss::Mixer *m_mixer = nullptr;
+    // P14 t: Ausgang, Mischer und Töne des Chat-Bots; nullptr ohne DSS_CORE_AUDIO
+    dss::AudioOutput *m_actionOutput = nullptr;
+    dss::Mixer *m_actionMixer = nullptr;
+    dss::ActionSound *m_actionSound = nullptr;
     // P12b b4: Meldungen der Seiten an den Mischer; nullptr ohne Ton oder ohne Overlay-Server
     dss::VideoAudio *m_videoAudio = nullptr;
     void connectVideoAudio();

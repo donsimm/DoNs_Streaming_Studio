@@ -190,7 +190,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 13); // seit P12b b5 (Format 5)
+        QCOMPARE(c->coreHello().protocolVersion, 14); // seit P14 t (Medienart «Ton»)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -660,11 +660,14 @@ private slots:
         const AudioOutputsInfo first = *one->audioOutputs();
 #if DSS_CORE_AUDIO
         QVERIFY(first.enabled);
-        QCOMPARE(first.routes.keys(), QStringList{video});
+        // P14 t: zweiter Zweck «aktionen» (Töne des Chat-Bots), ebenfalls ohne Ausgang
+        const QString actions = QString::fromLatin1(kAudioPurposeActions);
+        QCOMPARE(first.routes.keys(), (QStringList{actions, video}));
         const bool pipewire = stateOf(*one) != QStringLiteral("no_pipewire");
-        if (pipewire)
+        if (pipewire) {
             QCOMPARE(stateOf(*one), QStringLiteral("no_target"));
-        else
+            QCOMPARE(first.routes.value(actions).state, QStringLiteral("no_target"));
+        } else
             qInfo("Ohne PipeWire: %s", qPrintable(first.routes.value(video).detail));
         // Kein Ausgang ist vorgewählt, auch nicht der Standardausgang.
         one->requestSettings();

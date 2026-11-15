@@ -250,7 +250,8 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# Passwort steht nicht hier, sondern verschlüsselt in obs-passwort.cred.\n"
             "# [ton-video]: Ausgang für den Ton der Videos (Name in PipeWire, leer = kein Ton) und\n"
             "# versatz_ms (" + QByteArray::number(kAudioOffsetMinMs) + " bis "
-            + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n";
+            + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n"
+            "# [ton-aktionen]: Ausgang für die Töne des Chat-Bots; versatz_ms wirkt dort nicht.\n";
     text += '[' + QByteArray(kSection) + "]\n";
     text += QByteArray(kPortKey) + '=' + QByteArray::number(settings.port) + '\n';
     text += QByteArray(kAddressKey) + '=' + settings.homeAddress.toUtf8() + '\n';

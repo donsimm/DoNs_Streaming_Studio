@@ -254,12 +254,19 @@ private slots:
     {
         const CoreSettings defaults{8081, QString()};
         const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        const QString actions = QString::fromLatin1(kAudioPurposeActions);
         CoreSettings s;
         QString error;
-        QCOMPARE(audioPurposeIds(), QStringList{video});
+        QCOMPARE(audioPurposeIds(), (QStringList{video, actions}));
         QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
         QCOMPARE(s.audioRoutes, CoreSettings::defaultAudioRoutes());
-        QCOMPARE(s.audioRoutes.keys(), QStringList{video});
+        QCOMPARE(s.audioRoutes.keys(), (QStringList{actions, video})); // QMap sortiert
+        QCOMPARE(s.audioRoutes.value(video), AudioRoute());
+        QCOMPARE(s.audioRoutes.value(actions), AudioRoute());
+        // P14 t: [ton-aktionen] unabhängig von [ton-video]
+        QVERIFY2(parseCoreSettings("[ton-aktionen]\nausgang=test_bot.analog-stereo\n", defaults, &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.audioRoutes.value(actions), (AudioRoute{QStringLiteral("test_bot.analog-stereo"), 0}));
         QCOMPARE(s.audioRoutes.value(video), AudioRoute());
         QVERIFY2(parseCoreSettings("[ton-video]\nausgang = test_ausgang.analog-stereo \nversatz_ms=-120\n", defaults,
                                    &s, &error),
@@ -279,6 +286,7 @@ private slots:
             QCOMPARE(s, written);
         }
         QVERIFY(serializeCoreSettings({8090, QString()}).contains("\n[ton-video]\nausgang=\nversatz_ms=0\n"));
+        QVERIFY(serializeCoreSettings({8090, QString()}).contains("\n[ton-aktionen]\nausgang=\nversatz_ms=0\n"));
     }
 
     void parseAudioInvalid_data()

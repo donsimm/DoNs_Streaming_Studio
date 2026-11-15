@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 14); // seit P12b b5 (Format 5)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 14); // seit P14 t (Medienart «Ton»)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -585,7 +585,8 @@ private slots:
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
                                 "\"type\":\"settings\"}\n")
                      .insert(1, QStringLiteral("\"audio_offset_max_ms\":500,\"audio_offset_min_ms\":-500,"
-                                               "\"audio_routes\":{\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
+                                               "\"audio_routes\":{\"aktionen\":{\"offset_ms\":0,\"output\":\"\"},"
+                                               "\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
         SettingsInfo back;
         QString error;
         QVERIFY2(parseSettings(o, &back, &error), qPrintable(error));
@@ -603,7 +604,9 @@ private slots:
         QVERIFY2(parseSettings(settingsMessage(audio), &back, &error), qPrintable(error));
         QCOMPARE(back, audio);
         QCOMPARE(settingsMessage(audio).value(QStringLiteral("audio_routes")).toObject(),
-                 (QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("test_ausgang")},
+                 (QJsonObject{{QStringLiteral("aktionen"), QJsonObject{{QStringLiteral("output"), QString()},
+                                                                       {QStringLiteral("offset_ms"), 0}}},
+                              {QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("test_ausgang")},
                                                                     {QStringLiteral("offset_ms"), -120}}}}));
         for (const QString &field : {QStringLiteral("audio_routes"), QStringLiteral("audio_offset_min_ms"),
                                      QStringLiteral("audio_offset_max_ms")}) {

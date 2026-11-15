@@ -9,6 +9,7 @@
 #include "overlayserver.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "actionsound.h"
 #include "audiooutput.h"
 #include "mixer.h"
 #endif
@@ -705,6 +706,21 @@ void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
     };
     applyAudioSettings();
 }
+
+void CoreService::setActionAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
+{
+    m_actionOutput = output;
+    m_actionMixer = mixer;
+    m_actionSound = new dss::ActionSound(m_store->dataDir(), mixer, output, this);
+    // Wie setAudioOutput: Rückrufe im Thread des Ausgangs, nur weiterreichen.
+    output->onChange = [this] {
+        QMetaObject::invokeMethod(this, &CoreService::onAudioChanged, Qt::QueuedConnection);
+    };
+    output->onLog = [this](const QString &line) {
+        QMetaObject::invokeMethod(this, [line] { qInfo("Ton Chat-Bot: %s", qPrintable(line)); }, Qt::QueuedConnection);
+    };
+    applyAudioSettings();
+}
 #endif
 
 void CoreService::connectVideoAudio()
@@ -725,19 +741,29 @@ void CoreService::stopAudio()
     if (m_videoAudio)
         m_videoAudio->shutdown();
 #endif
+#if DSS_CORE_AUDIO
+    if (m_actionSound)
+        m_actionSound->shutdown();
+#endif
 }
 
 void CoreService::applyAudioSettings()
 {
 #if DSS_CORE_AUDIO
-    if (!m_audioOutput || !m_settings)
+    if (!m_settings)
         return;
-    const dss::AudioRoute route =
-        m_settings->settings().audioRoutes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
-    m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
-    // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
-    // (neu gewählt, pwoutput.h).
-    m_audioOutput->setTarget(route.output);
+    const QMap<QString, dss::AudioRoute> routes = m_settings->settings().audioRoutes;
+    if (m_audioOutput) {
+        const dss::AudioRoute route = routes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
+        m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
+        // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
+        // (neu gewählt, pwoutput.h).
+        m_audioOutput->setTarget(route.output);
+    }
+    // P14 t: Ohne gewählten Ausgang legt PwOutput keinen Strom an (Plan P14, 4.3: «nur offen,
+    // solange ein Ausgang gewählt ist»). Der Versatz wirkt bei freien Stimmen nicht.
+    if (m_actionOutput)
+        m_actionOutput->setTarget(routes.value(QString::fromLatin1(dss::kAudioPurposeActions)).output);
 #endif
 }
 
@@ -753,6 +779,18 @@ QJsonObject CoreService::audioOutputsMessage() const
         info.routes.insert(QString::fromLatin1(dss::kAudioPurposeVideo),
                            {QString::fromLatin1(dss::AudioOutput::stateName(m_audioOutput->state())),
                             m_audioOutput->stateDetail()});
+    }
+    // P14 t: Die Liste der Ausgänge kommt vom Ausgang der Videos (dieselbe Registry von PipeWire).
+    if (m_actionOutput) {
+        info.enabled = true;
+        if (!m_audioOutput) {
+            const QList<dss::AudioDevice> devices = m_actionOutput->devices();
+            for (const dss::AudioDevice &d : devices)
+                info.devices.append({d.name, d.description, d.isDefault});
+        }
+        info.routes.insert(QString::fromLatin1(dss::kAudioPurposeActions),
+                           {QString::fromLatin1(dss::AudioOutput::stateName(m_actionOutput->state())),
+                            m_actionOutput->stateDetail()});
     }
 #endif
     return dss::audioOutputsMessage(info);

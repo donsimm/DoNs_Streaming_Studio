@@ -134,6 +134,9 @@ struct ControlDock
     QComboBox *audioOutput = nullptr;
     QSpinBox *audioOffset = nullptr;
     QLabel *audioOutputState = nullptr;
+    // P14 t: Zeile «Ton Chat-Bot» (Zweck «aktionen»), ohne Versatz
+    QComboBox *actionsAudioOutput = nullptr;
+    QLabel *actionsAudioOutputState = nullptr;
     QSpinBox *overlayWidth = nullptr;
     QSpinBox *overlayHeight = nullptr;
 };

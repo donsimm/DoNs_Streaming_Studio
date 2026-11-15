@@ -21,6 +21,7 @@
 #include "mediainfo.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "actionsound.h"
 #include "mixer.h"
 #include "nulloutput.h"
 #include "pwoutput.h"
@@ -308,6 +309,23 @@ int main(int argc, char *argv[])
     service.setAudioOutput(audioOutput.get(), &audioMixer);
     if (!audioOutput->start(&error))
         qWarning("Ton: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
+
+    // Töne des Chat-Bots (P14 t): zweiter Strom mit eigenem Mischer und Ausgang aus kern.ini
+    // ([ton-aktionen]), standardmässig «kein Ausgang». Freie Stimmen ohne Seitentakt (mixer.h).
+    dss::Mixer actionMixer(dss::ActionSound::kMaxSounds);
+    std::unique_ptr<dss::AudioOutput> actionOutput;
+    if (parser.isSet(substituteOutputOption)) {
+        actionOutput = std::make_unique<dss::NullOutput>(&actionMixer);
+    } else {
+        actionOutput = std::make_unique<dss::PwOutput>(&actionMixer, QStringLiteral("ton-aktionen"),
+                                                       installed ? QStringLiteral("dss_core_ton_aktionen")
+                                                                 : QStringLiteral("dss_core_entwicklung_ton_aktionen"),
+                                                       QStringLiteral("DoNs Streaming Studio (%1): Ton des Chat-Bots")
+                                                           .arg(dss::editionLabel()));
+    }
+    service.setActionAudioOutput(actionOutput.get(), &actionMixer);
+    if (!actionOutput->start(&error))
+        qWarning("Ton Chat-Bot: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
 #endif
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,

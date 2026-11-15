@@ -232,6 +232,10 @@ if(TARGET dss_audio)
   dss_add_test(tst_tonmischer)
   target_link_libraries(tst_tonmischer PRIVATE dss_audio)
   target_compile_definitions(tst_tonmischer PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+  # P14 t: freie Stimme mit echtem Decoder und tests/daten/ton/ton-piep.wav
+  if(TEST toene_vorbereiten)
+    set_tests_properties(tst_tonmischer PROPERTIES FIXTURES_REQUIRED dss_toene)
+  endif()
 endif()
 # P12b b3: Ausgabe über PipeWire mit eigenen virtuellen Senken (unhörbar, nur Stille), Liste, Wahl,
 # fehlender und verschwundener Ausgang, Wiederkehr, fremde Verbindung. Nur mit DSS_CORE_AUDIO.
@@ -241,12 +245,14 @@ if(TARGET dss_pwoutput)
 endif()
 # P12b b4: Kern als eigener Prozess mit Ersatzausgang ohne Gerät (--ersatzausgang): Meldungen der
 # Seite an den Mischer, Stopp-Regeln, Nachführen, Wiederholen. Braucht Ton und Overlay-Server.
+# P14 t: Zweck «aktionen» im Kern und Töne des Chat-Bots (ActionSound) mit Ersatzausgang im Prozess.
 if(DSS_CORE_AUDIO AND DSS_CORE_OVERLAY_SERVER)
   dss_add_test(tst_kernton)
-  target_link_libraries(tst_kernton PRIVATE dss_audio Qt6::Network)
+  target_link_libraries(tst_kernton PRIVATE dss_audiooutput Qt6::Network)
   target_compile_definitions(tst_kernton PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
     DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
   add_dependencies(tst_kernton dss-core)
+  set_tests_properties(tst_kernton PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,

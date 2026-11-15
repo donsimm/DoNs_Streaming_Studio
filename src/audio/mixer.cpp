@@ -74,6 +74,7 @@ struct Params
 {
     bool enabled = false;
     bool playing = false;
+    bool free = false; // P14 t: freie Stimme ohne Uhr einer Seite
     uint32_t startSerial = 0;
     uint32_t minPass = 0; // ältere Durchgänge verwerfen
     PageClock clock;
@@ -127,6 +128,7 @@ struct Mixer::Slot
     Voice voice;    // nur Abruf
 
     std::atomic<bool> playing{false};
+    std::atomic<bool> ended{false};
     std::atomic<uint32_t> pass{0};
     std::atomic<uint32_t> loops{0};
     std::atomic<uint64_t> frames{0};
@@ -318,9 +320,101 @@ struct Mixer::Slot
         return mediaNs / kNsPerFrame;
     }
 
+    // Freie Stimme: nächster Rahmen des Durchgangs; Stille, wenn der Ring leer ist oder der
+    // Durchgang zu Ende (dann ended).
+    void fetchNext(float *dst)
+    {
+        Voice &v = voice;
+        dst[0] = dst[1] = 0.0f;
+        if (v.ended)
+            return;
+        for (;;) {
+            syncHead();
+            const size_t n = ring.readable();
+            if (n == 0) {
+                emptyFrames.fetch_add(1, std::memory_order_relaxed);
+                return;
+            }
+            if (!v.headKnown) {
+                skipToMark(n);
+                continue;
+            }
+            if (!v.passKnown) {
+                if (v.headPass < v.needPass) {
+                    skipToMark(n);
+                    continue;
+                }
+                v.pass = v.headPass;
+                v.passKnown = true;
+                pass.store(v.pass, std::memory_order_relaxed);
+            }
+            if (v.headPass < v.pass) {
+                skipToMark(n);
+                continue;
+            }
+            if (v.headPass > v.pass) {
+                v.ended = true;
+                ended.store(true, std::memory_order_relaxed);
+                return;
+            }
+            const float *f = ring.frame(0);
+            dst[0] = f[0];
+            dst[1] = f[1];
+            skip(1);
+            frames.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+    }
+
+    void renderFree(const Params &p, float *out, uint32_t count)
+    {
+        Voice &v = voice;
+        if (p.enabled && p.playing && p.startSerial != v.startSerial) {
+            v.startSerial = p.startSerial;
+            v.active = true;
+            v.stopping = false;
+            v.ended = false;
+            v.needPass = p.minPass;
+            v.passKnown = false;
+            v.gain = 0.0f;
+            ended.store(false, std::memory_order_relaxed);
+        }
+        if (v.active && (!p.enabled || !p.playing))
+            v.stopping = true;
+        playing.store(v.active && !v.stopping, std::memory_order_relaxed);
+        if (!v.active) {
+            discardStale(p.minPass);
+            return;
+        }
+        const float target = (v.stopping || p.muted) ? 0.0f : std::clamp(p.gain, 0.0f, kMaxFreeGain);
+        // Ein- und Ausblenden in kRampFrames, auch bei 200 % (Schritt im Verhältnis zum Ziel)
+        const float step = std::max(target, 1.0f) * kRampStep;
+        for (uint32_t i = 0; i < count; ++i) {
+            if (v.gain < target)
+                v.gain = std::min(target, v.gain + step);
+            else if (v.gain > target)
+                v.gain = std::max(target, v.gain - step);
+            if (v.stopping && v.gain <= 0.0f) {
+                v.active = false;
+                v.stopping = false;
+                playing.store(false, std::memory_order_relaxed);
+                discardStale(p.minPass);
+                return;
+            }
+            float f[2];
+            fetchNext(f);
+            out[2 * i] += std::clamp(f[0] * v.gain, -1.0f, 1.0f);
+            out[2 * i + 1] += std::clamp(f[1] * v.gain, -1.0f, 1.0f);
+        }
+    }
+
     void render(int64_t audible, bool outputJump, float *out, uint32_t count)
     {
         const Params &p = params.read();
+        if (p.free) {
+            renderFree(p, out, count);
+            return;
+        }
         Voice &v = voice;
         v.limit = p.lengthFrames;
         bool hard = false;
@@ -461,9 +555,22 @@ void Mixer::start(int id, uint32_t pass, const PageClock &clock)
         return;
     Slot &s = *m_slots[size_t(id)];
     s.control.playing = true;
+    s.control.free = false;
     ++s.control.startSerial;
     s.control.minPass = pass;
     s.control.clock = clock;
+    s.publish();
+}
+
+void Mixer::startFree(int id, uint32_t pass)
+{
+    if (id < 0 || size_t(id) >= m_used.size() || !m_used[size_t(id)])
+        return;
+    Slot &s = *m_slots[size_t(id)];
+    s.control.playing = true;
+    s.control.free = true;
+    ++s.control.startSerial;
+    s.control.minPass = pass;
     s.publish();
 }
 
@@ -537,6 +644,9 @@ void Mixer::render(const OutputTiming &timing, float *out, uint32_t frames)
     const int64_t withDelay = audible + m_extraDelayNs.load(std::memory_order_relaxed);
     for (const std::unique_ptr<Slot> &slot : m_slots)
         slot->render(withDelay, jump, out, frames);
+    // P14 t: Summe auf ±1,0 begrenzen (mehrere laute Töne zugleich). Werte darin bleiben genau.
+    for (float *f = out, *end = out + size_t(frames) * kChannels; f != end; ++f)
+        *f = std::clamp(*f, -1.0f, 1.0f);
     m_frames.fetch_add(frames, std::memory_order_relaxed);
     m_pulls.fetch_add(1, std::memory_order_relaxed);
     m_audibleNs.store(audible, std::memory_order_relaxed);
@@ -549,6 +659,7 @@ Mixer::SourceStats Mixer::sourceStats(int id) const
         return r;
     const Slot &s = *m_slots[size_t(id)];
     r.playing = s.playing.load(std::memory_order_relaxed);
+    r.ended = s.ended.load(std::memory_order_relaxed);
     r.pass = s.pass.load(std::memory_order_relaxed);
     r.loops = s.loops.load(std::memory_order_relaxed);
     r.frames = s.frames.load(std::memory_order_relaxed);

@@ -6,7 +6,7 @@ Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Ände
 
 ### Version 14 (P14 t, vorläufig)
 
-Die Nummer ist vorläufig; Lotse vergibt sie beim Zusammenführen der parallelen Spuren von P13 und P14. `media_list` kennt die Art `audio` (Medienart «Ton»: `mp3`, `wav`, `ogg`, `m4a`) und das Pflichtfeld `files[].duration_ms`. Ein Fenster der Version 13 würde eine Medienliste mit einem Ton als ungültig verwerfen (unbekannte Art), und einer Medienliste eines Kerns der Version 13 fehlte das neue Pflichtfeld. Darum stieg die Version.
+Die Nummer ist vorläufig; Lotse vergibt sie beim Zusammenführen der parallelen Spuren von P13 und P14. `media_list` kennt die Art `audio` (Medienart «Ton»: `mp3`, `wav`, `ogg`, `m4a`) und das Pflichtfeld `files[].duration_ms`. Ein Fenster der Version 13 würde eine Medienliste mit einem Ton als ungültig verwerfen (unbekannte Art), und einer Medienliste eines Kerns der Version 13 fehlte das neue Pflichtfeld. Darum stieg die Version. Dazu kommt der Zweck `aktionen` (Töne des Chat-Bots, Abschnitt `[ton-aktionen]`) in `audio_outputs.routes`, `settings.audio_routes` und `update_settings.audio_routes`; die Felder bleiben dieselben.
 
 ### Version 13 (P12b b5)
 
@@ -170,7 +170,7 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":13,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":14,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -423,7 +423,7 @@ Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder
 
 ### `audio_outputs` (seit Version 12, P12b)
 
-Ausgänge für den Ton und Zustand je Zweck (heute nur `video`, Ton der Videos). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle (Ausgang erschienen oder verschwunden, Zustand geändert). Das Dock «Steuerung» zeigt daraus die Zeile «Ton Videos» (Auswahlliste, Hinweis «Ausgang fehlt»).
+Ausgänge für den Ton und Zustand je Zweck (`video`, Ton der Videos; seit P14 t `aktionen`, Töne des Chat-Bots). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle (Ausgang erschienen oder verschwunden, Zustand geändert). Das Dock «Steuerung» zeigt daraus die Zeilen «Ton Videos» und «Ton Chat-Bot» (Auswahlliste, Hinweis «Ausgang fehlt»). Die Liste `devices` kommt vom Ausgang der Videos; beide Ausgänge sehen dieselben Geräte von PipeWire.
 
 | Feld | Typ | Inhalt |
 |---|---|---|
@@ -432,7 +432,7 @@ Ausgänge für den Ton und Zustand je Zweck (heute nur `video`, Ton der Videos).
 | `routes` | Objekt | je Zweck `state` (`no_pipewire`, `no_target` = kein Ausgang gewählt, `missing` = gewählter Ausgang fehlt, `connecting`, `playing`, `error`) und `detail` (Text oder `null`) |
 
 ```json
-{"devices":[{"default":true,"description":"Gerät Analog Stereo","name":"alsa_output.<gerät>.analog-stereo"}],"enabled":true,"routes":{"video":{"detail":null,"state":"no_target"}},"type":"audio_outputs"}
+{"devices":[{"default":true,"description":"Gerät Analog Stereo","name":"alsa_output.<gerät>.analog-stereo"}],"enabled":true,"routes":{"aktionen":{"detail":null,"state":"no_target"},"video":{"detail":null,"state":"no_target"}},"type":"audio_outputs"}
 ```
 
 Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann nichts und weicht auf kein anderes Gerät aus (`target.object`, `node.dont-reconnect`, `node.dont-fallback`, `node.dont-move`); kommt der Ausgang wieder, spielt er ohne Neustart weiter. Hängt der Strom an einem fremden Knoten, gibt er Stille aus und bleibt auf `error`, bis der Ausgang neu gewählt wird. Code: `src/audio/pwoutput.cpp`.
@@ -479,7 +479,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":13,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":14,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -636,6 +636,9 @@ port=4455
 [ton-video]
 ausgang=
 versatz_ms=0
+[ton-aktionen]
+ausgang=
+versatz_ms=0
 ```
 
 | Wert | Festlegung |
@@ -648,7 +651,10 @@ versatz_ms=0
 | `[ton-video] ausgang` | seit P12b b3: Ausgang für den Ton der Videos, `node.name` in PipeWire (wie `audio_outputs.devices[].name`); leer = kein Ausgang, kein Ton (Standard, ein neuer Kern hat «Kein Ausgang», Entscheid 6 vom 2026-11-12). Höchstens so lang wie im Code (`kAudioOutputMaxLength`), ohne Steuerzeichen und ohne Leerzeichen am Rand. Ein Name, den es gerade nicht gibt, ist erlaubt (Zustand `missing`) |
 | `[ton-video] versatz_ms` | seit P12b b3: Versatz in ms, −500 bis +500, Standard 0. Bedeutung: Weg des Tons hinter dem Ausgang (Mischpult, Streaming-PC); so viel früher spielt der Kern. Vorzeichen und Bereich sind eine Annahme bis zum Handtest H2 |
 
-Ein Abschnitt je Zweck; heute nur `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`). Weitere Zwecke (Chat-Bot, Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
+| `[ton-aktionen] ausgang` | seit P14 t: Ausgang für die Töne des Chat-Bots, Regeln wie `[ton-video] ausgang`, Standard leer. Eigener Strom (`dss_core_ton_aktionen` bzw. `dss_core_entwicklung_ton_aktionen`), nur offen, solange ein Ausgang gewählt ist |
+| `[ton-aktionen] versatz_ms` | wird gelesen und geschrieben wie bei `[ton-video]`, wirkt aber nicht (Töne ohne Bild) |
+
+Ein Abschnitt je Zweck: `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`) und seit P14 t `[ton-aktionen]` (`aktionen`, Töne des Chat-Bots, Plan P14 Abschnitt 4.3). Weitere Zwecke (Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Ein Kern vor P14 t liest eine `kern.ini` mit `[ton-aktionen]` nicht («unbekannter Abschnitt»). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
 
 Das Passwort von OBS steht nicht in `kern.ini` (Regel 12), sondern verschlüsselt in `obs-passwort.cred` neben ihr, Rechte 0600, je Version getrennt (`src/obs/obssecretstore.h`, `systemd-creds --user`, Entscheid F1). Der Kern ruft `systemd-creds` über `QProcess` mit stdin und stdout auf, das Passwort steht nie in der Befehlszeile. Quelle: https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html. Grenze: Andere Programme desselben Benutzers könnten es ebenfalls entschlüsseln, und der Host-Schlüssel liegt auf derselben Platte.
 
@@ -667,11 +673,11 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `settings_error` | Text oder `null` | Meldung, wenn die Datei ungültig ist |
 | `obs_enabled`, `obs_host`, `obs_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[obs]`, seit Version 11 |
 | `obs_password_set` | wahr/falsch | Ein Passwort ist gespeichert. Der Wert selbst geht nie an ein Fenster (Regel 12), seit Version 11 |
-| `audio_routes` | Objekt | seit Version 12: je Zweck (`video`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` |
+| `audio_routes` | Objekt | seit Version 12: je Zweck (`video`, seit Version 14 auch `aktionen`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` bzw. `[ton-aktionen]` |
 | `audio_offset_min_ms`, `audio_offset_max_ms` | ganze Zahlen | seit Version 12: gültiger Bereich des Versatzes (−500, 500); das Fenster stellt sein Feld «Versatz» danach ein |
 
 ```json
-{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
@@ -783,7 +789,8 @@ Kern (`src/core/videoaudio.cpp`, Mischer `src/audio/mixer.cpp`, Ausgang `src/aud
 - Mehrere Seiten auf dasselbe Overlay: Die Seite, die zuerst startet, führt; der Ton kommt einmal je Videoquelle.
 - Stopp sofort bei `stop` (Seite inaktiv), `end`, Ausgabe des Overlays aus, Quelle verborgen, gelöscht oder geändert (andere Datei, Wiederholen umgeschaltet), Overlay gelöscht, Ende von `…/events/<page>`, 3 s ohne Meldung. Kommt danach wieder `frame` oder `loop` (zum Beispiel nach einem Neustart des Kerns), steigt der Ton an der gemeldeten Lage ein («Ton: Einstieg …»).
 - Protokoll: «Ton: Start», «Ton: Einstieg», «Ton: Stopp … (gespielt, Wiederholungen, Sprünge, weich, Abweichung zuletzt)», «Ton: Nachführen» (höchstens einmal je Sekunde), alle 10 s «Ton: Lage …» mit Abweichung; Ausgang «Ton (ton-video): …» (Zustand, Ausgänge erschienen oder verschwunden, abgebrochene Zyklen, Abrufe ohne Puffer, Wechsel von `delay` und `size`).
-- Testoption `dss-core --ersatzausgang`: Ersatzausgang ohne Gerät und ohne PipeWire (für `tst_kernton`). Schalter `DSS_CORE_AUDIO` (Standard ON; OFF = Kern ohne Ton, ohne libpipewire).
+- Testoption `dss-core --ersatzausgang`: Ersatzausgang ohne Gerät und ohne PipeWire (für `tst_kernton`), seit P14 t für beide Zwecke. Schalter `DSS_CORE_AUDIO` (Standard ON; OFF = Kern ohne Ton, ohne libpipewire).
+- Töne des Chat-Bots (seit P14 t, `src/audio/actionsound.h`): zweiter Mischer und eigener Strom aus `[ton-aktionen]` mit bis zu 8 freien Stimmen ohne Seite und ohne Versatz, Lautstärke 0 bis 200 %, jede Stimme und die Summe auf ±1,0 begrenzt. Ohne gewählten Ausgang gibt es keinen Strom, ein Ton meldet dann «Kein Ausgang für «Ton Chat-Bot» gewählt (Dock «Steuerung»).». Protokoll «Ton Chat-Bot: Start …» und «Ton Chat-Bot: Ende …», Ausgang «Ton Chat-Bot: …». Ausgelöst wird ein Ton erst mit dem Schritt «Ton abspielen» des Chat-Bots (später in P14).
 
 ## Fehlerfälle
 

@@ -329,7 +329,7 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #serverMessage { font-weight: bold; color: @coreDisconnected@; }
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
-#obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+#obsSourceState[state="problem"], #audioOutputState[state="problem"], #actionsAudioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},

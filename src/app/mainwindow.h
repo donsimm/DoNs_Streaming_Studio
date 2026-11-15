@@ -111,9 +111,9 @@ private:
     // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
     void refreshObsSource();
     // P12b b5: Zeile «Ton Videos» im Dock «Steuerung» aus Einstellungen und Ausgängen des Kerns;
-    // Änderungen gehen mit update_settings an den Kern.
+    // Änderungen gehen mit update_settings an den Kern. P14 t: dazu die Zeile «Ton Chat-Bot».
     void refreshAudioRoute();
-    void sendAudioRoute(const dss::AudioRouteChange &change);
+    void sendAudioRoute(const QString &purpose, const dss::AudioRouteChange &change);
     void showObsSourceDialog();
     std::optional<dss::Overlay> selectedOverlay() const;
 

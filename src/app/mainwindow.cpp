@@ -68,6 +68,38 @@ QString layoutFile()
     return dss::configDir() + QStringLiteral("/fenster.ini");
 }
 
+// Liste und Zustand einer Zeile «Ton …» im Dock «Steuerung» (P12b b5, P14 t)
+void showAudioRouteRow(const dss::AudioRouteRow &row, QComboBox *box, QLabel *state, const QString &boxToolTip,
+                       bool coreConnected)
+{
+    {
+        const QSignalBlocker block(box);
+        // Neu füllen nur, wenn sich die Liste geändert hat (offene Liste bleibt offen).
+        bool same = box->count() == row.choices.size();
+        for (int i = 0; same && i < box->count(); ++i)
+            same = box->itemData(i).toString() == row.choices.at(i).name && box->itemText(i) == row.choices.at(i).label;
+        if (!same) {
+            box->clear();
+            for (const dss::AudioOutputChoice &c : row.choices)
+                box->addItem(c.label, c.name);
+        }
+        box->setCurrentIndex(row.current);
+    }
+    box->setToolTip(QStringLiteral("%1: %2").arg(boxToolTip, box->currentText()));
+    box->setEnabled(row.canEdit);
+    // Ohne Kern ausgegraut wie die Zeilen «Ausgabe» und «OBS».
+    state->setEnabled(coreConnected);
+    state->setText(row.text);
+    state->setToolTip(row.toolTip);
+    const QString stateKey = row.problem ? QStringLiteral("problem") : QStringLiteral("normal");
+    if (state->property("state").toString() != stateKey) {
+        state->setProperty("state", stateKey);
+        // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
+        state->style()->unpolish(state);
+        state->style()->polish(state);
+    }
+}
+
 } // namespace
 
 MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *client,
@@ -360,12 +392,18 @@ void MainWindow::connectCore()
     connect(m_controlDock.audioOutput, &QComboBox::activated, this, [this](int index) {
         dss::AudioRouteChange change;
         change.output = m_controlDock.audioOutput->itemData(index).toString();
-        sendAudioRoute(change);
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeVideo), change);
     });
     connect(m_controlDock.audioOffset, &QSpinBox::valueChanged, this, [this](int value) {
         dss::AudioRouteChange change;
         change.offsetMs = value;
-        sendAudioRoute(change);
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeVideo), change);
+    });
+    // P14 t: Zeile «Ton Chat-Bot»
+    connect(m_controlDock.actionsAudioOutput, &QComboBox::activated, this, [this](int index) {
+        dss::AudioRouteChange change;
+        change.output = m_controlDock.actionsAudioOutput->itemData(index).toString();
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeActions), change);
     });
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
@@ -702,24 +740,12 @@ void MainWindow::refreshObsSource()
 
 void MainWindow::refreshAudioRoute()
 {
-    const dss::AudioRouteRow row =
-        dss::audioRouteRow(m_client ? m_client->settings() : std::nullopt,
-                           m_client ? m_client->audioOutputs() : std::nullopt, QString::fromLatin1(dss::kAudioPurposeVideo));
-    QComboBox *box = m_controlDock.audioOutput;
-    {
-        const QSignalBlocker block(box);
-        // Neu füllen nur, wenn sich die Liste geändert hat (offene Liste bleibt offen).
-        bool same = box->count() == row.choices.size();
-        for (int i = 0; same && i < box->count(); ++i)
-            same = box->itemData(i).toString() == row.choices.at(i).name && box->itemText(i) == row.choices.at(i).label;
-        if (!same) {
-            box->clear();
-            for (const dss::AudioOutputChoice &c : row.choices)
-                box->addItem(c.label, c.name);
-        }
-        box->setCurrentIndex(row.current);
-    }
-    box->setToolTip(QStringLiteral("Ausgang für den Ton der Videos: %1").arg(box->currentText()));
+    const std::optional<dss::SettingsInfo> settings = m_client ? m_client->settings() : std::nullopt;
+    const std::optional<dss::AudioOutputsInfo> outputs = m_client ? m_client->audioOutputs() : std::nullopt;
+    const bool connected = m_client && m_client->isConnected();
+    const dss::AudioRouteRow row = dss::audioRouteRow(settings, outputs, QString::fromLatin1(dss::kAudioPurposeVideo));
+    showAudioRouteRow(row, m_controlDock.audioOutput, m_controlDock.audioOutputState,
+                      QStringLiteral("Ausgang für den Ton der Videos"), connected);
     QSpinBox *offset = m_controlDock.audioOffset;
     {
         const QSignalBlocker block(offset);
@@ -728,26 +754,17 @@ void MainWindow::refreshAudioRoute()
         if (m_audioRouteRequests.isEmpty() && offset->value() != row.offsetMs)
             offset->setValue(row.offsetMs);
     }
-    box->setEnabled(row.canEdit);
     offset->setEnabled(row.canEdit);
-    QLabel *state = m_controlDock.audioOutputState;
-    // Ohne Kern ausgegraut wie die Zeilen «Ausgabe» und «OBS».
-    state->setEnabled(m_client && m_client->isConnected());
-    state->setText(row.text);
-    state->setToolTip(row.toolTip);
-    const QString stateKey = row.problem ? QStringLiteral("problem") : QStringLiteral("normal");
-    if (state->property("state").toString() != stateKey) {
-        state->setProperty("state", stateKey);
-        // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
-        state->style()->unpolish(state);
-        state->style()->polish(state);
-    }
+    // P14 t: Zeile «Ton Chat-Bot», ohne Versatz
+    showAudioRouteRow(dss::audioRouteRow(settings, outputs, QString::fromLatin1(dss::kAudioPurposeActions)),
+                      m_controlDock.actionsAudioOutput, m_controlDock.actionsAudioOutputState,
+                      QStringLiteral("Ausgang für den Ton des Chat-Bots"), connected);
 }
 
-void MainWindow::sendAudioRoute(const dss::AudioRouteChange &change)
+void MainWindow::sendAudioRoute(const QString &purpose, const dss::AudioRouteChange &change)
 {
     dss::SettingsUpdate update;
-    update.audioRoutes.insert(QString::fromLatin1(dss::kAudioPurposeVideo), change);
+    update.audioRoutes.insert(purpose, change);
     if (const qint64 id = m_client->sendSettingsUpdate(update); id > 0)
         m_audioRouteRequests.append(id);
     else
