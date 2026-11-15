@@ -20,6 +20,13 @@ Plan des Projektleiter-Agenten vom 2026-11-15. Gebaut wird erst nach dem Go des 
 - Licht: die zwei Elgato Key Light Air (Ein/Aus, Helligkeit, Farbtemperatur) im Studio, dazu Licht-Presets (zum Beispiel «Stream», «Abend»: je Lampe Ein/Aus, Helligkeit, Farbtemperatur) anlegen, speichern, abrufen, auch per Stream Deck.
 - Reihenfolge: direkt nach P14 (`docs/07-bauplan.md`).
 
+## Antworten des Nutzers (2026-11-15, 21:55, in der Sitzung mit Lotse)
+
+1. **Ort:** **B) Eigener Modul-Reiter «Kameras»** neben «Overlays» und «Chat-Bot», nicht das Dock aus Abschnitt 8. Abschnitt 8 und e werden vor Abschnitt e auf einen Reiter umgeplant (Unterteilung «Steuerung», «Bild», «Licht» im Reiter, Kopfzeile, Dialoge bleiben); `ui-consistency:design` vor dem Bau von e. Bis dahin gilt 8 nur für Inhalt, nicht für den Ort.
+2. **Preset:** **A)** Position und Zoom, Kästchen «Bildwerte mitspeichern» (Standard aus).
+3. **Schutz:** **A)** ohne Anmeldung, drei Schichten (Abschnitt 5).
+4. **Go:** **A)** Schritt 0 und Abschnitte a bis c parallel zu P13/P14, wenn Platz ist, ohne P13/P14 zu verschieben; d bis f nach der Abnahme von P14. Rechte für Lotse am Streaming-PC wie in Frage 4 A (nie während eines Streams; bleibende Werte nur mit OK in der Sitzung). Grenze: Bau.
+
 ## Wichtigste Befunde
 
 | Befund | Beleg |
