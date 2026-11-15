@@ -51,8 +51,9 @@ Stand: 2026-11-15 (Punkt 3: Umfang des Chat-Bots und Übernahme der Zuschauer-Da
 - Rest aus Punkt 85: Der echte Fall (Kabel ziehen, Kern starten, Kabel einstecken) ist nicht geprüft.
 109. Aus P12b b5: Die Lautstärke wirkt linear (`volume` / 100 als Faktor im Mischer). Ob das nach Gehör passt, ist nicht geprüft; Handtest N2/N3.
 110. Aus P12b: Am echten Ausgang nicht gemessen: `pw_time.delay` (an der virtuellen Senke immer 0), der hörbare Zeitpunkt und damit Startwert, Vorzeichen und Bereich (±500 ms) von `versatz_ms`. Kommt mit H2 (ersetzt M4).
-111. Aus P12b: In OBS nicht geprüft: verschachtelte Szenen (Rückfall `GetSourceActive`, `videoActive`), Verhalten mit «shutdown», Gang zwischen den Rechnern über 60 min (H3, M3 nur rund 3 min mit −5,2 ms/min), Ruhe des Glättens bei der Streuung aus M3 (p95 24,9 ms), Ursache der rund 20 Bildaufrufe je Sekunde bei 30 Bildern/s.
+111. Aus P12b: In OBS nicht geprüft: verschachtelte Szenen (Rückfall `GetSourceActive`, `videoActive`), Verhalten mit «shutdown», Ruhe des Glättens bei der Streuung aus M3 (p95 24,9 ms), Ursache der rund 20 Bildaufrufe je Sekunde bei 30 Bildern/s.
 112. Aus P12b b1 (Klick 197, Z3c): Beim Wechsel des Quantums von PipeWire kann ein kurzes Stück Ton fehlen, ohne Lageverschiebung und ohne gemeldeten Unterlauf. Knoten und Hörbarkeit nicht geklärt; der Kern schreibt abgebrochene Zyklen ins Protokoll. Ob im Betrieb ein Programm das Quantum ändert, ist nicht geprüft.
+121. Aus P12 H3 (Dauerlauf 60 min in OBS, 2026-11-15): Am Wiederholpunkt schwankt die Pause von OBS zwischen 9 und 67 ms (M2: 58,6 ms fest). Der Mischer schätzt sie und gleicht danach aus; 8-mal lag die Abweichung dabei über 20 ms (−29 bis +44 ms), jeweils mit Sprung. Während des Videos höchstens 5,6 ms (358 Lagen), keine Aussetzer, keine Warnungen. Entscheid Nutzer: H3 gilt mit dieser Einschränkung als bestanden; verbessern später (z. B. auf die Meldung der Seite warten statt die Pause schätzen), Hörbarkeit an der Nahtstelle nicht geprüft.
 
 ## Machbarkeitstests
 
