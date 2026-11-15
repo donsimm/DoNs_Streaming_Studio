@@ -10,6 +10,7 @@
 #include "coresession.h"
 #include "coresettings.h"
 #include "datalock.h"
+#include "eventtypes.h"
 #include "overlaystore.h"
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
@@ -18,6 +19,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QJsonDocument>
 #include <QRegularExpression>
 #include <QTextStream>
 
@@ -90,6 +92,7 @@ const char *const kUsageTemplate =
     "  einstellungen\n"
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
+    "  ereignisse [--folgen] [--typ FILTER]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -116,9 +119,14 @@ const char *const kUsageTemplate =
     "ORDNER, ZIELORDNER: Pfad wie in medien-liste, zum Beispiel «Logos/Alt»; \"/\" = oberste Ebene.\n"
     "medien-ordner-anlegen legt den letzten Teil des Pfads an. Löschen eines Ordners: Inhalt kommt\n"
     "eine Ebene höher. medium-loeschen löscht nur Dateien, die keine Quelle verwendet.\n"
+    "ereignisse: Verlauf des Ereignisflusses im laufenden Kern (höchstens 200, nur im Speicher), eine\n"
+    "JSON-Zeile je Ereignis. --folgen: danach neue Ereignisse, bis der Kern trennt (Ctrl+C beendet).\n"
+    "--typ: genauer Typ wie twitch.chat_message oder Vorsilbe mit Punkt wie twitch.; mehrmals\n"
+    "möglich; ohne: alle Typen. Verworfene Ereignisse (Ausgabe zu langsam) meldet dss-cli auf stderr.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
-    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern).\n";
+    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern,\n"
+    "ereignisse).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -136,6 +144,8 @@ struct Arguments
     bool flipHorizontal = false; // P09b
     bool flipVertical = false;   // P09b
     bool yes = false;            // P10: neuer-token ohne Rückfrage
+    bool follow = false;         // P13: ereignisse --folgen
+    QStringList eventTypes;      // P13: ereignisse --typ (mehrmals möglich)
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -169,6 +179,14 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->flipVertical = true;
         } else if (a == QLatin1String("--ja")) {
             result->yes = true;
+        } else if (a == QLatin1String("--folgen")) {
+            result->follow = true;
+        } else if (a == QLatin1String("--typ")) {
+            if (i + 1 >= args.size()) {
+                *error = QStringLiteral("--typ braucht einen Filter.");
+                return false;
+            }
+            result->eventTypes.append(args.at(++i));
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -825,6 +843,71 @@ int runMedia(const Arguments &args)
     return kExitOk;
 }
 
+// Ereignisse aus dem laufenden Kern (P13, Plan 1.5): Werkzeug für den Handtest ohne Bildschirmfoto.
+int runEvents(const Arguments &args)
+{
+    if (args.positional.size() != 1) {
+        err() << "Fehler: ereignisse erwartet keine Argumente.\n\n" << usageText();
+        return kExitUsage;
+    }
+    QStringList filters = args.eventTypes;
+    for (const QString &filter : std::as_const(filters)) {
+        if (!dss::events::isValidFilter(filter)) {
+            err() << "Fehler: Unbekannter Ereignistyp «" << filter
+                  << "» (genauer Typ oder Vorsilbe mit Punkt, zum Beispiel «twitch.»).\n\n" << usageText();
+            return kExitUsage;
+        }
+    }
+    if (filters.isEmpty())
+        filters = dss::events::eventTypeNames();
+
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Die Ereignisse kennt nur der laufende Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    const std::optional<QList<dss::events::Event>> history = session.subscribeEvents(filters, &error);
+    if (!history) {
+        err() << "Fehler: " << error << '\n';
+        return kExitError;
+    }
+    const auto print = [](const dss::events::Event &event) {
+        out() << QJsonDocument(dss::events::eventToJson(event)).toJson(QJsonDocument::Compact) << '\n';
+        out().flush();
+    };
+    for (const dss::events::Event &event : *history)
+        print(event);
+    if (!args.follow)
+        return kExitOk;
+    for (;;) {
+        const std::optional<QJsonObject> message = session.nextEventMessage(&error);
+        if (!message) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        if (dss::messageType(*message) == QLatin1String(dss::msg::kEventsDropped)) {
+            qint64 count = 0;
+            if (dss::parseEventsDropped(*message, &count, &error))
+                err() << "Hinweis: " << count << " Ereignisse verworfen (Ausgabe zu langsam).\n";
+            err().flush();
+            continue;
+        }
+        dss::events::Event event;
+        if (!dss::parseEventMessage(*message, &event, &error)) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        print(event);
+    }
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -853,6 +936,22 @@ int main(int argc, char *argv[])
         return kExitUsage;
     }
 
+    const bool events = args.positional.first() == QLatin1String("ereignisse");
+    if (!events && (args.follow || !args.eventTypes.isEmpty())) {
+        err() << "Fehler: --folgen und --typ gelten nur für ereignisse.\n\n" << usageText();
+        return kExitUsage;
+    }
+    if (events) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für ereignisse (sie kommen vom Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runEvents(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
     if (kSettingsCommands.contains(args.positional.first())) {
         const int rc = runSettings(args);
         out().flush();
@@ -872,7 +971,7 @@ int main(int argc, char *argv[])
     }
     if (!args.connection.isEmpty()) {
         err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port, "
-                 "einstellung-adresse und die Änderungen der Medienliste.\n\n" << usageText();
+                 "einstellung-adresse, ereignisse und die Änderungen der Medienliste.\n\n" << usageText();
         return kExitUsage;
     }
 

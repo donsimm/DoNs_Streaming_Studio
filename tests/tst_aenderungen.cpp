@@ -195,6 +195,8 @@ private slots:
         QCOMPARE(changeTypes().size(), 31);
         QVERIFY(!isChangeType(QStringLiteral("get_overlay")));
         QVERIFY(!isChangeType(QStringLiteral("set_token")));
+        // P13: Ereignisse bestellen ist keine Änderung (keine change_result, nichts gespeichert)
+        QVERIFY(!isChangeType(QString::fromLatin1(msg::kSubscribeEvents)));
     }
 
     void placementOptional()

@@ -1,5 +1,6 @@
 #include "protocol.h"
 
+#include "eventtypes.h"
 #include "overlayjson.h"
 
 #include <QJsonArray>
@@ -1754,6 +1755,100 @@ bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString
         return false;
     *overlayId = id;
     return true;
+}
+
+QJsonObject subscribeEventsMessage(const SubscribeEvents &request)
+{
+    QJsonObject o = typed(msg::kSubscribeEvents);
+    o.insert(QStringLiteral("types"), QJsonArray::fromStringList(request.types));
+    o.insert(QStringLiteral("history"), request.history);
+    return o;
+}
+
+bool parseSubscribeEvents(const QJsonObject &message, SubscribeEvents *request, QString *error)
+{
+    SubscribeEvents r;
+    const QJsonValue types = message.value(QStringLiteral("types"));
+    if (!types.isArray()) {
+        *error = QStringLiteral("Feld types fehlt oder ist keine Liste");
+        return false;
+    }
+    for (const QJsonValue &v : types.toArray()) {
+        if (!v.isString()) {
+            *error = QStringLiteral("Feld types enthält etwas anderes als Text");
+            return false;
+        }
+        if (!events::isValidFilter(v.toString())) {
+            *error = QStringLiteral("Unbekannter Ereignistyp «%1» (genauer Typ oder Vorsilbe mit Punkt, "
+                                    "zum Beispiel «twitch.»)").arg(v.toString());
+            return false;
+        }
+        r.types.append(v.toString());
+    }
+    if (!requireBool(message, QStringLiteral("history"), &r.history, error))
+        return false;
+    *request = r;
+    return true;
+}
+
+QJsonObject eventHistoryMessage(const QList<events::Event> &events)
+{
+    QJsonArray list;
+    for (const events::Event &e : events)
+        list.append(events::eventToJson(e));
+    QJsonObject o = typed(msg::kEventHistory);
+    o.insert(QStringLiteral("events"), list);
+    return o;
+}
+
+bool parseEventHistory(const QJsonObject &message, QList<events::Event> *events, QString *error)
+{
+    const QJsonValue list = message.value(QStringLiteral("events"));
+    if (!list.isArray()) {
+        *error = QStringLiteral("Feld events fehlt oder ist keine Liste");
+        return false;
+    }
+    QList<events::Event> result;
+    for (const QJsonValue &v : list.toArray()) {
+        events::Event e;
+        if (!v.isObject() || !events::eventFromJson(v.toObject(), &e, error)) {
+            if (!v.isObject())
+                *error = QStringLiteral("Feld events enthält etwas anderes als Objekte");
+            return false;
+        }
+        result.append(e);
+    }
+    *events = result;
+    return true;
+}
+
+QJsonObject eventMessage(const events::Event &event)
+{
+    QJsonObject o = typed(msg::kEvent);
+    o.insert(QStringLiteral("event"), events::eventToJson(event));
+    return o;
+}
+
+bool parseEventMessage(const QJsonObject &message, events::Event *event, QString *error)
+{
+    const QJsonValue v = message.value(QStringLiteral("event"));
+    if (!v.isObject()) {
+        *error = QStringLiteral("Feld event fehlt oder ist kein Objekt");
+        return false;
+    }
+    return events::eventFromJson(v.toObject(), event, error);
+}
+
+QJsonObject eventsDroppedMessage(qint64 count)
+{
+    QJsonObject o = typed(msg::kEventsDropped);
+    o.insert(QStringLiteral("count"), double(count));
+    return o;
+}
+
+bool parseEventsDropped(const QJsonObject &message, qint64 *count, QString *error)
+{
+    return requireInt(message, QStringLiteral("count"), 1, qint64(1) << 53, count, error);
 }
 
 QJsonObject serverStatusMessage(const ServerStatusInfo &info)
