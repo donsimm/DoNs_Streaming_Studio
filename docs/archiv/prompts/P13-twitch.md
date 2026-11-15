@@ -238,7 +238,7 @@ Die Namen stammen aus der Recherche vom 2026-11-09 (https://dev.twitch.tv/docs/a
 
 **Kanal-Konto, für das Abzeichen:** zusätzlich `channel:bot` (erlaubt dem Bot das Schreiben mit App-Token; als Moderator ginge es auch ohne, `channel:bot` macht es unabhängig davon).
 
-**Weggelassen (Empfehlung, Frage 1):** `channel:read:stream_key` (Streamschlüssel), `user:read:email`, `user:edit`, `channel:manage:videos` (Videos löschen), `channel:manage:moderators`, `channel:manage:extensions`.
+**Frage 1 entschieden 2026-11-15: B, wirklich alles.** Der Kanal holt auch `channel:read:stream_key` (Streamschlüssel), `user:read:email`, `user:edit`, `channel:manage:videos` (Videos löschen), `channel:manage:moderators`, `channel:manage:extensions` und alle übrigen Rechte, die Twitch anbietet (vollständige Liste in Schritt 0 aus der Doku). Folge: Ein gestohlenes Token des Kanals wiegt schwerer; Ablage wie F1 bleibt, Token nie im Protokoll.
 
 - Fehlt ein Recht, zeigt der Kern «Rechte fehlen: … Neu anmelden.». Die Neuanmeldung verlangt die nötigen Rechte neu, die vorhandenen Ereignisse laufen bis dahin weiter.
 - Raid, Stream online und offline brauchen kein Recht (Schritt 0).
@@ -469,14 +469,9 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 
 ## 7. Fragen an den Nutzer (gebündelt)
 
-1. **Welche Rechte holt die Anmeldung des Kanals?** (Konto, sichtbar beim Bestätigen)
-   - **A) Empfohlen:** alles aus 2.4 lesen und schreiben, **ohne** Streamschlüssel, E-Mail, Konto ändern, Videos löschen, Moderatoren und Erweiterungen verwalten. Grund: Eine Zustimmung reicht für P14 und alles Spätere; die weggelassenen Rechte braucht kein geplanter Baustein und sie wären bei einem gestohlenen Token besonders schädlich.
-   - B) Wirklich alles, was Twitch anbietet. Gegenargument zu A: Wer später eines der weggelassenen Rechte braucht, muss sich einmal neu anmelden (1 min).
-   - C) Nur, was P14 braucht. Gegenargument: Jeder spätere Baustein (Kategorie, Umfrage, Moderation) verlangt dann eine neue Anmeldung.
+1. ~~Rechte~~ **Entschieden 2026-11-15: B, wirklich alles.**
 2. ~~Abzeichen «Chat Bot»?~~ **Entschieden 2026-11-15: B, mit Abzeichen schon in P13** (vertrauliche App, Secret im Studio, App-Token, +½ Sitzung). Bot-Konto: das bisherige aus der Zeit mit Streamer.bot.
-3. **Go für den angepassten Plan P13.**
-   - **A) Go wie geplant (empfohlen):** Der Agent baut die Commits 1–10. Die Registrierung der App mit dem Skript ist erst vor dem Handtest nötig.
-   - B) Änderungen am Plan, bitte nennen.
+3. ~~Go~~ **Go 2026-11-15** (zusammen mit P14-1, parallele Spuren nach P14 10.2).
 
 ## 8. Risiken und `[OFFEN]`
 

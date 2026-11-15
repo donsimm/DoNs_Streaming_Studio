@@ -694,27 +694,13 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 | P14-1 | ~8,5 Sitzungen Arbeit; mit drei Spuren neben P13 etwa 7,5 Sitzungen Wartezeit bis «streamfähig» einschliesslich P13 | Prüfungen je Abschnitt (~2 h), z0 (~1 h), Handtest L1–L6 (~2,5 h) | .NET SDK installieren (~5 min), Installation, N1–N6, N8 (~1,5 h), N7 im ersten Stream |
 | P14-2 | ~2 Sitzungen | ~1 h, L7 | ~20 min |
 
-## 16. Fragen an den Nutzer (nur noch offene)
+## 16. Fragen an den Nutzer: beantwortet 2026-11-15
 
-1. **Wie Aktionen Overlays ändern** (sichtbar).
-   - **A) Empfohlen:** nur «jetzt» (Laufzustand): nicht in der Datei, nach einem Neustart wieder der Stand des Editors, sichtbar mit Marke «live». Im ersten Stream ohne Übergänge (sofort ein und aus); «weich» ein- und ausblenden kommt mit P14-2.
-   - B) Wie A, aber «weich» schon in P14-1 (+½ Sitzung bis zum ersten Stream).
-   - C) Aktionen ändern die Overlay-Datei. Gegenargument zu A: C ist einfacher, aber jede Meldung schreibt die Datei zweimal, und nach einem Absturz bleibt sie eingeblendet.
-2. **Mehrteilige Meldungen** (Rahmen, Bild und Name zusammen; sichtbar und bedienbar).
-   - **A) Empfohlen:** Der Schritt nimmt mehrere Elemente eines Overlays; im Overlay-Editor bleiben es einzelne Quellen. Kein Umbau des Overlay-Editors vor dem ersten Stream.
-   - B) Gruppen von Quellen im Overlay-Editor wie im Entwurf (Seite 5): als Ganzes verschieben, ein- und ausblenden; neues Overlay-Format, beide Zeichner, etwa +1 Sitzung. Gegenargument zu A: Beim Gestalten verschiebt man die Teile einer Meldung einzeln.
-3. **Test-Knopf** (bedienbar).
-   - **A) Empfohlen:** Probelauf als Standard (nichts geht an Twitch oder OBS, Overlay und Ton laufen echt), Kästchen «echt ausführen». Schützt vor Testnachrichten im Chat während eines Streams.
-   - B) Immer echt, wie Streamer.bot. Gegenargument zu A: Ein Probelauf zeigt keine Fehler von Twitch (Rechte, Grenzen).
-4. **Lesen der Zuschauer-Daten (LiteDB).**
-   - **A) Empfohlen:** einmaliger Export mit kleinem .NET-Werkzeug und der Original-Bibliothek; du installierst dafür das .NET SDK und kannst es danach entfernen. Sicherer, weil dieselbe Bibliothek wie Streamer.bot liest, und etwa 1 Sitzung schneller.
-   - B) Eigener Leser im Studio, ohne fremdes Paket. Gegenargument zu A: neues, grosses Paket für eine einmalige Aufgabe.
-5. **Go und Reihenfolge.**
-   - **A) Empfohlen:** P14-1 wie Abschnitt 10.2 mit bis zu drei Agenten gleichzeitig neben P13 (Lotse stimmt Prüfungen ab); P14-2 nach dem ersten Stream. Lotse darf im Handtest, nie während eines Streams, «DSS-Test»-Nachrichten als Bot und Kanal senden, Testaktionen anlegen und löschen, eine Testquelle in «test 2» schalten und die Zuschauer-Daten in den Datenordner der Version in Arbeit kopieren und dort importieren (Eintrag in `CLAUDE.md`, «Umgebung»). Den endgültigen Import in die Version im Einsatz machst du mit dem Skript.
-   - B) Wie A, aber nur ein Agent zur Zeit (weniger Abstimmung, etwa 4 bis 5 Sitzungen später streamfähig).
-   - C) Änderungen, bitte nennen.
-
-Höchstens 4 Fragen je Auswahldialog: Dialog 1 mit P13 Frage 1 und P14 Fragen 1 bis 3, Dialog 2 mit P14 Fragen 4 und 5 und P13 Frage 3 (Go). P13 Frage 2 (Abzeichen) ist am 2026-11-15 entschieden: mit Abzeichen.
+1. Overlays: **A**, nur «jetzt» (Laufzustand), weich ein- und ausblenden erst in P14-2.
+2. Mehrteilige Meldungen: **A**, der Schritt nimmt mehrere Elemente; keine Gruppen im Overlay-Editor vor dem ersten Stream.
+3. Test-Knopf: **A**, Probelauf als Standard, Kästchen «echt ausführen».
+4. Zuschauer-Daten: **A**, einmaliger Export mit .NET-Werkzeug (Nutzer installiert das .NET SDK).
+5. Go: **A**, P14-1 mit bis zu drei Agenten parallel neben P13; Handtest-Rechte für Lotse wie beschrieben (eingetragen in `CLAUDE.md`, «Umgebung»).
 
 ## 17. Risiken und `[OFFEN]`
 
