@@ -15,8 +15,8 @@
 // - Ein Name besteht aus Buchstaben A–Z, a–z, Ziffern und «_». Alles andere zwischen zwei
 //   Zeichen % ist kein Platzhalter («100% sicher, %user%» ersetzt nur %user%). Damit bleiben auch
 //   Formate wie %name:format% wörtlich stehen (nicht in P14).
-// - Gross- und Kleinschreibung zählt. Ob Streamer.bot Namen ohne Rücksicht darauf auflöst, ist
-//   im Schritt-0-Bericht vom 2026-11-15 nicht geklärt ([OFFEN]).
+// - Gross- und Kleinschreibung des Arguments zählt nicht (wie Streamer.bot, Entscheid des Nutzers
+//   vom 2026-11-15); der Laufzustand der Overlays nutzt dieselbe Ersetzung (P14 c5).
 // - Eingesetzte Werte werden nicht nochmals durchsucht (keine Platzhalter aus Chat-Texten).
 // - Nicht in P14: $math()$, $length()$ (kommen beim Nutzer nicht vor).
 

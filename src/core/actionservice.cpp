@@ -311,6 +311,15 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     // Twitch-Ereignisse vom Fluss (P13)
     m_subscription = m_bus->subscribe(this, {QStringLiteral("twitch.")},
                                       [this](const dss::events::Event &event) { onEvent(event); });
+    // c5: «~name~» im eigenen Text eines Elements (und in overlay_live_set) mit den dauerhaften
+    // globalen Variablen, wie im Lauf (ActionRun::placeholders, Plan 2.9)
+    if (m_options.overlayLive) {
+        m_options.overlayLive->setSubstitute([this](const QString &text, const QHash<QString, QString> &arguments) {
+            return dss::substitutePlaceholders(text, arguments, [this](const QString &name) {
+                return m_variables.value({dss::actions::VariableScope::Global, QString(), name, true});
+            });
+        });
+    }
 
     if (!m_options.inUseSocket.isEmpty()) {
         m_probeTimer = new QTimer(this);
@@ -326,6 +335,8 @@ ActionService::~ActionService()
     QString error;
     if (!savePending(&error))
         qCritical("Aktionen: beim Beenden nicht gespeichert: %s", qPrintable(error));
+    if (m_options.overlayLive)
+        m_options.overlayLive->setSubstitute({});
     // Läufe vor Uhr und Variablen beenden (Reihenfolge der Mitglieder)
     m_dispatcher.reset();
     m_engine.reset();

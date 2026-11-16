@@ -1,7 +1,6 @@
 #include "overlaylive.h"
 
 #include <QJsonArray>
-#include <QRegularExpression>
 #include <QSet>
 
 #include <cmath>
@@ -113,34 +112,14 @@ Overlay applyLiveState(const Overlay &overlay, const LiveElements &elements)
     return result;
 }
 
-QString substitutePlaceholders(const QString &text, const QHash<QString, QString> &arguments)
+QString substitutePlaceholders(const QString &text, const QHash<QString, QString> &arguments,
+                               const dss::actions::GlobalLookup &globals)
 {
-    if (arguments.isEmpty() || !text.contains(QLatin1Char('%')))
-        return text;
-    // Name ohne Leerzeichen und ohne «%» zwischen zwei «%»; ein unbekannter Name bleibt stehen, und
-    // die Suche geht nach seinem ersten «%» weiter (so findet «100 % %user%» noch «%user%»).
-    QString result;
-    result.reserve(text.size());
-    qsizetype i = 0;
-    while (i < text.size()) {
-        const qsizetype start = text.indexOf(QLatin1Char('%'), i);
-        if (start < 0) {
-            result.append(QStringView(text).mid(i));
-            break;
-        }
-        result.append(QStringView(text).mid(i, start - i));
-        const qsizetype end = text.indexOf(QLatin1Char('%'), start + 1);
-        const QString name = end > start + 1 ? text.mid(start + 1, end - start - 1) : QString();
-        const bool plausible = !name.isEmpty() && !name.contains(QRegularExpression(QStringLiteral("\\s")));
-        if (plausible && arguments.contains(name)) {
-            result.append(arguments.value(name));
-            i = end + 1;
-        } else {
-            result.append(QLatin1Char('%'));
-            i = start + 1;
-        }
-    }
-    return result;
+    dss::actions::Arguments values;
+    values.reserve(arguments.size());
+    for (auto it = arguments.cbegin(); it != arguments.cend(); ++it)
+        values.insert(it.key(), it.value());
+    return dss::actions::replacePlaceholders(text, values, globals);
 }
 
 bool isLiveImageUrl(const QString &image)

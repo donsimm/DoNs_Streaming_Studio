@@ -735,6 +735,7 @@ private slots:
         QUuid overlayId;
         QUuid greeting;
         QUuid thanks;
+        QUuid counterText;
         QUuid picture;
         QString otherImage;
         {
@@ -745,6 +746,9 @@ private slots:
             QVERIFY2(!overlayId.isNull(), qPrintable(error));
             greeting = store.addTextSource(overlayId, QStringLiteral("Hallo %user%!"), QStringLiteral(DSS_TEST_FONT), &error);
             thanks = store.addTextSource(overlayId, QStringLiteral("Danke"), QStringLiteral(DSS_TEST_FONT), &error);
+            counterText = store.addTextSource(overlayId, QStringLiteral("~dsstest_zaehler~ von %USER% (%user%)"),
+                                              QStringLiteral(DSS_TEST_FONT), &error);
+            QVERIFY2(!counterText.isNull(), qPrintable(error));
             picture = store.addImageSource(overlayId, QStringLiteral(DSS_TEST_EXIF_DIR "/orientierung-1.png"), &error);
             const QUuid other = store.addImageSource(overlayId, QStringLiteral(DSS_TEST_EXIF_DIR "/orientierung-2.png"), &error);
             QVERIFY2(!greeting.isNull() && !thanks.isNull() && !picture.isNull() && !other.isNull(), qPrintable(error));
@@ -805,6 +809,22 @@ private slots:
         QCOMPARE(live.value(greeting).text, std::optional<QString>(QStringLiteral("Hallo %geheim%!")));
         QCOMPARE(live.value(thanks).text, std::optional<QString>(QStringLiteral("Danke %geheim%")));
         QCOMPARE(live.value(picture).image, QString()); // «%anderesBild%» ist kein Bild: eigenes Bild
+        QTRY_VERIFY_WITH_TIMEOUT(liveElements(core.socket, overlayId).isEmpty(), 6000);
+
+        // c5: Eigener Text des Elements wie Plan 2.9: «~name~» setzt die dauerhafte globale
+        // Variable ein, Gross- und Kleinschreibung des Arguments zählt nicht, ein Wert mit «%…%»
+        // wird nicht nochmals ersetzt
+        Step counter = newStep(QString::fromLatin1(kStepGlobalSet));
+        counter.fields.insert(QStringLiteral("name"), QStringLiteral("dsstest_zaehler"));
+        counter.fields.insert(QStringLiteral("operation"), QStringLiteral("increment"));
+        counter.fields.insert(QStringLiteral("value"), QStringLiteral("7"));
+        run = runAction(c, newAction(QStringLiteral("DSS-Test Zähler zeigen"),
+                                     {counter, overlayStep(overlayId, QStringLiteral("show"),
+                                                           {{counterText, std::nullopt, std::nullopt}}, 300, false)}),
+                        tricky, &tookMs);
+        QVERIFY2(run.state == RunState::Ok, qPrintable(run.log.isEmpty() ? run.message : run.log.last().message));
+        live = liveElements(core.socket, overlayId);
+        QCOMPARE(live.value(counterText).text, std::optional<QString>(QStringLiteral("7 von %geheim% (%geheim%)")));
         QTRY_VERIFY_WITH_TIMEOUT(liveElements(core.socket, overlayId).isEmpty(), 6000);
 
         // wait: der Lauf wartet die Dauer ab; «weich» wirkt in P14-1 wie ohne Übergang

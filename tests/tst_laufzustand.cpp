@@ -110,12 +110,13 @@ private slots:
         QTest::newRow("zwei") << "%user% mit %bits% Bits" << "Zuschauer42 mit 100 Bits";
         QTest::newRow("unbekannt bleibt") << "Hallo %niemand%" << "Hallo %niemand%";
         QTest::newRow("Prozent davor") << "100 % %user%" << "100 % Zuschauer42";
-        QTest::newRow("Gross/klein zählt") << "%User%" << "%User%";
+        QTest::newRow("Gross/klein zählt nicht") << "%User% %user% %USER%" << "Zuschauer42 Zuschauer42 Zuschauer42";
         QTest::newRow("leer") << "%%" << "%%";
         QTest::newRow("Leerzeichen") << "%user name%" << "%user name%";
         QTest::newRow("ohne Ende") << "%user" << "%user";
-        QTest::newRow("Variable bleibt") << "~zaehler~" << "~zaehler~";
+        QTest::newRow("Variable") << "~zaehler~ und ~unbekannt~" << "7 und ~unbekannt~";
         QTest::newRow("Wert mit Prozent") << "%prozent%%user%" << "50 %Zuschauer42";
+        QTest::newRow("Wert nicht nochmals") << "%trick% ~trick~" << "%user% %bits%";
     }
 
     void placeholders()
@@ -124,8 +125,18 @@ private slots:
         QFETCH(QString, expected);
         const QHash<QString, QString> args = {{QStringLiteral("user"), QStringLiteral("Zuschauer42")},
                                               {QStringLiteral("bits"), QStringLiteral("100")},
-                                              {QStringLiteral("prozent"), QStringLiteral("50 %")}};
-        QCOMPARE(substitutePlaceholders(text, args), expected);
+                                              {QStringLiteral("prozent"), QStringLiteral("50 %")},
+                                              {QStringLiteral("trick"), QStringLiteral("%user%")}};
+        const dss::actions::GlobalLookup globals = [](const QString &name) -> std::optional<QJsonValue> {
+            if (name == QLatin1String("zaehler"))
+                return QJsonValue(7);
+            if (name == QLatin1String("trick"))
+                return QJsonValue(QStringLiteral("%bits%"));
+            return std::nullopt;
+        };
+        QCOMPARE(substitutePlaceholders(text, args, globals), expected);
+        // Ohne Variablen (Kern ohne Aktionssystem) bleibt «~name~» wörtlich
+        QCOMPARE(substitutePlaceholders(QStringLiteral("~zaehler~"), args), QStringLiteral("~zaehler~"));
     }
 
     void applyToOverlay()

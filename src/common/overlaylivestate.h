@@ -31,6 +31,8 @@ class OverlayLiveState : public QObject
     Q_OBJECT
 
 public:
+    using Substitute = std::function<QString(const QString &, const QHash<QString, QString> &)>;
+
     struct Options
     {
         QString imageDir; // <Datenordner>/live-bilder
@@ -42,12 +44,19 @@ public:
         qint64 maxImageBytes = 2 * 1024 * 1024;
         int maxImages = 200;
         int timeoutMs = 10000;
-        // Platzhalter einsetzen; Abschnitt c2 kann hier den Ablauf der Aktionen (Abschnitt a) einsetzen.
-        std::function<QString(const QString &, const QHash<QString, QString> &)> substitute = substitutePlaceholders;
+        // Platzhalter einsetzen (ohne Variablen); mit Aktionssystem setzt es setSubstitute (c5).
+        Substitute substitute = [](const QString &text, const QHash<QString, QString> &arguments) {
+            return substitutePlaceholders(text, arguments);
+        };
     };
 
     OverlayLiveState(const OverlayStore *store, const Options &options, QObject *parent = nullptr);
     ~OverlayLiveState() override;
+
+    // Ersetzung der Platzhalter tauschen (P14 c5): der Kern legt den Laufzustand vor dem
+    // Aktionssystem an; dieses gibt hier die dauerhaften globalen Variablen für «~name~» hinein und
+    // setzt beim Beenden zurück. Leer = wieder die Ersetzung aus Options.
+    void setSubstitute(const Substitute &substitute);
 
     // Leert den Ordner der Profilbilder (beim Start des Kerns). Rückgabe: gelöschte Dateien.
     int clearImages();
@@ -97,6 +106,7 @@ private:
 
     const OverlayStore *m_store;
     Options m_options;
+    Substitute m_substitute; // Options::substitute oder aus setSubstitute
     QHash<QUuid, QMap<QUuid, Entry>> m_state;
     QElapsedTimer m_clock;
     QTimer *m_expiry = nullptr;

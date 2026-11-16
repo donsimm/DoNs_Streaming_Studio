@@ -1,6 +1,7 @@
 #pragma once
 
 #include "overlay.h"
+#include "placeholders.h"
 
 #include <QHash>
 #include <QJsonObject>
@@ -64,10 +65,12 @@ struct OverlayLiveInfo
 // Elemente ohne Quelle im Overlay werden übergangen.
 Overlay applyLiveState(const Overlay &overlay, const LiveElements &elements);
 
-// Platzhalter wie Streamer.bot (Plan 2.9): «%name%» wird durch das Argument name ersetzt, ein
-// unbekanntes bleibt wörtlich stehen. Gross-/Kleinschreibung zählt. «~name~» (Variablen) kommt mit
-// dem Ablauf der Aktionen (Abschnitt b), bis dahin bleibt es wörtlich.
-QString substitutePlaceholders(const QString &text, const QHash<QString, QString> &arguments);
+// Platzhalter wie Streamer.bot (Plan 2.9), dieselbe Ersetzung wie im Ablauf der Aktionen
+// (dss::actions::replacePlaceholders, P14 c5): «%name%» setzt das Argument ein, Gross- und
+// Kleinschreibung des Namens zählt nicht; «~name~» setzt die dauerhafte globale Variable aus
+// globals ein. Unbekanntes bleibt wörtlich stehen, eingesetzte Werte werden nicht nochmals ersetzt.
+QString substitutePlaceholders(const QString &text, const QHash<QString, QString> &arguments,
+                               const dss::actions::GlobalLookup &globals = {});
 
 // Adresse aus dem Netz (http:// oder https://) statt einer Datei der Mediathek
 bool isLiveImageUrl(const QString &image);
