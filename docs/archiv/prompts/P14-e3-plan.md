@@ -147,7 +147,7 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Tests: `tst_fensterchatbot` (Zeilen, Minutenfeld «7,5» → 450 s im `timer_put`, «Zufällig» schaltet nur die Freigabe, Prüfmeldung). `scripts/testen.sh -R '^tst_fensterchatbot$'`.
   - Handtest: H3.
 
-- [ ] **e3-7 «Variablen».** Schreibt neu `src/app/variablespage.{h,cpp}`, `chatbotpage.cpp`, `mainwindow.cpp` (holen beim Zeigen des Unterreiters und nach `actions.run_finished`, solange er sichtbar ist).
+- [x] **e3-7 «Variablen».** Schreibt neu `src/app/variablespage.{h,cpp}`, `chatbotpage.cpp`, `mainwindow.cpp` (holen beim Zeigen des Unterreiters und nach `actions.run_finished`, solange er sichtbar ist).
   - Checkliste:
     - Zwei `dockPanel` «Für alle» und «Je Zuschauer» nebeneinander im waagrechten `QSplitter` (Entscheid Frage 5), fest.
     - Je ein Suchfeld wie oben; «Je Zuschauer» dazu der Filter «Alle Variablen» aus `userVariableNames()`/`variableNameLabel()` auf derselben Zeile.

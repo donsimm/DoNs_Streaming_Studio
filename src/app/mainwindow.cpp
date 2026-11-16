@@ -604,6 +604,7 @@ void MainWindow::connectChatBot()
     connectActions();
     connectCommands();
     connectTimers();
+    connectVariables();
 }
 
 void MainWindow::openAction(const QUuid &actionId)

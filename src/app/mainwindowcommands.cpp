@@ -9,6 +9,7 @@
 #include "coreclient.h"
 #include "dialogs.h"
 #include "listdetailpage.h"
+#include "variablespage.h"
 
 #include <QSignalBlocker>
 
@@ -322,6 +323,7 @@ void MainWindow::sendNextCommandTest()
 
 void MainWindow::requestShownVariables()
 {
-    if (m_client && m_chatBot && m_client->isConnected() && m_chatBot->commandsPage()->isVisible())
+    if (m_client && m_chatBot && m_client->isConnected()
+        && (m_chatBot->commandsPage()->isVisible() || m_chatBot->variablesPage()->isVisible()))
         m_client->requestVariables();
 }

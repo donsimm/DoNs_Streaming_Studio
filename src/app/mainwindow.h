@@ -158,8 +158,15 @@ private:
     void sendNextTimerEdit();
     // Bearbeitung der gezeigten Zeitnachricht: change ändert eine Kopie aus dem Kern (putTimer)
     void editShownTimer(TimerForm::Section section, const std::function<void(dss::actions::Timer &)> &change);
-    // Variablen holen, solange «Befehle» sichtbar ist (Spalte «Benutzt»)
+    // Variablen holen, solange «Befehle» (Spalte «Benutzt») oder «Variablen» sichtbar ist
     void requestShownVariables();
+    // P14 e3-7: Unterreiter «Variablen» (mainwindowvariables.cpp); Bearbeitungen wie bei «Befehle»,
+    // Prüfmeldung unter der Tabelle. area: VariablesPage::Area.
+    void connectVariables();
+    void refreshVariables();
+    void refreshVariableButtons();
+    void runVariableEdits(const dss::EditResult &result, int area, const QString &savedName, bool deleted = false);
+    void sendNextVariableEdit();
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -311,6 +318,16 @@ private:
     QUuid m_timerEditCreated;
     TimerForm::Section m_timerEditSection = TimerForm::NoSection;
     bool m_timerEditDeleted = false;
+    // P14 e3-7: «Variablen»; Zeilen wie in den Tabellen (Kennung → VariableRow)
+    QList<dss::VariableRow> m_variableRows[2];
+    // Gewählte Zeile je Tabelle (Prüfzeile leeren nur bei echtem Wechsel) und zuletzt gezeigter fileError
+    QString m_variableSelection[2];
+    QString m_variableFileError;
+    QList<dss::ActionsEdit> m_variableEdits;
+    qint64 m_variableEditRequest = 0;
+    QString m_variableEditSaved;
+    int m_variableEditArea = 0;
+    bool m_variableEditDeleted = false;
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

@@ -6,6 +6,7 @@
 #include "headerbar.h"
 #include "listdetailpage.h"
 #include "panels.h"
+#include "variablespage.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -354,20 +355,9 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     addSubTab(QStringLiteral("Zeitnachrichten"), m_timers);
 
     // «Variablen»: «Für alle» und «Je Zuschauer» nebeneinander mit Teiler wie «Live»
-    // (Entscheid des Nutzers 2026-11-16); Inhalt der Bereiche ab e3-7.
-    auto *variables = new QSplitter(Qt::Horizontal, m_pages);
-    variables->setObjectName(QStringLiteral("variablesSplitter"));
-    variables->setChildrenCollapsible(false);
-    const QString variableTitles[2] = {QStringLiteral("Für alle"), QStringLiteral("Je Zuschauer")};
-    for (int i = 0; i < 2; ++i) {
-        m_variableAreas[i] = new QWidget;
-        auto *areaColumn = new QVBoxLayout(m_variableAreas[i]);
-        areaColumn->setContentsMargins(0, 0, 0, 0);
-        areaColumn->setSpacing(0);
-        variables->addWidget(dockPanel(variableTitles[i], m_variableAreas[i], variables));
-        variables->setStretchFactor(i, 1);
-    }
-    addSubTab(QStringLiteral("Variablen"), variables);
+    // (Entscheid des Nutzers 2026-11-16). P14 e3-7: Aufbau in variablespage.h.
+    m_variables = new VariablesPage(m_pages);
+    addSubTab(QStringLiteral("Variablen"), m_variables);
 }
 
 int ChatBotPage::addSubTab(const QString &title, QWidget *page)

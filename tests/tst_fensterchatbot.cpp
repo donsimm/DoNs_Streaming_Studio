@@ -7,6 +7,7 @@
 // und «Chat-Nachrichten ausblenden».
 // P14 e2-14: «Aktionen» links (Suche, Baum, Leiste, Gruppen umbenennen und löschen).
 // P14 e3-5: «Befehle» (Zeilen, Filter, Kästchen, Formular, Prüfmeldung, Löschen, «Öffnen», Testen).
+// P14 e3-7: «Variablen» (Zeilen aus dem Import, Suche, Filter, Wert ändern, Prüfmeldung, Löschen).
 
 #include "actionfields.h"
 #include "actionfieldspanel.h"
@@ -16,6 +17,7 @@
 #include "chatbotpage.h"
 #include "commandspage.h"
 #include "coreclient.h"
+#include "coresession.h"
 #include "listdetailpage.h"
 #include "mainwindow.h"
 #include "prozesshilfe.h"
@@ -25,6 +27,7 @@
 #include "timerspage.h"
 #include "triggertypes.h"
 #include "twitchtestserver.h"
+#include "variablespage.h"
 #include "version.h"
 
 #include <QApplication>
@@ -544,7 +547,7 @@ private slots:
         QStringList variableTitles;
         for (int i = 0; i < 2; ++i) {
             variableTitles << variables->widget(i)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text();
-            QVERIFY(chatBot->variablesArea(i)->isVisible());
+            QVERIFY(variables->widget(i)->isVisible());
         }
         QCOMPARE(variableTitles, QStringList({QStringLiteral("Für alle"), QStringLiteral("Je Zuschauer")}));
 
@@ -1943,6 +1946,174 @@ private slots:
         const std::optional<ChangeResult> removeAction = request(
             {QStringLiteral("action_remove"), QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
         QVERIFY(removeAction && removeAction->ok);
+    }
+
+    // P14 e3-7: «Variablen» mit den Daten aus tests/daten/streamerbot-export (Import im Testkern):
+    // Zeilen, Suche, Filter, Wert in der Zelle ändern, Prüfmeldung, Löschen mit Rückfrage, nachgeführt
+    // nach einem Lauf.
+    void variablesTab()
+    {
+        {
+            CoreSession session(30000);
+            QString error;
+            QVERIFY2(session.open(m_run->filePath(QStringLiteral("kern.sock")), QStringLiteral("tst_fensterchatbot"),
+                                  &error), qPrintable(error));
+            const std::optional<QJsonObject> imported = session.actionsRequest(
+                QString::fromLatin1(msg::kViewerImport),
+                {{QStringLiteral("path"), QStringLiteral(DSS_TEST_EXPORT_DIR)}, {QStringLiteral("dry_run"), false},
+                 {QStringLiteral("overwrite"), false}},
+                QString::fromLatin1(msg::kViewerImportResult), &error);
+            QVERIFY2(imported, qPrintable(error));
+        }
+        auto *chatBot = child<ChatBotPage>("chatBotPage");
+        VariablesPage *page = chatBot->variablesPage();
+        QVERIFY(page);
+        const auto status = [this] { return m_window->statusBar()->currentMessage(); };
+        const auto coreGlobal = [this](const QString &name) {
+            const std::optional<VariablesInfo> info = m_client->variables();
+            return info ? info->persisted.global.value(name).value : QJsonValue();
+        };
+        auto *global = page->findChild<QTreeWidget *>(QStringLiteral("globalVariables"));
+        auto *user = page->findChild<QTreeWidget *>(QStringLiteral("userVariables"));
+        auto *globalProblem = global->parentWidget()->findChildren<QLabel *>(QStringLiteral("fieldProblem")).value(0);
+        auto *globalRemove = page->findChild<QToolButton *>(QStringLiteral("globalVariablesRemove"));
+        auto *userRemove = page->findChild<QToolButton *>(QStringLiteral("userVariablesRemove"));
+        QVERIFY(global && user && globalProblem && globalRemove && userRemove);
+        QCOMPARE(globalProblem->text(), QString()); // Zeile immer da, leer ohne Meldung
+        QCOMPARE(user->parentWidget()->findChildren<QLabel *>(QStringLiteral("fieldProblem")).size(), 1);
+        // Gleicher Tooltip, zugänglicher Name je Bereich
+        QCOMPARE(globalRemove->toolTip(), QStringLiteral("Variable löschen"));
+        QCOMPARE(userRemove->toolTip(), QStringLiteral("Variable löschen"));
+        QCOMPARE(globalRemove->accessibleName(), QStringLiteral("Variable für alle löschen"));
+        QCOMPARE(userRemove->accessibleName(), QStringLiteral("Variable je Zuschauer löschen"));
+
+        // Beim Zeigen holen; die Zuschauer kommen nach den Variablen
+        QTest::mouseClick(child<QToolButton>("chatBotTab4"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(global, 0, QStringLiteral("testZaehler")), 5000);
+        QStringList headers;
+        for (int i = 0; i < global->columnCount(); ++i)
+            headers << global->headerItem()->text(i);
+        QCOMPARE(headers, (QStringList{QStringLiteral("Name"), QStringLiteral("Wert"), QStringLiteral("Dauerhaft"),
+                                       QStringLiteral("Herkunft")}));
+        headers.clear();
+        for (int i = 0; i < user->columnCount(); ++i)
+            headers << user->headerItem()->text(i);
+        QCOMPARE(headers, (QStringList{QStringLiteral("Zuschauer"), QStringLiteral("Variable"), QStringLiteral("Wert"),
+                                       QStringLiteral("Herkunft")}));
+        QTreeWidgetItem *counter = findRow(global, 0, QStringLiteral("testZaehler"));
+        QCOMPARE(counter->text(1), QStringLiteral("42"));
+        QCOMPARE(counter->text(2), QStringLiteral("dauerhaft"));
+        QCOMPARE(counter->text(3), QStringLiteral("Streamer.bot"));
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(user, 0, QStringLiteral("TestZuschauer1")), 5000);
+        QVERIFY(!globalRemove->isEnabled() && !userRemove->isEnabled()); // ohne Auswahl
+
+        // Suche «Für alle» in Name und Wert; Filter «Je Zuschauer» nach Variable
+        auto *search = page->findChild<QLineEdit *>(QStringLiteral("globalVariablesSearch"));
+        QCOMPARE(search->placeholderText(), QStringLiteral("Suchen …"));
+        search->setText(QStringLiteral("hallo"));
+        QCOMPARE(global->topLevelItemCount(), 1);
+        QCOMPARE(global->topLevelItem(0)->text(0), QStringLiteral("testText"));
+        search->clear();
+        auto *filter = page->findChild<QComboBox *>(QStringLiteral("userVariablesFilter"));
+        QCOMPARE(filter->itemText(0), QStringLiteral("Alle Variablen"));
+        QVERIFY(filter->findText(QStringLiteral("firsts")) > 0);
+        filter->setCurrentIndex(filter->findText(QStringLiteral("firsts")));
+        QVERIFY(user->topLevelItemCount() > 0);
+        for (int i = 0; i < user->topLevelItemCount(); ++i)
+            QCOMPARE(user->topLevelItem(i)->text(1), QStringLiteral("firsts"));
+        filter->setCurrentIndex(0);
+        QVERIFY(findRow(user, 1, QStringLiteral("watchtime")));
+
+        // Wert ändern: F2 auf der Zeile öffnet «Wert» → variable_set, «Gespeichert: <Name>»
+        const auto editValue = [&](QTreeWidget *table, QTreeWidgetItem *item, const QString &text) {
+            table->setFocus();
+            table->setCurrentItem(item, 0);
+            QTest::keyClick(table, Qt::Key_F2);
+            // Der Editor steht in «Wert», auch wenn Spalte 0 die aktuelle ist
+            auto *editor = qobject_cast<QLineEdit *>(QApplication::focusWidget());
+            const int valueColumn = table == global ? 1 : 2;
+            if (!editor || editor->x() < table->header()->sectionViewportPosition(valueColumn) - 2) {
+                qWarning("kein Editor in «Wert»");
+                return false;
+            }
+            editor->selectAll();
+            QTest::keyClicks(editor, text);
+            QTest::keyClick(editor, Qt::Key_Return);
+            return true;
+        };
+        counter = findRow(global, 0, QStringLiteral("testZaehler"));
+        QVERIFY(editValue(global, counter, QStringLiteral("43")));
+        QTRY_COMPARE_WITH_TIMEOUT(coreGlobal(QStringLiteral("testZaehler")), QJsonValue(43), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: testZaehler"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(findRow(global, 0, QStringLiteral("testZaehler"))->text(1), QStringLiteral("43"), 3000);
+        QCOMPARE(page->selectedRow(VariablesPage::Global).endsWith(QStringLiteral("/testZaehler")), true);
+
+        // Zahl mit Text: Prüfmeldung unter der Tabelle, die Zelle zeigt wieder den Wert des Kerns
+        QVERIFY(editValue(global, findRow(global, 0, QStringLiteral("testZaehler")), QStringLiteral("drei")));
+        QTRY_COMPARE_WITH_TIMEOUT(globalProblem->text(), QStringLiteral("«drei» ist keine Zahl."), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(findRow(global, 0, QStringLiteral("testZaehler"))->text(1), QStringLiteral("43"), 3000);
+        QCOMPARE(coreGlobal(QStringLiteral("testZaehler")), QJsonValue(43));
+        // Neu gefüllt mit derselben Auswahl: Meldung bleibt; Suche ohne Wechsel der Auswahl auch
+        QCOMPARE(globalProblem->text(), QStringLiteral("«drei» ist keine Zahl."));
+        search->setText(QStringLiteral("testZ"));
+        search->clear();
+        QCOMPARE(globalProblem->text(), QStringLiteral("«drei» ist keine Zahl."));
+
+        // Löschen nur mit Rückfrage: «Abbrechen» lässt die Variable stehen. Andere Zeile: Prüfzeile leer
+        global->setCurrentItem(findRow(global, 0, QStringLiteral("testText")));
+        QCOMPARE(globalProblem->text(), QString());
+        QVERIFY(globalRemove->isEnabled());
+        QString question;
+        answerQuestion(QStringLiteral("Abbrechen"), &question);
+        QTest::mouseClick(globalRemove, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(question, QStringLiteral("Variable «testText» löschen?"), 3000);
+        QTest::qWait(300);
+        QVERIFY(coreGlobal(QStringLiteral("testText")).isString());
+        QVERIFY(findRow(global, 0, QStringLiteral("testText")));
+
+        // Je Zuschauer: Rückfrage mit dem Namen aus VariableRow::viewer, dann variable_remove
+        QTreeWidgetItem *watch = nullptr;
+        for (int i = 0; i < user->topLevelItemCount(); ++i)
+            if (user->topLevelItem(i)->text(0) == QStringLiteral("TestZuschauer1")
+                && user->topLevelItem(i)->text(1) == QStringLiteral("watchtime"))
+                watch = user->topLevelItem(i);
+        QVERIFY(watch);
+        user->setCurrentItem(watch);
+        QVERIFY(userRemove->isEnabled());
+        question.clear();
+        answerQuestion(QStringLiteral("Löschen"), &question);
+        QTest::mouseClick(userRemove, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(question, QStringLiteral("Variable «watchtime» von «TestZuschauer1» löschen?"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gelöscht: watchtime"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!m_client->variables()->persisted.users.value(QStringLiteral("100000001"))
+                                      .contains(QStringLiteral("watchtime")), 3000);
+
+        // Nachgeführt nach einem Lauf (actions.run_finished), solange «Variablen» sichtbar ist
+        actions::Action action;
+        action.id = QUuid::createUuid();
+        action.name = QStringLiteral("DSS-Test Variable setzen");
+        actions::Step set = actions::newStep(QString::fromLatin1(actions::kStepGlobalSet));
+        set.fields.insert(QStringLiteral("name"), QStringLiteral("dsstest_lauf"));
+        set.fields.insert(QStringLiteral("operation"), QStringLiteral("increment"));
+        set.fields.insert(QStringLiteral("value"), QStringLiteral("1"));
+        action.steps = {set};
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(action)}}});
+        QVERIFY2(put && put->ok, put ? qPrintable(put->message) : "keine Antwort");
+        const std::optional<ChangeResult> run = request(
+            {QString::fromLatin1(msg::kActionTest),
+             QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)},
+                         {QStringLiteral("arguments"), QJsonObject()}, {QStringLiteral("dry_run"), false}}});
+        QVERIFY2(run && run->ok, run ? qPrintable(run->message) : "keine Antwort");
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(global, 0, QStringLiteral("dsstest_lauf")), 5000);
+        QCOMPARE(findRow(global, 0, QStringLiteral("dsstest_lauf"))->text(1), QStringLiteral("1"));
+
+        const std::optional<ChangeResult> removeAction = request(
+            {QString::fromLatin1(msg::kActionRemove),
+             QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
+        QVERIFY(removeAction && removeAction->ok);
+        QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.
