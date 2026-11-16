@@ -657,6 +657,8 @@ private slots:
         QCOMPARE(run.log.size(), 1);
         QVERIFY2(run.log.at(0).message.contains(QStringLiteral("Kein Ausgang für «Ton Chat-Bot»")),
                  qPrintable(run.log.at(0).message));
+        // Meldung des Laufs über das Protokoll: die erste Fehlermeldung (Entscheid Nutzer 2026-11-16)
+        QCOMPARE(run.message, run.log.at(0).message);
 
         // Ausgang wählen: der Ersatzausgang
         SettingsUpdate update;
@@ -702,6 +704,7 @@ private slots:
         const RunRecord run = runAction(c, newAction(QStringLiteral("DSS-Test Ton"), {soundStep(file, true)}));
         QCOMPARE(run.state, RunState::Error);
         QCOMPARE(run.log.at(0).message, QStringLiteral("ohne Ton gebaut"));
+        QCOMPARE(run.message, QStringLiteral("ohne Ton gebaut"));
         stop(core);
 #endif
     }

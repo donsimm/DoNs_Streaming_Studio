@@ -543,7 +543,9 @@ QString durationText(qint64 ms)
         return QStringLiteral("%1 min").arg(ms / 60000);
     if (ms % 1000 == 0)
         return QStringLiteral("%1 s").arg(ms / 1000);
-    return QStringLiteral("%1 s").arg(QString::number(double(ms) / 1000.0, 'g', 6));
+    // Schweizer Schreibweise mit Komma, passt zur Eingabe «8,5 s»
+    return QStringLiteral("%1 s").arg(
+        QString::number(double(ms) / 1000.0, 'g', 6).replace(QLatin1Char('.'), QLatin1Char(',')));
 }
 
 // --- «Aktionen», links ---

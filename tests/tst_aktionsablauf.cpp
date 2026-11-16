@@ -372,6 +372,16 @@ private slots:
                               QStringLiteral("nicht verfügbar")}));
         QCOMPARE(messages(r, StepLogEntry::Result::Skipped), QStringList{QStringLiteral("Skript-Schritt nicht verfügbar")});
         QCOMPARE(r.stepsExecuted, 5);
+        // Meldung des Laufs: die erste Fehlermeldung (Entscheid Nutzer 2026-11-16)
+        QCOMPARE(r.message, QStringLiteral("nicht verfügbar"));
+
+        // Erster Fehler mit anderer Meldung als die späteren
+        const QUuid b = env.add(act(QStringLiteral("Fehler 2"), {mk(kStepPlaySound), chat(QStringLiteral("ohne Dienst"))}));
+        QCOMPARE(env.rec(env.run(b)).message, QStringLiteral("keine Datei gewählt"));
+
+        // Ohne Fehler bleibt die Meldung leer
+        Env ok;
+        QCOMPARE(ok.rec(ok.run(ok.add(act(QStringLiteral("Gut"), {chat(QStringLiteral("hallo"))})))).message, QString());
     }
 
     // «zufällig einen» nach Gewicht, nur aktive Schritte (Plan 2.3, 2.4)

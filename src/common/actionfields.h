@@ -53,6 +53,7 @@ struct FieldSection
     QString title;
     QList<FieldRow> rows;
     QList<FieldButton> buttons = {}; // unter den Zeilen
+    QString hint = {};               // Hinweis unter dem Abschnitt (grau), meist leer
 };
 
 // Gespeicherter Wert (aus aktionen.json) in den angezeigten Wert umrechnen, z. B. 8500 ms → 8,5 s.

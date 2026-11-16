@@ -358,6 +358,16 @@ void TestActionFields::triggerLimitsAndChoices()
     QCOMPARE(cheer[0].rows[1].label, QStringLiteral("bis"));
     QCOMPARE(cheer[0].rows[1].suffix, QStringLiteral("Bits"));
     QCOMPARE(cheer[0].rows[0].min, 0.0);
+    // Hinweis unter «Bits» nur bei Cheer (Entscheid Nutzer 2026-11-16)
+    QCOMPARE(cheer[0].title, QStringLiteral("Bits"));
+    QCOMPARE(cheer[0].hint, QStringLiteral("Nur «bis»: genau dieser Wert"));
+    for (const TriggerTypeInfo &t : triggerTypes())
+        for (const FieldSection &s : triggerForm(t.key))
+            if (t.key != QLatin1String("twitch.cheer"))
+                QVERIFY2(s.hint.isEmpty(), qPrintable(t.key));
+    for (const StepTypeInfo &t : stepTypes())
+        for (const FieldSection &s : stepForm(t.key))
+            QVERIFY2(s.hint.isEmpty(), qPrintable(t.key));
     QCOMPARE(triggerForm(QStringLiteral("twitch.raid"))[0].rows[0].suffix, QStringLiteral("Zuschauer"));
     QCOMPARE(triggerForm(QStringLiteral("twitch.gift_bomb"))[1].rows[1].suffix, QStringLiteral("Abos"));
 

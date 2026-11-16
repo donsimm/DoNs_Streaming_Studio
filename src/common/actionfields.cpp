@@ -222,8 +222,12 @@ QList<FieldSection> triggerSectionsFor(const QString &type)
                  {row(QStringLiteral("min_months"), QStringLiteral("ab"), {}, QStringLiteral("Monaten"))}}};
     if (type == QLatin1String(kTriggerGiftBomb))
         return {tiersSection(), countSection(QStringLiteral("Anzahl"), QStringLiteral("Abos"))};
-    if (type == QLatin1String(kTriggerCheer))
-        return {countSection(QStringLiteral("Bits"), QStringLiteral("Bits"))};
+    if (type == QLatin1String(kTriggerCheer)) {
+        // Bei Cheer heisst «nur max» genau dieser Wert (Plan 2.5, triggerdispatcher.cpp)
+        FieldSection bits = countSection(QStringLiteral("Bits"), QStringLiteral("Bits"));
+        bits.hint = QStringLiteral("Nur «bis»: genau dieser Wert");
+        return {bits};
+    }
     if (type == QLatin1String(kTriggerRaid))
         return {countSection(QStringLiteral("Zuschauer"), QStringLiteral("Zuschauer"))};
     // Gleicher Text wie triggerDetail in actionview.cpp
