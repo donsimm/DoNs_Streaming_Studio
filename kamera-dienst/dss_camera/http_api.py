@@ -81,14 +81,17 @@ class Router:
 
 
 class Api:
-    def __init__(self, backend: Backend, fake: bool, controls=None, mover=None, presets=None) -> None:
+    def __init__(self, backend: Backend, fake: bool, controls=None, mover=None, presets=None,
+                 lights=None, light_presets=None) -> None:
         self.backend = backend
         self.fake = fake
-        # controls.ControlManager, motion.Mover und presets.CameraPresets; fehlen ohne Geräte
-        # (Attrappe ohne --geraeteordner).
+        # controls.ControlManager, motion.Mover, presets.CameraPresets, lights.Lights und
+        # lights.LightPresets; fehlen ohne Geräte (Attrappe ohne --geraeteordner).
         self.controls = controls
         self.mover = mover
         self.presets = presets
+        self.lights = lights
+        self.light_presets = light_presets
         self.router = Router()
         self.router.add("GET", "status", self.get_status)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
@@ -105,6 +108,16 @@ class Api:
         self.router.add("DELETE", "camera-presets/{preset}", self.delete_camera_preset)
         self.router.add("POST", "camera-presets/{preset}/save-current", self.post_save_current)
         self.router.add("POST", "camera-presets/{preset}/recall", self.post_recall)
+        self.router.add("PUT", "lights/{light}", self.put_light)
+        self.router.add("POST", "lights", self.post_light)
+        self.router.add("PUT", "lights/{light}/config", self.put_light_config)
+        self.router.add("DELETE", "lights/{light}", self.delete_light)
+        self.router.add("POST", "light-presets", self.post_light_preset)
+        self.router.add("GET", "light-presets/{preset}", self.get_light_preset)
+        self.router.add("PUT", "light-presets/{preset}", self.put_light_preset)
+        self.router.add("DELETE", "light-presets/{preset}", self.delete_light_preset)
+        self.router.add("POST", "light-presets/{preset}/save-current", self.post_light_save_current)
+        self.router.add("POST", "light-presets/{preset}/recall", self.post_light_recall)
 
     def get_status(self, request: Request) -> dict:
         return {
@@ -179,6 +192,48 @@ class Api:
 
     def post_recall(self, request: Request, preset: str) -> dict:
         return self._presets().recall(preset, request.json(optional=True))
+
+    def _lights(self):
+        if self.lights is None:
+            raise ApiError(404, "not_found",
+                           "Lampen gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
+        return self.lights
+
+    def put_light(self, request: Request, light: str) -> dict:
+        return self._lights().set(light, request.json())
+
+    def post_light(self, request: Request) -> dict:
+        return self._lights().create(request.json())
+
+    def put_light_config(self, request: Request, light: str) -> dict:
+        return self._lights().config(light, request.json())
+
+    def delete_light(self, request: Request, light: str) -> dict:
+        return self._lights().delete(light)
+
+    def _light_presets(self):
+        if self.light_presets is None:
+            raise ApiError(404, "not_found",
+                           "Licht-Presets gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
+        return self.light_presets
+
+    def post_light_preset(self, request: Request) -> dict:
+        return self._light_presets().create(request.json())
+
+    def get_light_preset(self, request: Request, preset: str) -> dict:
+        return self._light_presets().get(preset)
+
+    def put_light_preset(self, request: Request, preset: str) -> dict:
+        return self._light_presets().put(preset, request.json())
+
+    def delete_light_preset(self, request: Request, preset: str) -> dict:
+        return self._light_presets().delete(preset)
+
+    def post_light_save_current(self, request: Request, preset: str) -> dict:
+        return self._light_presets().save_current(preset, request.json(optional=True))
+
+    def post_light_recall(self, request: Request, preset: str) -> dict:
+        return self._light_presets().recall(preset, request.json(optional=True))
 
 
 def make_handler(api: Api, allowed_addresses: frozenset[str]):

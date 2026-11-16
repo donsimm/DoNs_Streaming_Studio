@@ -83,31 +83,43 @@ def _check_preset(preset) -> str | None:
     return None
 
 
-def check(data) -> str | None:
+def check(data, list_key: str = "presets", check_item=_check_preset, item: str = "Preset") -> str | None:
     """Fehlermeldung für den Nutzer, None wenn der Inhalt gültig ist."""
     if not isinstance(data, dict):
         return "Inhalt ist kein JSON-Objekt."
     if data.get("format_version") != FORMAT_VERSION:
         return f"«format_version» muss {FORMAT_VERSION} sein."
-    presets = data.get("presets", [])
-    if not isinstance(presets, list):
-        return "«presets» ist keine Liste."
+    entries = data.get(list_key, [])
+    if not isinstance(entries, list):
+        return f"«{list_key}» ist keine Liste."
     seen = set()
-    for index, preset in enumerate(presets, 1):
-        error = _check_preset(preset)
+    for index, entry in enumerate(entries, 1):
+        error = check_item(entry)
         if error is not None:
-            return f"Preset {index}: {error}"
-        if preset["id"] in seen:
-            return f"Kennung «{preset['id']}» kommt mehrfach vor."
-        seen.add(preset["id"])
+            return f"{item} {index}: {error}"
+        if entry["id"] in seen:
+            return f"Kennung «{entry['id']}» kommt mehrfach vor."
+        seen.add(entry["id"])
     return None
 
 
 class PresetStore:
+    """Liste mit Kennungen in einer JSON-Datei; Unterklassen ändern Datei, Liste und Meldungen
+    (`lights.LightStore` für licht.json, `lights.LightPresetStore` für licht-presets.json)."""
+
+    FILE_NAME = FILE_NAME
+    LIST_KEY = "presets"
+    ITEM = "Preset"
+    UNKNOWN = "Unbekanntes Kamera-Preset"
+    LOCKED = "Kamera-Presets sind gesperrt"
+    # Kennungen, die nie vergeben werden (z. B. «all» bei den Lampen).
+    RESERVED: frozenset[str] = frozenset()
+    check_item = staticmethod(_check_preset)
+
     def __init__(self, data_dir: Path) -> None:
-        self.path = data_dir / FILE_NAME
+        self.path = data_dir / self.FILE_NAME
         self._lock = threading.Lock()
-        self._data: dict = {"format_version": FORMAT_VERSION, "presets": []}
+        self._data: dict = {"format_version": FORMAT_VERSION, self.LIST_KEY: []}
         # Meldung, wenn die Datei ungültig ist; dann wird nichts gespeichert.
         self.error: str | None = None
         self._load()
@@ -125,9 +137,9 @@ class PresetStore:
             except json.JSONDecodeError as error:
                 self.error = f"kein gültiges JSON: {error}"
             else:
-                self.error = check(data)
+                self.error = check(data, self.LIST_KEY, self.check_item, self.ITEM)
                 if self.error is None:
-                    data.setdefault("presets", [])
+                    data.setdefault(self.LIST_KEY, [])
                     self._data = data
         if self.error is not None:
             log.error("%s ungültig, wird nicht überschrieben, Änderungen werden abgewiesen: %s",
@@ -136,10 +148,10 @@ class PresetStore:
     def ensure_valid(self) -> None:
         if self.error is not None:
             raise ApiError(409, "file_error", f"{self.path} ist ungültig ({self.error}); "
-                                              "Kamera-Presets sind gesperrt.")
+                                              f"{self.LOCKED}.")
 
     def _find(self, preset_id: str) -> dict | None:
-        return next((p for p in self._data["presets"] if p["id"] == preset_id), None)
+        return next((p for p in self._data[self.LIST_KEY] if p["id"] == preset_id), None)
 
     def _write(self) -> None:
         try:
@@ -147,29 +159,34 @@ class PresetStore:
         except OSError as error:
             log.error("%s nicht gespeichert: %s", self.path, error)
             raise ApiError(409, "file_error",
-                           f"Preset nicht gespeichert: {error.strerror or error}.") from None
+                           f"{self.ITEM} nicht gespeichert: {error.strerror or error}.") from None
 
     def summary(self) -> list[dict]:
         """Für GET status: `id`, `name` (leer bei ungültiger Datei)."""
         with self._lock:
-            return [{"id": p["id"], "name": p["name"]} for p in self._data["presets"]]
+            return [{"id": p["id"], "name": p["name"]} for p in self._data[self.LIST_KEY]]
+
+    def entries(self) -> list[dict]:
+        """Alle Einträge als Kopie (leer bei ungültiger Datei)."""
+        with self._lock:
+            return json.loads(json.dumps(self._data[self.LIST_KEY]))
 
     def get(self, preset_id: str) -> dict:
         self.ensure_valid()
         with self._lock:
             preset = self._find(preset_id)
             if preset is None:
-                raise ApiError(404, "not_found", f"Unbekanntes Kamera-Preset «{preset_id}».")
+                raise ApiError(404, "not_found", f"{self.UNKNOWN} «{preset_id}».")
             return json.loads(json.dumps(preset))
 
     def create(self, fields: dict) -> dict:
         """Neues Preset; die Kennung wird aus dem Namen gebildet."""
         self.ensure_valid()
         with self._lock:
-            taken = {p["id"] for p in self._data["presets"]}
+            taken = {p["id"] for p in self._data[self.LIST_KEY]} | self.RESERVED
             preset = {"id": unique_id(id_from_name(fields["name"]), taken), **fields}
             self._store(preset)
-            self._data["presets"].append(preset)
+            self._data[self.LIST_KEY].append(preset)
             self._write()
             return dict(preset)
 
@@ -179,32 +196,33 @@ class PresetStore:
         with self._lock:
             old = self._find(preset_id)
             if old is None and not create:
-                raise ApiError(404, "not_found", f"Unbekanntes Kamera-Preset «{preset_id}».")
+                raise ApiError(404, "not_found", f"{self.UNKNOWN} «{preset_id}».")
+            if old is None and preset_id in self.RESERVED:
+                raise ApiError(400, "invalid", f"Die Kennung «{preset_id}» ist reserviert.")
             preset = {**(old or {"id": preset_id}), **changes}
             if preset.get("controls") is None:
                 preset.pop("controls", None)
             self._store(preset)
             if old is None:
-                self._data["presets"].append(preset)
+                self._data[self.LIST_KEY].append(preset)
             else:
                 old.clear()
                 old.update(preset)
             self._write()
             return dict(preset)
 
-    @staticmethod
-    def _store(preset: dict) -> None:
-        error = _check_preset(preset)
+    def _store(self, preset: dict) -> None:
+        error = self.check_item(preset)
         if error is not None:
-            raise ApiError(400, "invalid", f"Preset {error}")
+            raise ApiError(400, "invalid", f"{self.ITEM} {error}")
 
     def delete(self, preset_id: str) -> None:
         self.ensure_valid()
         with self._lock:
             preset = self._find(preset_id)
             if preset is None:
-                raise ApiError(404, "not_found", f"Unbekanntes Kamera-Preset «{preset_id}».")
-            self._data["presets"].remove(preset)
+                raise ApiError(404, "not_found", f"{self.UNKNOWN} «{preset_id}».")
+            self._data[self.LIST_KEY].remove(preset)
             self._write()
 
 

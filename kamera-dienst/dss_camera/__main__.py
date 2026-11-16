@@ -18,6 +18,7 @@ from .controls import ControlManager, open_v4l2
 from .devices import DeviceWatcher
 from .fake import FakeBackend, fake_watcher, open_fake_device
 from .http_api import Api, Servers
+from .lights import LightPresets, LightPresetStore, Lights, LightStore
 from .motion import Mover
 from .presets import CameraPresets, PresetStore
 from .store import CameraStore, default_data_dir
@@ -72,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     manager = None
     mover = None
     presets = None
+    lights = None
+    light_presets = None
     if devices is not None:
         # Gemerkte Werte in $XDG_DATA_HOME/dss-kamera/kameras.json (Plan 3).
         store = CameraStore(default_data_dir())
@@ -80,7 +83,13 @@ def main(argv: list[str] | None = None) -> int:
         mover = Mover(manager, store)
         backend.preset_store = PresetStore(default_data_dir())
         presets = CameraPresets(backend.preset_store, mover, manager)
-    api = Api(backend, fake=args.attrappe, controls=manager, mover=mover, presets=presets)
+        # Lampen aus licht.json, Licht-Presets aus licht-presets.json (Plan 2.6, 3).
+        lights = Lights(LightStore(default_data_dir()))
+        backend.light_controller = lights
+        backend.light_preset_store = LightPresetStore(default_data_dir())
+        light_presets = LightPresets(backend.light_preset_store, lights)
+    api = Api(backend, fake=args.attrappe, controls=manager, mover=mover, presets=presets,
+              lights=lights, light_presets=light_presets)
     try:
         servers = Servers(api, settings.listen_addresses, settings.port, settings.allowed_addresses)
     except OSError as error:
@@ -91,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     if devices is not None:
         devices.start()
         mover.start()
+        lights.start()
 
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
@@ -104,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         pass
     servers.close()
     if devices is not None:
+        lights.close()
         mover.close()
         devices.close()
     os.close(lock_fd)

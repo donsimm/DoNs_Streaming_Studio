@@ -37,3 +37,9 @@ set_tests_properties(kd_bewegen PROPERTIES TIMEOUT 120)
 add_test(NAME kd_presets
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_presets.py)
 set_tests_properties(kd_presets PROPERTIES TIMEOUT 120)
+
+# Licht: Ein/Aus, Helligkeit, Temperatur, Begrenzung, stiller Fehler, Zeitüberschreitung,
+# Content-Length, Nachführen alle 5 s, Licht-Presets (Attrappen-Lampen auf 127.0.0.1, über HTTP).
+add_test(NAME kd_licht
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_licht.py)
+set_tests_properties(kd_licht PROPERTIES TIMEOUT 120)

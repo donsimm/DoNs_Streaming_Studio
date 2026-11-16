@@ -7,8 +7,11 @@ liefert es leere Listen; die Attrappe (`fake.py`) f체llt sie mit erfundenen Ger�
 
 
 class Backend:
-    # presets.PresetStore; gesetzt, sobald es Ger채te gibt (__main__).
+    # presets.PresetStore, lights.Lights und lights.LightPresetStore; gesetzt, sobald es
+    # Ger채te gibt (__main__).
     preset_store = None
+    light_controller = None
+    light_preset_store = None
 
     # Eintr채ge je Kamera: id, name, model, present, state, ptz.
     # state: awake, asleep, privacy, absent, unknown.
@@ -17,18 +20,18 @@ class Backend:
 
     # Eintr채ge je Lampe: id, name, reachable, on, brightness, temperature.
     def lights(self) -> list[dict]:
-        return []
+        return [] if self.light_controller is None else self.light_controller.status()
 
     # Eintr채ge je Preset: id, name.
     def camera_presets(self) -> list[dict]:
         return [] if self.preset_store is None else self.preset_store.summary()
 
     def light_presets(self) -> list[dict]:
-        return []
+        return [] if self.light_preset_store is None else self.light_preset_store.summary()
 
 
 class DeviceBackend(Backend):
-    """Kameras aus der Suche in `/dev/v4l/by-id` (`devices.py`); Lampen folgen."""
+    """Kameras aus der Suche in `/dev/v4l/by-id` (`devices.py`), Lampen aus `licht.json`."""
 
     def __init__(self, devices) -> None:
         self.devices = devices

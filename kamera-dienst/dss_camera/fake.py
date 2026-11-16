@@ -16,16 +16,21 @@ Ein- und Ausstecken: Verweis in `by-id` anlegen bzw. löschen.
 
 Die Tiny 2 im Ordner hat zusätzlich die Erweiterungseinheit (Statusblock, Wecken,
 Schlafen, HDR) und ihr Verhalten aus Schritt 0 (`FakeDevice`, `tiny2_state`).
+
+Mit Attrappen-Ordner kommen die Lampen aus `licht.json`; in Tests zeigen sie auf
+Attrappen-Lampen (`FakeLight`, HTTP-Server auf 127.0.0.1).
 """
 
 import errno
 import json
 import os
 import struct
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import obsbot, uvc_xu, v4l2
@@ -57,6 +62,9 @@ class FakeBackend(Backend):
         return [dict(camera) for camera in self._cameras]
 
     def lights(self) -> list[dict]:
+        # Mit Attrappen-Ordner die Lampen aus licht.json (in Tests Attrappen-Lampen, `FakeLight`).
+        if self.light_controller is not None:
+            return self.light_controller.status()
         return [dict(light) for light in self._lights]
 
     def camera_presets(self) -> list[dict]:
@@ -66,6 +74,8 @@ class FakeBackend(Backend):
         return [dict(preset) for preset in self._camera_presets]
 
     def light_presets(self) -> list[dict]:
+        if self.light_preset_store is not None:
+            return self.light_preset_store.summary()
         return [dict(preset) for preset in self._light_presets]
 
 
@@ -396,3 +406,94 @@ TINY2_BY_ID = "usb-Remo_Tech_Co.__Ltd._OBSBOT_Tiny_2-video-index0"
 C922_BY_ID = "usb-046d_C922_Pro_Stream_Webcam_SERIE0001-video-index0"
 TINY2_ID = "aaaa:0001"
 C922_ID = "bbbb:0002:SERIE0001"
+
+
+class FakeLight:
+    """Elgato Key Light als HTTP-Server auf 127.0.0.1 (freier Port), Verhalten laut Plan 2.6:
+
+    - Werte ausserhalb des Bereichs: `200 OK`, der Wert bleibt (stiller Fehler).
+    - `hang_s` > 0: Antwort erst nach dieser Zeit (Zeitüberschreitung beim Dienst).
+    - `Content-Length` fehlt oder passt nicht zum Inhalt: `400` (`bad_requests` zählt mit).
+    """
+
+    def __init__(self, on: bool = False, brightness: int = 20, temperature: int = 200,
+                 brightness_range: tuple[int, int] = (3, 100),
+                 temperature_range: tuple[int, int] = (143, 344)) -> None:
+        self.state = {"on": int(on), "brightness": brightness, "temperature": temperature}
+        self.ranges = {"brightness": brightness_range, "temperature": temperature_range}
+        self.hang_s = 0.0
+        self.bad_requests = 0
+        # Gesendete Werte je PUT, in der Reihenfolge des Eingangs.
+        self.puts: list[dict] = []
+        self.gets = 0
+        self._lock = threading.Lock()
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
+        self._server.daemon_threads = True
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    @property
+    def host(self) -> str:
+        return f"127.0.0.1:{self._server.server_address[1]}"
+
+    def close(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+    def _body(self) -> bytes:
+        with self._lock:
+            return json.dumps({"numberOfLights": 1, "lights": [dict(self.state)]}).encode("utf-8")
+
+    def _handler(self):
+        light = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args) -> None:
+                pass
+
+            def _reply(self, status: int, data: bytes) -> None:
+                if light.hang_s > 0:
+                    time.sleep(light.hang_s)
+                try:
+                    self.send_response(status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                except OSError:
+                    pass  # Absender hat wegen Zeitüberschreitung schon aufgegeben
+
+            def do_GET(self) -> None:
+                if self.path != "/elgato/lights":
+                    self._reply(404, b"")
+                    return
+                with light._lock:
+                    light.gets += 1
+                self._reply(200, light._body())
+
+            def do_PUT(self) -> None:
+                length = self.headers.get("Content-Length")
+                values = None
+                if length is not None and length.isdigit():
+                    self.connection.settimeout(0.5)
+                    try:
+                        values = json.loads(self.rfile.read(int(length)).decode("utf-8"))["lights"][0]
+                    except (OSError, ValueError, KeyError, IndexError, TypeError):
+                        values = None
+                if self.path != "/elgato/lights" or not isinstance(values, dict):
+                    with light._lock:
+                        light.bad_requests += 1
+                    self._reply(400, b"")
+                    return
+                with light._lock:
+                    light.puts.append(dict(values))
+                    for key, value in values.items():
+                        if key == "on":
+                            light.state["on"] = 1 if value else 0
+                        elif key in light.ranges:
+                            low, high = light.ranges[key]
+                            if isinstance(value, int) and low <= value <= high:
+                                light.state[key] = value
+                self._reply(200, light._body())
+
+        return Handler
