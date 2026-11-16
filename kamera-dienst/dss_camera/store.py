@@ -6,7 +6,8 @@ Aufbau (`format_version` 1):
      "cameras": {"<kennung>": {"controls": {"power_line_frequency": 1}}}}
 
 Unter `controls` stehen nur die Bildwerte, die der Nutzer verstellt hat (Plan 2.5).
-Weitere Felder je Kamera (Name, Grenzen, … ab Abschnitt b) bleiben beim Speichern
+Unter `motion` stehen die Einstellungen zum Bewegen (Grenzen, Richtung, Tempo,
+Schrittweite, Mitte; `motion.DEFAULTS`). Weitere Felder je Kamera bleiben beim Speichern
 erhalten. Geschrieben wird atomar (temporäre Datei, dann `os.replace`). Eine ungültige
 Datei wird gemeldet und nie überschrieben; Änderungen werden dann abgewiesen.
 """
@@ -17,6 +18,8 @@ import os
 import tempfile
 import threading
 from pathlib import Path
+
+from .motion import check_settings
 
 FORMAT_VERSION = 1
 FILE_NAME = "kameras.json"
@@ -62,6 +65,10 @@ def _check(data) -> str | None:
         for key, value in controls.items():
             if not isinstance(value, (int, bool)):
                 return f"Wert «{key}» der Kamera «{camera_id}» ist keine Zahl."
+        if "motion" in entry:
+            error = check_settings(entry["motion"])
+            if error is not None:
+                return f"«motion» der Kamera «{camera_id}»: {error}"
     return None
 
 
@@ -99,6 +106,26 @@ class CameraStore:
         with self._lock:
             entry = self._data["cameras"].get(camera_id, {})
             return dict(entry.get("controls", {}))
+
+    def motion(self, camera_id: str) -> dict:
+        """Einstellungen zum Bewegen (`motion.DEFAULTS`); nur die gesetzten."""
+        with self._lock:
+            entry = self._data["cameras"].get(camera_id, {})
+            return dict(entry.get("motion", {}))
+
+    def update_motion(self, camera_id: str, changes: dict) -> None:
+        """Einstellungen zum Bewegen ändern (None = Standard) und speichern."""
+        error = check_settings({key: value for key, value in changes.items() if value is not None})
+        if self.error is not None or error is not None:
+            raise ValueError(self.error or error)
+        with self._lock:
+            settings = self._data["cameras"].setdefault(camera_id, {}).setdefault("motion", {})
+            for key, value in changes.items():
+                if value is None:
+                    settings.pop(key, None)
+                else:
+                    settings[key] = value
+            write_atomic(self.path, self._data)
 
     def update_controls(self, camera_id: str, changes: dict[str, int | bool | None]) -> None:
         """Merkt Werte (None = vergessen) und speichert; nur bei gültiger Datei aufrufen."""

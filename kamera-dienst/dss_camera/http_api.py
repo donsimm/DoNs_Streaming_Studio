@@ -41,12 +41,17 @@ class Request:
         self.path = path
         self._handler = handler
 
-    def json(self):
-        """Liest den Inhalt als JSON-Objekt; Fehler werden zu `400 invalid`."""
+    def json(self, optional: bool = False):
+        """Liest den Inhalt als JSON-Objekt; Fehler werden zu `400 invalid`.
+
+        Mit `optional` gilt eine Anfrage ohne Inhalt als `{}` (z. B. POST stop).
+        """
         length_text = self._handler.headers.get("Content-Length", "0")
         if not length_text.isdigit():
             raise ApiError(400, "invalid", "Content-Length ungültig.")
         length = int(length_text)
+        if optional and length == 0:
+            return {}
         if length > MAX_BODY_BYTES:
             raise ApiError(400, "invalid", f"Anfrage zu gross, höchstens {MAX_BODY_BYTES} Byte.")
         try:
@@ -76,17 +81,22 @@ class Router:
 
 
 class Api:
-    def __init__(self, backend: Backend, fake: bool, controls=None) -> None:
+    def __init__(self, backend: Backend, fake: bool, controls=None, mover=None) -> None:
         self.backend = backend
         self.fake = fake
-        # controls.ControlManager; fehlt ohne Geräte (Attrappe ohne --geraeteordner).
+        # controls.ControlManager und motion.Mover; fehlen ohne Geräte (Attrappe ohne --geraeteordner).
         self.controls = controls
+        self.mover = mover
         self.router = Router()
         self.router.add("GET", "status", self.get_status)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
         self.router.add("PUT", "cameras/{cam}/controls", self.put_controls)
         self.router.add("POST", "cameras/{cam}/wake", self.post_wake)
         self.router.add("POST", "cameras/{cam}/sleep", self.post_sleep)
+        self.router.add("POST", "cameras/{cam}/move", self.post_move)
+        self.router.add("POST", "cameras/{cam}/stop", self.post_stop)
+        self.router.add("POST", "cameras/{cam}/step", self.post_step)
+        self.router.add("POST", "cameras/{cam}/home", self.post_home)
 
     def get_status(self, request: Request) -> dict:
         return {
@@ -117,6 +127,26 @@ class Api:
 
     def post_sleep(self, request: Request, cam: str) -> dict:
         return {"state": self._control_manager().send_to_sleep(cam)}
+
+    def _mover(self):
+        if self.mover is None:
+            raise ApiError(404, "not_found",
+                           "Bewegen gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
+        return self.mover
+
+    def post_move(self, request: Request, cam: str) -> dict:
+        return self._mover().move(cam, request.json())
+
+    def post_stop(self, request: Request, cam: str) -> dict:
+        mover = self._mover()
+        request.json(optional=True)
+        return mover.stop(cam)
+
+    def post_step(self, request: Request, cam: str) -> dict:
+        return self._mover().step(cam, request.json())
+
+    def post_home(self, request: Request, cam: str) -> dict:
+        return self._mover().home(cam, request.json(optional=True))
 
 
 def make_handler(api: Api, allowed_addresses: frozenset[str]):

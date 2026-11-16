@@ -18,6 +18,7 @@ from .controls import ControlManager, open_v4l2
 from .devices import DeviceWatcher
 from .fake import FakeBackend, fake_watcher, open_fake_device
 from .http_api import Api, Servers
+from .motion import Mover
 from .store import CameraStore, default_data_dir
 
 EXIT_CONFIG = 1
@@ -68,11 +69,14 @@ def main(argv: list[str] | None = None) -> int:
         devices = DeviceWatcher()
         backend = DeviceBackend(devices)
     manager = None
+    mover = None
     if devices is not None:
         # Gemerkte Werte in $XDG_DATA_HOME/dss-kamera/kameras.json (Plan 3).
-        manager = ControlManager(devices, CameraStore(default_data_dir()), open_device)
+        store = CameraStore(default_data_dir())
+        manager = ControlManager(devices, store, open_device)
         devices.add_listener(manager.restore_pending)
-    api = Api(backend, fake=args.attrappe, controls=manager)
+        mover = Mover(manager, store)
+    api = Api(backend, fake=args.attrappe, controls=manager, mover=mover)
     try:
         servers = Servers(api, settings.listen_addresses, settings.port, settings.allowed_addresses)
     except OSError as error:
@@ -82,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_LISTEN
     if devices is not None:
         devices.start()
+        mover.start()
 
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
@@ -95,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         pass
     servers.close()
     if devices is not None:
+        mover.close()
         devices.close()
     os.close(lock_fd)
     log.info("Kamera-Dienst beendet.")

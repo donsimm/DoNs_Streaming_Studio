@@ -56,6 +56,11 @@ POLL_S = 0.1
 # Zustand für GET status höchstens alle 5 s lesen (Suche läuft jede Sekunde).
 STATE_INTERVAL_S = 5.0
 
+# KI-Modus «keine Verfolgung» vor Bewegung (Plan 2.3 Regel 4): in Schritt 0 nicht bestätigt,
+# darum gesperrt; erst nach Bestätigung am Gerät auf True setzen.
+AI_OFF_UNLOCKED = False
+AI_OFF_COMMAND = (0x16, 0x02, 0x00, 0x00)
+
 KEY_HDR = "obsbot_hdr"
 KEY_STATE = "obsbot_state"
 KEY_AUTO_SLEEP = "obsbot_auto_sleep"
@@ -147,6 +152,7 @@ class Obsbot:
         self._ready_at: dict[str, float] = {}
         self._last_run: dict[str, int] = {}
         self._last_read: dict[str, float] = {}
+        self._ai_noted: set[str] = set()
 
     def read_block(self, device, camera_id: str) -> bytes:
         block = device.xu_get(SELECTOR_COMMAND, XU_LENGTH)
@@ -219,6 +225,16 @@ class Obsbot:
         elif run != RUN_AWAKE:
             raise ApiError(409, "camera_asleep", f"Zustand der Kamera unbekannt ({run}), keine Bewegung.")
         self.wait_ready(camera_id)
+
+    def tracking_off(self, device, camera_id: str) -> bool:
+        """KI-Verfolgung aus vor einer Bewegung (Regel 4); False, solange der Befehl gesperrt ist."""
+        if not AI_OFF_UNLOCKED:
+            if camera_id not in self._ai_noted:
+                self._ai_noted.add(camera_id)
+                log.info("%s: KI-Modus «keine» ist gesperrt (nicht bestätigt), nicht gesendet.", camera_id)
+            return False
+        device.xu_set(SELECTOR_COMMAND, command(*AI_OFF_COMMAND))
+        return True
 
     def set_hdr(self, device, camera_id: str, raw: int) -> bool:
         """Setzt HDR und liest zurück (Status 0x06); nur im Zustand 1."""

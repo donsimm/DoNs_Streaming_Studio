@@ -360,6 +360,16 @@ class FakeDeviceFolder:
         data["obsbot"].update(fields)
         path.write_text(json.dumps(data), encoding="utf-8")
 
+    def fail(self, node: str, failure: str | None) -> None:
+        """Knoten unerreichbar machen (z. B. `"EPROTO"`, `"ETIMEDOUT"`) oder mit None wieder heilen."""
+        path = self.dev / node
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if failure:
+            data["fehler"] = failure
+        else:
+            data.pop("fehler", None)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
     def unplug(self, by_id_name: str) -> None:
         (self.by_id / by_id_name).unlink(missing_ok=True)
 

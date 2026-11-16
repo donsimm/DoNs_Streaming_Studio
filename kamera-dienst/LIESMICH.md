@@ -45,6 +45,15 @@ Der Dienst sucht die Kameras jede Sekunde in `/dev/v4l/by-id` (Meta-Knoten zähl
 
 Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR (setzbar, nur wenn die Kamera wach ist, wird gemerkt), Zustand und «Automatisch schlafen nach» (nur lesbar, `readonly: true`). Bildwinkel und KI-Modus bietet der Dienst nicht an (nicht bestätigt). `POST /api/v1/cameras/{cam}/wake` weckt die Kamera und wartet, bis sie wach ist (höchstens 10 s), `…/sleep` legt sie schlafen. Bewegungsbefehle gehen nur an die wache Kamera und frühestens 4,5 s nach dem Wecken. Der Zustand in `status` (`awake`, `asleep`, `privacy`) wird höchstens alle 5 s gelesen.
 
+## Bewegen
+
+- `POST /api/v1/cameras/{cam}/move` mit `{"pan": -1…1, "tilt": -1…1, "zoom": -1…1, "speed": 1…100}`: Dauerbewegung (`pan` +1 = Bild nach rechts, `tilt` +1 = nach oben, `zoom` +1 = hinein). Die Anfrage muss alle 200 ms wiederholt werden; fehlt sie 500 ms, hält der Dienst an.
+- `…/stop` hält an, `…/step` mit `{"pan": -1/0/1, …}` macht einen Schritt (Standard 2°, Zoom 10 % des Bereichs), `…/home` fährt in die Mitte (Zoom bleibt).
+- Ist die Tiny 2 im Schlaf, kommt `409 camera_asleep`; mit `"wake": true` weckt der Dienst sie vorher.
+- Jeder Zielwert bleibt in den Grenzen: Tiny 2 Neigen unten −66° (nie unter −75°, bei −76° schläft sie ein), C922 ±10°.
+- Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach; Wiederholungen werden abgewiesen, bis `stop` kommt oder sie 500 ms ausbleiben.
+- Einstellungen je Kamera in `kameras.json` unter `motion`: Grenzen (`pan_min`, `pan_max`, `tilt_min`, `tilt_max` in Grad), `invert_pan`/`invert_tilt`/`invert_zoom`, `step_deg`, `zoom_step_percent`, `home_pan`, `home_tilt`, `speed`, `auto_wake`, `ai_off_before_move`.
+
 ## Installation
 
 Folgt mit Abschnitt c (`installieren.sh`, `system-einrichten.sh`).

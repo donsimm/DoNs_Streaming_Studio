@@ -25,3 +25,9 @@ set_tests_properties(kd_werte PROPERTIES TIMEOUT 120)
 add_test(NAME kd_obsbot
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obsbot.py $<TARGET_FILE:kamera_ioctl_werte>)
 set_tests_properties(kd_obsbot PROPERTIES TIMEOUT 120)
+
+# Bewegen: Grenzen bei Dauerbewegung, Totmann, Wecken vor Bewegung, KI-Befehl gesperrt,
+# Abbruch ohne Nachsenden, step, home, Richtung umkehren (ersetzbare Uhr und über HTTP).
+add_test(NAME kd_bewegen
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_bewegen.py)
+set_tests_properties(kd_bewegen PROPERTIES TIMEOUT 120)
