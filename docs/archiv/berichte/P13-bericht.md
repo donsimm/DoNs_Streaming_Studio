@@ -1,6 +1,27 @@
 # P13 – Bericht Twitch-Anbindung mit Ereignisfluss (Punkt 92)
 
-Stand: 2026-11-15, nach Commit 10 (Dokumente). Plan: `docs/archiv/prompts/P13-twitch.md`. Schritt 0: `docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md`. Ausgeführt auf `lotse/p13` in parallelen Spuren neben P14 und P15. Jeder Commit ist in Stufe «Klein» geprüft (Bau und die Tests des Commits). **Prüfstufe «Baustein» und Handtest stehen aus** (folgen durch Lotse).
+Stand: 2026-11-16, Handtest bis auf L3 bestanden (Lotse). Plan: `docs/archiv/prompts/P13-twitch.md`. Schritt 0: `docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md`. Ausgeführt auf `lotse/p13` in parallelen Spuren neben P14 und P15. Jeder Commit ist in Stufe «Klein» geprüft (Bau und die Tests des Commits). Prüfstufe «Baustein» bestanden (unten). **Offen nur L3 Dauerlauf** (läuft).
+
+## Handtest-Ergebnis (2026-11-16)
+
+Kern als `dss-core-entwicklung.service` vorübergehend aus dem Stand `lotse/p14-a` (enthält P13), Fenster `dss-app` aus demselben Stand mit eigenem `XDG_CONFIG_HOME`. Echte Twitch-App und echte Konten des Nutzers.
+
+| Prüfung | Wer | Ergebnis |
+|---|---|---|
+| N1 App registrieren | Nutzer | **bestanden.** App «vertraulich» (Client Type «Confidential»), Kategorie «Broadcaster Suite». Client-ID ausserhalb des Repos abgelegt. |
+| N2 Anmelden, beide Konten | Nutzer | **bestanden.** Kanal und Bot angemeldet. Punkt 116 geklärt: Das Client Secret beim Tausch des Gerätecodes stört nicht. |
+| N3 Ereignisse auslösen | Nutzer, Lotse | **bestanden** für Chat-Nachrichten (Kanal und Bot, siehe L2). Follow, Sub, Raid und Cheer nicht geprüft (nur im Stream, bei Gelegenheit, Punkt 120). |
+| N4 Abmelden und Freigabe entziehen | – | **entfallen** (Entscheid Nutzer 2026-11-16): durch `tst_twitchanmeldung` und `tst_kerntwitch` abgedeckt. |
+| L1 Bildschirmfotos | Lotse | **bestanden.** Zustände des Bereichs «Twitch» und Liste «Ereignisse» fotografiert (nur Scratchpad). Befund: Breite des Dialogs springt (unten). |
+| L2 Ereignisse aus dem echten Chat | Lotse | **bestanden.** `twitch.chat_message` mit `role` 4 (Kanal) und 3 (Bot), `is_bot_account: true` beim Bot, `twitch.first_message` je Konto genau einmal. `obs.scene_changed` nicht geprüft (Entwicklungskern ohne OBS-Verbindung). |
+| L3 Dauerlauf | Lotse | **läuft** seit 2026-11-16 08:21. Bis 08:57: Kanal verbunden, EventSub 10 von 10 Abos, kein Token im Protokoll (Suche nach langen Zeichenketten: 0). Erneuerung nach ≈ 4 h und stündliche Prüfung folgen. Auffällig: «Chat-Bot aus» (keine Aktionen); ob das Bot-Token dann erneuert wird, ist nicht geprüft. |
+| L4 Neustart | Lotse | **bestanden.** Nach `systemctl --user restart dss-core-entwicklung.service` beide Anmeldungen erhalten, keine neue Anmeldung, Abos wieder aktiv (letzter Neustart im Protokoll: 08:21:30 gestartet, 08:21:31 10 von 10 Abos aktiv). |
+
+**Befunde aus dem Handtest:**
+- Dialog «Einstellungen», Bereich «Twitch»: Die Breite ändert sich zwischen den Zuständen «Code angezeigt» und «angemeldet», das Layout springt. Gehört zu `ui-consistency` (Entscheid Nutzer, sichtbar).
+- `scripts/twitch-einrichten.sh` schlägt die Kategorie «Application Integration» vor, registriert wurde mit «Broadcaster Suite» (Anleitung von Lotse). Text im Skript angleichen (Punkt 115).
+- Fenster warnt «unbekannte Nachricht actions_config/actions_status»: kommt aus P14 (Kern schon mit Aktionen, Fenster ohne Editor e2/e3), erledigt sich mit e2/e3.
+- Bei der Installation: Client-ID, ein neues Client Secret, Kanal und Bot nochmals anmelden; die Einstellungen der Version im Einsatz sind getrennt von der Entwicklung (Nutzer informiert).
 
 ## Ablauf
 
@@ -115,11 +136,11 @@ Mit Kern und Fenster aus `build/`, eigenem `XDG_CONFIG_HOME` für `dss-app`, ohn
 
 ## Nicht erledigt, `[OFFEN]`
 
-- Handtest (oben).
+- Handtest: nur noch L3 (oben, «Handtest-Ergebnis»).
 - Punkt 113: Restzeit des Codes nach Ablauf läuft nur nach der Uhr des PCs, bis der Kern `login_pending` entfernt.
 - Punkt 114: Client-ID im Skript nur Kleinbuchstaben und Ziffern, im Kern auch Grossbuchstaben; angleichen?
 - Punkt 115: Kategorie («z. B. Application Integration») und «Client Type» bei der Registrierung nicht belegt.
-- Punkt 116: Client Secret beim Tausch des Gerätecodes nicht belegt.
+- ~~Punkt 116~~: geklärt im Handtest N2 (Secret beim Tausch stört nicht).
 - Punkt 117: Erneuern beim Gerätefluss, Doku widersprüchlich (L3).
 - Punkt 118: Abzeichen «Chat Bot», Seite der Doku 404; sichtbar erst beim Senden mit P14.
 - Punkt 119: Argumentnamen «eigener Name» nicht bei Streamer.bot belegt.
