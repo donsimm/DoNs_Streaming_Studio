@@ -489,12 +489,12 @@ private slots:
         QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
         QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer50"));
         QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer249"));
-        QCOMPARE(rows.append(history.first()), 1);
+        QCOMPARE(rows.add(history.first()), (RowsAppend{true, 1}));
         QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
         QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer51"));
         QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer0"));
         rows.reset({});
-        QCOMPARE(rows.append(history.first()), 0);
+        QCOMPARE(rows.add(history.first()), (RowsAppend{true, 0}));
         QCOMPARE(rows.rows().size(), 1);
         QCOMPARE(eventsDroppedText(5), QStringLiteral("5 Ereignisse nicht angezeigt: Das Fenster kam nicht nach."));
 

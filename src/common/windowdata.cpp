@@ -546,15 +546,6 @@ QList<EventRow> EventRows::visibleRows() const
     return result;
 }
 
-int EventRows::append(const events::Event &event)
-{
-    m_rows.append(eventRow(event));
-    if (m_rows.size() <= kMaxRows)
-        return 0;
-    m_rows.removeFirst();
-    return 1;
-}
-
 QString eventsDroppedText(qint64 count)
 {
     return QStringLiteral("%1 Ereignisse nicht angezeigt: Das Fenster kam nicht nach.").arg(count);

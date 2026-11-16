@@ -64,7 +64,8 @@ QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
     return w;
 }
 
-QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, QWidget *parent)
+QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, QWidget *parent,
+                   QWidget *stretchWidget)
 {
     auto *bar = new QWidget(parent);
     bar->setObjectName(QStringLiteral("dockButtons"));
@@ -74,9 +75,10 @@ QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, 
     row->setSpacing(6);
     for (QWidget *w : left) {
         w->setParent(bar);
-        row->addWidget(w);
+        row->addWidget(w, w == stretchWidget ? 1 : 0);
     }
-    row->addStretch(1);
+    if (!stretchWidget)
+        row->addStretch(1);
     for (QWidget *w : right) {
         w->setParent(bar);
         row->addWidget(w);

@@ -27,8 +27,10 @@ QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
                  const QList<QToolButton *> &titleButtons = {});
 
 // Knopfleiste unter einer Liste (#dockButtons): left linksbündig, right nach einer Dehnung
-// rechtsbündig.
-QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, QWidget *parent);
+// rechtsbündig. Ist stretchWidget gesetzt (ein Element aus left), nimmt es den freien Platz
+// statt der Dehnung.
+QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, QWidget *parent,
+                   QWidget *stretchWidget = nullptr);
 
 // Liste mit einer Knopfleiste (buttonBar) darunter.
 QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent);

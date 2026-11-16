@@ -506,11 +506,18 @@ void MainWindow::connectChatBot()
     connect(m_client, &dss::CoreClient::connectedChanged, this, &MainWindow::refreshChatBotHeader);
     connect(m_client, &dss::CoreClient::eventHistoryReceived, this, [this](const QList<dss::events::Event> &events) {
         m_eventRows.reset(events);
-        m_chatBot->resetEvents(m_eventRows.rows());
+        m_chatBot->resetEvents(m_eventRows.visibleRows());
+        m_chatRows.reset(events, m_client->twitchStatus());
+        m_chatBot->resetChat(m_chatRows.rows());
     });
     connect(m_client, &dss::CoreClient::eventReceived, this, [this](const dss::events::Event &event) {
-        // P14 e2-12: Meldungen der Läufe (actions.run_*) nur in «Läufe der Aktionen»
+        // P14 e2-12: Meldungen der Läufe (actions.run_*) nur in «Läufe der Aktionen»; ein gestarteter
+        // Lauf bekommt dazu eine graue Zeile im «Chat» (e2-13).
         if (event.type.startsWith(QLatin1String("actions."))) {
+            if (event.type == QLatin1String("actions.run_started")) {
+                const dss::RowsAppend chat = m_chatRows.add(event, m_client->twitchStatus());
+                m_chatBot->appendChat(chat, chat.appended ? m_chatRows.rows().last() : dss::ChatRow());
+            }
             dss::actions::RunRecord record;
             QString error;
             if (!dss::runFromJson(event.data, &record, &error)) {
@@ -521,8 +528,11 @@ void MainWindow::connectChatBot()
             m_chatBot->applyRun(change, change.index >= 0 ? m_runRows.row(record.runId) : nullptr);
             return;
         }
-        const int removed = m_eventRows.append(event);
-        m_chatBot->appendEvent(m_eventRows.rows().last(), removed);
+        // P14 e2-13: jedes Ereignis in «Chat» und «Ereignisse», sofern der Typ dort eine Zeile hat
+        const dss::RowsAppend chat = m_chatRows.add(event, m_client->twitchStatus());
+        m_chatBot->appendChat(chat, chat.appended ? m_chatRows.rows().last() : dss::ChatRow());
+        const dss::RowsAppend row = m_eventRows.add(event);
+        m_chatBot->appendEvent(row, row.appended ? m_eventRows.rows().last() : dss::EventRow());
     });
     connect(m_client, &dss::CoreClient::eventsDropped, this,
             [this](qint64 count) { showStatus(dss::eventsDroppedText(count)); });
@@ -560,8 +570,39 @@ void MainWindow::connectChatBot()
     // [OFFEN] e2-14: die Aktion im Unterreiter «Aktionen» auch wählen; bis dahin nur der Wechsel.
     connect(m_chatBot, &ChatBotPage::openActionClicked, this,
             [this](const QUuid &) { m_chatBot->setCurrentSubTab(ChatBotPage::Actions); });
-    // Bis e2-13 ohne die Chat-Nachrichten (chatBotLiveFilters), nur zusätzlich die Läufe
-    m_client->subscribeEvents(dss::chatBotEventFilters() + QStringList{QStringLiteral("actions.")});
+    // P14 e2-13: «Chat-Nachrichten ausblenden» füllt nur die Liste «Ereignisse» neu.
+    connect(m_chatBot, &ChatBotPage::hideChatToggled, this, [this](bool hideChat) {
+        m_eventRows.setHideChat(hideChat);
+        m_chatBot->resetEvents(m_eventRows.visibleRows());
+    });
+    // Senden: Prüfung wie im Kern (chatSendEdit), ein Grund in die Statuszeile; Ablehnungen des
+    // Kerns zeigt onChangeFinished. Der Text bleibt bis zur Bestätigung stehen.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshChatSend);
+    connect(m_chatBot, &ChatBotPage::chatInputChanged, this, &MainWindow::refreshChatSend);
+    connect(m_chatBot, &ChatBotPage::chatSendClicked, this, [this](const QString &text, const QString &account) {
+        const dss::EditResult result = dss::chatSendEdit(text, account, m_client->actionsStatus());
+        if (!result.problem.isEmpty()) {
+            showStatus(result.problem);
+            return;
+        }
+        for (const dss::ActionsEdit &edit : result.edits)
+            m_chatSendRequest = m_client->sendActionsEdit(edit);
+    });
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_chatSendRequest == 0 || result.requestId != m_chatSendRequest)
+            return;
+        m_chatSendRequest = 0;
+        if (result.ok)
+            m_chatBot->clearChatText();
+    });
+    refreshChatSend();
+    m_client->subscribeEvents(dss::chatBotLiveFilters());
+}
+
+void MainWindow::refreshChatSend()
+{
+    m_chatBot->setChatSend(dss::chatSendView(m_chatBot->chatText(), m_chatBot->chatAccount(),
+                                             m_client->actionsStatus()));
 }
 
 void MainWindow::requestActionRuns()

@@ -100,6 +100,7 @@ private:
     void refreshChatBotHeader();
     void connectChatBot();
     void requestActionRuns();
+    void refreshChatSend(); // P14 e2-13: Eingabezeile «Chat» aus dss::chatSendView
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -222,6 +223,8 @@ private:
     qint64 m_actionsEnabledRequest = 0; // P14 e2-11: offene Anfrage «Chat-Bot aktiv»
     dss::RunRows m_runRows;             // P14 e2-12: Bereich «Läufe der Aktionen»
     bool m_runsRequested = false;       // get_action_runs in dieser Verbindung geschickt
+    dss::ChatRows m_chatRows;           // P14 e2-13: Bereich «Chat»
+    qint64 m_chatSendRequest = 0;       // offene Anfrage chat_send (Text leeren bei Erfolg)
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

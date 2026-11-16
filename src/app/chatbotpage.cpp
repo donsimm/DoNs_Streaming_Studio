@@ -7,15 +7,19 @@
 #include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QSignalBlocker>
 #include <QSplitter>
 #include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QStyle>
 #include <QStyledItemDelegate>
 #include <QToolButton>
@@ -77,6 +81,119 @@ bool atBottom(QTreeWidget *list)
     return bar->value() == bar->maximum();
 }
 
+// Änderung nach dss::RowsAppend: vorne removedFront Zeilen weg, dann item (falls da) anhängen;
+// nach unten rollen nur, wenn die Liste schon unten stand.
+void appendItem(QTreeWidget *list, int removedFront, QTreeWidgetItem *item)
+{
+    const bool follow = atBottom(list);
+    for (int i = 0; i < removedFront && list->topLevelItemCount() > 0; ++i)
+        delete list->takeTopLevelItem(0);
+    if (item) {
+        list->addTopLevelItem(item);
+        if (follow)
+            list->scrollToBottom();
+    }
+}
+
+// Daten einer Zeile «Chat» für den Delegaten
+constexpr int kChatEventRole = Qt::UserRole;
+constexpr int kChatBadgesRole = Qt::UserRole + 1;
+constexpr int kChatNameRole = Qt::UserRole + 2;
+constexpr int kChatColorRole = Qt::UserRole + 3;
+constexpr int kChatTextRole = Qt::UserRole + 4;
+
+QTreeWidgetItem *chatItem(const dss::ChatRow &row)
+{
+    // Angezeigter Text auch als Text der Zelle (Suche, Tooltip, Tests); gezeichnet vom Delegaten
+    const QString message = row.name.isEmpty() ? row.text : row.name + QStringLiteral(": ") + row.text;
+    auto *item = new QTreeWidgetItem(QStringList{row.time, message});
+    for (int column = 0; column < 2; ++column)
+        item->setData(column, kChatEventRole, row.isEvent);
+    item->setData(1, kChatBadgesRole, row.badges);
+    item->setData(1, kChatNameRole, row.name);
+    item->setData(1, kChatColorRole, row.color);
+    item->setData(1, kChatTextRole, row.text);
+    return item;
+}
+
+// Zeilen «Chat»: graue Ereigniszeilen (chatEventRow), Abzeichen in badgeBot/badgeChannel/badgeMod,
+// Name in der Chatfarbe der Zeile. Wie ResultColorDelegate selbst gezeichnet, weil das Stylesheet
+// Text- und Hintergrundfarbe aus den Rollen überdeckt. Farben nur aus dem Theme und der Chatfarbe.
+class ChatRowDelegate : public QStyledItemDelegate
+{
+public:
+    ChatRowDelegate(const Theme &theme, QObject *parent) : QStyledItemDelegate(parent), m_theme(theme) {}
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        const bool event = index.data(kChatEventRole).toBool();
+        if (event && !option.state.testFlag(QStyle::State_Selected))
+            painter->fillRect(option.rect, m_theme.chatEventRow);
+        if (event || index.column() == 0) {
+            QStyledItemDelegate::paint(painter, option, index);
+            return;
+        }
+        QStyleOptionViewItem opt(option);
+        initStyleOption(&opt, index);
+        const QWidget *widget = opt.widget;
+        QStyle *style = widget ? widget->style() : QApplication::style();
+        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
+        const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
+        const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
+                                   .adjusted(margin, 0, -margin, 0);
+        opt.text.clear();
+        style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
+
+        painter->save();
+        painter->setClipRect(textRect);
+        painter->setRenderHint(QPainter::Antialiasing);
+        const QFontMetrics &fm = opt.fontMetrics;
+        const int height = fm.height();
+        const int top = textRect.top() + (textRect.height() - height) / 2;
+        int x = textRect.left();
+        // Abzeichen: Kästchen mit Rundung 4 px wie die Listen, Innenabstand 4 px, Abstand 4 px
+        QFont badgeFont = opt.font;
+        badgeFont.setBold(true);
+        const QFontMetrics badgeMetrics(badgeFont);
+        painter->setFont(badgeFont);
+        for (const QString &badge : index.data(kChatBadgesRole).toStringList()) {
+            const QRect box(x, top, badgeMetrics.horizontalAdvance(badge) + 8, height);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(badgeColor(badge));
+            painter->drawRoundedRect(box, 4, 4);
+            painter->setPen(m_theme.text);
+            painter->drawText(box, Qt::AlignCenter, badge);
+            x = box.right() + 1 + 4;
+        }
+        // Name fett in der Chatfarbe (leer = Text), danach die Nachricht
+        const QString name = index.data(kChatNameRole).toString() + QStringLiteral(": ");
+        const QColor nameColor(index.data(kChatColorRole).toString());
+        painter->setPen(nameColor.isValid() ? nameColor : m_theme.text);
+        painter->drawText(QRect(x, textRect.top(), textRect.right() - x + 1, textRect.height()),
+                          Qt::AlignLeft | Qt::AlignVCenter, name);
+        x += badgeMetrics.horizontalAdvance(name);
+        painter->setFont(opt.font);
+        painter->setPen(m_theme.text);
+        const QRect rest(x, textRect.top(), textRect.right() - x + 1, textRect.height());
+        painter->drawText(rest, Qt::AlignLeft | Qt::AlignVCenter,
+                          fm.elidedText(index.data(kChatTextRole).toString(), Qt::ElideRight, rest.width()));
+        painter->restore();
+    }
+
+private:
+    QColor badgeColor(const QString &badge) const
+    {
+        // Texte der Abzeichen aus dss::chatRow (chatbotlive.cpp)
+        if (badge == QLatin1String("Bot"))
+            return m_theme.badgeBot;
+        if (badge == QLatin1String("Mod"))
+            return m_theme.badgeMod;
+        return m_theme.badgeChannel;
+    }
+
+    Theme m_theme;
+};
+
 } // namespace
 
 ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent), m_theme(theme)
@@ -132,6 +249,7 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
 
     m_events = new QTreeWidget;
     m_events->setObjectName(QStringLiteral("chatBotEvents"));
+    m_events->setAccessibleName(QStringLiteral("Ereignisse"));
     m_events->setColumnCount(4);
     m_events->setHeaderLabels({QStringLiteral("Zeit"), QStringLiteral("Art"), QStringLiteral("Name"),
                                QStringLiteral("Details")});
@@ -145,11 +263,24 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_events->setColumnWidth(0, digit * 10);
     m_events->setColumnWidth(1, digit * 16);
     m_events->setColumnWidth(2, digit * 16);
-    addLivePanel(QStringLiteral("Ereignisse"), m_events, 1);
+    // P14 e2-13: Leiste mit «Chat-Nachrichten ausblenden», Standard wie dss::EventRows
+    m_hideChat = new QCheckBox(QStringLiteral("Chat-Nachrichten ausblenden"));
+    m_hideChat->setObjectName(QStringLiteral("chatBotHideChat"));
+    m_hideChat->setAccessibleName(QStringLiteral("Chat-Nachrichten ausblenden"));
+    m_hideChat->setChecked(dss::EventRows().hideChat());
+    connect(m_hideChat, &QCheckBox::toggled, this, &ChatBotPage::hideChatToggled);
+    auto *eventsBox = new QWidget;
+    auto *eventsColumn = new QVBoxLayout(eventsBox);
+    eventsColumn->setContentsMargins(0, 0, 0, 0);
+    eventsColumn->setSpacing(0);
+    eventsColumn->addWidget(m_events, 1);
+    eventsColumn->addWidget(buttonBar({m_hideChat}, {}, eventsBox));
+    addLivePanel(QStringLiteral("Ereignisse"), eventsBox, 1);
 
     // Bereich «Läufe der Aktionen»: Tabelle wie «Ereignisse», darunter die Knopfleiste
     m_runs = new QTreeWidget;
     m_runs->setObjectName(QStringLiteral("chatBotRuns"));
+    m_runs->setAccessibleName(QStringLiteral("Läufe der Aktionen"));
     m_runs->setColumnCount(4);
     m_runs->setHeaderLabels({QStringLiteral("Zeit"), QStringLiteral("Aktion"), QStringLiteral("Auslöser"),
                              QStringLiteral("Ergebnis")});
@@ -189,6 +320,52 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     runsColumn->addWidget(buttonBar({m_openAction, m_cancelRun}, {m_onlyErrors}, runsBox));
     addLivePanel(QStringLiteral("Läufe der Aktionen"), runsBox, 1);
     refreshRunButtons();
+
+    // P14 e2-13: Bereich «Chat» links: Liste wie «Ereignisse» ohne Spaltenkopf (Zeit, Nachricht),
+    // darunter die Eingabezeile als Leiste. Texte, Zähler und Freigabe nur aus setChatSend.
+    m_chat = new QTreeWidget;
+    m_chat->setObjectName(QStringLiteral("chatBotChat"));
+    m_chat->setAccessibleName(QStringLiteral("Chat"));
+    m_chat->setColumnCount(2);
+    m_chat->setHeaderHidden(true);
+    m_chat->setRootIsDecorated(false);
+    m_chat->setUniformRowHeights(true);
+    m_chat->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_chat->setFocusPolicy(Qt::NoFocus);
+    m_chat->header()->setStretchLastSection(true);
+    m_chat->setColumnWidth(0, digit * 10);
+    m_chat->setItemDelegate(new ChatRowDelegate(m_theme, m_chat));
+
+    m_chatAccount = new QComboBox;
+    m_chatAccount->setObjectName(QStringLiteral("chatBotChatAccount"));
+    m_chatAccount->setAccessibleName(QStringLiteral("Konto für den Chat"));
+    m_chatText = new QLineEdit;
+    m_chatText->setObjectName(QStringLiteral("chatBotChatText"));
+    m_chatText->setAccessibleName(QStringLiteral("Nachricht an den Chat"));
+    m_chatText->setPlaceholderText(QStringLiteral("Nachricht an den Chat …"));
+    // Breite für «500 / 500»: Der Wechsel des Zählers ändert die Anordnung nicht (Regel 9).
+    m_chatCounter = new QLabel;
+    m_chatCounter->setObjectName(QStringLiteral("chatBotChatCounter"));
+    m_chatCounter->setAccessibleName(QStringLiteral("Zeichen der Nachricht"));
+    m_chatCounter->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_chatCounter->setText(QStringLiteral("%1 / %1").arg(dss::kChatSendMaxLength));
+    m_chatCounter->setMinimumWidth(m_chatCounter->sizeHint().width());
+    m_chatSend = new QPushButton(QStringLiteral("Senden"));
+    m_chatSend->setObjectName(QStringLiteral("chatBotChatSend"));
+    m_chatSend->setEnabled(false);
+    connect(m_chatText, &QLineEdit::textChanged, this, &ChatBotPage::chatInputChanged);
+    connect(m_chatAccount, &QComboBox::currentIndexChanged, this, &ChatBotPage::chatInputChanged);
+    connect(m_chatText, &QLineEdit::returnPressed, this, &ChatBotPage::sendChat);
+    connect(m_chatSend, &QPushButton::clicked, this, &ChatBotPage::sendChat);
+
+    auto *chatBox = new QWidget;
+    auto *chatColumn = new QVBoxLayout(chatBox);
+    chatColumn->setContentsMargins(0, 0, 0, 0);
+    chatColumn->setSpacing(0);
+    chatColumn->addWidget(m_chat, 1);
+    // Das Eingabefeld nimmt den freien Platz statt der Dehnung von buttonBar.
+    chatColumn->addWidget(buttonBar({m_chatAccount, m_chatText}, {m_chatCounter, m_chatSend}, chatBox, m_chatText));
+    addLivePanel(QStringLiteral("Chat"), chatBox, 1, 0);
 
     m_actions = new ActionsPage(m_pages);
     addSubTab(QStringLiteral("Aktionen"), m_actions);
@@ -241,14 +418,76 @@ void ChatBotPage::resetEvents(const QList<dss::EventRow> &rows)
     m_events->scrollToBottom();
 }
 
-void ChatBotPage::appendEvent(const dss::EventRow &row, int removedFront)
+void ChatBotPage::appendEvent(const dss::RowsAppend &change, const dss::EventRow &row)
 {
-    const bool follow = atBottom(m_events);
-    for (int i = 0; i < removedFront && m_events->topLevelItemCount() > 0; ++i)
-        delete m_events->takeTopLevelItem(0);
-    m_events->addTopLevelItem(eventItem(row));
-    if (follow)
-        m_events->scrollToBottom();
+    appendItem(m_events, change.removedFront, change.appended ? eventItem(row) : nullptr);
+}
+
+void ChatBotPage::resetChat(const QList<dss::ChatRow> &rows)
+{
+    m_chat->clear();
+    QList<QTreeWidgetItem *> items;
+    items.reserve(rows.size());
+    for (const dss::ChatRow &row : rows)
+        items.append(chatItem(row));
+    m_chat->addTopLevelItems(items);
+    m_chat->scrollToBottom();
+}
+
+void ChatBotPage::appendChat(const dss::RowsAppend &change, const dss::ChatRow &row)
+{
+    appendItem(m_chat, change.removedFront, change.appended ? chatItem(row) : nullptr);
+}
+
+void ChatBotPage::setChatSend(const dss::ChatSendView &view)
+{
+    m_chatCounter->setText(view.counter);
+    m_chatCounter->setProperty("state", view.tooLong ? QStringLiteral("error") : QString());
+    // Das Stylesheet wertet [state="…"] nur beim Polieren aus (wie setHeader).
+    m_chatCounter->style()->unpolish(m_chatCounter);
+    m_chatCounter->style()->polish(m_chatCounter);
+    m_chatSendEnabled = view.sendEnabled;
+    m_chatSend->setEnabled(view.sendEnabled);
+    m_chatSend->setToolTip(view.problem);
+    m_chatText->setToolTip(view.problem);
+    // Konten: beim ersten Mal anlegen; ein ausgegrautes gewähltes Konto bleibt gewählt (problem).
+    const QSignalBlocker block(m_chatAccount);
+    if (m_chatAccount->count() != view.accounts.size()) {
+        m_chatAccount->clear();
+        for (const dss::ChatSendAccount &account : view.accounts)
+            m_chatAccount->addItem(account.label, account.account);
+    }
+    auto *model = qobject_cast<QStandardItemModel *>(m_chatAccount->model());
+    for (int i = 0; i < view.accounts.size(); ++i) {
+        const dss::ChatSendAccount &account = view.accounts.at(i);
+        m_chatAccount->setItemText(i, account.label);
+        m_chatAccount->setItemData(i, account.account);
+        m_chatAccount->setItemData(i, account.toolTip, Qt::ToolTipRole);
+        if (QStandardItem *item = model ? model->item(i) : nullptr)
+            item->setEnabled(account.enabled);
+    }
+}
+
+QString ChatBotPage::chatText() const
+{
+    return m_chatText->text();
+}
+
+QString ChatBotPage::chatAccount() const
+{
+    return m_chatAccount->currentData().toString();
+}
+
+void ChatBotPage::clearChatText()
+{
+    m_chatText->clear();
+}
+
+void ChatBotPage::sendChat()
+{
+    // Enter wie «Senden»: nur mit freigegebenem Senden (Prüfung in dss::chatSendView)
+    if (m_chatSendEnabled)
+        emit chatSendClicked(m_chatText->text(), chatAccount());
 }
 
 void ChatBotPage::fillRunItem(QTreeWidgetItem *item, const dss::RunRow &row) const

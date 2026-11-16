@@ -335,7 +335,8 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
 #mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
 #chatBotEvents::item:selected, #chatBotEvents::item:selected:hover, #chatBotRuns::item,
-#chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover { border-radius: 0px;
+#chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover, #chatBotChat::item,
+#chatBotChat::item:hover, #chatBotChat::item:selected, #chatBotChat::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
@@ -358,6 +359,9 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
 /* P14 e2: Prüfmeldung am Feld, eine Zeile unter dem Abschnitt (Entscheid des Nutzers 2026-11-16). */
 #fieldProblem { color: @stateError@; }
+/* P14 e2-13: Zähler der Eingabezeile «Chat», zu lang wie eine Prüfmeldung. */
+#chatBotChatCounter { color: @textMuted@; }
+#chatBotChatCounter[state="error"] { color: @stateError@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},

@@ -10,8 +10,10 @@
 class ActionsPage;
 class QButtonGroup;
 class QCheckBox;
+class QComboBox;
 class QHBoxLayout;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QSplitter;
 class QStackedWidget;
@@ -25,7 +27,8 @@ class QTreeWidgetItem;
 // Bereiche «Chat» und «Läufe der Aktionen» hinzu. P14 e2-11: Schalter «Chat-Bot aktiv» links vom
 // Zustand und Unterreiter «Aktionen» (actionspage.h). P14 e2-12: Bereiche in «Live» mit Teilern
 // (QSplitter) und Bereich «Läufe der Aktionen»; Zeilen aus dss::RunRows (chatbotlive.h), die
-// Ergebnisfarben aus dem Theme.
+// Ergebnisfarben aus dem Theme. P14 e2-13: Bereich «Chat» links mit der Eingabezeile (Zeilen aus
+// dss::ChatRows, Eingabe aus dss::chatSendView) und in «Ereignisse» «Chat-Nachrichten ausblenden».
 class ChatBotPage : public QWidget
 {
     Q_OBJECT
@@ -38,10 +41,18 @@ public:
     // Zustand und Schalter nur aus chatBotHeaderView (windowdata.h).
     void setHeader(const dss::ChatBotHeaderView &view);
     ActionsPage *actionsPage() const { return m_actions; }
-    // Bereich «Ereignisse»: ganze Liste neu (Verlauf) bzw. eine Zeile anhängen, nachdem vorne
-    // removedFront alte Zeilen weggefallen sind (dss::EventRows::append).
+    // Bereich «Ereignisse»: sichtbare Liste neu (dss::EventRows::visibleRows) bzw. eine Änderung
+    // nach dss::EventRows::add; row gilt nur bei change.appended.
     void resetEvents(const QList<dss::EventRow> &rows);
-    void appendEvent(const dss::EventRow &row, int removedFront);
+    void appendEvent(const dss::RowsAppend &change, const dss::EventRow &row);
+    // Bereich «Chat»: ganze Liste neu bzw. eine Änderung nach dss::ChatRows::add (wie oben).
+    void resetChat(const QList<dss::ChatRow> &rows);
+    void appendChat(const dss::RowsAppend &change, const dss::ChatRow &row);
+    // Eingabezeile nur aus dss::chatSendView (Zähler, «zu lang», Freigabe, Konten, Grund).
+    void setChatSend(const dss::ChatSendView &view);
+    QString chatText() const;
+    QString chatAccount() const; // bot, broadcaster (chat_send)
+    void clearChatText();
     // Bereich «Läufe der Aktionen»: sichtbare Liste neu (dss::RunRows::visibleRows, Auswahl bleibt
     // beim selben Lauf) bzw. eine Änderung nach dss::RunRows::apply; row ist die Zeile des Laufs
     // (nullptr, wenn change.index -1).
@@ -61,8 +72,15 @@ signals:
     void openActionClicked(const QUuid &actionId);
     void cancelRunClicked(const QUuid &runId);
     void onlyErrorsToggled(bool onlyErrors);
+    // Eingabezeile: Text oder Konto geändert (das Fenster setzt danach setChatSend); «Senden» oder
+    // Enter mit freigegebenem Senden; «Chat-Nachrichten ausblenden» umgeschaltet.
+    void chatInputChanged();
+    void chatSendClicked(const QString &text, const QString &account);
+    void hideChatToggled(bool hideChat);
 
 private:
+    void sendChat();
+
     QTreeWidgetItem *runItem(const dss::RunRow &row) const;
     void fillRunItem(QTreeWidgetItem *item, const dss::RunRow &row) const;
     void refreshRunButtons();
@@ -79,5 +97,12 @@ private:
     QCheckBox *m_enabled = nullptr;
     QLabel *m_state = nullptr;
     QTreeWidget *m_events = nullptr;
+    QCheckBox *m_hideChat = nullptr;
+    QTreeWidget *m_chat = nullptr;
+    QComboBox *m_chatAccount = nullptr;
+    QLineEdit *m_chatText = nullptr;
+    QLabel *m_chatCounter = nullptr;
+    QPushButton *m_chatSend = nullptr;
+    bool m_chatSendEnabled = false;
     ActionsPage *m_actions = nullptr;
 };

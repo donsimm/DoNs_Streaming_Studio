@@ -202,9 +202,6 @@ public:
     // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten. Typen
     // ohne Zeile (shows) fallen weg.
     void reset(const QList<events::Event> &events);
-    // P13: Hängt eine Zeile an (jeden Typ); Rückgabe: wie viele alte Zeilen vorne dafür wegfallen
-    // (0 oder 1). Bleibt, bis das Fenster in e2-13 auf add umstellt.
-    int append(const events::Event &event);
     // P14 e2-6: Hängt eine Zeile an, wenn der Typ eine hat (shows); Rückgabe für visibleRows.
     RowsAppend add(const events::Event &event);
     // «Chat-Nachrichten ausblenden» (Standard an): visibleRows ohne isChat. Danach baut das Fenster

@@ -225,8 +225,9 @@ if(DSS_BUILD_APP)
 
   # P14 e2-11: Reiter «Chat-Bot» im echten Fenster (Schalter «Chat-Bot aktiv», Unterreiter
   # «Aktionen») mit eigenem dss-core; ohne X11 übersprungen (77).
-  qt_add_executable(tst_fensterchatbot tst_fensterchatbot.cpp)
-  target_link_libraries(tst_fensterchatbot PRIVATE dss_app_ui dss_warnings Qt6::Test)
+  # P14 e2-13: Senden gegen tests/twitchtestserver.h (127.0.0.1, ohne Netz)
+  qt_add_executable(tst_fensterchatbot tst_fensterchatbot.cpp twitchtestserver.h)
+  target_link_libraries(tst_fensterchatbot PRIVATE dss_app_ui dss_warnings Qt6::Test Qt6::Network Qt6::WebSockets)
   target_compile_definitions(tst_fensterchatbot PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
   add_dependencies(tst_fensterchatbot dss-core)
   add_test(NAME tst_fensterchatbot COMMAND tst_fensterchatbot)

@@ -3,6 +3,8 @@
 // (an, aus, ausgegraut bei «stumm» mit einem zweiten Kern unter der Verbindung der Version im
 // Einsatz), die Zustände der Kopfzeile und den Unterreiter «Aktionen». Muster: tst_fensterbearbeiten.
 // P14 e2-12: «Live» mit Teilern und Bereich «Läufe der Aktionen» (Probeläufe über den Testkern).
+// P14 e2-13: Bereich «Chat» (Zeilen über test_event, Senden gegen den Twitch-Testserver, nie Twitch)
+// und «Chat-Nachrichten ausblenden».
 
 #include "actionjson.h"
 #include "actionmodel.h"
@@ -14,15 +16,21 @@
 #include "steptypes.h"
 #include "symbols.h"
 #include "theme.h"
+#include "twitchtestserver.h"
 #include "version.h"
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFrame>
 #include <QHeaderView>
 #include <QImage>
+#include <QJsonArray>
 #include <QLabel>
+#include <QLayout>
+#include <QLineEdit>
 #include <QPushButton>
+#include <QStandardItemModel>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTemporaryDir>
@@ -127,12 +135,13 @@ class TestFensterChatBot : public QObject
     }
 
     // Kommt die Farbe von setForeground im Bild an (Stylesheet setzt QTreeView::item color)?
-    bool cellShowsColor(QTreeWidget *list, QTreeWidgetItem *item, const QColor &color)
+    bool cellShowsColor(QTreeWidget *list, QTreeWidgetItem *item, const QColor &color, int column = 3)
     {
         list->scrollToItem(item);
         QApplication::processEvents();
         const QRect row = list->visualItemRect(item);
-        const QRect cell(list->header()->sectionViewportPosition(3), row.top(), list->header()->sectionSize(3), row.height());
+        const QRect cell(list->header()->sectionViewportPosition(column), row.top(),
+                         list->header()->sectionSize(column), row.height());
         const QImage image = list->viewport()->grab(cell).toImage();
         for (int y = 0; y < image.height(); ++y)
             for (int x = 0; x < image.width(); ++x) {
@@ -144,6 +153,56 @@ class TestFensterChatBot : public QObject
         return false;
     }
 
+    // Zeile in einer Liste, deren Spalte column den Text text hat
+    static QTreeWidgetItem *findRow(QTreeWidget *list, int column, const QString &text)
+    {
+        for (int i = 0; i < list->topLevelItemCount(); ++i)
+            if (list->topLevelItem(i)->text(column) == text)
+                return list->topLevelItem(i);
+        return nullptr;
+    }
+
+    // twitch.chat_message für test_event (Aufbau wie tst_kernaktionen, chatEvent)
+    static QJsonObject chatEvent(const QString &text, bool moderator, const QString &color)
+    {
+        const QJsonObject data{{QStringLiteral("message_id"), QUuid::createUuid().toString(QUuid::WithoutBraces)},
+                               {QStringLiteral("user_id"), QStringLiteral("900000001")},
+                               {QStringLiteral("user_login"), QStringLiteral("dsstestzuschauer")},
+                               {QStringLiteral("user_name"), QStringLiteral("DSS-Test Zuschauer")},
+                               {QStringLiteral("text"), text},
+                               {QStringLiteral("fragments"),
+                                QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("text")},
+                                                       {QStringLiteral("text"), text},
+                                                       {QStringLiteral("emote_id"), QJsonValue::Null}}}},
+                               {QStringLiteral("color"), color},
+                               {QStringLiteral("badges"), QJsonArray()},
+                               {QStringLiteral("role"), moderator ? 3 : 1},
+                               {QStringLiteral("is_subscriber"), false},
+                               {QStringLiteral("is_vip"), false},
+                               {QStringLiteral("is_moderator"), moderator},
+                               {QStringLiteral("is_broadcaster"), false},
+                               {QStringLiteral("is_bot_account"), false},
+                               {QStringLiteral("bits"), 0},
+                               {QStringLiteral("reply_to"), QJsonValue::Null},
+                               {QStringLiteral("reward_id"), QJsonValue::Null},
+                               {QStringLiteral("message_type"), QStringLiteral("text")},
+                               {QStringLiteral("is_highlight"), false},
+                               {QStringLiteral("source_broadcaster_id"), QJsonValue::Null}};
+        return QJsonObject{{QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)},
+                           {QStringLiteral("type"), QStringLiteral("twitch.chat_message")},
+                           {QStringLiteral("origin"), QStringLiteral("twitch")},
+                           {QStringLiteral("time"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+                           {QStringLiteral("origin_id"), QString()},
+                           {QStringLiteral("data"), data}};
+    }
+
+    static void openChatBot(QWidget *window)
+    {
+        for (QToolButton *b : window->findChild<QFrame *>(QStringLiteral("moduleTabs"))->findChildren<QToolButton *>())
+            if (b->text() == QStringLiteral("Chat-Bot"))
+                QTest::mouseClick(b, Qt::LeftButton);
+    }
+
 private slots:
     void initTestCase()
     {
@@ -152,7 +211,8 @@ private slots:
         const QString socket = m_run->filePath(QStringLiteral("kern.sock"));
         m_inUseSocket = m_run->filePath(QStringLiteral("einsatz.sock"));
         m_core = testhelp::startCore(m_data.path(), socket, testhelp::testConfigHome(),
-                                     {QStringLiteral("--einsatz-verbindung"), m_inUseSocket});
+                                     {QStringLiteral("--einsatz-verbindung"), m_inUseSocket,
+                                      QStringLiteral("--testereignisse")});
         QString log;
         QVERIFY2(testhelp::waitForLog(m_core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
         CoreClient::Options o;
@@ -169,9 +229,7 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(m_window.get()));
         m_client->start();
         QTRY_VERIFY_WITH_TIMEOUT(m_client->isConnected() && m_client->actionsStatus().has_value(), 5000);
-        for (QToolButton *b : child<QFrame>("moduleTabs")->findChildren<QToolButton *>())
-            if (b->text() == QStringLiteral("Chat-Bot"))
-                QTest::mouseClick(b, Qt::LeftButton);
+        openChatBot(m_window.get());
         QTRY_VERIFY_WITH_TIMEOUT(child<QWidget>("chatBotPage")->isVisible(), 3000);
     }
 
@@ -299,7 +357,7 @@ private slots:
         auto *splitter = child<QSplitter>("chatBotLiveSplitter");
         QVERIFY(splitter && splitter->isVisible());
         QVERIFY(!splitter->childrenCollapsible());
-        QCOMPARE(splitter->count(), 2);
+        QCOMPARE(splitter->count(), 3);
         QStringList titles;
         for (int i = 0; i < splitter->count(); ++i) {
             auto *title = splitter->widget(i)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"));
@@ -307,13 +365,53 @@ private slots:
             QVERIFY(splitter->widget(i)->findChild<QFrame *>(QStringLiteral("chatBotPanelBody")));
             titles << title->text();
         }
-        QCOMPARE(titles, QStringList({QStringLiteral("Ereignisse"), QStringLiteral("Läufe der Aktionen")}));
+        QCOMPARE(titles, QStringList({QStringLiteral("Chat"), QStringLiteral("Ereignisse"),
+                                      QStringLiteral("Läufe der Aktionen")}));
         QCOMPARE(splitter->handle(1)->width(), 4);
-        // Teiler verschieben: beide Bereiche bleiben sichtbar
+        // Teiler verschieben: alle Bereiche bleiben sichtbar
         const QList<int> before = splitter->sizes();
-        splitter->setSizes({before.at(0) + 100, before.at(1) - 100});
-        QCOMPARE(splitter->sizes().at(0), before.at(0) + 100);
+        splitter->setSizes({before.at(0) + 40, before.at(1) - 40, before.at(2)});
+        QCOMPARE(splitter->sizes().at(0), before.at(0) + 40);
         splitter->setSizes(before);
+
+        // «Chat»: Liste ohne Kopf, darunter die Eingabezeile als Leiste (Konto, Feld, Zähler, Senden)
+        auto *chat = child<QTreeWidget>("chatBotChat");
+        auto *account = child<QComboBox>("chatBotChatAccount");
+        auto *text = child<QLineEdit>("chatBotChatText");
+        auto *counter = child<QLabel>("chatBotChatCounter");
+        auto *send = child<QPushButton>("chatBotChatSend");
+        QVERIFY(chat && account && text && counter && send);
+        QVERIFY(chat->isHeaderHidden());
+        QCOMPARE(chat->focusPolicy(), Qt::NoFocus);
+        QCOMPARE(account->count(), 2);
+        QCOMPARE(account->itemText(0), QStringLiteral("als Bot"));
+        QCOMPARE(account->itemText(1), QStringLiteral("als Kanal"));
+        QCOMPARE(text->placeholderText(), QStringLiteral("Nachricht an den Chat …"));
+        QCOMPARE(counter->text(), QStringLiteral("0 / 500"));
+        QCOMPARE(send->text(), QStringLiteral("Senden"));
+        QCOMPARE(text->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        QVERIFY(account->geometry().right() < text->geometry().left());
+        QVERIFY(text->geometry().right() < counter->geometry().left());
+        QVERIFY(counter->geometry().right() < send->geometry().left());
+        QVERIFY(counter->minimumWidth() >= counter->fontMetrics().horizontalAdvance(QStringLiteral("500 / 500")));
+        QVERIFY(text->width() > send->width()); // das Feld nimmt den freien Platz
+        // keine Lücke zwischen Feld und Zähler (nur der Abstand der Leiste)
+        QCOMPARE(counter->geometry().left() - text->geometry().right() - 1,
+                 text->parentWidget()->layout()->spacing());
+        // «Ereignisse»: Leiste mit «Chat-Nachrichten ausblenden», Standard an
+        auto *hide = child<QCheckBox>("chatBotHideChat");
+        QVERIFY(hide);
+        // zugängliche Namen wie in den Docks
+        QCOMPARE(chat->accessibleName(), QStringLiteral("Chat"));
+        QCOMPARE(account->accessibleName(), QStringLiteral("Konto für den Chat"));
+        QCOMPARE(text->accessibleName(), QStringLiteral("Nachricht an den Chat"));
+        QCOMPARE(counter->accessibleName(), QStringLiteral("Zeichen der Nachricht"));
+        QCOMPARE(hide->accessibleName(), QStringLiteral("Chat-Nachrichten ausblenden"));
+        QCOMPARE(child<QTreeWidget>("chatBotEvents")->accessibleName(), QStringLiteral("Ereignisse"));
+        QCOMPARE(child<QTreeWidget>("chatBotRuns")->accessibleName(), QStringLiteral("Läufe der Aktionen"));
+        QCOMPARE(hide->text(), QStringLiteral("Chat-Nachrichten ausblenden"));
+        QVERIFY(hide->isChecked());
+        QCOMPARE(hide->parentWidget()->objectName(), QStringLiteral("dockButtons"));
 
         auto *runs = child<QTreeWidget>("chatBotRuns");
         QVERIFY(runs);
@@ -409,6 +507,169 @@ private slots:
         disconnect(c);
         QCOMPARE(runs->topLevelItemCount(), all);
         QVERIFY(runItem(QStringLiteral("DSS-Test Fehler")));
+    }
+
+    // P14 e2-13: «Chat» zeigt Chat-Nachrichten (Abzeichen, Chatfarbe) und gestartete Läufe grau;
+    // «Chat-Nachrichten ausblenden» in «Ereignisse»; Zähler und «zu lang»; ohne Twitch beide Konten
+    // ausgegraut, «Senden» aus mit Grund.
+    void chatPanel()
+    {
+        const Theme theme = darkTheme();
+        auto *chat = child<QTreeWidget>("chatBotChat");
+        auto *events = child<QTreeWidget>("chatBotEvents");
+        auto *hide = child<QCheckBox>("chatBotHideChat");
+        QVERIFY(chat && events && hide);
+
+        // Gestarteter Probelauf: graue Zeile, auch im Bild (Laufmeldungen stehen nicht im Verlauf,
+        // darum ein eigener Lauf nach der neuen Verbindung in actionRuns)
+        actions::Step empty = actions::newStep(QString::fromLatin1(actions::kStepChatSend));
+        empty.fields.insert(QStringLiteral("text"), QString());
+        QVERIFY(!testRun(QStringLiteral("DSS-Test Chatzeile"), empty).isNull());
+        const QString started = QStringLiteral("Probelauf · Aktion «DSS-Test Chatzeile» ausgelöst");
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, started), 3000);
+        QTreeWidgetItem *startedRow = findRow(chat, 1, started);
+        QVERIFY(startedRow->data(1, Qt::UserRole).toBool());
+        QVERIFY(cellShowsColor(chat, startedRow, theme.chatEventRow, 0));
+
+        // Chat-Nachricht eines Mods mit Chatfarbe: Zeile im Chat, Abzeichen und Name im Bild
+        const QString message = QStringLiteral("DSS-Test Hallo");
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kTestEvent), QJsonObject{{QStringLiteral("event"), chatEvent(message, true, QStringLiteral("#FF4040"))}}});
+        QVERIFY2(put && put->ok, put ? qPrintable(put->message) : "keine Antwort");
+        const QString line = QStringLiteral("DSS-Test Zuschauer: ") + message;
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, line), 3000);
+        QTreeWidgetItem *row = findRow(chat, 1, line);
+        QCOMPARE(row->data(1, Qt::UserRole + 1).toStringList(), QStringList{QStringLiteral("Mod")});
+        QVERIFY(!row->data(1, Qt::UserRole).toBool());
+        QVERIFY(cellShowsColor(chat, row, theme.badgeMod, 1));
+        QVERIFY(cellShowsColor(chat, row, QColor(0xff, 0x40, 0x40), 1));
+        // Hintergrund am rechten Rand der Zeitspalte (ohne Text): grau nur bei der Ereigniszeile
+        const auto background = [&](QTreeWidgetItem *item) {
+            chat->scrollToItem(item);
+            QApplication::processEvents();
+            const QPoint at(chat->header()->sectionSize(0) - 3, chat->visualItemRect(item).center().y());
+            return chat->viewport()->grab(QRect(at, QSize(1, 1))).toImage().pixelColor(0, 0);
+        };
+        QCOMPARE(background(startedRow), theme.chatEventRow);
+        QVERIFY(background(row) != theme.chatEventRow);
+
+        // «Ereignisse»: Chat-Nachricht ausgeblendet; Umschalten füllt die Liste neu
+        // (Der Kern meldet dazu «Erste Nachricht» mit demselben Namen; die bleibt sichtbar.)
+        const auto viewerRows = [&] {
+            int n = 0;
+            for (int i = 0; i < events->topLevelItemCount(); ++i)
+                n += events->topLevelItem(i)->text(2) == QStringLiteral("DSS-Test Zuschauer");
+            return n;
+        };
+        QVERIFY(hide->isChecked());
+        const int withoutChat = events->topLevelItemCount();
+        const int viewerWithoutChat = viewerRows();
+        QTest::mouseClick(hide, Qt::LeftButton, {}, QPoint(4, hide->height() / 2));
+        QVERIFY(!hide->isChecked());
+        QCOMPARE(events->topLevelItemCount(), withoutChat + 1);
+        QCOMPARE(viewerRows(), viewerWithoutChat + 1);
+        QTest::mouseClick(hide, Qt::LeftButton, {}, QPoint(4, hide->height() / 2));
+        QCOMPARE(events->topLevelItemCount(), withoutChat);
+        QCOMPARE(viewerRows(), viewerWithoutChat);
+
+        // Eingabezeile: Zähler, «zu lang» in stateError über [state]
+        auto *account = child<QComboBox>("chatBotChatAccount");
+        auto *text = child<QLineEdit>("chatBotChatText");
+        auto *counter = child<QLabel>("chatBotChatCounter");
+        auto *send = child<QPushButton>("chatBotChatSend");
+        const int counterWidth = counter->width();
+        QTest::keyClicks(text, QStringLiteral("Hallo"));
+        QCOMPARE(counter->text(), QStringLiteral("5 / 500"));
+        QVERIFY(counter->property("state").toString() != QStringLiteral("error"));
+        text->setText(QString(501, QLatin1Char('x')));
+        QCOMPARE(counter->text(), QStringLiteral("501 / 500"));
+        QCOMPARE(counter->property("state").toString(), QStringLiteral("error"));
+        QCOMPARE(counter->palette().color(QPalette::WindowText), theme.stateError);
+        QVERIFY(!send->isEnabled());
+        QApplication::processEvents();
+        QCOMPARE(counter->width(), counterWidth); // Anordnung bleibt (Regel 9)
+        // Testkern ohne Twitch: beide Konten ausgegraut mit Grund, «Senden» aus, Enter schickt nichts
+        text->setText(QStringLiteral("Hallo"));
+        auto *model = qobject_cast<QStandardItemModel *>(account->model());
+        QVERIFY(model);
+        QVERIFY(!model->item(0)->isEnabled() && !model->item(1)->isEnabled());
+        QVERIFY(!account->itemData(0, Qt::ToolTipRole).toString().isEmpty());
+        QVERIFY(!send->isEnabled());
+        QVERIFY(!send->toolTip().isEmpty());
+        QCOMPARE(account->currentIndex(), 0); // ausgegraut, Auswahl bleibt
+        int sent = 0;
+        const QMetaObject::Connection c = connect(m_window->findChild<ChatBotPage *>(), &ChatBotPage::chatSendClicked,
+                                                  this, [&] { ++sent; });
+        QTest::keyClick(text, Qt::Key_Return);
+        disconnect(c);
+        QCOMPARE(sent, 0);
+        text->clear();
+        QCOMPARE(counter->text(), QStringLiteral("0 / 500"));
+    }
+
+    // Senden gegen den Twitch-Testserver (nie Twitch): eigener Kern mit angemeldetem Kanal, «als Kanal»
+    // wählen, Enter schickt chat_send; danach Feld leer und die eigene Nachricht im Chat.
+    void chatSendTwitch()
+    {
+        testhelp::TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        QTemporaryDir data;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && runtime->isValid());
+        const QString socket = runtime->filePath(QStringLiteral("kern.sock"));
+        const QString home = testhelp::testConfigHome();
+        QFile ini(home + QStringLiteral("/dons-streaming-studio-entwicklung/kern.ini"));
+        QVERIFY(ini.open(QIODevice::Append));
+        ini.write("[twitch]\naktiv=ja\nclient-id=testclient\n");
+        ini.close();
+        std::unique_ptr<QProcess> core = testhelp::startCore(
+            data.path(), socket, home,
+            {QStringLiteral("--twitch-testserver"), server.baseUrl().toString(), QStringLiteral("--einsatz-verbindung"),
+             runtime->filePath(QStringLiteral("einsatz.sock"))});
+        QString log;
+        QVERIFY2(testhelp::waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        {
+            CoreClient::Options o;
+            o.socketPath = socket;
+            o.program = QStringLiteral("dss-app");
+            o.version = version();
+            CoreClient client(o);
+            const Theme theme = darkTheme();
+            MainWindow window(theme, false, &client);
+            window.resize(1280, 800);
+            window.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&window));
+            client.start();
+            QTRY_VERIFY_WITH_TIMEOUT(client.isConnected() && client.actionsStatus().has_value(), 5000);
+            openChatBot(&window);
+            QVERIFY(client.sendTwitchAccountRequest(msg::kTwitchLoginStart, QStringLiteral("channel")) != 0);
+            const testhelp::TwitchTestUser channel{QStringLiteral("100000001"), QStringLiteral("testkanal")};
+            QVERIFY(QTest::qWaitFor([&] { return server.approveLatest(channel); }, 5000));
+
+            auto *account = window.findChild<QComboBox *>(QStringLiteral("chatBotChatAccount"));
+            auto *text = window.findChild<QLineEdit *>(QStringLiteral("chatBotChatText"));
+            auto *chat = window.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+            QVERIFY(account && text && chat);
+            auto *model = qobject_cast<QStandardItemModel *>(account->model());
+            QTRY_VERIFY_WITH_TIMEOUT(model->item(1)->isEnabled(), 5000);
+            QVERIFY(!model->item(0)->isEnabled()); // Bot nicht angemeldet
+            account->setCurrentIndex(1);
+            const QString message = QStringLiteral("DSS-Test Fenster senden");
+            QTest::keyClicks(text, message);
+            QVERIFY(window.findChild<QPushButton *>(QStringLiteral("chatBotChatSend"))->isEnabled());
+            QTest::keyClick(text, Qt::Key_Return);
+            QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 1, 5000);
+            QCOMPARE(server.chatMessages[0].body.value(QStringLiteral("message")).toString(), message);
+            QCOMPARE(server.chatMessages[0].body.value(QStringLiteral("sender_id")).toString(), channel.id);
+            QTRY_VERIFY_WITH_TIMEOUT(text->text().isEmpty(), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, QStringLiteral("testkanal: ") + message), 5000);
+            QCOMPARE(findRow(chat, 1, QStringLiteral("testkanal: ") + message)->data(1, Qt::UserRole + 1).toStringList(),
+                     QStringList{QStringLiteral("Kanal")});
+            window.close(); // bittet den Kern, sich zu beenden (einziges Fenster)
+        }
+        if (core->state() != QProcess::NotRunning && !core->waitForFinished(3000))
+            stopCore(core.get());
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.
