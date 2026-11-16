@@ -24,6 +24,10 @@
 
 namespace dss {
 
+// actionprotocol.h bindet diese Datei ein; deshalb nur deklariert (Testen, e2-7)
+struct ActionsStatus;
+struct TwitchStatusInfo;
+
 // --- Änderungsbefehle (Plan 5) ---
 
 // Nachricht an den Kern ohne request_id. type wie im Plan 5 (action_put, action_remove, action_copy,
@@ -169,6 +173,34 @@ EditResult putAction(const actions::Action &before, const actions::Action &after
 // anderer Schreibweise («shoutout» bei «Shoutout»), übernimmt after deren Schreibweise.
 EditResult putAction(const actions::ActionsConfig &config, const actions::Action &before,
                      const actions::Action &after);
+
+// --- «Aktionen», Mitte: «▶ Testen» (Plan 3.6, P14 e2-7) ---
+
+// Eintrag der Auswahl «Testwerte: Benutzer» (Entscheid des Nutzers, 2026-11-16): «Testzuschauer»
+// (erfunden, fester Login und Kennung) und «eigener Kanal» (Login und Kennung aus dem Twitch-Status).
+struct TestUserChoice
+{
+    QString label;    // «Testzuschauer», «eigener Kanal»
+    QString user;     // Argument user (Anzeigename)
+    QString userName; // Argument userName (Login)
+    QString userId;   // Argument userId (Twitch-ID)
+    bool operator==(const TestUserChoice &) const = default;
+};
+// Erst «Testzuschauer», dann «eigener Kanal». Ohne Login oder Kennung des Kanals (nicht angemeldet,
+// Kern ohne Twitch) fehlt «eigener Kanal»; der Status nennt nur den Login, er gilt auch als Anzeigename.
+QList<TestUserChoice> testUserChoices(const TwitchStatusInfo &twitch);
+// «▶ Testen» bedienbar: Aktion gespeichert und Aktionssystem gebaut und lesbar (nicht
+// unavailable, nicht file_error). Auch bei abgeschaltetem Hauptschalter, wie im Kern.
+bool testAllowed(const actions::Action &action, const ActionsStatus &status);
+// «echt ausführen» bedienbar: wie testAllowed, aber nicht stumm (Version im Einsatz läuft, Plan
+// 3.4); sonst nur Probelauf, das Kästchen ist ausgegraut.
+bool realTestAllowed(const actions::Action &action, const ActionsStatus &status);
+// Anfrage action_test {action_id, arguments, dry_run = !real}. arguments: die Testwerte des
+// Auslösers «Test» der Aktion (erster solcher Auslöser), darüber user, userName und userId des
+// gewählten Benutzers. Prüft nicht, ob der Test erlaubt ist (testAllowed, realTestAllowed).
+EditResult testAction(const actions::Action &action, const TestUserChoice &user, bool real);
+// Statuszeile nach der Antwort: «Probelauf gestartet: <Name>» bzw. «Gestartet: <Name>»
+QString testStartedStatusText(const QString &name, bool real);
 
 // --- «Aktionen», Mitte: Bereich «Auslöser» ---
 

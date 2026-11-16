@@ -1,7 +1,10 @@
 #include "actionview.h"
 
 #include "actionjson.h"
+#include "actionprotocol.h"
+#include "eventtypes.h"
 #include "fieldspec.h"
+#include "protocol.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
@@ -758,6 +761,72 @@ QString removeActionGroupQuestion(const ActionsConfig &config, const QString &gr
 QString actionTitle(const Action &action)
 {
     return QStringLiteral("Aktion %1").arg(quoted(action.name));
+}
+
+namespace {
+
+// Name des Arguments zu einem Feld user_* der Chat-Nachricht (eventtypes.h, Plan 1.3)
+QString userArgument(const char *field)
+{
+    const events::EventType *type = events::findEventType(QString::fromLatin1(kTriggerChatMessage));
+    Q_ASSERT(type);
+    for (const events::EventField &f : type->fields) {
+        if (qstrcmp(f.name, field) == 0)
+            return QString::fromLatin1(f.argument);
+    }
+    Q_UNREACHABLE_RETURN(QString());
+}
+
+bool testState(const ActionsStatus &status)
+{
+    return status.state != QLatin1String("unavailable") && status.state != QLatin1String("file_error");
+}
+
+} // namespace
+
+QList<TestUserChoice> testUserChoices(const TwitchStatusInfo &twitch)
+{
+    // Erfunden; 0 ist keine Twitch-ID, Variablen je Zuschauer treffen so keinen echten Zuschauer
+    QList<TestUserChoice> choices{{QStringLiteral("Testzuschauer"), QStringLiteral("Testzuschauer"),
+                                   QStringLiteral("testzuschauer"), QStringLiteral("0")}};
+    const TwitchAccountInfo &channel = twitch.channel;
+    if (twitch.enabled && !channel.login.isEmpty() && !channel.userId.isEmpty())
+        choices.append({QStringLiteral("eigener Kanal"), channel.login, channel.login, channel.userId});
+    return choices;
+}
+
+bool testAllowed(const Action &action, const ActionsStatus &status)
+{
+    return !action.id.isNull() && testState(status);
+}
+
+bool realTestAllowed(const Action &action, const ActionsStatus &status)
+{
+    return testAllowed(action, status) && status.state != QLatin1String("muted");
+}
+
+EditResult testAction(const Action &action, const TestUserChoice &user, bool real)
+{
+    QJsonObject arguments;
+    for (const Trigger &trigger : action.triggers) {
+        if (trigger.type == QLatin1String(kTriggerTest)) {
+            arguments = trigger.fields.value(QStringLiteral("variables")).toObject();
+            break;
+        }
+    }
+    arguments.insert(userArgument("user_name"), user.user);
+    arguments.insert(userArgument("user_login"), user.userName);
+    arguments.insert(userArgument("user_id"), user.userId);
+    EditResult r;
+    r.edits.append(edit(msg::kActionTest, {{QStringLiteral("action_id"), uuidText(action.id)},
+                                           {QStringLiteral("arguments"), arguments},
+                                           {QStringLiteral("dry_run"), !real}}));
+    return r;
+}
+
+QString testStartedStatusText(const QString &name, bool real)
+{
+    return real ? QStringLiteral("Gestartet: %1").arg(name) : QStringLiteral("Probelauf gestartet: %1").arg(name);
 }
 
 QList<QueueChoice> queueChoices(const ActionsConfig &config, const QUuid &current)
