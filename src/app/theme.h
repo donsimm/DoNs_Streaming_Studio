@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QPalette>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 
@@ -97,3 +98,10 @@ QPalette palette(const Theme &theme);
 // https://doc.qt.io/qt-6.8/stylesheet-reference.html
 QString styleSheet(const Theme &theme,
                    const std::function<QString(const QString &)> &symbolPath);
+
+// Aussehen der ganzen Anwendung: Stil «Fusion», Schriften aus fontDir (loadWindowFonts),
+// Schrift und Palette des Themes, Stylesheet mit den Symbolen aus symbolPath. Von dss-app und
+// den Fenstertests genutzt, damit beide dieselbe Schrift haben, unabhängig von den Schriften im
+// System. Braucht eine QApplication. Gibt die geladenen Familien zurück.
+// https://doc.qt.io/qt-6.8/qapplication.html#setFont
+QStringList applyAppearance(const Theme &theme, const QString &fontDir);

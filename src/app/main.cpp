@@ -164,17 +164,9 @@ int main(int argc, char *argv[])
     // Texte von Qt selbst deutsch, ohne «ß» (P09, Punkt 44).
     installQtTranslation(&app);
 
-    // Fusion: derselbe Grundstil unabhängig von der Desktop-Umgebung.
-    // https://doc.qt.io/qt-6.8/qstylefactory.html
-    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Stil, Schrift, Palette und Stylesheet; dieselbe Funktion nutzen die Fenstertests.
     const Theme theme = darkTheme();
-    // Schrift aus src/app/schriften/, nicht aus einer Installation (Auftrag P06).
-    const QStringList families = loadWindowFonts(fontDir());
-    if (!families.contains(theme.fontFamily))
-        qWarning("Schrift «%s» nicht geladen, Qt wählt einen Ersatz", qPrintable(theme.fontFamily));
-    QApplication::setFont(QFont(theme.fontFamily, theme.fontSize));
-    QApplication::setPalette(palette(theme));
-    app.setStyleSheet(styleSheet(theme, symbolPath));
+    applyAppearance(theme, fontDir());
 
     // Verbindung zum Kern. Beim Bildschirmfoto nur mit --verbindung und ohne Start der Einheit,
     // damit Prüfungen nie den echten Kern starten.

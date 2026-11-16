@@ -354,7 +354,6 @@ private slots:
         m_check = std::make_unique<CoreClient>(o);
 
         const Theme theme = darkTheme();
-        qApp->setStyleSheet(styleSheet(theme, symbolPath));
         m_window = std::make_unique<MainWindow>(theme, false, m_client.get());
         m_window->resize(1280, 800);
         m_window->show();
@@ -1074,14 +1073,20 @@ private slots:
                      qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
             QVERIFY(std::abs(s.width - expectedWidth) <= 3);
         }
-        // Text hat keine Originalgrösse: Verhältnis des Kastens beim Beginn (300x100 = 3:1)
+        // Text hat keine Originalgrösse: Verhältnis des Kastens beim Beginn (300x100 = 3:1). Die
+        // Breite folgt der Höhe (360:160 < 3:1). at() rundet auf ganze Pixel des Fensters, die
+        // Höhe kommt daher aus der wirklichen Verschiebung (Massstab hängt von der Grösse der
+        // Leinwand ab), nicht aus den gerundeten 60.
         selectSourceRow(0);
-        drag(canvas, at(1800, 200), at(1860, 260));
-        QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).width != 300, true, 3000);
         {
+            const QPoint a = at(1800, 200);
+            const QPoint b = at(1860, 260);
+            const int expectedHeight = 100 + int(std::lround((canvas->overlayPoint(b) - canvas->overlayPoint(a)).y()));
+            drag(canvas, a, b);
+            QTRY_COMPARE_WITH_TIMEOUT(sourceAtRow(0).width != 300, true, 3000);
             const Source s = sourceAtRow(0);
-            QVERIFY2(std::abs(s.width - 3 * s.height) <= 1 && std::abs(s.width - 480) <= 3,
-                     qPrintable(QStringLiteral("%1x%2").arg(s.width).arg(s.height)));
+            QVERIFY2(std::abs(s.width - 3 * s.height) <= 1 && std::abs(s.height - expectedHeight) <= 1,
+                     qPrintable(QStringLiteral("%1x%2, Höhe erwartet %3").arg(s.width).arg(s.height).arg(expectedHeight)));
         }
         place(text, 1500, 100, 300, 100);
         selectSourceRow(2);
@@ -2755,7 +2760,8 @@ int main(int argc, char *argv[])
         return 77;
     }
     QApplication app(argc, argv);
-    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Aussehen wie dss-app, Schriften aus src/app/schriften/ statt aus dem System.
+    applyAppearance(darkTheme(), QStringLiteral(DSS_TEST_APP_FONT_DIR));
     TestFensterBearbeiten test;
     return QTest::qExec(&test, argc, argv);
 }

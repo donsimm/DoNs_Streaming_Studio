@@ -369,7 +369,8 @@ int main(int argc, char *argv[])
         return 77;
     }
     QApplication app(argc, argv);
-    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Aussehen wie dss-app, Schriften aus src/app/schriften/ statt aus dem System.
+    applyAppearance(darkTheme(), QStringLiteral(DSS_TEST_APP_FONT_DIR));
     TestLeinwand test;
     return QTest::qExec(&test, argc, argv);
 }

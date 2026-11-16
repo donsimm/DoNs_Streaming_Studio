@@ -224,7 +224,9 @@ target_compile_definitions(tst_windowedit PRIVATE DSS_TEST_FONT_DATA="${CMAKE_CU
 if(DSS_BUILD_APP)
   qt_add_executable(tst_fensterbearbeiten tst_fensterbearbeiten.cpp)
   target_link_libraries(tst_fensterbearbeiten PRIVATE dss_app_ui dss_obs dss_warnings Qt6::Test)
+  # Schriften des Fensters aus dem Quellbaum, auch beim Bau der Version im Einsatz.
   target_compile_definitions(tst_fensterbearbeiten PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_APP_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften"
     DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
     DSS_TEST_LARGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/gross-daten"
     DSS_CORE_OVERLAY_SERVER=$<BOOL:${DSS_CORE_OVERLAY_SERVER}>)
@@ -248,6 +250,7 @@ if(DSS_BUILD_APP)
   target_link_libraries(tst_fensterchatbot PRIVATE dss_app_ui dss_warnings Qt6::Test Qt6::Network Qt6::WebSockets)
   # P14 e3-7: Variablen und Zuschauer für «Variablen» aus dem erfundenen Export (Import im Testkern)
   target_compile_definitions(tst_fensterchatbot PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_APP_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften"
     DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
   add_dependencies(tst_fensterchatbot dss-core)
   add_test(NAME tst_fensterchatbot COMMAND tst_fensterchatbot)
@@ -353,6 +356,7 @@ if(DSS_BUILD_APP AND DSS_APP_RENDERER)
   qt_add_executable(tst_leinwand tst_leinwand.cpp)
   target_link_libraries(tst_leinwand PRIVATE dss_app_ui dss_media dss_warnings Qt6::Test)
   target_compile_definitions(tst_leinwand PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
+    DSS_TEST_APP_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften"
     DSS_TEST_FONT="${DSS_TEST_FONT}"
     DSS_TEST_VARIABLE_FONT="${CMAKE_CURRENT_SOURCE_DIR}/daten/schriften/urbanist/Urbanist[wght].ttf"
     DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"

@@ -353,7 +353,6 @@ private slots:
         m_client = std::make_unique<CoreClient>(o);
 
         const Theme theme = darkTheme();
-        qApp->setStyleSheet(styleSheet(theme, symbolPath));
         m_window = std::make_unique<MainWindow>(theme, false, m_client.get());
         m_window->resize(1280, 800);
         m_window->show();
@@ -2294,7 +2293,9 @@ private slots:
                 input->setTextValue(name);
                 input->accept();
             });
-            const QPoint center = list->visualItemRect(list->currentItem()).center();
+            // Mitte der Spalte «Name»; die Mitte der Zeile liegt je nach Schriftbreite schon in «Nacheinander».
+            const QPoint center(list->header()->sectionViewportPosition(0) + list->header()->sectionSize(0) / 2,
+                                list->visualItemRect(list->currentItem()).center().y());
             QTest::mouseClick(list->viewport(), Qt::LeftButton, {}, center);
             QTest::mouseDClick(list->viewport(), Qt::LeftButton, {}, center);
             QTRY_VERIFY_WITH_TIMEOUT(asked, 3000);
@@ -2705,7 +2706,8 @@ int main(int argc, char *argv[])
         return 77;
     }
     QApplication app(argc, argv);
-    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Aussehen wie dss-app, Schriften aus src/app/schriften/ statt aus dem System.
+    applyAppearance(darkTheme(), QStringLiteral(DSS_TEST_APP_FONT_DIR));
     TestFensterChatBot test;
     return QTest::qExec(&test, argc, argv);
 }

@@ -1,5 +1,10 @@
 #include "theme.h"
 
+#include "fonts.h"
+#include "symbols.h"
+
+#include <QApplication>
+#include <QFont>
 #include <QRegularExpression>
 
 // Werte aus Yami.obt (OBS Studio, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524, GPL Version 2),
@@ -427,4 +432,19 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
     css.replace(QStringLiteral("@fontSizeLarge@"), QString::number(t.fontSizeLarge));
     css.replace(QStringLiteral("@fontSizeChat@"), QString::number(t.fontSizeChat));
     return css;
+}
+
+QStringList applyAppearance(const Theme &t, const QString &fontDir)
+{
+    // Fusion: derselbe Grundstil unabhängig von der Desktop-Umgebung.
+    // https://doc.qt.io/qt-6.8/qstylefactory.html
+    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Schrift aus src/app/schriften/, nicht aus einer Installation (Auftrag P06).
+    const QStringList families = loadWindowFonts(fontDir);
+    if (!families.contains(t.fontFamily))
+        qWarning("Schrift «%s» nicht geladen, Qt wählt einen Ersatz", qPrintable(t.fontFamily));
+    QApplication::setFont(QFont(t.fontFamily, t.fontSize));
+    QApplication::setPalette(palette(t));
+    qApp->setStyleSheet(styleSheet(t, symbolPath));
+    return families;
 }
