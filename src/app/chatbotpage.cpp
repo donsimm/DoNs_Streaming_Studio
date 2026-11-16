@@ -38,42 +38,6 @@ constexpr int kRunIdRole = Qt::UserRole;
 constexpr int kActionIdRole = Qt::UserRole + 1;
 constexpr int kCancellableRole = Qt::UserRole + 2;
 
-// Ergebnisfarbe der Zelle: Das Stylesheet setzt QTreeView::item { color }, und QStyleSheetStyle
-// überschreibt damit die Textfarbe aus Qt::ForegroundRole (im Bild geprüft, tst_fensterchatbot).
-// Darum zeichnet der Delegat Hintergrund und Rahmen wie die Zeile und den Text selbst in der Farbe
-// der Rolle. Gewählte Zeile wie alle (Farbe auf @primary@ wäre ein neues Paar im Theme).
-class ResultColorDelegate : public QStyledItemDelegate
-{
-public:
-    using QStyledItemDelegate::QStyledItemDelegate;
-
-    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
-    {
-        const QVariant foreground = index.data(Qt::ForegroundRole);
-        if (!foreground.canConvert<QBrush>() || option.state.testFlag(QStyle::State_Selected)) {
-            QStyledItemDelegate::paint(painter, option, index);
-            return;
-        }
-        QStyleOptionViewItem opt(option);
-        initStyleOption(&opt, index);
-        const QWidget *widget = opt.widget;
-        QStyle *style = widget ? widget->style() : QApplication::style();
-        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
-        const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
-        const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
-                                   .adjusted(margin, 0, -margin, 0);
-        const QString text = opt.text;
-        opt.text.clear();
-        style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
-        painter->save();
-        painter->setFont(opt.font);
-        painter->setPen(foreground.value<QBrush>().color());
-        painter->drawText(textRect, int(opt.displayAlignment),
-                          opt.fontMetrics.elidedText(text, opt.textElideMode, textRect.width()));
-        painter->restore();
-    }
-};
-
 // Mitlaufen nur, wenn die Liste schon unten stand (sonst liest der Nutzer gerade weiter oben).
 bool atBottom(QTreeWidget *list)
 {
@@ -117,7 +81,7 @@ QTreeWidgetItem *chatItem(const dss::ChatRow &row)
 }
 
 // Zeilen «Chat»: graue Ereigniszeilen (chatEventRow), Abzeichen in badgeBot/badgeChannel/badgeMod,
-// Name in der Chatfarbe der Zeile. Wie ResultColorDelegate selbst gezeichnet, weil das Stylesheet
+// Name in der Chatfarbe der Zeile. Wie ForegroundDelegate (panels.h) selbst gezeichnet, weil das Stylesheet
 // Text- und Hintergrundfarbe aus den Rollen überdeckt. Farben nur aus dem Theme und der Chatfarbe.
 class ChatRowDelegate : public QStyledItemDelegate
 {
@@ -293,7 +257,7 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_runs->setColumnWidth(0, digit * 10);
     m_runs->setColumnWidth(1, digit * 20);
     m_runs->setColumnWidth(2, digit * 18);
-    m_runs->setItemDelegateForColumn(3, new ResultColorDelegate(m_runs));
+    m_runs->setItemDelegateForColumn(3, new ForegroundDelegate(m_runs));
     connect(m_runs, &QTreeWidget::itemSelectionChanged, this, &ChatBotPage::refreshRunButtons);
 
     m_openAction = new QPushButton(QStringLiteral("Im Editor öffnen"));
@@ -367,7 +331,7 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     chatColumn->addWidget(buttonBar({m_chatAccount, m_chatText}, {m_chatCounter, m_chatSend}, chatBox, m_chatText));
     addLivePanel(QStringLiteral("Chat"), chatBox, 1, 0);
 
-    m_actions = new ActionsPage(m_pages);
+    m_actions = new ActionsPage(m_theme, m_pages);
     addSubTab(QStringLiteral("Aktionen"), m_actions);
 }
 

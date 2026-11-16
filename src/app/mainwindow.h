@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actionspage.h"
 #include "actionview.h"
 #include "canvasedit.h"
 #include "connectionstate.h"
@@ -14,6 +15,7 @@
 #include <QMainWindow>
 #include <QUuid>
 
+#include <functional>
 #include <optional>
 
 class CanvasWidget;
@@ -107,8 +109,22 @@ private:
     void connectActions();
     void refreshActionList();
     void refreshActionButtons();
-    void runActionEdits(const dss::EditResult &result, const QString &savedName);
+    // section: Abschnitt der Mitte (Prüfmeldung am Feld statt in der Statuszeile); deleted:
+    // «Gelöscht: <Name>» statt «Gespeichert: <Name>».
+    void runActionEdits(const dss::EditResult &result, const QString &savedName,
+                        ActionsPage::Section section = ActionsPage::NoSection, bool deleted = false);
     void sendNextActionEdit();
+    // P14 e2-15, Mitte: Abschnitte aus dem Stand des Kerns, Freigaben der Schritte und von «▶ Testen».
+    // resetFields: Felder zeigen wieder den Wert des Kerns (nach Prüfmeldung oder Ablehnung).
+    void refreshActionDetail(bool resetFields = false);
+    void refreshStepButtons();
+    void refreshActionTest();
+    void connectActionDetail();
+    // Bearbeitung der gezeigten Aktion: fn bekommt die Aktion des Kerns und liefert die Bearbeitung
+    void editDetailAction(ActionsPage::Section section,
+                          const std::function<dss::EditResult(const dss::actions::ActionsConfig &,
+                                                              const dss::actions::Action &)> &fn);
+    void startActionTest();
     void askRenameActionGroup(const QString &group);
     void askRemoveActionGroup(const QString &group);
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
@@ -239,6 +255,13 @@ private:
     qint64 m_actionEditRequest = 0;     // offene Bearbeitung
     QString m_actionEditSaved;          // Name für «Gespeichert: <Name>» nach der letzten
     QUuid m_actionEditCreated;          // neue Aktion, danach wählen
+    // P14 e2-15: Abschnitt der Mitte, aus dem die Bearbeitung kommt (Prüfmeldung am Feld, neue
+    // Schritte und Auslöser wählen); nach dem Löschen «Gelöscht: <Name>»
+    ActionsPage::Section m_actionEditSection = ActionsPage::NoSection;
+    bool m_actionEditDeleted = false;
+    qint64 m_actionTestRequest = 0;     // offene Anfrage action_test
+    QString m_actionTestName;
+    bool m_actionTestReal = false;
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

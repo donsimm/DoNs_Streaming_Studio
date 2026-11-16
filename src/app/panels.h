@@ -2,6 +2,7 @@
 
 #include <QList>
 #include <QString>
+#include <QStyledItemDelegate>
 
 class QAbstractSpinBox;
 class QGridLayout;
@@ -38,3 +39,16 @@ QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWi
 // Bereich wie ein Dock: Titel (#chatBotPanelTitle) wie QDockWidget::title, darunter der Inhalt
 // (#chatBotPanelBody), fest ohne Lösen und Schliessen.
 QWidget *dockPanel(const QString &title, QWidget *content, QWidget *parent);
+
+// Textfarbe einer Zelle aus Qt::ForegroundRole (Theme-Wert, vom Fenster hereingereicht): Das
+// Stylesheet setzt QTreeView::item { color }, und QStyleSheetStyle überschreibt damit die
+// Textfarbe aus der Rolle (im Bild geprüft, tst_fensterchatbot). Darum zeichnet der Delegat
+// Hintergrund, Rahmen und Kästchen wie die Zeile und den Text selbst in der Farbe der Rolle, mit
+// der Schrift aus Qt::FontRole. Gewählte Zeile wie alle (Farbe auf @primary@ wäre ein neues Paar im
+// Theme). P14 e2-12 für «Läufe der Aktionen», seit e2-15 auch für die Schritte.
+class ForegroundDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+};

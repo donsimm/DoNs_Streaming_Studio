@@ -648,7 +648,7 @@ void MainWindow::connectActions()
             && !confirm(this, QStringLiteral("Aktion löschen?"), question, QStringLiteral("Löschen"),
                         QStringLiteral("Abbrechen")))
             return;
-        runActionEdits(dss::removeAction(*info->config, id), action->name);
+        runActionEdits(dss::removeAction(*info->config, id), action->name, ActionsPage::NoSection, true);
     });
     connect(page, &ActionsPage::resetClicked, this, [this] {
         const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
@@ -665,27 +665,241 @@ void MainWindow::connectActions()
     });
     connect(page, &ActionsPage::renameGroupRequested, this, &MainWindow::askRenameActionGroup);
     connect(page, &ActionsPage::removeGroupRequested, this, &MainWindow::askRemoveActionGroup);
-    // Antworten: beim ersten Fehler aufhören (die Meldung zeigt onChangeFinished) und die Liste
-    // wieder aus dem Stand des Kerns zeigen; nach der letzten «Gespeichert: <Name>».
+    // Antworten: beim ersten Fehler aufhören (die Meldung zeigt onChangeFinished, aus der Mitte
+    // dazu am Feld) und die Liste wieder aus dem Stand des Kerns zeigen; nach der letzten
+    // «Gespeichert: <Name>» bzw. «Gelöscht: <Name>».
     connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
         if (m_actionEditRequest == 0 || result.requestId != m_actionEditRequest)
             return;
         m_actionEditRequest = 0;
+        ActionsPage *page = m_chatBot->actionsPage();
         if (!result.ok) {
             m_actionEdits.clear();
+            page->setSectionProblem(m_actionEditSection, result.message);
             refreshActionList();
+            refreshActionDetail(true);
             return;
         }
         if (!m_actionEdits.isEmpty()) {
             sendNextActionEdit();
             return;
         }
-        if (!m_actionEditCreated.isNull())
-            m_chatBot->actionsPage()->selectAction(m_actionEditCreated);
+        if (!m_actionEditCreated.isNull()) {
+            if (m_actionEditSection == ActionsPage::StepSection)
+                page->selectStep(m_actionEditCreated);
+            else if (m_actionEditSection == ActionsPage::TriggerSection)
+                page->selectTrigger(m_actionEditCreated);
+            else
+                page->selectAction(m_actionEditCreated);
+        }
         if (!m_actionEditSaved.isEmpty())
-            showStatus(dss::savedStatusText(m_actionEditSaved));
+            showStatus(m_actionEditDeleted ? dss::deletedStatusText(m_actionEditSaved)
+                                           : dss::savedStatusText(m_actionEditSaved));
     });
+    connectActionDetail();
     refreshActionList();
+}
+
+void MainWindow::connectActionDetail()
+{
+    // P14 e2-15, Mitte: jede Bearbeitung über dss::actionview, die ganze Aktion als action_put
+    using dss::actions::Action;
+    using dss::actions::ActionsConfig;
+    ActionsPage *page = m_chatBot->actionsPage();
+    connect(page, &ActionsPage::nameEdited, this, [this](const QString &name) {
+        editDetailAction(ActionsPage::ActionSection, [name](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.name = name;
+            return dss::putAction(config, before, after);
+        });
+    });
+    connect(page, &ActionsPage::groupEdited, this, [this](const QString &group) {
+        editDetailAction(ActionsPage::ActionSection, [group](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.group = group;
+            return dss::putAction(config, before, after);
+        });
+    });
+    connect(page, &ActionsPage::queueChosen, this, [this](const QUuid &queue) {
+        editDetailAction(ActionsPage::ActionSection, [queue](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.queue = queue;
+            return dss::putAction(config, before, after);
+        });
+    });
+    connect(page, &ActionsPage::triggerAddChosen, this, [this](const QString &type) {
+        editDetailAction(ActionsPage::TriggerSection, [type](const ActionsConfig &, const Action &action) {
+            return dss::addTrigger(action, type);
+        });
+    });
+    connect(page, &ActionsPage::triggerRemoveClicked, this, [this] {
+        const QUuid id = m_chatBot->actionsPage()->selectedTrigger();
+        editDetailAction(ActionsPage::TriggerSection, [id](const ActionsConfig &, const Action &action) {
+            return dss::removeTrigger(action, id);
+        });
+    });
+    connect(page, &ActionsPage::triggerEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        editDetailAction(ActionsPage::TriggerSection, [id, enabled](const ActionsConfig &, const Action &action) {
+            return dss::setTriggerEnabled(action, id, enabled);
+        });
+    });
+    connect(page, &ActionsPage::stepAddChosen, this, [this](const QString &type) {
+        const QUuid selected = m_chatBot->actionsPage()->selectedStep();
+        editDetailAction(ActionsPage::StepSection, [selected, type](const ActionsConfig &, const Action &action) {
+            return dss::addStep(action, selected, type);
+        });
+    });
+    connect(page, &ActionsPage::stepRemoveClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedStep();
+        const Action *action = info && info->config ? info->config->action(m_chatBot->actionsPage()->detailAction())
+                                                    : nullptr;
+        if (!action || id.isNull())
+            return;
+        const QString question = dss::removeStepQuestion(*action, id);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Schritt löschen?"), question, QStringLiteral("Löschen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        // Stand nach der Rückfrage: Während sie offen war, kann eine neue Liste gekommen sein.
+        editDetailAction(ActionsPage::StepSection, [id](const ActionsConfig &, const Action &a) {
+            return dss::removeStep(a, id);
+        });
+    });
+    connect(page, &ActionsPage::stepMoveClicked, this, [this](int direction) {
+        const QUuid id = m_chatBot->actionsPage()->selectedStep();
+        editDetailAction(ActionsPage::StepSection, [id, direction](const ActionsConfig &, const Action &action) {
+            return dss::moveStep(action, id, direction);
+        });
+    });
+    connect(page, &ActionsPage::stepEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        editDetailAction(ActionsPage::StepSection, [id, enabled](const ActionsConfig &, const Action &action) {
+            return dss::setStepEnabled(action, id, enabled);
+        });
+    });
+    connect(page, &ActionsPage::stepSelected, this, &MainWindow::refreshStepButtons);
+    connect(page, &ActionsPage::triggerSelected, this, &MainWindow::refreshStepButtons);
+    // «▶ Testen»: action_test an den Kern; «Probelauf gestartet: <Name>» nach der Antwort,
+    // Ablehnungen zeigt onChangeFinished.
+    connect(page, &ActionsPage::testClicked, this, &MainWindow::startActionTest);
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshActionTest);
+    connect(m_client, &dss::CoreClient::twitchStatusChanged, this, &MainWindow::refreshActionTest);
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionTestRequest == 0 || result.requestId != m_actionTestRequest)
+            return;
+        m_actionTestRequest = 0;
+        if (result.ok)
+            showStatus(dss::testStartedStatusText(m_actionTestName, m_actionTestReal));
+    });
+}
+
+void MainWindow::editDetailAction(ActionsPage::Section section,
+                                  const std::function<dss::EditResult(const dss::actions::ActionsConfig &,
+                                                                      const dss::actions::Action &)> &fn)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    const dss::actions::Action *action = info->config->action(m_chatBot->actionsPage()->detailAction());
+    if (!action)
+        return;
+    const dss::EditResult result = fn(*info->config, *action);
+    // Nach dem Umbenennen steht der neue Name in der Statuszeile
+    const QString name = result.edits.isEmpty() || result.edits.first().type != QLatin1String("action_put")
+        ? action->name
+        : result.edits.first().fields.value(QStringLiteral("action")).toObject().value(QStringLiteral("name")).toString();
+    runActionEdits(result, name, section);
+}
+
+void MainWindow::refreshActionDetail(bool resetFields)
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->selectedAction()) : nullptr;
+    ActionsPage::ActionDetail detail;
+    if (action) {
+        const dss::actions::ActionsConfig &config = *info->config;
+        // Namen der Kurzinhalte: Overlays aus der Liste, Quellen der Overlays, die das Fenster
+        // schon geladen hat
+        dss::ActionViewNames names;
+        for (const dss::OverlaySummary &summary : m_client->overlays()) {
+            names.overlays.insert(summary.id, summary.name);
+            if (const std::optional<dss::Overlay> overlay = m_client->overlay(summary.id)) {
+                for (const dss::Source &source : overlay->sources)
+                    names.sources.insert(source.id, source.name);
+            }
+        }
+        detail.actionId = action->id;
+        detail.name = action->name;
+        detail.group = action->group;
+        detail.groups = dss::actionGroupChoices(config);
+        detail.queues = dss::queueChoices(config, action->queue);
+        detail.queue = action->queue;
+        detail.enabled = action->enabled;
+        // [OFFEN] Fassung der Vorlage (templateAction) kommt mit f; bis dahin nur «mitgeliefert»
+        detail.hint = dss::templateHint(*action, nullptr);
+        // [OFFEN] e2-14: Prüfmeldungen (checkReferences) wie in refreshActionList
+        detail.triggers = dss::triggerRows(*action, config, {});
+        detail.steps = dss::stepRows(*action, config, names, {});
+        detail.editable = true;
+        page->setAreaTitle(ActionsPage::Action, dss::actionTitle(*action));
+    } else {
+        detail.hint = QStringLiteral("Keine Aktion gewählt");
+        page->setAreaTitle(ActionsPage::Action, QStringLiteral("Aktion"));
+    }
+    page->setActionDetail(detail, resetFields);
+    refreshStepButtons();
+    refreshActionTest();
+}
+
+void MainWindow::refreshStepButtons()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    page->setStepButtons(action != nullptr, action ? dss::stepButtons(*action, page->selectedStep()) : dss::StepButtons(),
+                         action && !page->selectedTrigger().isNull());
+}
+
+void MainWindow::refreshActionTest()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    const bool editable = m_client->isConnected() && info && info->config && status;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    page->setTestState(dss::testUserChoices(m_client->twitchStatus().value_or(dss::TwitchStatusInfo())),
+                       action && dss::testAllowed(*action, *status),
+                       action && dss::realTestAllowed(*action, *status));
+}
+
+void MainWindow::startActionTest()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    const dss::actions::Action *action =
+        m_client->isConnected() && info && info->config && status ? info->config->action(page->detailAction()) : nullptr;
+    if (!action || !dss::testAllowed(*action, *status) || m_actionTestRequest != 0)
+        return;
+    const QList<dss::TestUserChoice> users =
+        dss::testUserChoices(m_client->twitchStatus().value_or(dss::TwitchStatusInfo()));
+    const int index = page->testUserIndex();
+    if (index < 0 || index >= users.size())
+        return;
+    const bool real = page->realTest() && dss::realTestAllowed(*action, *status);
+    const dss::EditResult result = dss::testAction(*action, users.at(index), real);
+    if (!result.problem.isEmpty()) {
+        showStatus(result.problem);
+        return;
+    }
+    if (result.edits.isEmpty())
+        return;
+    m_actionTestRequest = m_client->sendActionsEdit(result.edits.first());
+    m_actionTestName = action->name;
+    m_actionTestReal = real;
 }
 
 void MainWindow::refreshActionList()
@@ -707,22 +921,32 @@ void MainWindow::refreshActionButtons()
         editable ? info->config->action(m_chatBot->actionsPage()->selectedAction()) : nullptr;
     m_chatBot->actionsPage()->setListButtons(editable, action != nullptr,
                                              action && dss::actionResettable(*action));
+    refreshActionDetail();
 }
 
-void MainWindow::runActionEdits(const dss::EditResult &result, const QString &savedName)
+void MainWindow::runActionEdits(const dss::EditResult &result, const QString &savedName,
+                                ActionsPage::Section section, bool deleted)
 {
+    // Aus der Mitte: Prüfmeldung am Feld (Entscheid des Nutzers, 2026-11-16), eine neue
+    // Bearbeitung löscht die alte Meldung des Abschnitts.
+    m_chatBot->actionsPage()->setSectionProblem(section, result.problem);
     if (!result.problem.isEmpty()) {
-        showStatus(result.problem);
+        if (section == ActionsPage::NoSection)
+            showStatus(result.problem);
         refreshActionList();
+        refreshActionDetail(true);
         return;
     }
     if (result.edits.isEmpty() || m_actionEditRequest != 0) {
-        // Nichts zu tun oder eine Bearbeitung noch unterwegs: Kästchen wieder wie im Kern
+        // Nichts zu tun oder eine Bearbeitung noch unterwegs: Kästchen und Felder wieder wie im Kern
         refreshActionList();
+        refreshActionDetail(true);
         return;
     }
     m_actionEdits = result.edits;
     m_actionEditCreated = result.created;
+    m_actionEditSection = section;
+    m_actionEditDeleted = deleted;
     // Ohne Namen (neue oder kopierte Aktion): der Name aus action_put
     m_actionEditSaved = savedName.isEmpty()
         ? result.edits.first().fields.value(QStringLiteral("action")).toObject().value(QStringLiteral("name")).toString()
@@ -763,7 +987,7 @@ void MainWindow::askRemoveActionGroup(const QString &group)
         return;
     const std::optional<dss::ActionsConfigInfo> now = m_client->actionsConfig();
     if (now && now->config)
-        runActionEdits(dss::removeActionGroup(*now->config, group), group);
+        runActionEdits(dss::removeActionGroup(*now->config, group), group, ActionsPage::NoSection, true);
 }
 
 void MainWindow::refreshChatSend()

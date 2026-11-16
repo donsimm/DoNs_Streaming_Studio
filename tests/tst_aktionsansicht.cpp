@@ -143,6 +143,7 @@ private slots:
         QCOMPARE(durationText(90000), QStringLiteral("90 s"));
         QCOMPARE(durationText(1200000), QStringLiteral("20 min"));
         QCOMPARE(savedStatusText(QStringLiteral("Begrüssung")), QStringLiteral("Gespeichert: Begrüssung"));
+        QCOMPARE(deletedStatusText(QStringLiteral("Begrüssung")), QStringLiteral("Gelöscht: Begrüssung"));
         QCOMPARE(copyName(QStringLiteral("A"), {QStringLiteral("A")}), QStringLiteral("A (Kopie)"));
         QCOMPARE(copyName(QStringLiteral("A"), {QStringLiteral("A"), QStringLiteral("A (Kopie)")}),
                  QStringLiteral("A (Kopie 2)"));

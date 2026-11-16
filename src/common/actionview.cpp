@@ -516,6 +516,11 @@ QString savedStatusText(const QString &name)
     return QStringLiteral("Gespeichert: %1").arg(name);
 }
 
+QString deletedStatusText(const QString &name)
+{
+    return QStringLiteral("Gelöscht: %1").arg(name);
+}
+
 QString copyName(const QString &name, const QStringList &names)
 {
     const QString first = QStringLiteral("%1 (Kopie)").arg(name);

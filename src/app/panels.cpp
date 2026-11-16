@@ -3,12 +3,41 @@
 #include "symbols.h"
 
 #include <QAbstractSpinBox>
+#include <QApplication>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPainter>
+#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+void ForegroundDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    const QVariant foreground = index.data(Qt::ForegroundRole);
+    if (!foreground.canConvert<QBrush>() || option.state.testFlag(QStyle::State_Selected)) {
+        QStyledItemDelegate::paint(painter, option, index);
+        return;
+    }
+    QStyleOptionViewItem opt(option);
+    initStyleOption(&opt, index);
+    const QWidget *widget = opt.widget;
+    QStyle *style = widget ? widget->style() : QApplication::style();
+    // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
+    const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
+    const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
+                               .adjusted(margin, 0, -margin, 0);
+    const QString text = opt.text;
+    opt.text.clear();
+    style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
+    painter->save();
+    painter->setFont(opt.font);
+    painter->setPen(foreground.value<QBrush>().color());
+    painter->drawText(textRect, int(opt.displayAlignment),
+                      opt.fontMetrics.elidedText(text, opt.textElideMode, textRect.width()));
+    painter->restore();
+}
 
 QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
                           const QString &toolTip, QWidget *parent)

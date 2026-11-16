@@ -61,6 +61,9 @@ QUuid keptSelection(const QList<QUuid> &before, const QList<QUuid> &after, const
 
 // Statuszeile nach einer gespeicherten Änderung: «Gespeichert: <Name>»
 QString savedStatusText(const QString &name);
+// Statuszeile nach dem Löschen einer Aktion oder Gruppe: «Gelöscht: <Name>» (Entscheid des
+// Nutzers, 2026-11-16)
+QString deletedStatusText(const QString &name);
 
 // Name einer Kopie: «<Name> (Kopie)», bei Bedarf «<Name> (Kopie 2)» usw., eindeutig in names.
 QString copyName(const QString &name, const QStringList &names);

@@ -835,10 +835,13 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
                                   QStringLiteral("Gespeichert: ") + coreAction(created)->name, 3000);
 
-        // Löschen ohne Verweise: ohne Rückfrage
+        // Löschen ohne Verweise: ohne Rückfrage, danach «Gelöscht: <Name>»
+        const QString createdName = coreAction(created)->name;
         QTest::mouseClick(remove, Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!coreAction(created), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(treeItem(tree, QStringLiteral("DSS-Test Gruppe"))->childCount(), 2, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gelöscht: ") + createdName, 3000);
 
         // Doppelklick öffnet nur «Umbenennen»: Dialog abbrechen, die Gruppe bleibt aufgeklappt
         group = treeItem(tree, QStringLiteral("DSS-Test Gruppe"));
@@ -914,6 +917,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!coreAction(greet) && !coreAction(raid), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(!treeItem(tree, QStringLiteral("DSS-Test Gruppe Neu")), 3000);
         QVERIFY(coreAction(single));
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gelöscht: DSS-Test Gruppe Neu"), 3000);
 
         // Ohne Kern kein Menü und kein Umbenennen, auch wenn noch eine Gruppenzeile da ist
         // (Zeilen von Hand gesetzt, nach der Trennung leert MainWindow den Baum sonst selbst)
@@ -952,6 +957,213 @@ private slots:
         QVERIFY(!dialogShown);
         m_client->start();
         QTRY_VERIFY_WITH_TIMEOUT(m_client->isConnected(), 5000);
+    }
+
+    // Schritte der Aktion im Kern, alle Ebenen; -1 = Aktion fehlt
+    int stepCount(const QUuid &id) const
+    {
+        const std::optional<actions::Action> a = coreAction(id);
+        if (!a)
+            return -1;
+        std::function<int(const QList<actions::Step> &)> count = [&count](const QList<actions::Step> &steps) {
+            int n = 0;
+            for (const actions::Step &s : steps)
+                n += 1 + count(s.steps);
+            return n;
+        };
+        return count(a->steps);
+    }
+
+    // Eintrag text im Menü eines Knopfs «hinzufügen»
+    static QAction *menuAction(QToolButton *button, const QString &text)
+    {
+        if (!button->menu())
+            return nullptr;
+        for (QAction *a : button->menu()->actions())
+            if (!a->isSeparator() && a->text() == text)
+                return a;
+        return nullptr;
+    }
+
+    // P14 e2-15, Mitte: Titel und Hinweis, Abschnitte, Name mit Enter, Prüfmeldung am Feld,
+    // Auslöser und Schritte, durchgestrichen, «▶ Testen» im Testkern
+    void actionDetail()
+    {
+        QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
+        auto *page = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->actionsConfig() && m_client->actionsConfig()->config, 3000);
+        auto *tree = child<QTreeWidget>("actionsTree");
+        auto *name = child<QLineEdit>("actionName");
+        auto *group = child<QComboBox>("actionGroup");
+        auto *queue = child<QComboBox>("actionQueue");
+        auto *enabled = child<QCheckBox>("actionEnabled");
+        auto *triggers = child<QTreeWidget>("actionTriggers");
+        auto *steps = child<QTreeWidget>("actionSteps");
+        auto *triggerAdd = child<QToolButton>("actionTriggerAdd");
+        auto *triggerRemove = child<QToolButton>("actionTriggerRemove");
+        auto *stepAdd = child<QToolButton>("actionStepAdd");
+        auto *stepRemove = child<QToolButton>("actionStepRemove");
+        auto *stepUp = child<QToolButton>("actionStepUp");
+        auto *stepDown = child<QToolButton>("actionStepDown");
+        auto *testUser = child<QComboBox>("actionTestUser");
+        auto *test = child<QPushButton>("actionTest");
+        auto *realTest = child<QCheckBox>("actionRealTest");
+        auto *actionSection = child<QWidget>("actionSection");
+        auto *hint = actionSection ? actionSection->findChild<QLabel *>(QStringLiteral("hintLabel")) : nullptr;
+        QVERIFY(tree && name && group && queue && enabled && triggers && steps && triggerAdd && triggerRemove
+                && stepAdd && stepRemove && stepUp && stepDown && testUser && test && realTest && hint);
+        const QList<QLabel *> problems = page->findChildren<QLabel *>(QStringLiteral("fieldProblem"));
+        QCOMPARE(problems.size(), 3);
+        for (QLabel *problem : problems)
+            QVERIFY(problem->height() > 0); // Höhe reserviert, auch ohne Meldung
+
+        // Abschnitte über section(), Tooltips und Leiste wie unter den Docks
+        const QList<std::pair<QToolButton *, QString>> tips{
+            {triggerAdd, QStringLiteral("Auslöser hinzufügen")}, {triggerRemove, QStringLiteral("Auslöser entfernen")},
+            {stepAdd, QStringLiteral("Schritt hinzufügen")}, {stepRemove, QStringLiteral("Schritt löschen")},
+            {stepUp, QStringLiteral("Schritt nach oben")}, {stepDown, QStringLiteral("Schritt nach unten")}};
+        for (const auto &[button, tip] : tips) {
+            QCOMPARE(button->toolTip(), tip);
+            QCOMPARE(button->accessibleName(), tip);
+            QCOMPARE(button->iconSize(), QSize(14, 14));
+        }
+        QCOMPARE(stepAdd->popupMode(), QToolButton::InstantPopup);
+        QCOMPARE(triggerAdd->popupMode(), QToolButton::InstantPopup);
+        QCOMPARE(stepAdd->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        QCOMPARE(test->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        QCOMPARE(test->text(), QStringLiteral("▶ Testen"));
+        QCOMPARE(realTest->text(), QStringLiteral("echt ausführen"));
+        // «Testen» rechtsbündig nach der Dehnung
+        QVERIFY(test->geometry().left() > stepDown->geometry().right() + 3 * stepDown->width());
+
+        // Ohne Auswahl: Titel «Aktion», Hinweis, Felder ausgegraut
+        tree->setCurrentItem(nullptr);
+        QCOMPARE(page->areaTitle(ActionsPage::Action), QStringLiteral("Aktion"));
+        QCOMPARE(hint->text(), QStringLiteral("Keine Aktion gewählt"));
+        QVERIFY(!name->isEnabled() && !group->isEnabled() && !queue->isEnabled() && !enabled->isEnabled());
+        QVERIFY(!test->isEnabled() && !stepAdd->isEnabled() && !triggerAdd->isEnabled());
+
+        const QUuid id = QUuid::createUuid();
+        QVERIFY(putTestAction(id, QStringLiteral("DSS-Test Mitte"), QString()));
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectAction(id), 3000);
+        QCOMPARE(page->areaTitle(ActionsPage::Action), QStringLiteral("Aktion «DSS-Test Mitte»"));
+        QCOMPARE(name->text(), QStringLiteral("DSS-Test Mitte"));
+        QVERIFY(hint->text().isEmpty()); // eigene Aktion
+        QVERIFY(name->isEnabled() && enabled->isChecked());
+        QCOMPARE(queue->currentText(), QStringLiteral("Standard"));
+        // «Warteschlangen verwalten …» ausgegraut (Wirkung mit e3)
+        auto *queueModel = qobject_cast<QStandardItemModel *>(queue->model());
+        QVERIFY(queueModel);
+        const int manage = queue->findText(QStringLiteral("Warteschlangen verwalten …"));
+        QVERIFY(manage >= 0);
+        QVERIFY(!queueModel->item(manage)->isEnabled());
+
+        // Name mit Enter speichern: action_put, Titel und Statuszeile mit dem neuen Namen
+        name->selectAll();
+        QTest::keyClicks(name, QStringLiteral("DSS-Test Mitte Neu"));
+        QTest::keyClick(name, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(coreAction(id)->name, QStringLiteral("DSS-Test Mitte Neu"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(page->areaTitle(ActionsPage::Action), QStringLiteral("Aktion «DSS-Test Mitte Neu»"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gespeichert: DSS-Test Mitte Neu"), 3000);
+
+        // Leerer Name: Prüfmeldung unter dem Abschnitt «Aktion», das Feld zeigt wieder den Wert des Kerns
+        QLabel *actionProblem = actionSection->findChild<QLabel *>(QStringLiteral("fieldProblem"));
+        QVERIFY(actionProblem && actionProblem->text().isEmpty());
+        const int problemHeight = actionProblem->height();
+        name->clear();
+        QTest::keyClick(name, Qt::Key_Return);
+        QVERIFY(!actionProblem->text().isEmpty());
+        QCOMPARE(page->sectionProblem(ActionsPage::ActionSection), actionProblem->text());
+        QCOMPARE(name->text(), QStringLiteral("DSS-Test Mitte Neu"));
+        QCOMPARE(coreAction(id)->name, QStringLiteral("DSS-Test Mitte Neu"));
+        QCOMPARE(actionProblem->height(), problemHeight); // Anordnung bleibt
+
+        // Auslöser hinzufügen (Menü aus triggerChoices) und entfernen
+        QAction *addTest = menuAction(triggerAdd, QStringLiteral("Test"));
+        QVERIFY(triggerAdd->isEnabled() && addTest);
+        addTest->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(coreAction(id)->triggers.size(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(triggers->topLevelItemCount(), 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(page->selectedTrigger(), coreAction(id)->triggers.first().id, 3000);
+        QVERIFY(triggers->topLevelItem(0)->flags() & Qt::ItemIsUserCheckable);
+        QVERIFY(triggerRemove->isEnabled());
+        QTest::mouseClick(triggerRemove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(coreAction(id)->triggers.isEmpty(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(triggers->topLevelItemCount(), 0, 3000);
+        QVERIFY(!triggerRemove->isEnabled());
+
+        // Schritte: Gruppe, darin zwei Kommentare (der neue Schritt ist jeweils gewählt)
+        const auto addStep = [&](const QString &label, int count) {
+            QAction *a = menuAction(stepAdd, label);
+            QVERIFY2(a, qPrintable(label));
+            a->trigger();
+            QTRY_COMPARE_WITH_TIMEOUT(stepCount(id), count, 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(!page->selectedStep().isNull(), 3000);
+        };
+        const QString groupLabel = actions::stepType(QString::fromLatin1(actions::kStepGroup))->label;
+        const QString commentLabel = actions::stepType(QString::fromLatin1(actions::kStepComment))->label;
+        addStep(groupLabel, 1);
+        addStep(commentLabel, 2);
+        const QUuid first = page->selectedStep();
+        addStep(commentLabel, 3);
+        const QUuid second = page->selectedStep();
+        QTRY_COMPARE_WITH_TIMEOUT(steps->topLevelItemCount(), 1, 3000);
+        QTreeWidgetItem *groupItem = steps->topLevelItem(0);
+        QCOMPARE(groupItem->childCount(), 2);
+        QCOMPARE(groupItem->text(0), groupLabel);
+        QVERIFY(groupItem->font(0).bold()); // Art fett
+        QVERIFY(!groupItem->font(1).bold());
+        QCOMPARE(coreAction(id)->steps.first().steps.at(1).id, second);
+
+        // Schritt nach oben: Reihenfolge im Kern, Auswahl bleibt
+        QVERIFY(stepUp->isEnabled() && !stepDown->isEnabled() && stepRemove->isEnabled());
+        QTest::mouseClick(stepUp, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(coreAction(id)->steps.first().steps.first().id, second, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(page->selectedStep(), second, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!stepUp->isEnabled() && stepDown->isEnabled(), 3000);
+        QCOMPARE(steps->topLevelItem(0)->child(1)->data(0, Qt::UserRole).toUuid(), first);
+
+        // Kästchen der Gruppe aus: Gruppe und Schritte darin rot durchgestrichen (stateError)
+        steps->topLevelItem(0)->setCheckState(0, Qt::Unchecked);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreAction(id)->steps.first().enabled, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(steps->topLevelItem(0)->font(0).strikeOut(), 3000);
+        QTreeWidgetItem *child0 = steps->topLevelItem(0)->child(0);
+        QVERIFY(child0->font(0).strikeOut() && child0->font(1).strikeOut());
+        QCOMPARE(child0->foreground(1).color(), darkTheme().stateError);
+        QCOMPARE(child0->checkState(0), Qt::Checked); // selbst an, nur darüber abgeschaltet
+
+        // Schritt entfernen: Rückfrage aus removeStepQuestion, Abbrechen lässt alles stehen
+        steps->setCurrentItem(steps->topLevelItem(0));
+        QString question;
+        answerQuestion(QStringLiteral("Abbrechen"), &question);
+        QTest::mouseClick(stepRemove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!question.isEmpty(), 3000);
+        QCOMPARE(question, removeStepQuestion(*coreAction(id), coreAction(id)->steps.first().id));
+        QCOMPARE(stepCount(id), 3);
+        question.clear();
+        answerQuestion(QStringLiteral("Löschen"), &question);
+        QTest::mouseClick(stepRemove, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(stepCount(id), 0, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(steps->topLevelItemCount(), 0, 3000);
+
+        // «▶ Testen» mit «Testzuschauer»: Probelauf im Testkern
+        QVERIFY(testUser->findText(QStringLiteral("Testzuschauer")) >= 0);
+        testUser->setCurrentIndex(testUser->findText(QStringLiteral("Testzuschauer")));
+        menuAction(stepAdd, commentLabel)->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(stepCount(id), 1, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(test->isEnabled(), 3000);
+        QVERIFY(!realTest->isChecked());
+        QTest::mouseClick(test, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Probelauf gestartet: DSS-Test Mitte Neu"), 3000);
+
+        // Aktion löschen: «Gelöscht: <Name>»
+        QTest::mouseClick(child<QToolButton>("actionRemove"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreAction(id), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gelöscht: DSS-Test Mitte Neu"), 3000);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.
