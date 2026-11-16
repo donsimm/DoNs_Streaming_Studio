@@ -2,6 +2,7 @@
 
 #include "actionspage.h"
 #include "headerbar.h"
+#include "listdetailpage.h"
 #include "panels.h"
 
 #include <QApplication>
@@ -333,6 +334,60 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
 
     m_actions = new ActionsPage(m_theme, m_pages);
     addSubTab(QStringLiteral("Aktionen"), m_actions);
+
+    // P14 e3-4: «Befehle» und «Zeitnachrichten» als Tabelle links, Gewähltes rechts. Spalten aus
+    // CommandRow bzw. TimerRow (actionview.h), Breiten in Ziffern der Schrift.
+    ListDetailPage::Setup commands;
+    commands.name = QStringLiteral("commands");
+    commands.listTitle = QStringLiteral("Befehle");
+    commands.detailTitle = QStringLiteral("Befehl");
+    commands.emptyHint = QStringLiteral("Kein Befehl gewählt");
+    commands.tableName = QStringLiteral("Befehle");
+    commands.columns = {{QStringLiteral("Aktiv"), 8},         {QStringLiteral("Auslöser"), 18},
+                        {QStringLiteral("Gruppe"), 12},       {QStringLiteral("Wer darf"), 18},
+                        {QStringLiteral("Abkl. Kanal"), 13},  {QStringLiteral("Abkl. Person"), 14},
+                        {QStringLiteral("Aktionen"), 20},     {QStringLiteral("Benutzt"), 0}};
+    commands.search = true;
+    commands.searchName = QStringLiteral("Befehle suchen");
+    commands.filter = true;
+    commands.filterName = QStringLiteral("Gruppe der Befehle");
+    commands.addTip = QStringLiteral("Befehl hinzufügen");
+    commands.copyTip = QStringLiteral("Befehl kopieren");
+    commands.removeTip = QStringLiteral("Befehl löschen");
+    commands.listHint = true;
+    m_commands = new ListDetailPage(m_theme, commands, m_pages);
+    addSubTab(QStringLiteral("Befehle"), m_commands);
+
+    ListDetailPage::Setup timers;
+    timers.name = QStringLiteral("timers");
+    timers.listTitle = QStringLiteral("Zeitnachrichten");
+    timers.detailTitle = QStringLiteral("Zeitnachricht");
+    timers.emptyHint = QStringLiteral("Keine Zeitnachricht gewählt");
+    timers.tableName = QStringLiteral("Zeitnachrichten");
+    timers.columns = {{QStringLiteral("Aktiv"), 8},         {QStringLiteral("Name"), 18},
+                      {QStringLiteral("Abstand"), 24},      {QStringLiteral("Chat-Zeilen"), 13},
+                      {QStringLiteral("Nur im Stream"), 15}, {QStringLiteral("Aktionen"), 0}};
+    timers.addTip = QStringLiteral("Zeitnachricht hinzufügen");
+    timers.copyTip = QStringLiteral("Zeitnachricht kopieren");
+    timers.removeTip = QStringLiteral("Zeitnachricht löschen");
+    m_timers = new ListDetailPage(m_theme, timers, m_pages);
+    addSubTab(QStringLiteral("Zeitnachrichten"), m_timers);
+
+    // «Variablen»: «Für alle» und «Je Zuschauer» nebeneinander mit Teiler wie «Live»
+    // (Entscheid des Nutzers 2026-11-16); Inhalt der Bereiche ab e3-7.
+    auto *variables = new QSplitter(Qt::Horizontal, m_pages);
+    variables->setObjectName(QStringLiteral("variablesSplitter"));
+    variables->setChildrenCollapsible(false);
+    const QString variableTitles[2] = {QStringLiteral("Für alle"), QStringLiteral("Je Zuschauer")};
+    for (int i = 0; i < 2; ++i) {
+        m_variableAreas[i] = new QWidget;
+        auto *areaColumn = new QVBoxLayout(m_variableAreas[i]);
+        areaColumn->setContentsMargins(0, 0, 0, 0);
+        areaColumn->setSpacing(0);
+        variables->addWidget(dockPanel(variableTitles[i], m_variableAreas[i], variables));
+        variables->setStretchFactor(i, 1);
+    }
+    addSubTab(QStringLiteral("Variablen"), variables);
 }
 
 int ChatBotPage::addSubTab(const QString &title, QWidget *page)

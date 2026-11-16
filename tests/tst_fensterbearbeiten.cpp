@@ -2070,7 +2070,7 @@ private slots:
         QCOMPARE(header->sizePolicy().verticalPolicy(), QSizePolicy::Fixed);
         QCOMPARE(live->text(), QStringLiteral("Live"));
         QVERIFY(live->isChecked());
-        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 2); // «Live», «Aktionen» (P14 e2-11)
+        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 5); // «Live», «Aktionen» (P14 e2-11), «Befehle», «Zeitnachrichten», «Variablen» (e3-4)
         QCOMPARE(events->columnCount(), 4);
         const QTreeWidgetItem *labels = events->headerItem();
         QCOMPARE(QStringList({labels->text(0), labels->text(1), labels->text(2), labels->text(3)}),

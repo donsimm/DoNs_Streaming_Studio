@@ -345,7 +345,13 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
 #chatBotEvents::item:selected, #chatBotEvents::item:selected:hover, #chatBotRuns::item,
 #chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover, #chatBotChat::item,
-#chatBotChat::item:hover, #chatBotChat::item:selected, #chatBotChat::item:selected:hover { border-radius: 0px;
+#chatBotChat::item:hover, #chatBotChat::item:selected, #chatBotChat::item:selected:hover, #commandsTable::item,
+#commandsTable::item:hover, #commandsTable::item:selected, #commandsTable::item:selected:hover, #timersTable::item,
+#timersTable::item:hover, #timersTable::item:selected, #timersTable::item:selected:hover, #globalVariables::item,
+#globalVariables::item:hover, #globalVariables::item:selected, #globalVariables::item:selected:hover,
+#userVariables::item, #userVariables::item:hover, #userVariables::item:selected,
+#userVariables::item:selected:hover, #queuesList::item, #queuesList::item:hover, #queuesList::item:selected,
+#queuesList::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;

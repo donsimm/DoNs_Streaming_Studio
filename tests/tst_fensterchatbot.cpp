@@ -14,6 +14,7 @@
 #include "actionspage.h"
 #include "chatbotpage.h"
 #include "coreclient.h"
+#include "listdetailpage.h"
 #include "mainwindow.h"
 #include "prozesshilfe.h"
 #include "steptypes.h"
@@ -39,6 +40,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalSpy>
 #include <QStandardItemModel>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -317,7 +319,13 @@ private slots:
     void subTabs()
     {
         const QList<QToolButton *> tabs = child<QFrame>("chatBotTabs")->findChildren<QToolButton *>();
-        QCOMPARE(tabs.size(), 2);
+        QCOMPARE(tabs.size(), 5);
+        // P14 e3-4: Reihenfolge nach Plan 6
+        QStringList tabTitles;
+        for (int i = 0; i < 5; ++i)
+            tabTitles << child<QToolButton>(qPrintable(QStringLiteral("chatBotTab%1").arg(i)))->text();
+        QCOMPARE(tabTitles, QStringList({QStringLiteral("Live"), QStringLiteral("Aktionen"), QStringLiteral("Befehle"),
+                                         QStringLiteral("Zeitnachrichten"), QStringLiteral("Variablen")}));
         auto *live = child<QToolButton>("chatBotTab0");
         auto *actions = child<QToolButton>("chatBotTab1");
         QVERIFY(live && actions);
@@ -353,6 +361,189 @@ private slots:
         QTest::mouseClick(live, Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!page->isVisible(), 3000);
         QVERIFY(live->isChecked());
+    }
+
+    // P14 e3-4: «Befehle» und «Zeitnachrichten» als ListDetailPage, «Variablen» mit zwei Bereichen.
+    // Spalten und Kopf, Kästchen sendet enabledToggled (nicht beim Füllen), abgeschaltete Zeile in
+    // textDisabled, Auswahl bleibt beim Neufüllen, Wechsel ohne neue Widgets, Theme der Tabellen.
+    void listDetailPages()
+    {
+        auto *chatBot = child<ChatBotPage>("chatBotPage");
+        QVERIFY(chatBot);
+        ListDetailPage *commands = chatBot->commandsPage();
+        QVERIFY(commands && commands->objectName() == QStringLiteral("commandsPage"));
+        QTest::mouseClick(child<QToolButton>("chatBotTab2"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(commands->isVisible(), 3000);
+
+        auto *splitter = commands->findChild<QSplitter *>(QStringLiteral("commandsSplitter"));
+        QVERIFY(splitter);
+        QCOMPARE(splitter->count(), 2);
+        QVERIFY(!splitter->childrenCollapsible());
+        QStringList titles;
+        for (int i = 0; i < 2; ++i)
+            titles << splitter->widget(i)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text();
+        QCOMPARE(titles, QStringList({QStringLiteral("Befehle"), QStringLiteral("Befehl")}));
+        commands->setDetailTitle(QStringLiteral("Befehl «!test»"));
+        QCOMPARE(splitter->widget(1)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text(),
+                 QStringLiteral("Befehl «!test»"));
+        commands->setDetailTitle(QStringLiteral("Befehl"));
+
+        auto *search = commands->findChild<QLineEdit *>(QStringLiteral("commandsSearch"));
+        QVERIFY(search && search->isClearButtonEnabled() && !search->accessibleName().isEmpty());
+        QCOMPARE(search->placeholderText(), QStringLiteral("Suchen …"));
+        auto *filter = commands->findChild<QComboBox *>(QStringLiteral("commandsFilter"));
+        QVERIFY(filter && filter->isVisible());
+        QVERIFY(qAbs(filter->geometry().center().y() - search->geometry().center().y()) <= 1); // dieselbe Zeile
+        QSignalSpy filterSpy(commands, &ListDetailPage::filterChanged);
+        commands->setFilterChoices({QString(), QStringLiteral("Spiele")},
+                                   {QStringLiteral("Alle Gruppen"), QStringLiteral("Spiele")});
+        QCOMPARE(filterSpy.count(), 0); // Wert bleibt leer
+        filter->setCurrentIndex(1);
+        QCOMPARE(filterSpy.count(), 1);
+        QCOMPARE(commands->filterValue(), QStringLiteral("Spiele"));
+        commands->setFilterChoices({QString()}, {QStringLiteral("Alle Gruppen")});
+        QCOMPARE(filterSpy.count(), 2); // «Spiele» gibt es nicht mehr
+        QCOMPARE(commands->filterValue(), QString());
+
+        auto *table = commands->findChild<QTreeWidget *>(QStringLiteral("commandsTable"));
+        QVERIFY(table);
+        QCOMPARE(table->columnCount(), 8);
+        QStringList headers;
+        for (int i = 0; i < 8; ++i)
+            headers << table->headerItem()->text(i);
+        QCOMPARE(headers, QStringList({QStringLiteral("Aktiv"), QStringLiteral("Auslöser"), QStringLiteral("Gruppe"),
+                                       QStringLiteral("Wer darf"), QStringLiteral("Abkl. Kanal"),
+                                       QStringLiteral("Abkl. Person"), QStringLiteral("Aktionen"), QStringLiteral("Benutzt")}));
+        QVERIFY(!table->isHeaderHidden() && !table->rootIsDecorated() && table->uniformRowHeights());
+        QCOMPARE(table->selectionMode(), QAbstractItemView::SingleSelection);
+        QCOMPARE(table->editTriggers(), QAbstractItemView::NoEditTriggers);
+        QVERIFY(table->header()->stretchLastSection());
+        const int digit = table->fontMetrics().horizontalAdvance(QLatin1Char('0'));
+        QCOMPARE(table->columnWidth(1), digit * 18);
+
+        // Leiste: ausgegraut bis verbunden und geladen bzw. bis zur Auswahl
+        auto *add = commands->findChild<QToolButton *>(QStringLiteral("commandsAdd"));
+        auto *copy = commands->findChild<QToolButton *>(QStringLiteral("commandsCopy"));
+        auto *remove = commands->findChild<QToolButton *>(QStringLiteral("commandsRemove"));
+        QVERIFY(add && copy && remove);
+        QVERIFY(!add->isEnabled() && !copy->isEnabled() && !remove->isEnabled());
+        QCOMPARE(add->toolTip(), QStringLiteral("Befehl hinzufügen"));
+        QCOMPARE(remove->accessibleName(), QStringLiteral("Befehl löschen"));
+        commands->setListButtons(true, false);
+        QVERIFY(add->isEnabled() && !copy->isEnabled() && !remove->isEnabled());
+        commands->setHint(QStringLiteral("2 Befehle"));
+        QCOMPARE(commands->hint(), QStringLiteral("2 Befehle"));
+
+        // Ohne Auswahl rechts der Hinweis
+        auto *empty = commands->findChild<QWidget *>(QStringLiteral("commandsEmpty"));
+        QVERIFY(empty && empty->isVisible() && !commands->detailShown());
+        QCOMPARE(empty->findChild<QLabel *>(QStringLiteral("hintLabel"))->text(), QStringLiteral("Kein Befehl gewählt"));
+
+        const QUuid a = QUuid::createUuid(), b = QUuid::createUuid(), c = QUuid::createUuid();
+        const auto row = [](const QUuid &id, bool enabled, const QString &trigger) {
+            ListDetailPage::Row r;
+            r.id = id;
+            r.enabled = enabled;
+            r.cells = {trigger, QStringLiteral("Spiele"), QStringLiteral("Alle")};
+            return r;
+        };
+        QSignalSpy toggled(commands, &ListDetailPage::enabledToggled);
+        QSignalSpy selected(commands, &ListDetailPage::selectionChanged);
+        commands->setRows({row(a, true, QStringLiteral("!a")), row(b, false, QStringLiteral("!b")),
+                           row(c, true, QStringLiteral("!c"))});
+        QCOMPARE(toggled.count(), 0); // nicht beim Füllen
+        QCOMPARE(table->topLevelItemCount(), 3);
+        QTreeWidgetItem *itemB = table->topLevelItem(1);
+        QCOMPARE(itemB->text(1), QStringLiteral("!b"));
+        QCOMPARE(itemB->checkState(0), Qt::Unchecked);
+        QVERIFY(itemB->flags() & Qt::ItemIsUserCheckable);
+        for (int i = 0; i < 8; ++i)
+            QCOMPARE(itemB->foreground(i).color(), darkTheme().textDisabled);
+        QVERIFY(table->topLevelItem(0)->foreground(1).style() == Qt::NoBrush);
+
+        table->topLevelItem(0)->setCheckState(0, Qt::Unchecked);
+        QCOMPARE(toggled.count(), 1);
+        QCOMPARE(toggled.at(0).at(0).toUuid(), a);
+        QCOMPARE(toggled.at(0).at(1).toBool(), false);
+
+        // Auswahl bleibt beim Neufüllen; gibt es sie nicht mehr, die nächste Zeile
+        QVERIFY(commands->selectRow(b));
+        QCOMPARE(commands->selectedRow(), b);
+        QCOMPARE(selected.last().at(0).toUuid(), b);
+        const int widgetsBefore = commands->findChildren<QWidget *>().size();
+        commands->setRows({row(c, true, QStringLiteral("!c")), row(a, true, QStringLiteral("!a")),
+                           row(b, true, QStringLiteral("!b2"))});
+        QCOMPARE(commands->selectedRow(), b);
+        QCOMPARE(selected.last().at(0).toUuid(), b);
+        QCOMPARE(toggled.count(), 1);
+        commands->setRows({row(c, true, QStringLiteral("!c")), row(a, true, QStringLiteral("!a"))});
+        QVERIFY(!commands->selectedRow().isNull());
+        QCOMPARE(commands->selectedRow(), a); // keptSelection: der Nachbar
+        // Gewünschte Zeile, die erst mit den nächsten Zeilen kommt
+        QVERIFY(!commands->selectRow(b));
+        commands->setRows({row(c, true, QStringLiteral("!c")), row(b, true, QStringLiteral("!b"))});
+        QCOMPARE(commands->selectedRow(), b);
+
+        // Formular rechts: einmal eingesetzt, der Wechsel schaltet nur die Seite um
+        auto *form = new QLabel(QStringLiteral("Formular"));
+        form->setObjectName(QStringLiteral("commandsTestForm"));
+        commands->setDetailForm(form);
+        const int widgetsWithForm = commands->findChildren<QWidget *>().size();
+        commands->showDetail(true);
+        QVERIFY(commands->detailShown() && form->isVisible() && !empty->isVisible());
+        commands->setRows({row(c, false, QStringLiteral("!c")), row(b, true, QStringLiteral("!b"))});
+        commands->showDetail(false);
+        QVERIFY(!commands->detailShown() && empty->isVisible());
+        QCOMPARE(commands->findChildren<QWidget *>().size(), widgetsWithForm);
+        QCOMPARE(widgetsWithForm, widgetsBefore + 1);
+        commands->setDetailForm(nullptr);
+        commands->setRows({});
+        QVERIFY(commands->selectedRow().isNull());
+        commands->setListButtons(false, false);
+        commands->setHint(QString());
+
+        // «Zeitnachrichten»: ohne Suchfeld, Filter und Hinweis in der Leiste
+        ListDetailPage *timers = chatBot->timersPage();
+        QVERIFY(timers && timers->objectName() == QStringLiteral("timersPage"));
+        QTest::mouseClick(child<QToolButton>("chatBotTab3"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(timers->isVisible(), 3000);
+        QVERIFY(!timers->findChild<QLineEdit *>(QStringLiteral("timersSearch")));
+        QVERIFY(!timers->findChild<QComboBox *>(QStringLiteral("timersFilter")));
+        auto *timersTable = timers->findChild<QTreeWidget *>(QStringLiteral("timersTable"));
+        QVERIFY(timersTable);
+        QStringList timerHeaders;
+        for (int i = 0; i < timersTable->columnCount(); ++i)
+            timerHeaders << timersTable->headerItem()->text(i);
+        QCOMPARE(timerHeaders, QStringList({QStringLiteral("Aktiv"), QStringLiteral("Name"), QStringLiteral("Abstand"),
+                                            QStringLiteral("Chat-Zeilen"), QStringLiteral("Nur im Stream"),
+                                            QStringLiteral("Aktionen")}));
+        auto *timersSplitter = timers->findChild<QSplitter *>(QStringLiteral("timersSplitter"));
+        QCOMPARE(timersSplitter->widget(0)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text(),
+                 QStringLiteral("Zeitnachrichten"));
+        QCOMPARE(timers->findChild<QWidget *>(QStringLiteral("timersEmpty"))->findChild<QLabel *>(
+                     QStringLiteral("hintLabel"))->text(), QStringLiteral("Keine Zeitnachricht gewählt"));
+
+        // «Variablen»: zwei Bereiche nebeneinander mit Teiler
+        QTest::mouseClick(child<QToolButton>("chatBotTab4"), Qt::LeftButton);
+        auto *variables = child<QSplitter>("variablesSplitter");
+        QTRY_VERIFY_WITH_TIMEOUT(variables && variables->isVisible(), 3000);
+        QCOMPARE(variables->orientation(), Qt::Horizontal);
+        QVERIFY(!variables->childrenCollapsible());
+        QCOMPARE(variables->count(), 2);
+        QStringList variableTitles;
+        for (int i = 0; i < 2; ++i) {
+            variableTitles << variables->widget(i)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text();
+            QVERIFY(chatBot->variablesArea(i)->isVisible());
+        }
+        QCOMPARE(variableTitles, QStringList({QStringLiteral("Für alle"), QStringLiteral("Je Zuschauer")}));
+
+        // Theme: Zeilen der neuen Tabellen wie «Läufe der Aktionen»
+        for (const char *name : {"#commandsTable::item", "#timersTable::item", "#globalVariables::item",
+                                 "#userVariables::item", "#queuesList::item"})
+            QVERIFY2(qApp->styleSheet().contains(QLatin1String(name)), name);
+
+        QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!variables->isVisible(), 3000);
     }
 
     // Schalter links vom Zustand; ein Klick schickt actions_set_enabled, den Stand zeigt der Kern.

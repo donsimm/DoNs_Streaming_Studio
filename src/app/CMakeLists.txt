@@ -10,6 +10,7 @@ add_library(dss_app_ui STATIC
   chatbotpage.h chatbotpage.cpp
   actionfieldspanel.h actionfieldspanel.cpp
   actionspage.h actionspage.cpp
+  listdetailpage.h listdetailpage.cpp
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp

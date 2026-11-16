@@ -8,6 +8,7 @@
 #include <QWidget>
 
 class ActionsPage;
+class ListDetailPage;
 class QButtonGroup;
 class QCheckBox;
 class QComboBox;
@@ -34,13 +35,18 @@ class ChatBotPage : public QWidget
     Q_OBJECT
 
 public:
-    enum SubTab { Live = 0, Actions };
+    enum SubTab { Live = 0, Actions, Commands, Timers, Variables };
 
     explicit ChatBotPage(const Theme &theme, QWidget *parent = nullptr);
 
     // Zustand und Schalter nur aus chatBotHeaderView (windowdata.h).
     void setHeader(const dss::ChatBotHeaderView &view);
     ActionsPage *actionsPage() const { return m_actions; }
+    // P14 e3-4: Unterreiter «Befehle» und «Zeitnachrichten» (listdetailpage.h); «Variablen» mit den
+    // Bereichen «Für alle» und «Je Zuschauer» nebeneinander (Inhalt ab e3-7).
+    ListDetailPage *commandsPage() const { return m_commands; }
+    ListDetailPage *timersPage() const { return m_timers; }
+    QWidget *variablesArea(int which) const { return m_variableAreas[which]; } // 0 Für alle, 1 Je Zuschauer
     // Bereich «Ereignisse»: sichtbare Liste neu (dss::EventRows::visibleRows) bzw. eine Änderung
     // nach dss::EventRows::add; row gilt nur bei change.appended.
     void resetEvents(const QList<dss::EventRow> &rows);
@@ -105,4 +111,7 @@ private:
     QPushButton *m_chatSend = nullptr;
     bool m_chatSendEnabled = false;
     ActionsPage *m_actions = nullptr;
+    ListDetailPage *m_commands = nullptr;
+    ListDetailPage *m_timers = nullptr;
+    QWidget *m_variableAreas[2] = {};
 };
