@@ -83,7 +83,7 @@ Summe Agenten etwa 12 h (etwa 3 Sitzungen).
 
 ### Kern
 
-- [ ] **em-1 `emote_format` in den Fragmenten** (`src/twitch/eventsubprotocol.cpp`, Kommentar `src/events/eventtypes.h:70`, `docs/08-kern-schnittstelle.md` Abschnitt «Ereignisfluss»).
+- [x] **em-1 `emote_format` in den Fragmenten** (`src/twitch/eventsubprotocol.cpp`, Kommentar `src/events/eventtypes.h:70`, `docs/08-kern-schnittstelle.md` Abschnitt «Ereignisfluss»).
   - Je Fragment zusätzlich `emote_format`: Liste der Texte aus `emote.format` (`static`, `animated`), bei Fragmenten ohne Emote `null`. Quelle: https://dev.twitch.tv/docs/eventsub/reference/chat (Recherche 1).
   - Prüfen und im Bericht nennen: ob die Prüfung der Ereignisse (`eventtypes.h`, Prüfer im Kern) Felder innerhalb eines Fragments prüft; ob ein Test oder `dss-cli ereignisse` die Fragmente genau vergleicht (Suche `emote_id` in `tests/`: `tst_twitchprotokoll`, `tst_kernaktionen`, `tst_fensterchatbot`).
   - `docs/08`: eine Zeile «Seit P14 Emotes (Version unverändert): Fragmente in `twitch.chat_message` und `twitch.first_message` tragen `emote_format` …».
@@ -167,7 +167,7 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Handtest: H2, H3.
 
 - [ ] **em-9 GIFs im Chat** (Kern `src/twitch/eventsubprotocol.cpp` wie em-1; Logik `src/common/emotes.{h,cpp}`/`chatbotlive`; Laden `emoteloader`; Delegat `chatbotpage.cpp`). Nach em-7, Recherche `docs/archiv/recherchen/2026-11-16-twitch-gif.md`.
-  - Kern: Fragment `type: gif` mit `gif.id` und `gif.url` (laut Referenz; der Changelog nennt `gif_id`: beide Namen lesen) in die Fragmente übernehmen, `text` bleibt (Beschreibung, Tooltip). Keine neue Schnittstellenversion, wenn em-1 ohne auskam.
+  - Kern: Fragment `type: gif` mit `gif.id` und `gif.url` (laut Referenz; der Changelog nennt `gif_id`: beide Namen lesen) in die Fragmente übernehmen, `text` bleibt (Beschreibung, Tooltip). Keine neue Schnittstellenversion, wenn em-1 ohne auskam. **Erledigt in em-1** (Felder `gif_id`, `gif_url`, Version unverändert).
   - Laden: `gif.url` **unverändert** (Twitch: «must not be modified»; Giphy: keine Query-Parameter ändern). **Nur im Arbeitsspeicher** (kleiner LRU, Grenze wie Bilder in em-4/em-5), **kein** `QNetworkDiskCache`, kein Proxy (Giphy: «Do not … cache or store copies»). Nur Hosts `*.giphy.com`, sonst Text. Grenzen gegen zu grosse Bilder (Chatterino: «image too large in RAM»): Bytes, Pixel, Anzahl Bilder.
   - Anzeige: eigene Zeile unter dem Kopf der Nachricht (wie Chatterino), Höhe begrenzt (Vorschlag 112 px, Breite nach Seitenverhältnis), animiert über den gemeinsamen Takt aus em-5; ohne Bild der Text des Fragments.
   - Format: im Beispiel `.gif` (qtbase); WebP/MP4 nicht belegt. MP4 wird nicht gebaut (`[OFFEN]`, Text bleibt).

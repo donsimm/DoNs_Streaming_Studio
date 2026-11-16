@@ -28,6 +28,9 @@ Jede Nachricht hat `metadata` (`message_id`, `message_type`, `message_timestamp`
 | `chat_user_intro.json` | erste Nachricht überhaupt (`user_intro`) | dieselbe |
 | `chat_cheer.json` | Nachricht mit Cheer (`cheer.bits`) | dieselbe |
 | `chat_hervorgehoben.json` | hervorgehoben mit Kanalpunkten | dieselbe |
+| `chat_emote_animiert.json` | Emote mit `format` `["static", "animated"]` (P14 Emotes em-1) | dieselbe |
+| `chat_gif.json` | Fragment `gif` mit `gif.id` und `gif.url` (Giphy-Form, neutrale ID) | dieselbe |
+| `chat_gif_changelog.json` | Fragment `gif` mit `gif_id` statt `id` (Schreibweise des Changelogs) | https://dev.twitch.tv/docs/change-log/ (2026-07-16) |
 | `follow.json` | Follow (Version 2) | https://dev.twitch.tv/docs/eventsub/reference/channel#channel-follow |
 | `subscribe.json` | Abo ohne Geschenk, Stufe 1 | https://dev.twitch.tv/docs/eventsub/reference/channel#channel-subscribe |
 | `subscribe_geschenk.json` | geschenktes Abo (`is_gift`), Stufe 2 | dieselbe |

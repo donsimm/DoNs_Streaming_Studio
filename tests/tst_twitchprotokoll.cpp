@@ -178,8 +178,11 @@ private slots:
         const QJsonArray fragments = data.value(QStringLiteral("fragments")).toArray();
         QCOMPARE(fragments.size(), 2);
         QCOMPARE(fragments.at(0).toObject(),
-                 (QJsonObject{{"type", "text"}, {"text", "Hallo zusammen "}, {"emote_id", QJsonValue::Null}}));
-        QCOMPARE(fragments.at(1).toObject(), (QJsonObject{{"type", "emote"}, {"text", "Kappa"}, {"emote_id", "25"}}));
+                 (QJsonObject{{"type", "text"}, {"text", "Hallo zusammen "}, {"emote_id", QJsonValue::Null},
+                              {"emote_format", QJsonValue::Null}, {"gif_id", QJsonValue::Null}, {"gif_url", QJsonValue::Null}}));
+        QCOMPARE(fragments.at(1).toObject(),
+                 (QJsonObject{{"type", "emote"}, {"text", "Kappa"}, {"emote_id", "25"}, {"emote_format", QJsonArray{"static"}},
+                              {"gif_id", QJsonValue::Null}, {"gif_url", QJsonValue::Null}}));
         QCOMPARE(data.value(QStringLiteral("color")).toString(), QStringLiteral("#1E90FF"));
         QCOMPARE(data.value(QStringLiteral("badges")).toArray(), (QJsonArray{QJsonObject{{"set_id", "subscriber"}, {"id", "12"}}}));
         QCOMPARE(data.value(QStringLiteral("role")).toInt(), 1);
@@ -194,6 +197,53 @@ private slots:
         QCOMPARE(data.value(QStringLiteral("message_type")).toString(), QStringLiteral("text"));
         QVERIFY(!data.value(QStringLiteral("is_highlight")).toBool());
         QVERIFY(data.value(QStringLiteral("source_broadcaster_id")).isNull());
+    }
+
+    // P14 Emotes em-1: emote_format je Fragment, ohne Emote null
+    void chatEmoteFormat()
+    {
+        const QJsonArray animated = eventFrom(QStringLiteral("chat_emote_animiert.json")).data.value(QStringLiteral("fragments")).toArray();
+        QCOMPARE(animated.size(), 2);
+        QVERIFY(animated.at(0).toObject().value(QStringLiteral("emote_format")).isNull());
+        QCOMPARE(animated.at(1).toObject().value(QStringLiteral("emote_id")).toString(),
+                 QStringLiteral("emotesv2_00000000000000000000000000000001"));
+        QCOMPARE(animated.at(1).toObject().value(QStringLiteral("emote_format")).toArray(), (QJsonArray{"static", "animated"}));
+
+        const QJsonArray still = eventFrom(QStringLiteral("chat_message.json")).data.value(QStringLiteral("fragments")).toArray();
+        QCOMPARE(still.at(1).toObject().value(QStringLiteral("emote_format")).toArray(), QJsonArray{"static"});
+
+        const QJsonArray plain = eventFrom(QStringLiteral("chat_ohne_emote.json")).data.value(QStringLiteral("fragments")).toArray();
+        QVERIFY(plain.at(0).toObject().value(QStringLiteral("emote_format")).isNull());
+    }
+
+    // P14 Emotes em-9 (Kern): gif.id laut Referenz, gif_id laut Changelog, URL unverändert, ohne GIF null
+    void chatGif_data()
+    {
+        QTest::addColumn<QString>("file");
+        QTest::addColumn<QString>("id");
+        QTest::addColumn<QString>("text");
+        QTest::newRow("gif.id") << "chat_gif.json" << "testgif0000000001" << "[Test GIF eins]";
+        QTest::newRow("gif_id") << "chat_gif_changelog.json" << "testgif0000000002" << "[Test GIF zwei]";
+    }
+    void chatGif()
+    {
+        QFETCH(QString, file);
+        QFETCH(QString, id);
+        QFETCH(QString, text);
+        const QJsonArray fragments = eventFrom(file).data.value(QStringLiteral("fragments")).toArray();
+        QCOMPARE(fragments.size(), 1);
+        QCOMPARE(fragments.at(0).toObject(),
+                 (QJsonObject{{"type", "gif"}, {"text", text}, {"emote_id", QJsonValue::Null}, {"emote_format", QJsonValue::Null},
+                              {"gif_id", id},
+                              {"gif_url", QStringLiteral("https://media4.giphy.com/media/%1/giphy.gif?cid=test&ct=g").arg(id)}}));
+    }
+    void chatWithoutGif()
+    {
+        const QJsonArray fragments = eventFrom(QStringLiteral("chat_message.json")).data.value(QStringLiteral("fragments")).toArray();
+        for (const QJsonValue &fragment : fragments) {
+            QVERIFY(fragment.toObject().value(QStringLiteral("gif_id")).isNull());
+            QVERIFY(fragment.toObject().value(QStringLiteral("gif_url")).isNull());
+        }
     }
 
     void chatCases_data()
@@ -380,7 +430,8 @@ private slots:
     {
         const QStringList files{"chat_message.json", "chat_ohne_emote.json", "chat_antwort.json", "chat_moderator.json",
                                 "chat_vip.json", "chat_bot.json", "chat_kanal.json", "chat_user_intro.json",
-                                "chat_cheer.json", "chat_hervorgehoben.json", "follow.json", "subscribe.json",
+                                "chat_cheer.json", "chat_hervorgehoben.json", "chat_emote_animiert.json",
+                                "chat_gif.json", "chat_gif_changelog.json", "follow.json", "subscribe.json",
                                 "subscribe_geschenk.json", "resubscribe.json", "gift_bomb.json",
                                 "gift_bomb_anonym.json", "cheer.json", "cheer_anonym.json", "raid.json",
                                 "reward_redemption.json", "stream_online.json", "stream_offline.json"};

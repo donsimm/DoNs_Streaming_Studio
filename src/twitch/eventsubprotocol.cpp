@@ -162,6 +162,31 @@ void insertTier(QJsonObject *data, Reader &reader)
     data->insert(QStringLiteral("tier_name"), tierName(number));
 }
 
+QJsonValue stringOrNull(const QJsonValue &value)
+{
+    return value.isString() ? value : QJsonValue(QJsonValue::Null);
+}
+
+// emote.format: Liste mit «static» und/oder «animated» (P14 Emotes em-1). Nur Texte kommen mit,
+// fehlt die Liste, ist sie leer. https://dev.twitch.tv/docs/eventsub/reference/chat
+QJsonArray emoteFormat(const QJsonObject &emote)
+{
+    QJsonArray formats;
+    for (const QJsonValue &format : emote.value(QStringLiteral("format")).toArray()) {
+        if (format.isString())
+            formats.append(format);
+    }
+    return formats;
+}
+
+// gif.id laut Referenz (https://dev.twitch.tv/docs/eventsub/reference/chat), gif_id laut Changelog
+// vom 2026-07-16 (https://dev.twitch.tv/docs/change-log/); die Referenz zuerst (P14 Emotes em-9).
+QJsonValue gifId(const QJsonObject &gif)
+{
+    const QJsonValue id = gif.value(QStringLiteral("id"));
+    return id.isString() ? id : stringOrNull(gif.value(QStringLiteral("gif_id")));
+}
+
 // Rollen nach Streamer.bot (Schritt 0, C 19): 1 Zuschauer, 2 VIP, 3 Moderator, 4 Kanal. Abzeichen
 // set_id wie im Beispiel der Doku (moderator, subscriber) und bei Get Global Chat Badges
 // (broadcaster, vip): https://dev.twitch.tv/docs/eventsub/reference/chat#channel-chat-message
@@ -177,10 +202,15 @@ QJsonObject chatData(const Context &context, Reader &reader)
     for (const QJsonValue &value : messageReader.array("fragments")) {
         const QJsonObject fragment = value.toObject();
         const QJsonValue emote = fragment.value(QStringLiteral("emote"));
+        // gif.url bleibt unverändert: «it must not be modified» (Referenz, Feld gif.url)
+        const QJsonValue gif = fragment.value(QStringLiteral("gif"));
         fragments.append(QJsonObject{
             {QStringLiteral("type"), fragment.value(QStringLiteral("type")).toString()},
             {QStringLiteral("text"), fragment.value(QStringLiteral("text")).toString()},
             {QStringLiteral("emote_id"), emote.isObject() ? emote.toObject().value(QStringLiteral("id")) : QJsonValue::Null},
+            {QStringLiteral("emote_format"), emote.isObject() ? QJsonValue(emoteFormat(emote.toObject())) : QJsonValue::Null},
+            {QStringLiteral("gif_id"), gif.isObject() ? gifId(gif.toObject()) : QJsonValue::Null},
+            {QStringLiteral("gif_url"), gif.isObject() ? stringOrNull(gif.toObject().value(QStringLiteral("url"))) : QJsonValue::Null},
         });
     }
     if (!messageReader.ok())

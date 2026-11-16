@@ -67,7 +67,7 @@ namespace detail {
 
 #define DSS_EVENT_CHAT_FIELDS                                                                    \
     {"message_id", "msgId"}, DSS_EVENT_USER_FIELDS, {"text", "message"},                         \
-        {"fragments", "fragments"},                     /* eigener Name; je type, text, emote_id oder null */ \
+        {"fragments", "fragments"},                     /* eigener Name; je type, text, emote_id, emote_format (Liste), gif_id, gif_url, je oder null */ \
         {"color", "color"}, {"badges", "badges"},       /* badges: eigener Name; je set_id, id */ \
         {"role", "role"},                               /* 1 Zuschauer, 2 VIP, 3 Moderator, 4 Kanal */ \
         {"is_subscriber", "isSubscribed"}, {"is_vip", "isVip"}, {"is_moderator", "isModerator"}, \
