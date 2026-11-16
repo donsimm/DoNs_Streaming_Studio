@@ -22,7 +22,17 @@ Status eines Abschnitts: offen `[ ]`, erledigt `[x]`, `parked — <Grund>` bleib
 
 ## Decided
 
-Noch keine Entscheide zu den Fragen unten. Aus P14 gilt weiter: `settingsdialog.cpp` bleibt unverändert; Knöpfe und Rückfragen heissen «… löschen»; Prüfmeldungen und Texte kommen aus der Logik (P14-e3-Checkliste, Abschnitte 7 und 8).
+Antworten des Nutzers vom 2026-11-16 auf die Fragen unten, in seinen Worten zusammengefasst. Sie gehen den Empfehlungen in den Abschnitten vor:
+
+- **Frage 1, Bedienung:** «Keine Knöpfe, immer an.» Kein Kontextmenü, keine Leiste, kein Eintrag in `fenster.ini`: Emotes sind immer an und immer animiert. Geladen wird beim Start und bei einer anderen Kanal-ID, nicht auf Knopfdruck. em-7 entfällt bis auf die Verdrahtung und die Statuszeile; «Emotes animieren» und «Emotes neu laden» werden nicht gebaut (der gemeinsame Takt bleibt, ohne Schalter).
+- **Frage 2, Grösse:** «28 px ist gut, bitte Schrift an die Höhe anpassen, grösserer Chat ist gut.» Emotes 28 px hoch; die Schrift der Chat-Zeilen wird so vergrössert, dass Text und Emotes zusammenpassen (Zeilenhöhe nach den 28 px, nicht nur mehr Rand). Der Agent von em-6 wählt die Schriftgrösse aus dem Theme (`theme.cpp`) und nennt sie mit Bild im Bericht; der Nutzer prüft sie im Handtest.
+- **Frage 3, Neu laden:** kein Takt (Empfehlung).
+- **Frage 4, Bedingungen:** alle vier Anbieter, nur im HTTP-Zwischenspeicher, nichts ins Repo (Empfehlung). Der Nutzer liest die Bedingungen von BTTV, 7TV und Twitch vor dem Handtest; Lotse gibt ihm die Links.
+- **Freigaben:** Netzabrufe in em-0 für die Testdaten (globale Listen, Listen des eigenen Kanals, `curl -I` je CDN; Kanaldaten vor dem Einchecken neutral). Testnachrichten mit Emotes als Bot und Kanal in den eigenen Chat im Handtest, nie während eines Streams.
+- **Nachtrag Plattform-Symbol:** Vor jeder Chat-Nachricht steht ein Symbol der Plattform, damit man nach der YouTube-Anbindung sieht, woher die Nachricht kommt. Das Twitch-Symbol kommt schon jetzt (em-6), YouTube später mit der Anbindung. Die Plattform gehört als Feld in `ChatRow` (em-3, heute immer Twitch), damit YouTube nur einen Wert ergänzt. Herkunft und Lizenz des Twitch-Logos (Markenrichtlinien von Twitch) sind `[OFFEN]`; Lotse klärt sie in em-0 mit dem Nutzer, das Bild kommt erst danach ins Repo.
+- **Nachtrag GIFs:** Animierte Emotes (auch von Abonnenten) sind über `emote_format` abgedeckt (em-1). GIFs im Chat (EventSub-Fragment `gif`) sollen auch angezeigt werden; Lotse lässt die Felder recherchieren und ergänzt danach einen Abschnitt in diesem Plan.
+
+Aus P14 gilt weiter: `settingsdialog.cpp` bleibt unverändert; Knöpfe und Rückfragen heissen «… löschen»; Prüfmeldungen und Texte kommen aus der Logik (P14-e3-Checkliste, Abschnitte 7 und 8).
 
 ## Wer lädt: das Fenster (Interna-Entscheid)
 
