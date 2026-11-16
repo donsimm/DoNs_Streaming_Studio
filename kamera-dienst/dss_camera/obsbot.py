@@ -21,6 +21,7 @@ https://reveng.sourceforge.io/crc-catalogue/16.htm (CRC-16/USB: Poly 0x8005 gesp
 """
 
 import logging
+import math
 import struct
 import time
 from collections.abc import Callable
@@ -60,6 +61,24 @@ STATE_INTERVAL_S = 5.0
 # darum gesperrt; erst nach Bestätigung am Gerät auf True setzen.
 AI_OFF_UNLOCKED = False
 AI_OFF_COMMAND = (0x16, 0x02, 0x00, 0x00)
+
+# Dauerbewegung über V4L2_CID_PAN_SPEED/TILT_SPEED (Prüfung am Gerät 2026-11-16, über das
+# OBS-Bild): Wert → Grad je Sekunde, gleiches Vorzeichen wie die absoluten Werte; Wert 0 hält
+# jede Fahrt sofort an. Absolute Ziele fährt die Kamera mit fest ≈ 62 °/s.
+PAN_SPEED_CURVE = ((0, 0.0), (5, 5.1), (10, 12.0), (20, 22.1), (40, 42.6), (80, 84.8))
+TILT_SPEED_CURVE = ((0, 0.0), (10, 9.5), (20, 19.3))
+ABSOLUTE_DEG_PER_S = 62.0
+
+
+def speed_deg_per_s(curve: tuple, value: float) -> float:
+    """Grad je Sekunde für einen Tempowert: zwischen den Messpunkten linear, darüber mit der
+    Steigung des letzten Abschnitts; Vorzeichen wie der Wert."""
+    size = abs(value)
+    for (x0, y0), (x1, y1) in zip(curve, curve[1:]):
+        if size <= x1 or (x1, y1) == curve[-1]:
+            return math.copysign(y0 + (y1 - y0) * (size - x0) / (x1 - x0), value)
+    return 0.0
+
 
 KEY_HDR = "obsbot_hdr"
 KEY_STATE = "obsbot_state"

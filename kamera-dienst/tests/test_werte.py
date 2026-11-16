@@ -215,7 +215,9 @@ class ManagerTest(unittest.TestCase):
         self.clock.now += 5
         self.watcher.scan()
         self.assertEqual(len(self.folder.write_log(C922_NODE)), before + 1)
-        self.assertEqual(self.folder.values(TINY2_NODE), {})
+        # Bei der Tiny 2 nur Tempo 0 beim Erscheinen (hinterlassene Fahrt anhalten, b4).
+        self.assertEqual(self.folder.values(TINY2_NODE),
+                         {v4l2.V4L2_CID_PAN_SPEED: 0, v4l2.V4L2_CID_TILT_SPEED: 0})
 
     def test_restore_on_restart_auto_first(self) -> None:
         self.manager.put(C922_ID, {"auto_exposure": 1, "exposure_time_absolute": 700})

@@ -11,7 +11,9 @@
 - Gemerkte Werte setzt der Dienst neu, sobald eine Kamera erscheint (auch beim Start),
   nach der Wartezeit aus Plan 2.3 Regel 7. Nie verstellte Werte fasst er nicht an.
 - Pan, Tilt und Zoom erscheinen in der Liste, gesetzt werden sie nur über Bewegen
-  (Abschnitt b), damit die Schutzregeln (Plan 2.3) immer gelten.
+  (Abschnitt b), damit die Schutzregeln (Plan 2.3) immer gelten. Das Tempo von Pan und
+  Tilt (Tiny 2) fehlt in der Liste. Erscheint eine wache Tiny 2 (auch beim Start), sendet
+  der Dienst einmal Tempo 0, falls ein beendeter Dienst eine Fahrt hinterliess.
 - Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR schreibbar (nur wach),
   Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
   Bewegungsbefehlen (`movable`) laufen unter derselben Sperre wie die Bildwerte.
@@ -42,6 +44,8 @@ log = logging.getLogger("dss_camera.controls")
 AUTO_SWITCHES = (v4l2.V4L2_CID_EXPOSURE_AUTO, v4l2.V4L2_CID_FOCUS_AUTO,
                  v4l2.V4L2_CID_AUTO_WHITE_BALANCE)
 POSITION = (v4l2.V4L2_CID_PAN_ABSOLUTE, v4l2.V4L2_CID_TILT_ABSOLUTE, v4l2.V4L2_CID_ZOOM_ABSOLUTE)
+# Tempo der Dauerbewegung (Tiny 2): nicht in der Liste, nur über Bewegen (motion.py).
+SPEED = (v4l2.V4L2_CID_PAN_SPEED, v4l2.V4L2_CID_TILT_SPEED)
 
 TYPES = {v4l2.V4L2_CTRL_TYPE_INTEGER: "int", v4l2.V4L2_CTRL_TYPE_BOOLEAN: "bool",
          v4l2.V4L2_CTRL_TYPE_MENU: "menu", v4l2.V4L2_CTRL_TYPE_INTEGER_MENU: "menu"}
@@ -80,7 +84,8 @@ def control_key(name: str) -> str:
 
 
 def supported(control: v4l2.Control) -> bool:
-    return control.type in TYPES and not control.flags & v4l2.V4L2_CTRL_FLAG_DISABLED
+    return (control.type in TYPES and not control.flags & v4l2.V4L2_CTRL_FLAG_DISABLED
+            and control.id not in SPEED)
 
 
 def label(control: v4l2.Control) -> str:
@@ -389,9 +394,21 @@ class ControlManager:
                     or not self._watcher.writable(camera.id)):
                 continue
             self._restored[camera.id] = camera.appeared_at
+            if obsbot.is_tiny2(camera.model):
+                self._halt_speed(camera)
             remembered = self._store.remembered(camera.id)
             if remembered:
                 self._restore(camera, remembered)
+
+    def _halt_speed(self, camera: Camera) -> None:
+        """Tempo 0 für Pan und Tilt: hält eine hinterlassene Dauerfahrt an (nur wach, Plan 2.3)."""
+        try:
+            with self._lock, self._open(camera.node) as device:
+                for control in device.controls():
+                    if control.id in SPEED:
+                        device.set(control.id, 0)
+        except OSError as error:
+            log.warning("Tempo 0 an %s nicht gesendet: %s.", camera.id, error.strerror or error)
 
     def _restore(self, camera: Camera, remembered: dict) -> None:
         done = []

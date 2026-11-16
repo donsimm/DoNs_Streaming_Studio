@@ -7,6 +7,15 @@ Plan 4: POST cameras/{cam}/move, stop, step, home).
 - Dauerbewegung: alle `TICK_S` neue Zielposition (Richtung × Tempo × Zeit), begrenzt, auf
   den Schritt des Geräts gerundet; geschrieben wird nur, wenn sich der gerundete Wert ändert.
   Totmann: fehlt die Wiederholung `DEADMAN_S`, hält der Dienst an.
+- Tiny 2, Pan und Tilt (Abschnitt b4): Dauerbewegung über das Tempo (`V4L2_CID_PAN_SPEED`,
+  `V4L2_CID_TILT_SPEED`, Richtung × `speed` in Grad je Sekunde, Standard
+  `TINY2_SPEED_DEFAULT`), weil Zielpositionen alle 50 ms ruckeln. Die Kamera meldet ihre Lage
+  nicht (G_CTRL liefert nur den zuletzt gesetzten Wert); der Dienst schätzt sie aus Tempo ×
+  Zeit (Messkurve in `obsbot.py`). Reicht die Lage im nächsten Schritt über die Grenze: Tempo 0
+  und absolut genau auf die Grenze. Jeder andere Halt (stop, Totmann, Richtung 0, step, home)
+  sendet Tempo 0 und setzt den Treiberwert absolut auf die geschätzte Lage, damit `GET
+  controls`, Presets und Schritte von dort ausgehen. Absolute Ziele (step, home, Presets)
+  fährt die Kamera selbst fliessend.
 - Grenzen (Regel 3): je Kamera in `kameras.json` unter `motion` (Grad), sonst der Bereich des
   Geräts; bei der Tiny 2 Tilt unten Standard −66° (Schritt 0: Einschlafen bei −76°) und nie
   unter `TINY2_TILT_FLOOR_DEG`. Jeder Zielwert geht durch dieselbe Begrenzung (`goto` auch
@@ -14,8 +23,11 @@ Plan 4: POST cameras/{cam}/move, stop, step, home).
 - KI aus vor Bewegung (Regel 4): Einstellung `ai_off_before_move`; der Befehl selbst ist
   gesperrt, bis er am Gerät bestätigt ist (`obsbot.AI_OFF_UNLOCKED`).
 - Abbruch (Regel 6): Scheitert ein Schritt der Dauerbewegung (Kamera fehlt, Zeitüberschreitung,
-  `EPROTO`, eingeschlafen), hält der Dienst an und sendet nichts nach. Wiederholungen der
-  abgebrochenen Bewegung werden abgewiesen, bis `stop` kommt oder sie `DEADMAN_S` ausbleiben.
+  `EPROTO`, eingeschlafen), hält der Dienst an und sendet nichts nach ausser dem Halt der
+  Tiny 2 (einmal sofort mit Korrektur der Lage; misslingt er, beim Ende der Bewegung nochmals
+  nur Tempo 0). Bei fahrender Tiny 2 prüft jeder Schritt Kamera und Zustand, auch ohne Befehl.
+  Wiederholungen der abgebrochenen Bewegung werden abgewiesen, bis `stop` kommt oder sie
+  `DEADMAN_S` ausbleiben.
 - Jeder Befehl an die Tiny 2 läuft in `ControlManager.movable` (Regeln 1 und 2). Die Sperre
   dort hält die Dauerbewegung nur je Schritt, nicht dauerhaft.
 - Einstellungen (Plan 4: GET/PUT cameras/{cam}/config): Anzeigename und `DEFAULTS`, geprüft
@@ -24,7 +36,8 @@ Plan 4: POST cameras/{cam}/move, stop, step, home).
 
 Quellen:
 https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html
-(V4L2_CID_PAN_ABSOLUTE, V4L2_CID_TILT_ABSOLUTE in Bogensekunden, Vorzeichen; ZOOM_ABSOLUTE)
+(V4L2_CID_PAN_ABSOLUTE, V4L2_CID_TILT_ABSOLUTE in Bogensekunden, Vorzeichen; ZOOM_ABSOLUTE;
+V4L2_CID_PAN_SPEED, V4L2_CID_TILT_SPEED: 0 hält an, Vorzeichen gibt die Richtung)
 """
 
 import logging
@@ -51,9 +64,13 @@ MAX_DEG_PER_S = 60.0
 ZOOM_FULL_RANGE_S = 2.0
 TINY2_TILT_MIN_DEG = -66
 TINY2_TILT_FLOOR_DEG = -75
+# Tiny 2: `speed` in Grad je Sekunde (Entscheid Nutzer 2026-11-16).
+TINY2_SPEED_DEFAULT = 10
 
 AXES = (("pan", v4l2.V4L2_CID_PAN_ABSOLUTE), ("tilt", v4l2.V4L2_CID_TILT_ABSOLUTE),
         ("zoom", v4l2.V4L2_CID_ZOOM_ABSOLUTE))
+TINY2_SPEED = {"pan": (v4l2.V4L2_CID_PAN_SPEED, obsbot.PAN_SPEED_CURVE),
+               "tilt": (v4l2.V4L2_CID_TILT_SPEED, obsbot.TILT_SPEED_CURVE)}
 
 # Einstellungen je Kamera unter `motion` in kameras.json (Plan 4: PUT cameras/{cam}/config).
 DEFAULTS: dict = {
@@ -67,6 +84,11 @@ _OPTIONAL = {"pan_min", "pan_max", "tilt_min", "tilt_max"}
 CONFIG_FIELDS = {"name"} | set(DEFAULTS)
 NAME_MAX = 40
 STEP_DEG_MAX = 90
+
+
+def defaults(model: str) -> dict:
+    """Standards je Modell: bei der Tiny 2 ist `speed` Grad je Sekunde."""
+    return {**DEFAULTS, "speed": TINY2_SPEED_DEFAULT} if obsbot.is_tiny2(model) else dict(DEFAULTS)
 
 
 def is_number(value) -> bool:
@@ -97,6 +119,20 @@ class Axis:
     span: int
     rate: float  # Rohwert je Sekunde bei Tempo 100
     sign: int
+    # Tiny 2 Pan/Tilt: Dauerbewegung über das Tempo des Geräts (Bereich, Messkurve).
+    speed_id: int | None = None
+    speed_lo: int = 0
+    speed_hi: int = 0
+    curve: tuple = ()
+
+    def speed(self, direction: float, speed: float) -> int:
+        """Tempowert des Geräts für Richtung × Tempo (Grad je Sekunde), nie 0."""
+        value = self.sign * direction * speed
+        raw = round(value) or int(math.copysign(1, value))
+        return min(self.speed_hi, max(self.speed_lo, raw))
+
+    def arcsec_per_s(self, raw: int) -> float:
+        return obsbot.speed_deg_per_s(self.curve, raw) * ARCSEC_PER_DEG
 
     def clamp(self, value: float) -> float:
         return min(self.hi, max(self.lo, value))
@@ -135,6 +171,10 @@ def axes(model: str, controls: list[v4l2.Control], settings: dict) -> dict[str, 
         hi = control.maximum if hi_deg is None else hi_deg * ARCSEC_PER_DEG
         result[name] = make_axis(control, lo, hi, MAX_DEG_PER_S * ARCSEC_PER_DEG,
                                  settings[f"invert_{name}"])
+        speed_id, curve = TINY2_SPEED[name]
+        if obsbot.is_tiny2(model) and speed_id in by_id:
+            result[name].speed_id, result[name].curve = speed_id, curve
+            result[name].speed_lo, result[name].speed_hi = by_id[speed_id].minimum, by_id[speed_id].maximum
     return result
 
 
@@ -196,22 +236,59 @@ class Motion:
     axes: dict[str, Axis] = field(default_factory=dict)
     position: dict[str, float] = field(default_factory=dict)
     sent: dict[str, int] = field(default_factory=dict)
+    # Gesendetes Tempo der Tempo-Achsen (Tiny 2); ungleich 0 = die Kamera fährt.
+    speeds: dict[str, int] = field(default_factory=dict)
     last_tick: float = 0.0
 
     def advance(self, dt: float) -> list[tuple[int, int]]:
-        """Neue Zielwerte für dt Sekunden; nur Achsen, deren gerundeter Wert sich ändert."""
+        """Befehle für dt Sekunden seit dem letzten Schritt.
+
+        Tempo-Achsen über die ganze Zeit (die Kamera fährt weiter), sonst neue Zielwerte für
+        höchstens MAX_DT_S, nur bei Achsen, deren gerundeter Wert sich ändert.
+        """
         writes = []
         for name, axis in self.axes.items():
             direction = self.direction.get(name, 0.0)
+            if axis.speed_id is not None:
+                writes += self._advance_speed(name, axis, direction, dt)
+                continue
             if direction == 0:
                 continue
-            self.position[name] = axis.clamp(
-                self.position[name] + axis.sign * direction * axis.rate * self.speed / 100 * dt)
+            self.position[name] = axis.clamp(self.position[name] + axis.sign * direction * axis.rate
+                                              * self.speed / 100 * min(MAX_DT_S, dt))
             raw = axis.raw(self.position[name])
             if raw != self.sent[name]:
                 self.sent[name] = raw
                 writes.append((axis.control_id, raw))
         return writes
+
+    def _advance_speed(self, name: str, axis: Axis, direction: float, dt: float) -> list[tuple[int, int]]:
+        """Lage += Tempo × dt; neues Tempo nur bei Änderung. Vor der Grenze (Lage im nächsten
+        Schritt darüber) Tempo 0 und absolut auf die Grenze, bei jedem anderen Halt absolut auf
+        die geschätzte Lage (Plan 2.3 Regel 3)."""
+        current = self.speeds.get(name, 0)
+        self.position[name] += axis.arcsec_per_s(current) * dt
+        wanted = axis.speed(direction, self.speed) if direction else 0
+        target = None
+        if wanted:
+            ahead = self.position[name] + axis.arcsec_per_s(wanted) * TICK_S
+            if not axis.lo <= ahead <= axis.hi:
+                wanted, target = 0, axis.lo if ahead < axis.lo else axis.hi
+        writes = []
+        if wanted != current:
+            self.speeds[name] = wanted
+            writes.append((axis.speed_id, wanted))
+            if not wanted and target is None:
+                target = axis.raw(self.position[name])
+        if target is not None and (writes or self.position[name] != target):
+            self.position[name] = self.sent[name] = target
+            writes.append((axis.control_id, target))
+        return writes
+
+    def halt_speeds(self) -> list[tuple[int, int]]:
+        """Nur Tempo 0 für fahrende Achsen (nach einem Abbruch, Lage unbekannt)."""
+        return [(self.axes[name].speed_id, 0) for name, value in self.speeds.items()
+                if value and name in self.axes]
 
 
 def _fields(body: dict, allowed: set[str]) -> None:
@@ -242,7 +319,11 @@ class Mover:
         self.on_config: Callable[[str, dict], None] = lambda camera_id, config: None
 
     def settings(self, camera_id: str) -> dict:
-        return {**DEFAULTS, **self._store.motion(camera_id)}
+        try:
+            base = defaults(self._manager.known(camera_id).model)
+        except ApiError:
+            base = DEFAULTS
+        return {**base, **self._store.motion(camera_id)}
 
     # --- Einstellungen ---------------------------------------------------------------
 
@@ -287,8 +368,9 @@ class Mover:
             if not is_number(value) or not lo <= value <= hi:
                 raise ApiError(400, "invalid", f"«{key}» erwartet eine Zahl von {lo:g} bis {hi:g} "
                                                "oder null.")
+        base = defaults(camera.model)
         settings = {**self.settings(camera_id),
-                    **{key: DEFAULTS[key] if value is None else value for key, value in changes.items()}}
+                    **{key: base[key] if value is None else value for key, value in changes.items()}}
         _check_order(camera.model, settings, allowed)
         try:
             self._store.update_config(camera_id, changes, name)
@@ -379,10 +461,35 @@ class Mover:
 
         Gelingt auch ohne Kamera (Loslassen, nachdem sie ausgesteckt wurde).
         """
-        if self._cancel(camera_id) is not None:
+        motion = self._cancel(camera_id)
+        if motion is not None:
+            self._halt(camera_id, motion, not motion.aborted)
             # Position nach der Bewegung als Ereignis (events.py).
             self._manager.on_change(camera_id)
         return {"moving": False}
+
+    def _halt(self, camera_id: str, motion: Motion, correct: bool) -> None:
+        """Hält die Tempo-Achsen einer beendeten oder abgebrochenen Dauerbewegung an: Tempo 0,
+        mit `correct` danach Treiberwert auf die geschätzte Lage. Ohne Kamera nur ein Eintrag
+        im Protokoll; nach einem Abbruch versucht es das Ende der Bewegung nochmals, dann
+        ohne Korrektur (die Lage ist nach dem Fehler unsicher)."""
+        if not any(motion.speeds.values()):
+            return
+        try:
+            with self._manager.movable(camera_id, False) as device:
+                with self._lock:
+                    if not correct:
+                        writes = motion.halt_speeds()
+                    else:
+                        motion.direction = {}
+                        now = self._clock()
+                        writes = motion.advance(now - motion.last_tick)
+                        motion.last_tick = now
+                for control_id, raw in writes:
+                    device.set(control_id, raw)
+                motion.speeds = {}
+        except ApiError as error:
+            log.warning("Halt %s nicht gesendet: %s", camera_id, error.message)
 
     def tick(self) -> None:
         """Ein Schritt aller Dauerbewegungen (Plan 2.4); läuft alle TICK_S im eigenen Faden."""
@@ -393,18 +500,23 @@ class Mover:
                 if self._motions.get(camera_id) is not motion or not (motion.running or motion.aborted):
                     continue
                 now = self._clock()
-                if now - motion.last_request > DEADMAN_S:
+                expired = now - motion.last_request > DEADMAN_S
+                if expired:
                     del self._motions[camera_id]
-                    if motion.running:
-                        log.info("Bewegung %s angehalten: keine Wiederholung seit %.1f s (Totmann).",
-                                 camera_id, DEADMAN_S)
-                        self._manager.on_change(camera_id)
+                elif motion.aborted:
                     continue
-                if motion.aborted:
-                    continue
-                writes = motion.advance(min(MAX_DT_S, now - motion.last_tick))
-                motion.last_tick = now
-            if writes:
+                else:
+                    writes = motion.advance(now - motion.last_tick)
+                    motion.last_tick = now
+            if expired:
+                self._halt(camera_id, motion, not motion.aborted)
+                if motion.running:
+                    log.info("Bewegung %s angehalten: keine Wiederholung seit %.1f s (Totmann).",
+                             camera_id, DEADMAN_S)
+                    self._manager.on_change(camera_id)
+            elif writes or any(motion.speeds.values()):
+                # Auch ohne neuen Befehl: Fährt die Tiny 2 über das Tempo, prüft `movable` je
+                # Schritt Kamera und Zustand (Abbruch nach Regel 6, wie mit Zielpositionen).
                 self._send(camera_id, motion, writes)
 
     def _send(self, camera_id: str, motion: Motion, writes: list[tuple[int, int]]) -> None:
@@ -416,11 +528,13 @@ class Mover:
                     for control_id, raw in writes:
                         device.set(control_id, raw)
         except ApiError as error:
-            # Plan 2.3 Regel 6: anhalten, nichts nachsenden.
+            # Plan 2.3 Regel 6: anhalten, nichts nachsenden ausser Tempo 0.
             with self._lock:
-                if self._motions.get(camera_id) is motion:
-                    motion.running, motion.aborted = False, True
+                if self._motions.get(camera_id) is not motion:
+                    return
+                motion.running, motion.aborted = False, True
             log.warning("Bewegung %s abgebrochen: %s", camera_id, error.message)
+            self._halt(camera_id, motion, True)
 
     # --- Schritt und Mitte -----------------------------------------------------------
 
@@ -479,7 +593,9 @@ class Mover:
 
     def _goto(self, camera_id: str, settings: dict, wake: bool, target) -> dict:
         camera = self._ptz_camera(camera_id)
-        self._cancel(camera_id)
+        motion = self._cancel(camera_id)
+        if motion is not None:
+            self._halt(camera_id, motion, not motion.aborted)
         with self._manager.movable(camera_id, wake) as device:
             found, current = self._prepare(device, camera, settings)
             values = dict(current)
@@ -508,4 +624,8 @@ class Mover:
         if self._thread is not None:
             self._thread.join()
         with self._lock:
+            motions = list(self._motions.items())
             self._motions.clear()
+        # Keine Fahrt der Tiny 2 über das Ende des Diensts hinaus.
+        for camera_id, motion in motions:
+            self._halt(camera_id, motion, not motion.aborted)

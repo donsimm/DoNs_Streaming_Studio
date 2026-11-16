@@ -119,19 +119,31 @@ TINY2_WAKE_S = 1.5
 TINY2_HOMING_S = 4.0
 TINY2_SLEEP_TILT = -76 * 3600
 TINY2_POSITION = (v4l2.V4L2_CID_PAN_ABSOLUTE, v4l2.V4L2_CID_TILT_ABSOLUTE, v4l2.V4L2_CID_ZOOM_ABSOLUTE)
+# Prüfung am Gerät (2026-11-16): Dauerfahrt über das Tempo (Messkurve in obsbot.py), Tempo 0
+# hält jede Fahrt an, absolute Ziele mit ≈ 62 °/s; G_CTRL liefert nie die echte Lage.
+TINY2_ABSOLUTE = {v4l2.V4L2_CID_PAN_ABSOLUTE: "pan", v4l2.V4L2_CID_TILT_ABSOLUTE: "tilt"}
+TINY2_SPEED = {v4l2.V4L2_CID_PAN_SPEED: ("pan", obsbot.PAN_SPEED_CURVE),
+               v4l2.V4L2_CID_TILT_SPEED: ("tilt", obsbot.TILT_SPEED_CURVE)}
+TINY2_CURVES = dict(TINY2_SPEED.values())
+
+
+def tiny2_axes() -> dict:
+    """Echte Lage je Achse (Bogensekunden), Tempo, absolutes Ziel, Zeit der letzten Rechnung."""
+    return {name: {"pos": 0.0, "speed": 0, "target": None, "t": None} for name in ("pan", "tilt")}
 
 
 def tiny2_state() -> dict:
     """Zustand der Attrappe unter `obsbot` in der Knotendatei.
 
     `run`, `hdr`, `auto_sleep` wie im Statusblock; `wake_at`/`awake_since` Zeitpunkte der Uhr;
-    `stream_open` setzt der Test; Zähler: `lost_moves` (in der Grundstellungsfahrt verworfen),
-    `moves_asleep` (im Schlaf, ohne Strom), `restarts` (im Schlaf mit offenem Strom; gilt am
-    Gerät als Absturz mit Neustart der Kamera und darf nie vorkommen).
+    `stream_open` setzt der Test; `lage` die echte Lage (`tiny2_axes`, `FakeDevice.position`);
+    Zähler: `lost_moves` (in der Grundstellungsfahrt verworfen), `moves_asleep` (im Schlaf,
+    ohne Strom), `restarts` (im Schlaf mit offenem Strom; gilt am Gerät als Absturz mit
+    Neustart der Kamera und darf nie vorkommen).
     """
     return {"run": obsbot.RUN_AWAKE, "hdr": 0, "auto_sleep": 120, "wake_at": None,
             "awake_since": None, "stream_open": False, "lost_moves": 0, "moves_asleep": 0,
-            "restarts": 0, "xu_protokoll": []}
+            "restarts": 0, "xu_protokoll": [], "lage": tiny2_axes()}
 
 
 class FakeDevice:
@@ -159,7 +171,41 @@ class FakeDevice:
             done = state["wake_at"] + TINY2_WAKE_S
             if self._clock() >= done:
                 state.update(run=obsbot.RUN_AWAKE, awake_since=done, wake_at=None)
+        if state is not None:
+            self._drive(state)
         return state
+
+    def _drive(self, state: dict) -> None:
+        """Echte Lage bis jetzt fortschreiben; bis an den Anschlag (Bereich des Geräts).
+        Kommt Tilt auf −76° oder tiefer, schläft die Kamera ein und hält an."""
+        now = self._clock()
+        for control_id, name in TINY2_ABSOLUTE.items():
+            axis = state["lage"][name]
+            elapsed = 0.0 if axis["t"] is None else max(0.0, now - axis["t"])
+            axis["t"] = now
+            control = self._controls.get(control_id)
+            if state["run"] != obsbot.RUN_AWAKE or control is None:
+                continue
+            if axis["speed"]:
+                moved = obsbot.speed_deg_per_s(TINY2_CURVES[name], axis["speed"]) * 3600 * elapsed
+                axis["pos"] = max(control.minimum, min(control.maximum, axis["pos"] + moved))
+            elif axis["target"] is not None:
+                rest = axis["target"] - axis["pos"]
+                reach = obsbot.ABSOLUTE_DEG_PER_S * 3600 * elapsed
+                if abs(rest) <= reach:
+                    axis.update(pos=float(axis["target"]), target=None)
+                else:
+                    axis["pos"] += reach if rest > 0 else -reach
+        if state["run"] == obsbot.RUN_AWAKE and state["lage"]["tilt"]["pos"] <= TINY2_SLEEP_TILT:
+            state.update(run=obsbot.RUN_ASLEEP, awake_since=None)
+            for axis in state["lage"].values():
+                axis.update(speed=0, target=None)
+
+    def position(self) -> dict[str, float]:
+        """Echte Lage der Tiny 2 in Grad (am Gerät nicht lesbar, nur für Tests)."""
+        state = self._tiny2()
+        self._save()
+        return {name: axis["pos"] / 3600 for name, axis in state["lage"].items()}
 
     def xu_get(self, selector: int, size: int) -> bytes:
         state = self._tiny2()
@@ -212,6 +258,11 @@ class FakeDevice:
             return False
         if control_id == v4l2.V4L2_CID_TILT_ABSOLUTE and value <= TINY2_SLEEP_TILT:
             state.update(run=obsbot.RUN_ASLEEP, awake_since=None)
+            return True
+        if control_id in TINY2_SPEED:
+            state["lage"][TINY2_SPEED[control_id][0]].update(speed=value, target=None)
+        elif control_id in TINY2_ABSOLUTE:
+            state["lage"][TINY2_ABSOLUTE[control_id]].update(speed=0, target=value)
         return True
 
     def _value(self, control_id: int) -> int:
@@ -249,7 +300,8 @@ class FakeDevice:
         value = max(control.minimum, min(control.maximum, value))
         state = self._tiny2()
         # Wie am Gerät meldet G_CTRL auch einen verworfenen Befehl (Schritt 0, Zeile 7).
-        moved = state is None or control_id not in TINY2_POSITION or self._move(state, control_id, value)
+        moved = (state is None or (control_id not in TINY2_POSITION and control_id not in TINY2_SPEED)
+                 or self._move(state, control_id, value))
         self._data.setdefault("values", {})[str(control_id)] = value
         self._data.setdefault("protokoll", []).append([control_id, value] if moved else
                                                       [control_id, value, "verworfen"])
@@ -285,6 +337,8 @@ TINY2_CONTROLS = [
             -324000, 324000, 3600, 0),
     control(v4l2.V4L2_CID_ZOOM_ABSOLUTE, v4l2.V4L2_CTRL_TYPE_INTEGER, "Zoom, Absolute",
             0, 100, 1, 0),
+    control(v4l2.V4L2_CID_PAN_SPEED, _INT, "Pan, Speed", -160, 160, 1, 0),
+    control(v4l2.V4L2_CID_TILT_SPEED, _INT, "Tilt, Speed", -120, 120, 1, 0),
 ]
 C922_CONTROLS = [
     control(v4l2.V4L2_CID_BRIGHTNESS, _INT, "Brightness", 0, 255, 1, 128),
@@ -350,6 +404,8 @@ class FakeDeviceFolder:
             path = self.dev / node
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.pop("values", None) is not None:
+                if "obsbot" in data:
+                    data["obsbot"]["lage"] = tiny2_axes()
                 path.write_text(json.dumps(data), encoding="utf-8")
             link.symlink_to(os.path.relpath(path, self.by_id))
 

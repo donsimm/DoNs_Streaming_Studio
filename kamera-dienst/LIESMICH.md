@@ -48,10 +48,12 @@ Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR (setzbar, nu
 ## Bewegen
 
 - `POST /api/v1/cameras/{cam}/move` mit `{"pan": -1…1, "tilt": -1…1, "zoom": -1…1, "speed": 1…100}`: Dauerbewegung (`pan` +1 = Bild nach rechts, `tilt` +1 = nach oben, `zoom` +1 = hinein). Die Anfrage muss alle 200 ms wiederholt werden; fehlt sie 500 ms, hält der Dienst an.
-- `…/stop` hält an, `…/step` mit `{"pan": -1/0/1, …}` macht einen Schritt (Standard 2°, Zoom 10 % des Bereichs), `…/home` fährt in die Mitte (Zoom bleibt).
+- Tempo: Bei der Tiny 2 ist `speed` Grad pro Sekunde (1–100, Standard 10); sie fährt Schwenken und Neigen fliessend über ihre Geschwindigkeitssteuerung. Weil die Kamera ihre Lage nicht meldet, schätzt der Dienst sie aus Tempo × Zeit und setzt sie nach jedem Halt als Stellung (Abweichung etwa 1°). Bei der C922 bleibt `speed` 1–100 (100 = 60°/s, Standard 50), Zoom wie bisher.
+- `…/stop` hält an, `…/step` mit `{"pan": -1/0/1, …}` macht einen Schritt (Standard 2°, Zoom 10 % des Bereichs), `…/home` fährt in die Mitte (Zoom bleibt). Schritte, Mitte und Presets fährt die Tiny 2 am Stück an (≈ 62°/s).
 - Ist die Tiny 2 im Schlaf, kommt `409 camera_asleep`; mit `"wake": true` weckt der Dienst sie vorher.
-- Jeder Zielwert bleibt in den Grenzen: Tiny 2 Neigen unten −66° (nie unter −75°, bei −76° schläft sie ein), C922 ±10°.
-- Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach; Wiederholungen werden abgewiesen, bis `stop` kommt oder sie 500 ms ausbleiben.
+- Jeder Zielwert bleibt in den Grenzen: Tiny 2 Neigen unten −66° (nie unter −75°, bei −76° schläft sie ein), C922 ±10°. Bei der Dauerbewegung hält die Tiny 2 kurz vor der Grenze an und fährt genau auf sie.
+- Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach (ausser dem Halt der Tiny 2); Wiederholungen werden abgewiesen, bis `stop` kommt oder sie 500 ms ausbleiben.
+- Beim Start des Dienstes und beim Einstecken hält der Dienst eine noch laufende Fahrt der wachen Tiny 2 an.
 - Einstellungen je Kamera in `kameras.json` unter `motion`: Grenzen (`pan_min`, `pan_max`, `tilt_min`, `tilt_max` in Grad), `invert_pan`/`invert_tilt`/`invert_zoom`, `step_deg`, `zoom_step_percent`, `home_pan`, `home_tilt`, `speed`, `auto_wake`, `ai_off_before_move`.
 
 ## Installation

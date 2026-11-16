@@ -93,10 +93,13 @@ curl -X POST "$D/cameras/$CAM/wake"
 ```
 
 - `move`: `pan`, `tilt`, `zoom` je −1 bis 1 (`pan` +1 = Bild nach rechts, `tilt` +1 = nach oben, `zoom` +1 = hinein), `speed` 1 bis 100. Die Anfrage muss alle 200 ms wiederholt werden; fehlt sie 500 ms, hält der Dienst an (Totmann).
+- Tempo bei der Tiny 2: `speed` ist Grad pro Sekunde (Standard 10), die Richtung skaliert es (`"pan": 0.5, "speed": 10` = 5°/s). Schwenken und Neigen fahren fliessend über die Geschwindigkeitssteuerung der Kamera. Sie meldet ihre Lage nicht; der Dienst schätzt sie aus Tempo × Zeit (Abweichung am Gerät etwa 1°) und setzt sie nach jedem Halt als Stellung, sodass `controls`, `step` und `save-current` von dort ausgehen. Vor einer Grenze hält sie an und fährt genau auf die Grenze. `step`, `home` und Presets fährt sie am Stück an (≈ 62°/s).
+- Tempo bei der C922: `speed` 1 bis 100 (100 = 60°/s, Zoom 2 s über den ganzen Bereich), Standard 50.
 - `step`: je Achse −1, 0 oder 1; Standard 2°, Zoom 10 % des Bereichs. Antwort mit `position` (Pan, Tilt in Grad, Zoom im Wert des Geräts).
 - Jede Bewegung bleibt in den Grenzen (Tiny 2 Neigen unten −66°, nie unter −75°).
 - Schläft die Tiny 2, kommt `409 camera_asleep`; mit `"wake": true` (oder `auto_wake` in den Einstellungen) weckt der Dienst sie und wartet, bis sie bereit ist.
-- Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach (`409 camera_absent`, bis `stop` kommt).
+- Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach ausser dem Halt der Tiny 2 (`409 camera_absent`, bis `stop` kommt).
+- Beim Start des Dienstes und beim Einstecken hält der Dienst eine noch laufende Fahrt der wachen Tiny 2 an.
 
 ### Einstellungen je Kamera
 
@@ -110,7 +113,7 @@ curl -X PUT "$D/cameras/$CAM/config" -d '{"tilt_min": null}'
 {"ok": true,
  "config": {"name": "Kamera oben", "pan_min": null, "pan_max": null, "tilt_min": -50, "tilt_max": null,
             "invert_pan": true, "invert_tilt": false, "invert_zoom": false, "step_deg": 2,
-            "zoom_step_percent": 10, "home_pan": 0, "home_tilt": 0, "speed": 50,
+            "zoom_step_percent": 10, "home_pan": 0, "home_tilt": 0, "speed": 10,
             "auto_wake": false, "ai_off_before_move": true},
  "ranges": {"speed": [1, 100], "pan_min": [-130, 130], "pan_max": [-130, 130], "home_pan": [-130, 130],
             "tilt_min": [-75, 90], "tilt_max": [-75, 90], "home_tilt": [-75, 90],
@@ -125,7 +128,7 @@ curl -X PUT "$D/cameras/$CAM/config" -d '{"tilt_min": null}'
 | `invert_pan`, `invert_tilt`, `invert_zoom` | Richtung umkehren | `false` |
 | `step_deg`, `zoom_step_percent` | Schrittweite für `step` (Grad, Prozent des Zoombereichs) | 2, 10 |
 | `home_pan`, `home_tilt` | eigene Mitte für `home` in Grad | 0, 0 |
-| `speed` | Tempo von `move` ohne `speed` | 50 |
+| `speed` | Tempo von `move` ohne `speed` (Tiny 2 in Grad pro Sekunde) | Tiny 2: 10, sonst 50 |
 | `auto_wake` | Tiny 2 bei Bewegen ohne `wake` wecken | `false` |
 | `ai_off_before_move` | KI-Verfolgung vor Bewegung aus (Befehl noch gesperrt, siehe Einschränkungen) | `true` |
 
@@ -260,7 +263,8 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 ## Einschränkungen
 
 - **Tiny 2, Bildwinkel und KI-Modus:** In Schritt 0 nicht bestätigt, darum gesperrt und nicht angeboten. Der Befehl «KI-Verfolgung aus» vor einer Bewegung (`ai_off_before_move`) wird nicht gesendet, bis er am Gerät mit laufendem Videostrom geprüft ist (`obsbot.AI_OFF_UNLOCKED`); `ai_mode` gibt es in `controls` nicht. Auto-Schlaf wird nur gelesen.
-- **Richtung und Tempo:** Die Standards von «Richtung umkehren» und das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
+- **Richtung und Tempo:** Die Standards von «Richtung umkehren» und bei der C922 das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
+- **Lage der Tiny 2:** geschätzt, nicht gemessen (die Kamera meldet sie nicht). Die Schätzung folgt der am Gerät gemessenen Kurve Tempo → Grad pro Sekunde (2026-11-16, über das OBS-Bild; Pan bis 80, Tilt bis 20 gemessen, darüber verlängert). Nach einem Abbruch (Kamera unerreichbar) ist die Lage unsicher, bis `home` oder ein Preset sie absolut setzt.
 
 ## Dateien im Datenordner
 
@@ -279,5 +283,6 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 - Python `http.server`: https://docs.python.org/3/library/http.server.html (nicht abgerufen)
 - Elgato Key Light: https://apihandyman.io/hacking-elgato-key-light-with-postman/
 - OBSBOT Tiny 2, Frames: https://github.com/cgevans/tiny2
+- V4L2 Pan/Tilt absolut und Tempo: https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html (nicht abgerufen)
 - firewalld, reiche Regeln: https://firewalld.org/documentation/man-pages/firewalld.richlanguage.html und https://firewalld.org/documentation/man-pages/firewall-cmd.html (nicht abgerufen)
 - systemd-Benutzereinheit: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html (nicht abgerufen)

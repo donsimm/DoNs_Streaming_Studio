@@ -84,7 +84,9 @@ class ConfigTest(unittest.TestCase):
 
     def test_defaults_ranges_and_limits(self) -> None:
         answer = self.mover.get_config(TINY2_ID)
-        self.assertEqual(answer["config"], {"name": "OBSBOT Tiny 2", **motion.DEFAULTS})
+        # Tiny 2: Tempo in Grad je Sekunde, Standard 10 (b4).
+        self.assertEqual(answer["config"], {"name": "OBSBOT Tiny 2", **motion.DEFAULTS, "speed": 10})
+        self.assertEqual(self.mover.get_config(C922_ID)["config"]["speed"], 50)
         self.assertEqual(answer["ranges"]["tilt_min"], [-75, 90])
         self.assertEqual(answer["ranges"]["pan_max"], [-130, 130])
         self.assertEqual(answer["ranges"]["step_deg"], [1, 90])
@@ -137,12 +139,13 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual((position["pan"], position["tilt"]), (20, -30))
 
     def test_running_motion_takes_new_limit(self) -> None:
-        self.hold({"pan": 1, "speed": 50}, 0.4)
-        self.assertLess(max(self.writes(PAN)), 15 * DEG)
+        # Tiny 2 fährt über das Tempo (22,1 °/s): bis 15° kein absoluter Befehl.
+        self.hold({"pan": 1, "speed": 20}, 0.4)
+        self.assertEqual(self.writes(PAN), [])
         self.put({"pan_max": 15})
-        self.hold({"pan": 1, "speed": 50}, 2.0)
-        self.assertEqual(max(self.writes(PAN)), 15 * DEG)
-        self.assertEqual(self.writes(PAN)[-1], 15 * DEG)
+        self.hold({"pan": 1, "speed": 20}, 2.0)
+        self.assertEqual(self.writes(PAN), [15 * DEG])
+        self.assertEqual(self.writes(v4l2.V4L2_CID_PAN_SPEED)[-2:], [20, 0])
 
     def test_tilt_floor_and_order(self) -> None:
         self.assert_invalid({"tilt_min": -76}, "von -75 bis 90")
@@ -165,7 +168,7 @@ class ConfigTest(unittest.TestCase):
         self.assert_invalid({"name": "x" * 41}, "1 bis 40 Zeichen")
         # Eine ungültige Angabe weist die ganze Anfrage ab.
         self.assert_invalid({"speed": 70, "step_deg": 100}, "step_deg")
-        self.assertEqual(self.mover.get_config(TINY2_ID)["config"]["speed"], 50)
+        self.assertEqual(self.mover.get_config(TINY2_ID)["config"]["speed"], 10)
         self.assertEqual(self.events, [])
         with self.assertRaises(ApiError) as context:
             self.mover.put_config("cccc:0003", {"speed": 70})

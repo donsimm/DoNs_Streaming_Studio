@@ -45,7 +45,7 @@ Testquelle danach gelöscht (`RemoveInput`), Programm zurück auf «Szene», Tin
 
 ### Nicht erledigt, `[OFFEN]`
 
-- `[OFFEN]` **Dauerbewegung ruckelt.** Zielposition alle 50 ms ergibt im Bild Stufen. Ruhig ist `pan_speed`/`tilt_speed`, dabei ist die echte Position aber nicht lesbar (weder `G_CTRL` noch Statusblock). Die Grenze unten (−66°, Schlaf bei −76°) braucht dann einen anderen Schutz (z. B. Lage aus Zeit × Tempo mit Reserve, Tilt weiter über Zielpositionen). Entscheid vor dem nächsten Dienst-Abschnitt.
+- Erledigt in b4: ~~`[OFFEN]` **Dauerbewegung ruckelt.**~~ Zielposition alle 50 ms ergibt im Bild Stufen. Ruhig ist `pan_speed`/`tilt_speed`, dabei ist die echte Position aber nicht lesbar (weder `G_CTRL` noch Statusblock). Die Grenze unten (−66°, Schlaf bei −76°) braucht dann einen anderen Schutz (z. B. Lage aus Zeit × Tempo mit Reserve, Tilt weiter über Zielpositionen). Entscheid vor dem nächsten Dienst-Abschnitt.
 - `[OFFEN]` **`zoom_continuous` der Tiny 2** meldet 245 bei Bereich −100…100: Wert mit Vorzeichen wird ohne Vorzeichen gelesen (vermutlich −11).
 - `[OFFEN]` **Blackmagic-Karte** erscheint in `status` als Kamera (`ptz: false`, keine Werte). Ausblenden (nur UVC-Kameras mit Werten) oder lassen.
 - `[OFFEN]` Bildwinkel und KI-Modus sind am Gerät bestätigt und können im Dienst freigeschaltet werden (Bildwinkel `04 01 00/01/02`, KI «Oberkörper» `16 02 02 01`, aus `16 02 00 00` mit Übergang 6).
@@ -56,3 +56,12 @@ Testquelle danach gelöscht (`RemoveInput`), Programm zurück auf «Szene», Tin
 ### Ausserhalb des Studios
 
 Im Kernel-Protokoll des Streaming-PCs seit dem Start (07:15) 1828 korrigierbare PCIe-Fehler (`AER`, `RxErr`, Physical Layer) einer NVMe; mit den Kameras ohne Zusammenhang. Gehört zum System des Streaming-PCs, nicht zu P15.
+
+## b4: Dauerbewegung über Geschwindigkeit (2026-11-16)
+
+- **Geändert:** `kamera-dienst/dss_camera/motion.py` (Tiny 2: `move` setzt `pan_speed`/`tilt_speed`, Lage aus Tempo × Zeit, Halt vor der Grenze, Halt mit Korrektur des Treiberwerts, Standardtempo je Modell), `obsbot.py` (Messkurve Tempo → °/s), `v4l2.py` (Kennungen), `controls.py` (Tempo nicht in `controls`, Tempo 0 beim Erscheinen), `fake.py` (Attrappe mit echter Lage über die Zeit, Tempo, absolute Ziele mit 62 °/s), Tests `kd_bewegen`, `kd_einstellungen`, `kd_werte`, `docs/09-kamera-dienst.md`, `kamera-dienst/LIESMICH.md`.
+- **Geprüft (2026-11-16):** `scripts/testen.sh -R '^kd_'` alle grün (Attrappe). Am Gerät nicht geprüft.
+- **Handtest, prüft Lotse:** Dauerbewegung Tiny 2 im OBS-Bild fliessend (Pan, Tilt, schräg, Standard 10 °/s); nach dem Loslassen kein sichtbarer Sprung über ≈ 2°; `tilt -1` mit Tempo 100 hält bei −66° ohne Schlaf; Pan an den Grenzen ±130° ohne Anschlag; Dienst während der Fahrt beenden (`systemctl --user stop`) hält an. Grund: Bewegung und Bild nur am Gerät sichtbar.
+- **Interna:** Lage nach der Messkurve statt «Wert = °/s» (Pan 10 → 12,0 °/s, sonst Korrektursprung ≈ 20 %); Tempo nur bei Änderung senden, aber jeden Schritt Kamera und Zustand prüfen (Abbruch nach Regel 6 wie bisher); nach Abbruch sofort Halt mit Korrektur, misslingt er, beim Ende nochmals nur Tempo 0; Halt auch bei `step`, `home`, Presets und beim Beenden des Dienstes; Tempo-Werte aus `controls` ausgeblendet (sonst über `PUT controls` setzbar).
+- `[OFFEN]` Startet eine Dauerbewegung, während ein absolutes Ziel (`step`, Preset) noch fährt, beginnt die Schätzung beim Ziel statt bei der echten Lage.
+- **Quellen:** Messwerte am Gerät (Lotse, 2026-11-16, über das OBS-Bild); https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html (`V4L2_CID_PAN_SPEED`, `V4L2_CID_TILT_SPEED`, nicht abgerufen).
