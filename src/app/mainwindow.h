@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actionview.h"
 #include "canvasedit.h"
 #include "connectionstate.h"
 #include "docks.h"
@@ -101,6 +102,15 @@ private:
     void connectChatBot();
     void requestActionRuns();
     void refreshChatSend(); // P14 e2-13: Eingabezeile «Chat» aus dss::chatSendView
+    // P14 e2-14: Unterreiter «Aktionen», links. Bearbeitungen gehen nacheinander an den Kern
+    // (runActionEdits); «Gespeichert: <Name>» und Fehler in der Statuszeile.
+    void connectActions();
+    void refreshActionList();
+    void refreshActionButtons();
+    void runActionEdits(const dss::EditResult &result, const QString &savedName);
+    void sendNextActionEdit();
+    void askRenameActionGroup(const QString &group);
+    void askRemoveActionGroup(const QString &group);
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -225,6 +235,10 @@ private:
     bool m_runsRequested = false;       // get_action_runs in dieser Verbindung geschickt
     dss::ChatRows m_chatRows;           // P14 e2-13: Bereich «Chat»
     qint64 m_chatSendRequest = 0;       // offene Anfrage chat_send (Text leeren bei Erfolg)
+    QList<dss::ActionsEdit> m_actionEdits; // P14 e2-14: noch zu schickende Bearbeitungen
+    qint64 m_actionEditRequest = 0;     // offene Bearbeitung
+    QString m_actionEditSaved;          // Name für «Gespeichert: <Name>» nach der letzten
+    QUuid m_actionEditCreated;          // neue Aktion, danach wählen
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

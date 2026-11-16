@@ -273,6 +273,15 @@ QCheckBox::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
 QCheckBox::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
 QCheckBox::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
 QCheckBox::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
+/* P14: Kästchen in Bäumen (Aktionen im Chat-Bot) mit denselben Symbolen; nur Zeilen mit
+   Qt::ItemIsUserCheckable zeichnen eines, die übrigen Bäume bleiben unverändert. */
+QTreeView::indicator { width: 16px; height: 16px; }
+QTreeView::indicator:unchecked { image: url("@symbols@/kaestchen-aus.svg"); }
+QTreeView::indicator:unchecked:hover { image: url("@symbols@/kaestchen-aus-fokus.svg"); }
+QTreeView::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
+QTreeView::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
+QTreeView::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
+QTreeView::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
 
 /* Eigene Bereiche (in OBS nicht vorhanden), mit den Werten von Yami gestaltet. */
 #headerBar { background: @base@; border: 1px solid @border@; border-radius: 4px; }

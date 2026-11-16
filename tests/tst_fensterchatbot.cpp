@@ -5,6 +5,7 @@
 // P14 e2-12: «Live» mit Teilern und Bereich «Läufe der Aktionen» (Probeläufe über den Testkern).
 // P14 e2-13: Bereich «Chat» (Zeilen über test_event, Senden gegen den Twitch-Testserver, nie Twitch)
 // und «Chat-Nachrichten ausblenden».
+// P14 e2-14: «Aktionen» links (Suche, Baum, Leiste, Gruppen umbenennen und löschen).
 
 #include "actionjson.h"
 #include "actionmodel.h"
@@ -25,19 +26,25 @@
 #include <QFrame>
 #include <QHeaderView>
 #include <QImage>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QLabel>
 #include <QLayout>
 #include <QLineEdit>
+#include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStandardItemModel>
 #include <QSplitter>
 #include <QStackedWidget>
+#include <QStatusBar>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 
+#include <functional>
 #include <memory>
 
 using namespace dss;
@@ -194,6 +201,63 @@ class TestFensterChatBot : public QObject
                            {QStringLiteral("time"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
                            {QStringLiteral("origin_id"), QString()},
                            {QStringLiteral("data"), data}};
+    }
+
+    // Beantwortet den nächsten modalen Dialog, sobald er offen ist (wie tst_fensterbearbeiten).
+    static void answerDialog(std::function<void(QWidget *)> answer)
+    {
+        auto *timer = new QTimer(qApp);
+        timer->setInterval(20);
+        QObject::connect(timer, &QTimer::timeout, timer, [timer, answer] {
+            if (QWidget *dialog = QApplication::activeModalWidget()) {
+                timer->stop();
+                timer->deleteLater();
+                answer(dialog);
+            }
+        });
+        timer->start();
+    }
+
+    // Rückfrage (confirm) beantworten: Knopf mit dem Text button; *text bekommt die Frage.
+    static void answerQuestion(const QString &button, QString *text)
+    {
+        answerDialog([button, text](QWidget *dialog) {
+            auto *box = qobject_cast<QMessageBox *>(dialog);
+            if (!box)
+                return;
+            *text = box->text();
+            for (QAbstractButton *b : box->buttons())
+                if (b->text() == button)
+                    b->click();
+        });
+    }
+
+    // Zeile im Baum der Aktionen (alle Ebenen) mit dem Text text in Spalte 0
+    static QTreeWidgetItem *treeItem(QTreeWidget *tree, const QString &text)
+    {
+        for (QTreeWidgetItemIterator it(tree); *it; ++it)
+            if ((*it)->text(0) == text)
+                return *it;
+        return nullptr;
+    }
+
+    bool putTestAction(const QUuid &id, const QString &name, const QString &group)
+    {
+        actions::Action a;
+        a.id = id;
+        a.name = name;
+        a.group = group;
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(a)}}});
+        return put && put->ok;
+    }
+
+    // Aktion im Stand des Kerns (actions_config), leer = gibt es nicht
+    std::optional<actions::Action> coreAction(const QUuid &id) const
+    {
+        const std::optional<ActionsConfigInfo> info = m_client->actionsConfig();
+        const actions::Action *a = info && info->config ? info->config->action(id) : nullptr;
+        return a ? std::optional<actions::Action>(*a) : std::nullopt;
     }
 
     static void openChatBot(QWidget *window)
@@ -487,12 +551,18 @@ private slots:
         QTest::mouseClick(onlyErrors, Qt::LeftButton, {}, QPoint(4, onlyErrors->height() / 2));
         QCOMPARE(runs->topLevelItemCount(), all);
 
-        // «Im Editor öffnen»: Wechsel auf den Unterreiter «Aktionen»
+        // «Im Editor öffnen»: Wechsel auf den Unterreiter «Aktionen», die Aktion im Baum gewählt
+        // (auch wenn die Suche sie ausblendet: die Suche wird geleert)
+        child<QLineEdit>("actionsSearch")->setText(QStringLiteral("DSS-Test Fehler"));
         runs->setCurrentItem(runItem(QStringLiteral("DSS-Test Warten")));
         QTest::mouseClick(open, Qt::LeftButton);
         auto *page = child<ActionsPage>("actionsPage");
         QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
         QVERIFY(child<QToolButton>("chatBotTab1")->isChecked());
+        QVERIFY(child<QLineEdit>("actionsSearch")->text().isEmpty());
+        QTreeWidget *tree = child<QTreeWidget>("actionsTree");
+        QVERIFY(tree->currentItem());
+        QCOMPARE(tree->currentItem()->text(0), QStringLiteral("DSS-Test Warten"));
         QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(runs->isVisible(), 3000);
 
@@ -670,6 +740,218 @@ private slots:
         }
         if (core->state() != QProcess::NotRunning && !core->waitForFinished(3000))
             stopCore(core.get());
+    }
+
+    // P14 e2-14: «Aktionen» links. Suchfeld, Baum Gruppen → Aktionen, Leiste; Kästchen schickt
+    // action_put mit enabled; Hinzufügen, Löschen, Gruppe umbenennen (Doppelklick) und löschen
+    // (Kontextmenü, Rückfrage abbrechen und bestätigen); «Gespeichert: …» in der Statuszeile.
+    void actionsList()
+    {
+        QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
+        auto *page = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        auto *search = child<QLineEdit>("actionsSearch");
+        auto *tree = child<QTreeWidget>("actionsTree");
+        auto *add = child<QToolButton>("actionAdd");
+        auto *newGroup = child<QToolButton>("actionNewGroup");
+        auto *copy = child<QToolButton>("actionCopy");
+        auto *remove = child<QToolButton>("actionRemove");
+        auto *reset = child<QToolButton>("actionReset");
+        QVERIFY(search && tree && add && newGroup && copy && remove && reset);
+        QCOMPARE(page->areaTitle(ActionsPage::List), QStringLiteral("Aktionen"));
+        QCOMPARE(search->placeholderText(), QStringLiteral("Suchen …"));
+        QCOMPARE(search->accessibleName(), QStringLiteral("Aktionen suchen"));
+        QCOMPARE(tree->accessibleName(), QStringLiteral("Aktionen"));
+        QVERIFY(search->geometry().bottom() < tree->geometry().top());
+        const QList<std::pair<QToolButton *, QString>> tips{
+            {add, QStringLiteral("Aktion hinzufügen")}, {newGroup, QStringLiteral("Neue Gruppe")},
+            {copy, QStringLiteral("Aktion kopieren")}, {remove, QStringLiteral("Aktion löschen")},
+            {reset, QStringLiteral("Mitgelieferte Aktion zurücksetzen")}};
+        for (const auto &[button, tip] : tips) {
+            QCOMPARE(button->toolTip(), tip);
+            QCOMPARE(button->accessibleName(), tip);
+            QCOMPARE(button->iconSize(), QSize(14, 14));
+            QCOMPARE(button->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        }
+        QVERIFY(add->geometry().right() < newGroup->geometry().left());
+        QVERIFY(newGroup->geometry().right() < copy->geometry().left());
+        QVERIFY(copy->geometry().right() < remove->geometry().left());
+        // «Zurücksetzen» rechtsbündig nach der Dehnung
+        QVERIFY(reset->geometry().left() - remove->geometry().right() > 3 * reset->width());
+
+        // Zwei Aktionen in einer Gruppe, eine ohne
+        const QUuid greet = QUuid::createUuid();
+        const QUuid raid = QUuid::createUuid();
+        const QUuid single = QUuid::createUuid();
+        QVERIFY(putTestAction(greet, QStringLiteral("DSS-Test Begrüssung"), QStringLiteral("DSS-Test Gruppe")));
+        QVERIFY(putTestAction(raid, QStringLiteral("DSS-Test Raid"), QStringLiteral("DSS-Test Gruppe")));
+        QVERIFY(putTestAction(single, QStringLiteral("DSS-Test Einzel"), QString()));
+        QTRY_VERIFY_WITH_TIMEOUT(treeItem(tree, QStringLiteral("DSS-Test Einzel")), 3000);
+        QTreeWidgetItem *group = treeItem(tree, QStringLiteral("DSS-Test Gruppe"));
+        QVERIFY(group);
+        QCOMPARE(group->childCount(), 2);
+        QCOMPARE(group->text(1), QStringLiteral("(2)"));
+        QVERIFY(!(group->flags() & Qt::ItemIsUserCheckable));
+        QCOMPARE(group->child(0)->text(0), QStringLiteral("DSS-Test Begrüssung"));
+        QTreeWidgetItem *singleItem = treeItem(tree, QStringLiteral("DSS-Test Einzel"));
+        QVERIFY(!singleItem->parent());
+        QVERIFY(singleItem->flags() & Qt::ItemIsUserCheckable);
+        QCOMPARE(singleItem->checkState(0), Qt::Checked);
+
+        // Suche ohne Gross- und Kleinschreibung füllt nur den Baum neu
+        search->setText(QStringLiteral("dss-test raid"));
+        QVERIFY(treeItem(tree, QStringLiteral("DSS-Test Raid")));
+        QVERIFY(!treeItem(tree, QStringLiteral("DSS-Test Einzel")));
+        QVERIFY(!treeItem(tree, QStringLiteral("DSS-Test Begrüssung")));
+        search->clear();
+        QVERIFY(treeItem(tree, QStringLiteral("DSS-Test Einzel")));
+
+        // Auswahl: Gruppe → Kopieren und Löschen aus; Aktion → an; eigene Aktion nicht zurücksetzbar
+        tree->setCurrentItem(treeItem(tree, QStringLiteral("DSS-Test Gruppe")));
+        QVERIFY(add->isEnabled() && newGroup->isEnabled());
+        QVERIFY(!copy->isEnabled() && !remove->isEnabled() && !reset->isEnabled());
+        tree->setCurrentItem(treeItem(tree, QStringLiteral("DSS-Test Einzel")));
+        QVERIFY(copy->isEnabled() && remove->isEnabled());
+        QVERIFY(!reset->isEnabled());
+
+        // Kästchen schaltet die Aktion ab (action_put mit enabled), Statuszeile «Gespeichert: …»
+        treeItem(tree, QStringLiteral("DSS-Test Einzel"))->setCheckState(0, Qt::Unchecked);
+        QTRY_VERIFY_WITH_TIMEOUT(coreAction(single) && !coreAction(single)->enabled, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gespeichert: DSS-Test Einzel"), 3000);
+        QCOMPARE(treeItem(tree, QStringLiteral("DSS-Test Einzel"))->checkState(0), Qt::Unchecked);
+        QCOMPARE(tree->currentItem()->text(0), QStringLiteral("DSS-Test Einzel")); // Auswahl bleibt
+
+        // Hinzufügen in der Gruppe der Auswahl: die neue Aktion ist gewählt
+        tree->setCurrentItem(treeItem(tree, QStringLiteral("DSS-Test Raid")));
+        const int before = m_client->actionsConfig()->config->actions.size();
+        QTest::mouseClick(add, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->actionsConfig()->config->actions.size(), before + 1, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(treeItem(tree, QStringLiteral("DSS-Test Gruppe"))->childCount(), 3, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!page->selectedAction().isNull()
+                                     && page->selectedAction() != greet && page->selectedAction() != raid, 3000);
+        const QUuid created = page->selectedAction();
+        QCOMPARE(coreAction(created)->group, QStringLiteral("DSS-Test Gruppe"));
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gespeichert: ") + coreAction(created)->name, 3000);
+
+        // Löschen ohne Verweise: ohne Rückfrage
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreAction(created), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(treeItem(tree, QStringLiteral("DSS-Test Gruppe"))->childCount(), 2, 3000);
+
+        // Doppelklick öffnet nur «Umbenennen»: Dialog abbrechen, die Gruppe bleibt aufgeklappt
+        group = treeItem(tree, QStringLiteral("DSS-Test Gruppe"));
+        QVERIFY(group->isExpanded());
+        bool renameAsked = false;
+        answerDialog([&renameAsked](QWidget *dialog) {
+            if (auto *input = qobject_cast<QInputDialog *>(dialog)) {
+                renameAsked = true;
+                input->reject();
+            }
+        });
+        {
+            const QPoint center = tree->visualItemRect(group).center();
+            QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, center);
+            QTest::mouseDClick(tree->viewport(), Qt::LeftButton, {}, center);
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(renameAsked, 3000);
+        group = treeItem(tree, QStringLiteral("DSS-Test Gruppe"));
+        QVERIFY(group && group->isExpanded());
+
+        // Gruppe umbenennen per Doppelklick
+        answerDialog([](QWidget *dialog) {
+            if (auto *input = qobject_cast<QInputDialog *>(dialog)) {
+                input->setTextValue(QStringLiteral("DSS-Test Gruppe Neu"));
+                input->accept();
+            }
+        });
+        // Doppelklick wie mit der Maus: Qt meldet ihn nur nach einem Klick auf denselben Eintrag
+        // (wie doubleClick in tst_fensterbearbeiten)
+        const QPoint groupCenter = tree->visualItemRect(group).center();
+        QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, groupCenter);
+        QTest::mouseDClick(tree->viewport(), Qt::LeftButton, {}, groupCenter);
+        QTRY_VERIFY_WITH_TIMEOUT(coreAction(greet)->group == QStringLiteral("DSS-Test Gruppe Neu")
+                                     && coreAction(raid)->group == QStringLiteral("DSS-Test Gruppe Neu"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(treeItem(tree, QStringLiteral("DSS-Test Gruppe Neu")), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gespeichert: DSS-Test Gruppe Neu"), 3000);
+
+        // Gruppe löschen über das Kontextmenü: Rückfrage abbrechen, dann bestätigen
+        const auto removeGroupByMenu = [&](const QString &button, QString *question) {
+            QTreeWidgetItem *item = treeItem(tree, QStringLiteral("DSS-Test Gruppe Neu"));
+            QVERIFY(item);
+            // Das Menü ist kein modaler Dialog: Warten auf das offene Menü, dann «Löschen …»
+            auto *timer = new QTimer(this);
+            timer->setInterval(20);
+            connect(timer, &QTimer::timeout, timer, [timer, button, question] {
+                auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+                if (!menu)
+                    return;
+                timer->stop();
+                timer->deleteLater();
+                QAction *found = nullptr;
+                for (QAction *a : menu->actions())
+                    if (a->text() == QStringLiteral("Löschen …"))
+                        found = a;
+                QVERIFY(found);
+                answerQuestion(button, question);
+                menu->hide();
+                found->trigger();
+            });
+            timer->start();
+            emit tree->customContextMenuRequested(tree->visualItemRect(item).center());
+        };
+        QString question;
+        removeGroupByMenu(QStringLiteral("Abbrechen"), &question);
+        QTRY_VERIFY_WITH_TIMEOUT(!question.isEmpty(), 3000);
+        QVERIFY2(question.startsWith(QStringLiteral("Gruppe «DSS-Test Gruppe Neu» mit 2 Aktionen löschen?")),
+                 qPrintable(question));
+        QTest::qWait(300);
+        QVERIFY(coreAction(greet) && coreAction(raid));
+        question.clear();
+        removeGroupByMenu(QStringLiteral("Löschen"), &question);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreAction(greet) && !coreAction(raid), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!treeItem(tree, QStringLiteral("DSS-Test Gruppe Neu")), 3000);
+        QVERIFY(coreAction(single));
+
+        // Ohne Kern kein Menü und kein Umbenennen, auch wenn noch eine Gruppenzeile da ist
+        // (Zeilen von Hand gesetzt, nach der Trennung leert MainWindow den Baum sonst selbst)
+        m_client->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!m_client->isConnected(), 3000);
+        ActionListRow staleGroup;
+        staleGroup.text = QStringLiteral("DSS-Test Gruppe Alt");
+        staleGroup.group = staleGroup.text;
+        staleGroup.isGroup = true;
+        page->setActionRows({staleGroup});
+        QTreeWidgetItem *stale = treeItem(tree, staleGroup.text);
+        QVERIFY(stale);
+        bool popupShown = false;
+        bool dialogShown = false;
+        auto *watch = new QTimer(this);
+        watch->setInterval(20);
+        connect(watch, &QTimer::timeout, watch, [&popupShown, &dialogShown] {
+            if (QWidget *popup = QApplication::activePopupWidget()) {
+                popupShown = true;
+                popup->hide();
+            }
+            if (QWidget *dialog = QApplication::activeModalWidget()) {
+                dialogShown = true;
+                dialog->close();
+            }
+        });
+        watch->start();
+        const QPoint staleCenter = tree->visualItemRect(stale).center();
+        emit tree->customContextMenuRequested(staleCenter);
+        QTest::mouseClick(tree->viewport(), Qt::LeftButton, {}, staleCenter);
+        QTest::mouseDClick(tree->viewport(), Qt::LeftButton, {}, staleCenter);
+        QTest::qWait(300);
+        watch->stop();
+        delete watch;
+        QVERIFY(!popupShown);
+        QVERIFY(!dialogShown);
+        m_client->start();
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->isConnected(), 5000);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

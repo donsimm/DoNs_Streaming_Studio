@@ -576,6 +576,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_actionsStatus = status;
         emit actionsStatusChanged();
+    } else if (type == QLatin1String(msg::kActionsConfig)) {
+        ActionsConfigInfo info;
+        if (!parseActionsConfig(message, &info, &error)) {
+            qWarning("Kern: actions_config ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_actionsConfig = info;
+        emit actionsConfigChanged();
     } else if (type == QLatin1String(msg::kActionRuns)) {
         QList<actions::RunRecord> runs;
         if (!parseActionRuns(message, &runs, &error)) {
@@ -744,6 +752,10 @@ void CoreClient::clearData()
     if (m_actionsStatus) {
         m_actionsStatus.reset();
         emit actionsStatusChanged();
+    }
+    if (m_actionsConfig) {
+        m_actionsConfig.reset();
+        emit actionsConfigChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();

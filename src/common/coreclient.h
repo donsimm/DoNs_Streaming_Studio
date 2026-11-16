@@ -120,6 +120,9 @@ public:
     // P14 e2-11: Zustand des Aktionssystems (actions_status, nach hello und bei jeder Änderung);
     // ohne Verbindung leer.
     std::optional<ActionsStatus> actionsStatus() const { return m_actionsStatus; }
+    // P14 e2-14: Aktionen, Befehle und Zeitnachrichten (actions_config, nach hello und bei jeder
+    // Änderung); ohne Verbindung leer.
+    std::optional<ActionsConfigInfo> actionsConfig() const { return m_actionsConfig; }
     // Schickt eine Anfrage an das Aktionssystem (actionsEditMessage, z. B. actionsSetEnabledEdit);
     // requestId wird hier vergeben. Antwort über changeFinished. 0 = nicht verbunden. Abfragen
     // (z. B. get_action_runs) antworten mit eigener Nachricht, Fehler über changeFinished.
@@ -198,6 +201,8 @@ signals:
     void twitchStatusChanged();
     // actionsStatus() hat sich geändert (P14 e2-11).
     void actionsStatusChanged();
+    // actionsConfig() hat sich geändert (P14 e2-14).
+    void actionsConfigChanged();
     // P14 e2-12: Antwort action_runs auf get_action_runs (älteste zuerst, ohne Schritte); nicht
     // gespeichert, darum nichts zurückzusetzen bei der Trennung.
     void actionRunsReceived(const QList<dss::actions::RunRecord> &runs);
@@ -261,6 +266,7 @@ private:
     std::optional<TwitchStatusInfo> m_twitchStatus;
     QSet<qint64> m_twitchRequests;
     std::optional<ActionsStatus> m_actionsStatus;
+    std::optional<ActionsConfigInfo> m_actionsConfig;
     QStringList m_eventFilters;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;

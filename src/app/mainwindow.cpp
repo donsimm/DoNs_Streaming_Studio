@@ -1,10 +1,12 @@
 #include "mainwindow.h"
 
+#include "actionspage.h"
 #include "canvasimage.h"
 #include "canvaswidget.h"
 #include "chatbotpage.h"
 #include "configpaths.h"
 #include "coreclient.h"
+#include "dialogs.h"
 #include "dockviews.h"
 #include "docks.h"
 #include "headerbar.h"
@@ -567,9 +569,13 @@ void MainWindow::connectChatBot()
         m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kActionRunCancel),
                                    QJsonObject{{QStringLiteral("run_id"), runId.toString(QUuid::WithoutBraces)}}});
     });
-    // [OFFEN] e2-14: die Aktion im Unterreiter «Aktionen» auch wählen; bis dahin nur der Wechsel.
-    connect(m_chatBot, &ChatBotPage::openActionClicked, this,
-            [this](const QUuid &) { m_chatBot->setCurrentSubTab(ChatBotPage::Actions); });
+    // «Im Editor öffnen»: Unterreiter «Aktionen», die Aktion im Baum gewählt (steht sie wegen der
+    // Suche nicht da, wird die Suche geleert).
+    connect(m_chatBot, &ChatBotPage::openActionClicked, this, [this](const QUuid &id) {
+        m_chatBot->setCurrentSubTab(ChatBotPage::Actions);
+        if (!m_chatBot->actionsPage()->selectAction(id) && !m_chatBot->actionsPage()->searchText().isEmpty())
+            m_chatBot->actionsPage()->clearSearch();
+    });
     // P14 e2-13: «Chat-Nachrichten ausblenden» füllt nur die Liste «Ereignisse» neu.
     connect(m_chatBot, &ChatBotPage::hideChatToggled, this, [this](bool hideChat) {
         m_eventRows.setHideChat(hideChat);
@@ -597,6 +603,167 @@ void MainWindow::connectChatBot()
     });
     refreshChatSend();
     m_client->subscribeEvents(dss::chatBotLiveFilters());
+    connectActions();
+}
+
+void MainWindow::connectActions()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    connect(m_client, &dss::CoreClient::actionsConfigChanged, this, &MainWindow::refreshActionList);
+    connect(page, &ActionsPage::searchChanged, this, &MainWindow::refreshActionList);
+    connect(page, &ActionsPage::actionSelected, this, &MainWindow::refreshActionButtons);
+    connect(page, &ActionsPage::actionEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const dss::actions::Action *before = info && info->config ? info->config->action(id) : nullptr;
+        if (!before)
+            return;
+        dss::actions::Action after = *before;
+        after.enabled = enabled;
+        runActionEdits(dss::putAction(*info->config, *before, after), before->name);
+    });
+    connect(page, &ActionsPage::addClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::newAction(*info->config, m_chatBot->actionsPage()->selectedGroup()), QString());
+    });
+    connect(page, &ActionsPage::newGroupClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::newActionGroup(*info->config), QString());
+    });
+    connect(page, &ActionsPage::copyClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::copyAction(*info->config, m_chatBot->actionsPage()->selectedAction()), QString());
+    });
+    connect(page, &ActionsPage::removeClicked, this, [this] {
+        // Kopie: Während die Rückfrage offen ist, kann eine neue Liste kommen.
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedAction();
+        const dss::actions::Action *action = info && info->config ? info->config->action(id) : nullptr;
+        if (!action)
+            return;
+        const QString question = dss::removeActionQuestion(*info->config, id);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Aktion löschen?"), question, QStringLiteral("Löschen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        runActionEdits(dss::removeAction(*info->config, id), action->name);
+    });
+    connect(page, &ActionsPage::resetClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedAction();
+        const dss::actions::Action *action = info && info->config ? info->config->action(id) : nullptr;
+        if (!action)
+            return;
+        const QString question = dss::resetActionQuestion(*action);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Aktion zurücksetzen?"), question, QStringLiteral("Zurücksetzen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        runActionEdits(dss::resetAction(*info->config, id), action->name);
+    });
+    connect(page, &ActionsPage::renameGroupRequested, this, &MainWindow::askRenameActionGroup);
+    connect(page, &ActionsPage::removeGroupRequested, this, &MainWindow::askRemoveActionGroup);
+    // Antworten: beim ersten Fehler aufhören (die Meldung zeigt onChangeFinished) und die Liste
+    // wieder aus dem Stand des Kerns zeigen; nach der letzten «Gespeichert: <Name>».
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionEditRequest == 0 || result.requestId != m_actionEditRequest)
+            return;
+        m_actionEditRequest = 0;
+        if (!result.ok) {
+            m_actionEdits.clear();
+            refreshActionList();
+            return;
+        }
+        if (!m_actionEdits.isEmpty()) {
+            sendNextActionEdit();
+            return;
+        }
+        if (!m_actionEditCreated.isNull())
+            m_chatBot->actionsPage()->selectAction(m_actionEditCreated);
+        if (!m_actionEditSaved.isEmpty())
+            showStatus(dss::savedStatusText(m_actionEditSaved));
+    });
+    refreshActionList();
+}
+
+void MainWindow::refreshActionList()
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    // [OFFEN] e2-14: Prüfmeldungen (checkReferences) fehlen noch, dafür braucht das Fenster den
+    // ReferenceContext aus dem Stand des Kerns.
+    m_chatBot->actionsPage()->setActionRows(
+        info && info->config ? dss::actionListRows(*info->config, m_chatBot->actionsPage()->searchText(), {})
+                             : QList<dss::ActionListRow>());
+    refreshActionButtons();
+}
+
+void MainWindow::refreshActionButtons()
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action =
+        editable ? info->config->action(m_chatBot->actionsPage()->selectedAction()) : nullptr;
+    m_chatBot->actionsPage()->setListButtons(editable, action != nullptr,
+                                             action && dss::actionResettable(*action));
+}
+
+void MainWindow::runActionEdits(const dss::EditResult &result, const QString &savedName)
+{
+    if (!result.problem.isEmpty()) {
+        showStatus(result.problem);
+        refreshActionList();
+        return;
+    }
+    if (result.edits.isEmpty() || m_actionEditRequest != 0) {
+        // Nichts zu tun oder eine Bearbeitung noch unterwegs: Kästchen wieder wie im Kern
+        refreshActionList();
+        return;
+    }
+    m_actionEdits = result.edits;
+    m_actionEditCreated = result.created;
+    // Ohne Namen (neue oder kopierte Aktion): der Name aus action_put
+    m_actionEditSaved = savedName.isEmpty()
+        ? result.edits.first().fields.value(QStringLiteral("action")).toObject().value(QStringLiteral("name")).toString()
+        : savedName;
+    sendNextActionEdit();
+}
+
+void MainWindow::sendNextActionEdit()
+{
+    m_actionEditRequest = m_client->sendActionsEdit(m_actionEdits.takeFirst());
+    if (m_actionEditRequest == 0)
+        m_actionEdits.clear();
+}
+
+void MainWindow::askRenameActionGroup(const QString &group)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    QString name = group;
+    if (!askText(this, QStringLiteral("Gruppe umbenennen"), QStringLiteral("Neuer Name"), &name) || name == group)
+        return;
+    // Stand nach dem Dialog: Während er offen war, kann eine neue Liste gekommen sein.
+    const std::optional<dss::ActionsConfigInfo> now = m_client->actionsConfig();
+    if (now && now->config)
+        runActionEdits(dss::renameActionGroup(*now->config, group, name), name.trimmed());
+}
+
+void MainWindow::askRemoveActionGroup(const QString &group)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    const QString question = dss::removeActionGroupQuestion(*info->config, group);
+    if (!question.isEmpty()
+        && !confirm(this, QStringLiteral("Gruppe löschen?"), question, QStringLiteral("Löschen"),
+                    QStringLiteral("Abbrechen")))
+        return;
+    const std::optional<dss::ActionsConfigInfo> now = m_client->actionsConfig();
+    if (now && now->config)
+        runActionEdits(dss::removeActionGroup(*now->config, group), group);
 }
 
 void MainWindow::refreshChatSend()
