@@ -46,7 +46,14 @@ struct EventType
     const char *origin;
     bool trigger; // Auslöser im Aktionssystem (P14), im Plan mit «A» markiert
     std::span<const EventField> fields;
+    // Argumente, die das Aktionssystem aus anderen Feldern bildet (P14 triggerevent.cpp)
+    std::span<const char *const> derived;
 };
+
+// Gebildete Argumente (P14 c6). Namen nach Schritt 0, C 19 (Chat-Gruppe und Resub).
+inline constexpr char kArgFirstMessage[] = "firstMessage"; // message_type = user_intro
+inline constexpr char kArgStreakShared[] = "streakShared"; // streak_months nicht null
+inline constexpr char kArgIsMultiMonth[] = "isMultiMonth"; // duration_months > 1
 
 namespace detail {
 
@@ -194,28 +201,31 @@ inline constexpr EventField kChatDropped[] = {
 #undef DSS_EVENT_TIER_FIELDS
 #undef DSS_EVENT_USER_FIELDS
 
+inline constexpr const char *kChatDerived[] = {kArgFirstMessage};
+inline constexpr const char *kResubscribeDerived[] = {kArgStreakShared, kArgIsMultiMonth};
+
 } // namespace detail
 
 inline constexpr EventType kEventTypes[] = {
-    {"twitch.chat_message", "twitch", true, detail::kChatMessage},
-    {"twitch.first_message", "twitch", true, detail::kFirstMessage},
-    {"twitch.follow", "twitch", true, detail::kFollow},
-    {"twitch.subscribe", "twitch", true, detail::kSubscribe},
-    {"twitch.resubscribe", "twitch", true, detail::kResubscribe},
-    {"twitch.gift_bomb", "twitch", true, detail::kGiftBomb},
-    {"twitch.gift_sub", "twitch", true, detail::kGiftSub},
-    {"twitch.cheer", "twitch", true, detail::kCheer},
-    {"twitch.raid", "twitch", true, detail::kRaid},
+    {"twitch.chat_message", "twitch", true, detail::kChatMessage, detail::kChatDerived},
+    {"twitch.first_message", "twitch", true, detail::kFirstMessage, detail::kChatDerived},
+    {"twitch.follow", "twitch", true, detail::kFollow, {}},
+    {"twitch.subscribe", "twitch", true, detail::kSubscribe, {}},
+    {"twitch.resubscribe", "twitch", true, detail::kResubscribe, detail::kResubscribeDerived},
+    {"twitch.gift_bomb", "twitch", true, detail::kGiftBomb, {}},
+    {"twitch.gift_sub", "twitch", true, detail::kGiftSub, {}},
+    {"twitch.cheer", "twitch", true, detail::kCheer, {}},
+    {"twitch.raid", "twitch", true, detail::kRaid, {}},
     // Auslöser erst später (Kanalpunkte-Effekte, Entscheid 2026-11-15)
-    {"twitch.reward_redeemed", "twitch", false, detail::kRewardRedeemed},
-    {"twitch.stream_online", "twitch", true, detail::kStreamOnline},
-    {"twitch.stream_offline", "twitch", true, detail::kStreamOffline},
-    {"twitch.chat_sent", "twitch", false, detail::kChatSent},
-    {"twitch.chat_dropped", "twitch", false, detail::kChatDropped},
-    {"obs.scene_changed", "obs", false, detail::kObsSceneChanged},
-    {"actions.run_started", "actions", false, detail::kActionRun},
-    {"actions.run_changed", "actions", false, detail::kActionRun},
-    {"actions.run_finished", "actions", false, detail::kActionRun},
+    {"twitch.reward_redeemed", "twitch", false, detail::kRewardRedeemed, {}},
+    {"twitch.stream_online", "twitch", true, detail::kStreamOnline, {}},
+    {"twitch.stream_offline", "twitch", true, detail::kStreamOffline, {}},
+    {"twitch.chat_sent", "twitch", false, detail::kChatSent, {}},
+    {"twitch.chat_dropped", "twitch", false, detail::kChatDropped, {}},
+    {"obs.scene_changed", "obs", false, detail::kObsSceneChanged, {}},
+    {"actions.run_started", "actions", false, detail::kActionRun, {}},
+    {"actions.run_changed", "actions", false, detail::kActionRun, {}},
+    {"actions.run_finished", "actions", false, detail::kActionRun, {}},
 };
 
 // P14 b3: Ereignisse der Herkunft «actions» bleiben nicht im Verlauf des Flusses (ein Lauf mit
@@ -227,6 +237,9 @@ bool keepsHistory(const QString &type);
 const EventType *findEventType(const QString &type);
 // Alle Typen in der Reihenfolge der Liste.
 QStringList eventTypeNames();
+// Argumente eines Laufs aus diesem Typ: die der Felder, dann die gebildeten (einzige Quelle der
+// Namen, P14 c6). Leer bei unbekanntem Typ.
+QStringList eventArgumentNames(const QString &type);
 
 // Filter: genauer Typ («twitch.follow») oder Vorsilbe mit Punkt am Ende («twitch.»).
 bool matchesFilter(const QString &type, const QString &filter);

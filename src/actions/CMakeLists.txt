@@ -3,7 +3,8 @@
 # Ablauf der Läufe (b1): actionengine, actionrun, Uhr und Schnittstellen nach aussen.
 # Auslöser ohne Netz (b2): triggerevent (Ereignis → Argumente), triggerdispatcher (Filter, Befehle,
 # Zeitnachrichten). b3: actionedit (Änderungen an aktionen.json); die Anbindung an den Ereignisfluss
-# und an den Kern steht in src/core/actionservice.cpp, darum bleibt dss_events hier draussen.
+# und an den Kern steht in src/core/actionservice.cpp. c6: dss_events (nur Qt Core) liefert die
+# Typenliste mit den Argumentnamen, einzige Quelle für triggerevent und triggertypes.
 add_library(dss_actions STATIC
   fieldspec.h fieldspec.cpp
   steptypes.h steptypes.cpp
@@ -25,4 +26,4 @@ add_library(dss_actions STATIC
   chatoutbox.h chatoutbox.cpp # c1a: Chat senden (Grenzen, Kürzen, Schleifen), ohne Netz
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(dss_actions PUBLIC Qt6::Core PRIVATE dss_warnings)
+target_link_libraries(dss_actions PUBLIC Qt6::Core dss_events PRIVATE dss_warnings)

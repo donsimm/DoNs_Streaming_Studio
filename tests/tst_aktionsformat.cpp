@@ -282,10 +282,12 @@ private slots:
         QVERIFY(args("twitch.subscribe").contains(QStringLiteral("subscriptionTier")));
         QVERIFY(args("twitch.resubscribe").contains(QStringLiteral("monthStreak")));
         QVERIFY(args("twitch.gift_sub").contains(QStringLiteral("recipientId")));
-        QVERIFY(!args("twitch.gift_sub").contains(QStringLiteral("user")));
+        QVERIFY(args("twitch.gift_sub").contains(QStringLiteral("recipientUser")));
         QVERIFY(args("twitch.gift_bomb").contains(QStringLiteral("totalGifts")));
-        QVERIFY(args("twitch.cheer").contains(QStringLiteral("isAnonymous")));
-        QCOMPARE(args("twitch.stream_online"), QStringList{QStringLiteral("startedAt")});
+        // anonymous bei Cheer: Name aus P13 (Schritt 0: bei Cheer nicht belegbar), P14 c6
+        QVERIFY(args("twitch.cheer").contains(QStringLiteral("anonymous")));
+        QVERIFY(!args("twitch.cheer").contains(QStringLiteral("isAnonymous")));
+        QVERIFY(args("twitch.stream_online").contains(QStringLiteral("startedAt")));
         QCOMPARE(args("twitch.stream_offline"), QStringList{QStringLiteral("endedAt")});
         for (const TriggerTypeInfo &t : triggerTypes())
             QCOMPARE(QSet<QString>(t.arguments.cbegin(), t.arguments.cend()).size(), t.arguments.size());

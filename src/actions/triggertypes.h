@@ -8,12 +8,8 @@
 
 // Typen der Auslöser (P14 a, Plan 2.5) mit Nummer bei Streamer.bot, Ereignis des Ereignisflusses
 // (Plan P13 1.3) und den Argumenten, die ein Lauf bekommt (Plan P13 1.4). Nur Qt Core (CLAUDE.md
-// Regel 9). Die Ereignistypen stehen hier als Text; dss_events (P13) wird nicht eingebunden. Wie
-// ein Ereignis zu Argumenten wird, steht in triggerevent.cpp (b2).
-//
-// Argumentnamen nach Schritt 0 (docs/archiv/recherchen/2026-11-15-schritt0-twitch-streamerbot.md,
-// Abschnitt C). Wo Streamer.bot keinen Namen hat, steht ein eigener in derselben Schreibweise
-// (isAnonymous bei Cheer, firstEver).
+// Regel 9). Die Argumente aus Ereignissen stehen nur in der Typenliste von P13
+// (src/events/eventtypes.h, P14 c6); wie ein Ereignis zu Argumenten wird, steht in triggerevent.cpp.
 //
 // Quellen: Plan P14 2.5 (Recherche von Lotse vom 2026-11-09, https://docs.streamer.bot/guide/triggers,
 // https://docs.streamer.bot/api/triggers/core/commands/command-triggered), Plan P13 1.3 und 1.4,
@@ -58,11 +54,5 @@ QStringList subscriptionTiers();
 
 // Allgemeine Argumente in jedem Lauf (Plan 2.5)
 QStringList commonArguments();
-// Argumente aus einem Ereignis mit user_* (Plan P13 1.4)
-QStringList userArguments();
-// Rolle und Abzeichen des Absenders einer Chat-Nachricht (Plan P13 1.4)
-QStringList chatArguments();
-// Argumente der Nachricht selbst (Chat-Gruppe bei Streamer.bot)
-QStringList chatMessageArguments();
 
 } // namespace dss::actions

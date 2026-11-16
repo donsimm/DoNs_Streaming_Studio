@@ -5,6 +5,7 @@
 
 #include "actionengine.h"
 #include "aktionsuhr.h"
+#include "eventtypes.h"
 #include "fieldspec.h"
 #include "steptypes.h"
 #include "triggerdispatcher.h"
@@ -56,6 +57,7 @@ QJsonObject chatData(const QString &text, const QJsonObject &extra = {})
                                   {"reply_to", QJsonValue()},
                                   {"reward_id", QJsonValue()},
                                   {"message_type", "text"},
+                                  {"is_highlight", false},
                                   {"source_broadcaster_id", QJsonValue()}}),
                   extra);
 }
@@ -161,7 +163,8 @@ private slots:
 
         QTest::newRow("Chat") << "twitch.chat_message"
                               << chatData(QStringLiteral("Hallo"), {{"role", 3}, {"is_moderator", true},
-                                                                    {"message_type", "channel_points_highlighted"}})
+                                                                    {"message_type", "channel_points_highlighted"},
+                                                                    {"is_highlight", true}})
                               << QJsonObject{{"user", "Testzuschauer"}, {"userName", "testzuschauer"},
                                              {"userId", "100000001"}, {"msgId", "m-1"}, {"message", "Hallo"},
                                              {"role", 3}, {"isModerator", true}, {"isSubscribed", false},
@@ -173,43 +176,52 @@ private slots:
             << QJsonObject{{"message", "Hi"}, {"firstMessage", true}, {"firstEver", true}} << QStringList();
         QTest::newRow("Follow") << "twitch.follow" << merged(user(), {{"followed_at", "2026-11-15T20:00:00Z"}})
                                 << QJsonObject{{"user", "Testzuschauer"}, {"userId", "100000001"}} << QStringList();
-        QTest::newRow("Abo") << "twitch.subscribe" << merged(user(), {{"tier", "2000"}, {"is_gift", false}})
-                             << QJsonObject{{"tier", "tier 2"}, {"subscriptionTier", 2000}} << QStringList();
+        QTest::newRow("Abo") << "twitch.subscribe"
+                             << merged(user(), {{"tier", 2000}, {"tier_name", "tier 2"}, {"is_gift", false}})
+                             << QJsonObject{{"tier", "tier 2"}, {"subscriptionTier", 2000}, {"isGift", false}}
+                             << QStringList();
         QTest::newRow("Resub geteilt")
             << "twitch.resubscribe"
-            << merged(user(), {{"tier", "1000"}, {"text", "Danke"}, {"months", 14}, {"streak_months", 3},
-                               {"duration_months", 6}})
+            << merged(user(), {{"tier", 1000}, {"tier_name", "tier 1"}, {"text", "Danke"}, {"months", 14},
+                               {"streak_months", 3}, {"duration_months", 6}})
             << QJsonObject{{"tier", "tier 1"}, {"subscriptionTier", 1000}, {"message", "Danke"}, {"cumulative", 14},
                            {"monthStreak", 3}, {"streakShared", true}, {"multiMonthDuration", 6},
                            {"isMultiMonth", true}}
             << QStringList();
         QTest::newRow("Resub nicht geteilt")
             << "twitch.resubscribe"
-            << merged(user(), {{"tier", "3000"}, {"text", ""}, {"months", 2}, {"streak_months", QJsonValue()},
-                               {"duration_months", 1}})
+            << merged(user(), {{"tier", 3000}, {"tier_name", "tier 3"}, {"text", ""}, {"months", 2},
+                               {"streak_months", QJsonValue()}, {"duration_months", 1}})
             << QJsonObject{{"tier", "tier 3"}, {"monthStreak", 0}, {"streakShared", false}, {"isMultiMonth", false}}
             << QStringList();
-        QTest::newRow("Geschenk-Abo") << "twitch.gift_sub" << merged(user(), {{"tier", "1000"}})
-                                      << QJsonObject{{"recipientUser", "Testzuschauer"},
-                                                     {"recipientUserName", "testzuschauer"},
-                                                     {"recipientId", "100000001"}, {"tier", "tier 1"}}
-                                      << QStringList{QStringLiteral("user"), QStringLiteral("userId")};
+        // P13: Beschenkter in recipient_user_*, user_* (Schenkender) null
+        QTest::newRow("Geschenk-Abo")
+            << "twitch.gift_sub"
+            << QJsonObject{{"user_id", QJsonValue()}, {"user_login", QJsonValue()}, {"user_name", QJsonValue()},
+                           {"recipient_user_id", "100000001"}, {"recipient_user_login", "testzuschauer"},
+                           {"recipient_user_name", "Testzuschauer"}, {"tier", 1000}, {"tier_name", "tier 1"}}
+            << QJsonObject{{"recipientUser", "Testzuschauer"}, {"recipientUserName", "testzuschauer"},
+                           {"recipientId", "100000001"}, {"tier", "tier 1"}}
+            << QStringList{QStringLiteral("user"), QStringLiteral("userId")};
         QTest::newRow("Geschenk-Bündel anonym")
             << "twitch.gift_bomb"
             << QJsonObject{{"user_id", QJsonValue()}, {"user_login", QJsonValue()}, {"user_name", QJsonValue()},
-                           {"is_anonymous", true}, {"total", 5}, {"tier", "1000"}, {"cumulative_total", QJsonValue()}}
+                           {"is_anonymous", true}, {"total", 5}, {"tier", 1000}, {"tier_name", "tier 1"},
+                           {"cumulative_total", QJsonValue()}}
             << QJsonObject{{"gifts", 5}, {"anonymous", true}, {"tier", "tier 1"}}
             << QStringList{QStringLiteral("user"), QStringLiteral("totalGifts")};
         QTest::newRow("Geschenk-Bündel")
             << "twitch.gift_bomb"
-            << merged(user(), {{"is_anonymous", false}, {"total", 10}, {"tier", 1000}, {"cumulative_total", 42}})
+            << merged(user(), {{"is_anonymous", false}, {"total", 10}, {"tier", 1000}, {"tier_name", "tier 1"},
+                               {"cumulative_total", 42}})
             << QJsonObject{{"user", "Testzuschauer"}, {"gifts", 10}, {"totalGifts", 42}, {"tier", "tier 1"},
                            {"subscriptionTier", 1000}}
             << QStringList();
+        // anonymous: Name aus P13 (P14 c6, vorher isAnonymous)
         QTest::newRow("Cheer") << "twitch.cheer"
                                << merged(user(), {{"is_anonymous", false}, {"bits", 100}, {"text", "Cheer100 hallo"}})
-                               << QJsonObject{{"bits", 100}, {"message", "Cheer100 hallo"}, {"isAnonymous", false}}
-                               << QStringList();
+                               << QJsonObject{{"bits", 100}, {"message", "Cheer100 hallo"}, {"anonymous", false}}
+                               << QStringList{QStringLiteral("isAnonymous")};
         QTest::newRow("Raid") << "twitch.raid"
                               << QJsonObject{{"from_user_id", "100000002"}, {"from_user_login", "testkanal"},
                                              {"from_user_name", "Testkanal"}, {"viewers", 12}}
@@ -221,7 +233,8 @@ private slots:
                                                       {"at_start", false}}
                                        << QJsonObject{{"startedAt", "2026-11-15T19:00:00Z"}}
                                        << QStringList{QStringLiteral("game")};
-        QTest::newRow("Stream offline") << "twitch.stream_offline" << QJsonObject()
+        QTest::newRow("Stream offline") << "twitch.stream_offline"
+                                        << QJsonObject{{"ended_at", "2026-11-15T20:00:00.000Z"}}
                                         << QJsonObject{{"endedAt", "2026-11-15T20:00:00.000Z"}} << QStringList();
     }
     void eventArguments()
@@ -243,12 +256,41 @@ private slots:
             QVERIFY2(info->arguments.contains(it.key()), qPrintable(it.key()));
     }
 
+    // P14 c6: Argumentnamen nur aus der Typenliste von P13. Je Ereignis mit allen Feldern gesetzt
+    // trägt ein Lauf genau die Argumente aus eventtypes.h; der Auslöser nennt dieselben.
+    void eventArgumentsFromEventTypes()
+    {
+        for (const dss::events::EventType &type : dss::events::kEventTypes) {
+            const QString name = QString::fromLatin1(type.type);
+            QJsonObject data;
+            for (const dss::events::EventField &field : type.fields)
+                data.insert(QLatin1String(field.name), 1);
+            TriggerEvent e = ev("", data);
+            e.type = name;
+            const Arguments args = dss::actions::eventArguments(e);
+            const QStringList expected = dss::events::eventArgumentNames(name);
+            QVERIFY2(!expected.isEmpty(), qPrintable(name));
+            QCOMPARE(QSet<QString>(expected.cbegin(), expected.cend()).size(), expected.size());
+            QStringList keys = args.keys();
+            keys.sort();
+            QStringList sorted = expected;
+            sorted.sort();
+            QCOMPARE(keys, sorted);
+            if (!type.trigger)
+                continue;
+            const TriggerTypeInfo *info = triggerType(name);
+            QVERIFY2(info, qPrintable(name));
+            QCOMPARE(info->arguments, expected);
+        }
+        const QStringList command = triggerType(QStringLiteral("command"))->arguments;
+        for (const QString &arg : dss::events::eventArgumentNames(QStringLiteral("twitch.chat_message")))
+            QVERIFY2(command.contains(arg), qPrintable(arg));
+    }
+
     void tiers()
     {
-        QCOMPARE(tierText(QStringLiteral("1000")), QStringLiteral("tier 1"));
-        QCOMPARE(tierText(QStringLiteral("3000")), QStringLiteral("tier 3"));
-        QCOMPARE(tierText(QStringLiteral("prime")), QStringLiteral("prime"));
         QCOMPARE(eventTier({{"tier", 2000}}), QStringLiteral("2000"));
+        QCOMPARE(eventTier({{"tier", "3000"}}), QStringLiteral("3000"));
         QVERIFY(dss::actions::eventArguments(ev("gibt.es_nicht", user())).isEmpty());
     }
 

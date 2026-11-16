@@ -19,6 +19,19 @@ QStringList eventTypeNames()
     return names;
 }
 
+QStringList eventArgumentNames(const QString &type)
+{
+    QStringList names;
+    const EventType *entry = findEventType(type);
+    if (!entry)
+        return names;
+    for (const EventField &field : entry->fields)
+        names.append(QString::fromLatin1(field.argument));
+    for (const char *name : entry->derived)
+        names.append(QString::fromLatin1(name));
+    return names;
+}
+
 bool keepsHistory(const QString &type)
 {
     const EventType *entry = findEventType(type);
