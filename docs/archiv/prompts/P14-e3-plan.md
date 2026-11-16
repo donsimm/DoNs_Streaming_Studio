@@ -60,7 +60,7 @@ Summe Agenten etwa 14,5 h (etwa 3 Sitzungen).
 
 ## Aufgaben
 
-- [ ] **e3-0 Prüfung kalibrieren (Lotse, kein Commit).** Zwei Arten, je eine Pflanzung in einer Kopie ausserhalb des Arbeitsordners (ohne Git oder temporärer Worktree), je ein getrennter Agent mit `ui-consistency:verifying`, der Checkliste der Art und nur dem Hinweis «weicht irgendwo ab»:
+- [x] **e3-0 Prüfung kalibrieren (Lotse, kein Commit).** Ergebnis 2026-11-16: beide bestanden. «Bereich wie ein Dock» (Kopie `actionspage.cpp`, Suchfeld ohne `setClearButtonEnabled`) gemeldet, dazu echter Nebenbefund `setUniformRowHeights` (behoben 07fbfee); «Dialog» (Kopie `settingsdialog.cpp`, Meldung ohne feste Höhe) gemeldet. Geprüft nur Code, nichts Gerendertes. Zwei Arten, je eine Pflanzung in einer Kopie ausserhalb des Arbeitsordners (ohne Git oder temporärer Worktree), je ein getrennter Agent mit `ui-consistency:verifying`, der Checkliste der Art und nur dem Hinweis «weicht irgendwo ab»:
   - «Bereich wie ein Dock»: Kopie von `src/app/actionspage.cpp`, darin zum Beispiel das Suchfeld ohne `setClearButtonEnabled(true)` oder die Leiste von Hand statt `buttonBar()`. Checkliste: Abschnitt 3, «Befehle».
   - «Dialog»: Kopie von `src/app/settingsdialog.cpp`, darin zum Beispiel die Meldung des Kerns in der Statuszeile statt im `QLabel` mit fester Höhe. Checkliste: Abschnitt 3, «Dialog «Warteschlangen»».
   - Wird die Abweichung nicht gemeldet: anhalten, die Prüfung ist dafür blind. Ergebnis hier vermerken (was geprüft, was nicht). Wer pflanzt, prüft nicht. Der kalibrierte Agent prüft danach keine Seite. Für jede Art behält Lotse einen Prüfer für alle Seiten dieser Art (Seiten: e3-4 bis e3-7; Dialog: e3-8).
