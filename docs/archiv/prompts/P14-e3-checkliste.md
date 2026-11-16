@@ -230,3 +230,9 @@ Dialog «Warteschlangen» gegen «Dialog» (eigener Rahmen `QDialog`), Referenz 
 - **Frage 5, «Variablen»:** «Für alle» und «Je Zuschauer» nebeneinander mit Teiler wie «Live».
 - Aus e2 weiter gültig: Zeiten in Sekunden mit Komma («8,5 s»), Prüfmeldung am Feld als Zeile unter dem Abschnitt (`#fieldProblem`), Kontextmenü mit «…», Doppelklick nur umbenennen (`setExpandsOnDoubleClick(false)`), «Gelöscht: <Name>» nach dem Löschen (`deletedStatusText`, e2-15), zugängliche Namen für Felder ohne Beschriftung, `settingsdialog.cpp` bleibt unverändert.
 - **Frage «▶ Testen als …» (Plan e3):** Knopf mit Menü «Testzuschauer»/«eigener Kanal», immer Probelauf; «echt ausführen» nur in «Aktionen» (Dominik 2026-11-16 ~13:05).
+
+## 8. Nachträge Dominik (2026-11-16, im Lauf von e3)
+
+- Spaltenkopf «Aktionen» (Mehrzahl) in «Befehle» und «Zeitnachrichten» (statt «Aktion»); «Keine Zeitnachricht gewählt» bestätigt (e3-4).
+- Kurzinhalt des Auslösers «Zeitnachricht» in «Aktionen» auch in Minuten («alle 7,5 min»), mit e3-6.
+- Knöpfe und Rückfragen heissen «… löschen», nie «entfernen» (aus e2, Checkliste e2 Abschnitt 8).
