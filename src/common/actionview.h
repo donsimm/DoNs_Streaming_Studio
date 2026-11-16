@@ -389,6 +389,37 @@ QString removeTimerQuestion(const actions::ActionsConfig &config, const QUuid &t
 // sonst wie der Kern beim Lesen (timerFromJson). Gleich wie before: nichts.
 EditResult putTimer(const actions::Timer &before, const actions::Timer &after);
 
+// --- Dialog «Warteschlangen» ---
+
+struct QueueRow
+{
+    QUuid id;                      // null = «Standard»
+    QString name;
+    bool blocking = false;         // «nacheinander»
+    bool isDefault = false;        // «Standard»
+    bool removable = true;         // «Standard» nicht
+    bool blockingEditable = true;  // «Standard» ohne Kästchen
+    bool operator==(const QueueRow &) const = default;
+};
+// Zuerst «Standard» (nicht blockierend wie im Kern), dann die Warteschlangen nach Name ohne Rücksicht
+// auf Gross- und Kleinschreibung. Der Laufzustand (angehalten, wartend) kommt erst mit P14-2.
+QList<QueueRow> queueRows(const actions::ActionsConfig &config);
+// queue_put mit «Warteschlange 1», sonst der nächsten freien Nummer (ohne Rücksicht auf Schreibweise),
+// nicht blockierend; created = neue Kennung.
+EditResult newQueue(const actions::ActionsConfig &config);
+// Name ohne Leerzeichen am Rand. Prüfmeldung bei leerem Namen und bei «Standard» oder dem Namen einer
+// anderen Warteschlange in jeder Schreibweise («Die Warteschlange «Alerts» gibt es schon.», wie bei
+// den Gruppen). Gleicher Name oder unbekannte Warteschlange: nichts.
+EditResult renameQueue(const actions::ActionsConfig &config, const QUuid &queueId, const QString &name);
+// queue_put; gleicher Wert, «Standard» oder unbekannte Warteschlange: nichts.
+EditResult setQueueBlocking(const actions::ActionsConfig &config, const QUuid &queueId, bool blocking);
+// queue_remove; «Standard» oder unbekannte Warteschlange: nichts.
+EditResult removeQueue(const actions::ActionsConfig &config, const QUuid &queueId);
+// Rückfrage (siehe removeActionQuestion), nur wenn Aktionen die Warteschlange benutzen; diese laufen
+// danach in «Standard» (actionengine.cpp). «Warteschlange «Alerts» löschen? Sie wird von 2 Aktionen
+// benutzt. Diese laufen danach in «Standard».»
+QString removeQueueQuestion(const actions::ActionsConfig &config, const QUuid &queueId);
+
 // --- Unterreiter «Variablen» ---
 
 // Flüchtige Werte (nur im Speicher des Kerns, ohne Herkunft)
@@ -428,5 +459,8 @@ EditResult setVariableValue(const VariableRow &row, const QString &text);
 // Löschen nur, wenn es die Variable in data (dauerhaft) bzw. in den flüchtigen Werten noch gibt.
 EditResult removeVariable(const actions::VariablesData &data, const VolatileValues &volatileValues,
                           const VolatileUserValues &volatileUserValues, const VariableRow &row);
+// Rückfrage vor dem Löschen, immer (der Wert geht verloren): «Variable «firsts» löschen?», je Zuschauer
+// «Variable «firsts» von «Anna» löschen?» (VariableRow::viewer).
+QString removeVariableQuestion(const VariableRow &row);
 
 } // namespace dss

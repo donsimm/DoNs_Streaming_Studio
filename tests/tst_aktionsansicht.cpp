@@ -1052,6 +1052,99 @@ private slots:
         QCOMPARE(removeVariable(variables(), {{QStringLiteral("motto"), 1}}, {}, volatileGlobal).edits.size(), 1);
         QCOMPARE(variableValueText(QJsonValue(0.1)), QStringLiteral("0.1"));
         QCOMPARE(variableValueText(QJsonValue(-5.0)), QStringLiteral("-5"));
+        // Rückfrage vor dem Löschen, immer (e3-1)
+        QCOMPARE(removeVariableQuestion(motto), QStringLiteral("Variable «motto» löschen?"));
+        QCOMPARE(removeVariableQuestion(firsts),
+                 QStringLiteral("Variable «firsts» von «%1» löschen?").arg(firsts.viewer));
+        QVERIFY(!firsts.viewer.isEmpty());
+    }
+
+    // Dialog «Warteschlangen» (e3-1): Reihenfolge, «Standard», Neu, Umbenennen, nacheinander, Löschen
+    void queues()
+    {
+        ActionsConfig config = loadConfig();
+        QCOMPARE(queueRows(config),
+                 (QList<QueueRow>{{QUuid(), QStringLiteral("Standard"), false, true, false, false},
+                                  {kQueueAlerts, QStringLiteral("Alerts"), true, false, true, true},
+                                  {kQueueMessages, QStringLiteral("Meldungen"), true, false, true, true}}));
+        // Nach Name ohne Rücksicht auf Schreibweise, «Standard» bleibt oben
+        Queue lower{QUuid::createUuid(), QStringLiteral("aaa"), false, {}};
+        config.queues.append(lower);
+        QList<QueueRow> rows = queueRows(config);
+        QCOMPARE(rows.size(), 4);
+        QCOMPARE(rows.at(0).name, QStringLiteral("Standard"));
+        QCOMPARE(rows.at(1).name, QStringLiteral("aaa"));
+        QCOMPARE(rows.at(2).name, QStringLiteral("Alerts"));
+        config = loadConfig();
+
+        // Neu: «Warteschlange 1», sonst die nächste freie Nummer, nicht blockierend
+        EditResult r = newQueue(config);
+        QCOMPARE(r.edits.size(), 1);
+        QCOMPARE(r.edits.first().type, QStringLiteral("queue_put"));
+        QJsonObject q = r.edits.first().fields.value(QStringLiteral("queue")).toObject();
+        QCOMPARE(q.value(QStringLiteral("name")).toString(), QStringLiteral("Warteschlange 1"));
+        QCOMPARE(q.value(QStringLiteral("blocking")).toBool(), false);
+        QVERIFY(!r.created.isNull());
+        QCOMPARE(QUuid::fromString(q.value(QStringLiteral("id")).toString()), r.created);
+        config.queues.append({QUuid::createUuid(), QStringLiteral("warteschlange 1"), false, {}});
+        config.queues.append({QUuid::createUuid(), QStringLiteral("Warteschlange 3"), false, {}});
+        q = newQueue(config).edits.first().fields.value(QStringLiteral("queue")).toObject();
+        QCOMPARE(q.value(QStringLiteral("name")).toString(), QStringLiteral("Warteschlange 2"));
+        config = loadConfig();
+
+        // Umbenennen: ohne Leerzeichen am Rand, unbekannte Felder bleiben
+        r = renameQueue(config, kQueueMessages, QStringLiteral("  Hinweise "));
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits.size(), 1);
+        q = r.edits.first().fields.value(QStringLiteral("queue")).toObject();
+        QCOMPARE(q.value(QStringLiteral("id")).toString(), uuidText(kQueueMessages));
+        QCOMPARE(q.value(QStringLiteral("name")).toString(), QStringLiteral("Hinweise"));
+        QCOMPARE(q.value(QStringLiteral("blocking")).toBool(), true);
+        QVERIFY(q.contains(QStringLiteral("test_unbekannt")));
+        // Prüfmeldungen
+        r = renameQueue(config, kQueueMessages, QStringLiteral("   "));
+        QCOMPARE(r.problem, QStringLiteral("Der Name darf nicht leer sein."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameQueue(config, kQueueMessages, QStringLiteral("alerts"));
+        QCOMPARE(r.problem, QStringLiteral("Die Warteschlange «Alerts» gibt es schon."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameQueue(config, kQueueMessages, QStringLiteral("STANDARD"));
+        QCOMPARE(r.problem, QStringLiteral("Die Warteschlange «Standard» gibt es schon."));
+        // Andere Schreibweise derselben Warteschlange ist ein Umbenennen, gleicher Name nichts
+        QCOMPARE(renameQueue(config, kQueueMessages, QStringLiteral("MELDUNGEN")).edits.size(), 1);
+        r = renameQueue(config, kQueueMessages, QStringLiteral("Meldungen "));
+        QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
+        QVERIFY(renameQueue(config, QUuid(), QStringLiteral("Neu")).edits.isEmpty());
+        QVERIFY(renameQueue(config, QUuid::createUuid(), QStringLiteral("Neu")).edits.isEmpty());
+
+        // Nacheinander
+        r = setQueueBlocking(config, kQueueAlerts, false);
+        QCOMPARE(r.edits.size(), 1);
+        q = r.edits.first().fields.value(QStringLiteral("queue")).toObject();
+        QCOMPARE(q.value(QStringLiteral("name")).toString(), QStringLiteral("Alerts"));
+        QCOMPARE(q.value(QStringLiteral("blocking")).toBool(), false);
+        QVERIFY(setQueueBlocking(config, kQueueAlerts, true).edits.isEmpty());
+        QVERIFY(setQueueBlocking(config, QUuid(), true).edits.isEmpty());
+
+        // Löschen, «Standard» abgewiesen
+        QCOMPARE(removeQueue(config, kQueueAlerts).edits,
+                 (QList<ActionsEdit>{{QStringLiteral("queue_remove"),
+                                      {{QStringLiteral("queue_id"), uuidText(kQueueAlerts)}}}}));
+        QVERIFY(removeQueue(config, QUuid()).edits.isEmpty());
+        QVERIFY(removeQueue(config, QUuid::createUuid()).edits.isEmpty());
+
+        // Rückfrage nur bei Aktionen in der Warteschlange (auch abgeschaltete: «Alle Auslöser»)
+        QCOMPARE(removeQueueQuestion(config, kQueueAlerts),
+                 QStringLiteral("Warteschlange «Alerts» löschen? Sie wird von 1 Aktion benutzt. "
+                                "Diese läuft danach in «Standard»."));
+        config.actions[1].queue = kQueueAlerts;
+        QCOMPARE(removeQueueQuestion(config, kQueueAlerts),
+                 QStringLiteral("Warteschlange «Alerts» löschen? Sie wird von 2 Aktionen benutzt. "
+                                "Diese laufen danach in «Standard»."));
+        config.actions[0].queue = QUuid();
+        QVERIFY(removeQueueQuestion(config, kQueueMessages).isEmpty());
+        QVERIFY(removeQueueQuestion(config, QUuid()).isEmpty());
+        QVERIFY(removeQueueQuestion(config, QUuid::createUuid()).isEmpty());
     }
 
     // «▶ Testen» (Plan 3.6, e2-7): Auswahl «Testwerte: Benutzer», Anfrage action_test, stumm

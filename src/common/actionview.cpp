@@ -1579,6 +1579,106 @@ EditResult putTimer(const Timer &before, const Timer &after)
     return r;
 }
 
+// --- Dialog «Warteschlangen» ---
+
+namespace {
+
+const QString kDefaultQueueName = QStringLiteral("Standard");
+
+EditResult putQueue(const Queue &queue)
+{
+    EditResult r;
+    r.edits.append(edit("queue_put", {{QStringLiteral("queue"), queueToJson(queue)}}));
+    return r;
+}
+
+} // namespace
+
+QList<QueueRow> queueRows(const ActionsConfig &config)
+{
+    QList<QueueRow> rows{{QUuid(), kDefaultQueueName, false, true, false, false}};
+    QList<Queue> queues = config.queues;
+    std::stable_sort(queues.begin(), queues.end(),
+                     [](const Queue &a, const Queue &b) { return nameLess(a.name, b.name); });
+    for (const Queue &q : queues)
+        rows.append({q.id, q.name, q.blocking, false, true, true});
+    return rows;
+}
+
+EditResult newQueue(const ActionsConfig &config)
+{
+    QStringList names{kDefaultQueueName};
+    for (const Queue &q : config.queues)
+        names.append(q.name);
+    Queue q;
+    q.id = QUuid::createUuid();
+    for (int n = 1;; ++n) {
+        q.name = QStringLiteral("Warteschlange %1").arg(n);
+        if (!names.contains(q.name, Qt::CaseInsensitive))
+            break;
+    }
+    EditResult r = putQueue(q);
+    r.created = q.id;
+    return r;
+}
+
+EditResult renameQueue(const ActionsConfig &config, const QUuid &queueId, const QString &name)
+{
+    const Queue *queue = queueId.isNull() ? nullptr : config.queue(queueId);
+    if (!queue)
+        return {};
+    const QString newName = name.trimmed();
+    if (newName.isEmpty())
+        return problem(emptyNameProblem());
+    if (sameGroup(newName, kDefaultQueueName))
+        return problem(QStringLiteral("Die Warteschlange «%1» gibt es schon.").arg(kDefaultQueueName));
+    for (const Queue &q : config.queues) {
+        if (q.id != queueId && sameGroup(q.name, newName))
+            return problem(QStringLiteral("Die Warteschlange «%1» gibt es schon.").arg(q.name));
+    }
+    if (queue->name == newName)
+        return {};
+    Queue after = *queue;
+    after.name = newName;
+    return putQueue(after);
+}
+
+EditResult setQueueBlocking(const ActionsConfig &config, const QUuid &queueId, bool blocking)
+{
+    const Queue *queue = queueId.isNull() ? nullptr : config.queue(queueId);
+    if (!queue || queue->blocking == blocking)
+        return {};
+    Queue after = *queue;
+    after.blocking = blocking;
+    return putQueue(after);
+}
+
+EditResult removeQueue(const ActionsConfig &config, const QUuid &queueId)
+{
+    if (queueId.isNull() || !config.queue(queueId))
+        return {};
+    EditResult r;
+    r.edits.append(edit("queue_remove", {{QStringLiteral("queue_id"), uuidText(queueId)}}));
+    return r;
+}
+
+QString removeQueueQuestion(const ActionsConfig &config, const QUuid &queueId)
+{
+    const Queue *queue = queueId.isNull() ? nullptr : config.queue(queueId);
+    if (!queue)
+        return QString();
+    qsizetype n = 0;
+    for (const Action &a : config.actions) {
+        if (a.queue == queueId)
+            ++n;
+    }
+    if (n == 0)
+        return QString();
+    return QStringLiteral("Warteschlange «%1» löschen? Sie wird von %2 benutzt. %3 danach in «%4».")
+        .arg(queue->name, countText(n, QStringLiteral("Aktion"), QStringLiteral("Aktionen")),
+             n == 1 ? QStringLiteral("Diese läuft") : QStringLiteral("Diese laufen"), kDefaultQueueName);
+}
+
 // --- Unterreiter «Variablen» ---
 
 QString variableValueText(const QJsonValue &value)
@@ -1693,6 +1793,13 @@ EditResult removeVariable(const VariablesData &data, const VolatileValues &volat
     EditResult r;
     r.edits.append(edit("variable_remove", variableFields(row)));
     return r;
+}
+
+QString removeVariableQuestion(const VariableRow &row)
+{
+    if (row.scope == VariableScope::User)
+        return QStringLiteral("Variable «%1» von «%2» löschen?").arg(row.name, row.viewer);
+    return QStringLiteral("Variable «%1» löschen?").arg(row.name);
 }
 
 } // namespace dss

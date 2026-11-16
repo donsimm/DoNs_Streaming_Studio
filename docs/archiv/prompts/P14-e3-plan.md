@@ -67,7 +67,7 @@ Summe Agenten etwa 14,5 h (etwa 3 Sitzungen).
 
 ### Logik
 
-- [ ] **e3-1 Warteschlangen und Rückfrage für Variablen** (`src/common/actionview.{h,cpp}`).
+- [x] **e3-1 Warteschlangen und Rückfrage für Variablen** (`src/common/actionview.{h,cpp}`).
   - `struct QueueRow { QUuid id; QString name; bool blocking; bool isDefault; bool removable; bool blockingEditable; }`; `QList<QueueRow> queueRows(const actions::ActionsConfig &)`: zuerst «Standard» (null, nicht löschbar, ohne Kästchen), dann nach Name ohne Rücksicht auf Gross- und Kleinschreibung.
   - `EditResult newQueue(config)`: `queue_put` mit «Warteschlange 1», sonst der nächsten freien Nummer, nicht blockierend; `created` = neue Kennung.
   - `EditResult renameQueue(config, id, name)`: ohne Leerzeichen am Rand. Prüfmeldungen: leer «Der Name darf nicht leer sein.»; «Standard» und vorhandene Namen ohne Rücksicht auf Schreibweise «Die Warteschlange «<Name>» gibt es schon.» (Entscheid e2 zu Gruppennamen übertragen). Gleich wie vorher: nichts.
