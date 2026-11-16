@@ -1771,7 +1771,18 @@ EditResult removeQueue(const ActionsConfig &config, const QUuid &queueId)
 {
     if (queueId.isNull() || !config.queue(queueId))
         return {};
+    // Entscheid des Nutzers (16.11.): Aktionen der Warteschlange im selben Stapel auf «Standard».
     EditResult r;
+    for (const Action &a : config.actions) {
+        if (a.queue != queueId)
+            continue;
+        Action after = a;
+        after.queue = QUuid();
+        const EditResult put = putAction(a, after);
+        if (!put.problem.isEmpty())
+            return put;
+        r.edits += put.edits;
+    }
     r.edits.append(edit("queue_remove", {{QStringLiteral("queue_id"), uuidText(queueId)}}));
     return r;
 }

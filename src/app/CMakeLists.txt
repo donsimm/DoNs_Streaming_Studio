@@ -21,6 +21,7 @@ add_library(dss_app_ui STATIC
   dockviews.h dockviews.cpp
   dialogs.h dialogs.cpp
   obssourcedialog.h obssourcedialog.cpp
+  queuesdialog.h queuesdialog.cpp
   mainwindowedit.cpp
   mainwindowcommands.cpp
   mainwindowtimers.cpp

@@ -13,6 +13,7 @@
 #include "docks.h"
 #include "headerbar.h"
 #include "obssourcedialog.h"
+#include "queuesdialog.h"
 #include "symbols.h"
 #if DSS_APP_SETTINGS_DIALOG
 #include "settingsdialog.h"
@@ -727,6 +728,12 @@ void MainWindow::connectActionDetail()
             after.group = group;
             return dss::putAction(config, before, after);
         });
+    });
+    // P14 e3-8: Dialog «Warteschlangen», modal und geöffnet wie «Einstellungen»
+    connect(page, &ActionsPage::manageQueuesClicked, this, [this] {
+        if (!m_queuesDialog)
+            m_queuesDialog = new QueuesDialog(m_client, this);
+        m_queuesDialog->showFromCore();
     });
     connect(page, &ActionsPage::queueChosen, this, [this](const QUuid &queue) {
         editDetailAction(ActionsPage::ActionSection, [queue](const ActionsConfig &config, const Action &before) {

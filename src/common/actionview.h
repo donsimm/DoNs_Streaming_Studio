@@ -469,7 +469,8 @@ EditResult newQueue(const actions::ActionsConfig &config);
 EditResult renameQueue(const actions::ActionsConfig &config, const QUuid &queueId, const QString &name);
 // queue_put; gleicher Wert, «Standard» oder unbekannte Warteschlange: nichts.
 EditResult setQueueBlocking(const actions::ActionsConfig &config, const QUuid &queueId, bool blocking);
-// queue_remove; «Standard» oder unbekannte Warteschlange: nichts.
+// action_put je Aktion der Warteschlange (queue auf «Standard»), dann queue_remove; «Standard» oder
+// unbekannte Warteschlange: nichts.
 EditResult removeQueue(const actions::ActionsConfig &config, const QUuid &queueId);
 // Rückfrage (siehe removeActionQuestion), nur wenn Aktionen die Warteschlange benutzen; diese laufen
 // danach in «Standard» (actionengine.cpp). «Warteschlange «Alerts» löschen? Sie wird von 2 Aktionen

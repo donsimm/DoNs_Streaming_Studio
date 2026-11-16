@@ -161,7 +161,7 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Tests: `tst_fensterchatbot` (Zeilen aus `tests/daten/`, Filter, Zelle ändern → `variable_set`, Zahl mit Text → Prüfmeldung und alter Wert, Löschen mit Rückfrage, nachgeführt nach einem Lauf). `scripts/testen.sh -R '^tst_fensterchatbot$'`.
   - Handtest: H4, L2.
 
-- [ ] **e3-8 Dialog «Warteschlangen».** Schreibt neu `src/app/queuesdialog.{h,cpp}`, `actionspage.cpp` (Eintrag «Warteschlangen verwalten …» wirkt; danach steht die Auswahl wieder auf der vorherigen Warteschlange), `mainwindow.cpp`. Eigene Checkliste der Art «Dialog», Referenz `src/app/settingsdialog.cpp`, 3 von 3 Kandidaten; Prüfer der Art «Dialog» aus e3-0.
+- [x] **e3-8 Dialog «Warteschlangen».** Schreibt neu `src/app/queuesdialog.{h,cpp}`, `actionspage.cpp` (Eintrag «Warteschlangen verwalten …» wirkt; danach steht die Auswahl wieder auf der vorherigen Warteschlange), `mainwindow.cpp`. Eigene Checkliste der Art «Dialog», Referenz `src/app/settingsdialog.cpp`, 3 von 3 Kandidaten; Prüfer der Art «Dialog» aus e3-0.
   - Checkliste:
     - Eigene Klasse `QueuesDialog : public QDialog` wie `SettingsDialog`, Titel «Warteschlangen», `QVBoxLayout`; modal wie `SettingsDialog` (der Agent übernimmt dessen Art zu öffnen).
     - Liste `#queuesList` als `QTreeWidget` wie die Tabellen oben, Spalten «Name», «Nacheinander»; Kästchen in «Nacheinander» → `setQueueBlocking`; «Standard» ohne Kästchen. Zeilen aus `queueRows()`.

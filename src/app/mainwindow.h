@@ -26,6 +26,7 @@ class HeaderBar;
 class QDockWidget;
 class ObsSourceDialog;
 class SettingsDialog;
+class QueuesDialog;
 class SourceRenderer;
 class QAction;
 class QLabel;
@@ -281,6 +282,7 @@ private:
     QAction *m_canvasImageAction = nullptr;    // P10-vor, nur mit DSS_APP_CANVAS_IMAGE
     QString m_canvasImageDir;                  // Ablage der Bilder der Leinwand
     SettingsDialog *m_settingsDialog = nullptr;
+    QueuesDialog *m_queuesDialog = nullptr; // P14 e3-8
     ObsSourceDialog *m_obsSourceDialog = nullptr;
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;

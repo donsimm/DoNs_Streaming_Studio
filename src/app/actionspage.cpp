@@ -14,7 +14,6 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSplitter>
-#include <QStandardItemModel>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -29,6 +28,8 @@ constexpr int kGroupRole = Qt::UserRole + 1;    // Gruppe der Zeile, leer = ohne
 constexpr int kIsGroupRole = Qt::UserRole + 2;
 // Zeile eines Schritts oder Auslösers in der Mitte
 constexpr int kItemIdRole = Qt::UserRole;
+// Eintrag «Warteschlangen verwalten …» in der Auswahl «Warteschlange» (QueueChoice::manage)
+constexpr int kManageQueuesRole = Qt::UserRole + 1;
 
 // Menü eines Knopfs «hinzufügen» aus den Einträgen nach Abschnitten (stepChoices, triggerChoices)
 void fillTypeMenu(QToolButton *button, const QList<dss::TypeChoice> &choices,
@@ -271,9 +272,17 @@ QWidget *ActionsPage::createActionSection()
     connect(m_group->lineEdit(), &QLineEdit::editingFinished, this, &ActionsPage::finishGroupEdit);
     connect(m_group, &QComboBox::activated, this, &ActionsPage::finishGroupEdit);
     connect(m_queue, &QComboBox::activated, this, [this](int index) {
-        // «Warteschlangen verwalten …» ist ausgegraut (Wirkung mit e3) und nicht wählbar
-        if (!m_detailFilling && index >= 0)
-            emit queueChosen(m_queue->itemData(index).toUuid());
+        if (m_detailFilling || index < 0)
+            return;
+        // P14 e3-8: «Warteschlangen verwalten …» öffnet den Dialog; die Auswahl steht danach wieder
+        // auf der Warteschlange der Aktion.
+        if (m_queue->itemData(index, kManageQueuesRole).toBool()) {
+            const QSignalBlocker blocker(m_queue);
+            m_queue->setCurrentIndex(m_coreQueueIndex);
+            emit manageQueuesClicked();
+            return;
+        }
+        emit queueChosen(m_queue->itemData(index).toUuid());
     });
     connect(m_enabled, &QCheckBox::clicked, this, [this](bool checked) {
         if (!m_detailFilling && !m_shownAction.isNull())
@@ -376,15 +385,13 @@ void ActionsPage::setActionDetail(const ActionDetail &detail, bool resetFields)
     m_coreGroup = detail.group;
 
     m_queue->clear();
-    for (const dss::QueueChoice &choice : detail.queues)
+    for (int i = 0; i < detail.queues.size(); ++i) {
+        const dss::QueueChoice &choice = detail.queues.at(i);
         m_queue->addItem(choice.label, choice.id);
-    if (auto *model = qobject_cast<QStandardItemModel *>(m_queue->model())) {
-        for (int i = 0; i < detail.queues.size(); ++i) {
-            if (detail.queues.at(i).manage)
-                model->item(i)->setEnabled(false);
-        }
+        m_queue->setItemData(i, choice.manage, kManageQueuesRole);
     }
-    m_queue->setCurrentIndex(dss::queueChoiceIndex(detail.queues, detail.queue));
+    m_coreQueueIndex = dss::queueChoiceIndex(detail.queues, detail.queue);
+    m_queue->setCurrentIndex(m_coreQueueIndex);
     m_enabled->setChecked(present && detail.enabled);
     m_hint->setText(detail.hint);
     for (QWidget *field : {static_cast<QWidget *>(m_name), static_cast<QWidget *>(m_group),

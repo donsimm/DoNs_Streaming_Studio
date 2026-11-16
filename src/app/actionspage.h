@@ -116,6 +116,7 @@ signals:
     void nameEdited(const QString &name);
     void groupEdited(const QString &group);
     void queueChosen(const QUuid &queue);
+    void manageQueuesClicked(); // P14 e3-8: «Warteschlangen verwalten …»
     void triggerAddChosen(const QString &type);
     void triggerRemoveClicked();
     void triggerEnabledToggled(const QUuid &id, bool enabled);
@@ -176,6 +177,7 @@ private:
     QUuid m_shownAction;  // Aktion in der Mitte
     QString m_coreName;   // Wert des Kerns beim letzten setActionDetail
     QString m_coreGroup;
+    int m_coreQueueIndex = -1; // Warteschlange der Aktion in m_queue (nach «Warteschlangen verwalten …»)
     QString m_shownName;  // zuletzt gezeigter bzw. gemeldeter Name (keine doppelte Meldung)
     QString m_shownGroup;
     QList<QUuid> m_stepIds; // Schritte in der Reihenfolge des Baums (für keptSelection)

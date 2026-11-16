@@ -33,6 +33,8 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFrame>
 #include <QHeaderView>
@@ -225,6 +227,23 @@ class TestFensterChatBot : public QObject
         timer->setInterval(20);
         QObject::connect(timer, &QTimer::timeout, timer, [timer, answer] {
             if (QWidget *dialog = QApplication::activeModalWidget()) {
+                timer->stop();
+                timer->deleteLater();
+                answer(dialog);
+            }
+        });
+        timer->start();
+    }
+
+    // Wie answerDialog, aber erst für einen modalen Dialog der Klasse T: Neben einem schon offenen
+    // modalen Dialog (Dialog «Warteschlangen») ist der nicht gemeint.
+    template<typename T>
+    static void answerModal(std::function<void(T *)> answer)
+    {
+        auto *timer = new QTimer(qApp);
+        timer->setInterval(20);
+        QObject::connect(timer, &QTimer::timeout, timer, [timer, answer] {
+            if (auto *dialog = qobject_cast<T *>(QApplication::activeModalWidget())) {
                 timer->stop();
                 timer->deleteLater();
                 answer(dialog);
@@ -1263,12 +1282,12 @@ private slots:
         QVERIFY(hint->text().isEmpty()); // eigene Aktion
         QVERIFY(name->isEnabled() && enabled->isChecked());
         QCOMPARE(queue->currentText(), QStringLiteral("Standard"));
-        // «Warteschlangen verwalten …» ausgegraut (Wirkung mit e3)
+        // «Warteschlangen verwalten …» wählbar, seit e3-8 öffnet es den Dialog (queuesDialog)
         auto *queueModel = qobject_cast<QStandardItemModel *>(queue->model());
         QVERIFY(queueModel);
         const int manage = queue->findText(QStringLiteral("Warteschlangen verwalten …"));
         QVERIFY(manage >= 0);
-        QVERIFY(!queueModel->item(manage)->isEnabled());
+        QVERIFY(queueModel->item(manage)->isEnabled());
 
         // Name mit Enter speichern: action_put, Titel und Statuszeile mit dem neuen Namen
         name->selectAll();
@@ -2027,11 +2046,23 @@ private slots:
 
         // Wert ändern: F2 auf der Zeile öffnet «Wert» → variable_set, «Gespeichert: <Name>»
         const auto editValue = [&](QTreeWidget *table, QTreeWidgetItem *item, const QString &text) {
+            // Fenster aktiv und Fokus in der Tabelle, sonst kommt F2 nicht an (scheiterte gelegentlich)
+            m_window->activateWindow();
+            if (!QTest::qWaitForWindowActive(m_window.get()))
+                qWarning("Fenster nicht aktiv");
             table->setFocus();
+            if (!QTest::qWaitFor([table] { return table->hasFocus(); }, 3000)) {
+                qWarning("Tabelle ohne Fokus");
+                return false;
+            }
             table->setCurrentItem(item, 0);
             QTest::keyClick(table, Qt::Key_F2);
             // Der Editor steht in «Wert», auch wenn Spalte 0 die aktuelle ist
-            auto *editor = qobject_cast<QLineEdit *>(QApplication::focusWidget());
+            QLineEdit *editor = nullptr;
+            (void)QTest::qWaitFor([&editor] {
+                editor = qobject_cast<QLineEdit *>(QApplication::focusWidget());
+                return editor != nullptr;
+            }, 3000);
             const int valueColumn = table == global ? 1 : 2;
             if (!editor || editor->x() < table->header()->sectionViewportPosition(valueColumn) - 2) {
                 qWarning("kein Editor in «Wert»");
@@ -2112,6 +2143,247 @@ private slots:
         const std::optional<ChangeResult> removeAction = request(
             {QString::fromLatin1(msg::kActionRemove),
              QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
+        QVERIFY(removeAction && removeAction->ok);
+        QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
+    }
+
+    // Warteschlange im Stand des Kerns nach Name, leer = gibt es nicht
+    std::optional<actions::Queue> coreQueue(const QString &name) const
+    {
+        const std::optional<ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            for (const actions::Queue &q : info->config->queues)
+                if (q.name == name)
+                    return q;
+        return std::nullopt;
+    }
+
+    // P14 e3-8: Dialog «Warteschlangen» aus «Warteschlangen verwalten …» in «Aktionen», Mitte: Neu,
+    // Umbenennen mit Prüfmeldung im Dialog, Kästchen, Löschen mit Rückfrage, «Standard» fest,
+    // Steuerknöpfe ausgegraut, Auswahl in «Aktionen» danach wie vorher.
+    void queuesDialog()
+    {
+        QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
+        auto *page = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->actionsConfig() && m_client->actionsConfig()->config, 3000);
+        auto *queue = child<QComboBox>("actionQueue");
+        QVERIFY(queue);
+        const QUuid actionId = QUuid::createUuid();
+        QVERIFY(putTestAction(actionId, QStringLiteral("DSS-Test Warteschlange"), QString()));
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectAction(actionId), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(queue->currentText(), QStringLiteral("Standard"), 3000);
+
+        // Öffnen: Eintrag wählen wie mit der Maus; danach steht die Auswahl wieder auf «Standard»
+        const int manage = queue->findText(QStringLiteral("Warteschlangen verwalten …"));
+        QVERIFY(manage >= 0);
+        queue->setCurrentIndex(manage);
+        emit queue->activated(manage);
+        QCOMPARE(queue->currentText(), QStringLiteral("Standard"));
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("queuesDialog")))
+                                     && dialog->isVisible(), 3000);
+        QVERIFY(dialog->isModal());
+        QCOMPARE(dialog->windowTitle(), QStringLiteral("Warteschlangen"));
+        auto *list = dialog->findChild<QTreeWidget *>(QStringLiteral("queuesList"));
+        auto *add = dialog->findChild<QToolButton *>(QStringLiteral("queuesAdd"));
+        auto *remove = dialog->findChild<QToolButton *>(QStringLiteral("queuesRemove"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("queuesProblem"));
+        auto *buttons = dialog->findChild<QDialogButtonBox *>();
+        QVERIFY(list && add && remove && problem && buttons);
+        QCOMPARE(list->headerItem()->text(0), QStringLiteral("Name"));
+        QCOMPARE(list->headerItem()->text(1), QStringLiteral("Nacheinander"));
+        QCOMPARE(add->toolTip(), QStringLiteral("Warteschlange hinzufügen"));
+        QCOMPARE(remove->toolTip(), QStringLiteral("Warteschlange löschen"));
+        QCOMPARE(add->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        QCOMPARE(problem->height(), problem->fontMetrics().lineSpacing() * 3);
+        // Nur «Schliessen»; «Anhalten», «Fortsetzen», «Leeren» ausgegraut bis P14-2
+        QCOMPARE(buttons->buttons().size(), 1);
+        QCOMPARE(buttons->buttons().constFirst()->text(), QStringLiteral("Schliessen"));
+        const QList<std::pair<const char *, QString>> controls{{"queuesPause", QStringLiteral("Anhalten")},
+                                                               {"queuesResume", QStringLiteral("Fortsetzen")},
+                                                               {"queuesClear", QStringLiteral("Leeren")}};
+        for (const auto &[objectName, text] : controls) {
+            auto *button = dialog->findChild<QPushButton *>(QString::fromLatin1(objectName));
+            QVERIFY(button);
+            QCOMPARE(button->text(), text);
+            QVERIFY(!button->isEnabled());
+            QCOMPARE(button->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        }
+
+        // «Standard» zuerst, ohne Kästchen und nicht löschbar
+        QVERIFY(list->topLevelItemCount() >= 1);
+        QTreeWidgetItem *standard = list->topLevelItem(0);
+        QCOMPARE(standard->text(0), QStringLiteral("Standard"));
+        QVERIFY(!standard->data(1, Qt::CheckStateRole).isValid());
+        list->setCurrentItem(standard);
+        QVERIFY(add->isEnabled());
+        QVERIFY(!remove->isEnabled());
+
+        // Neu: «Warteschlange 1», gewählt, nicht nacheinander
+        QVERIFY(!coreQueue(QStringLiteral("Warteschlange 1")));
+        QTest::mouseClick(add, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(coreQueue(QStringLiteral("Warteschlange 1")), 3000);
+        const QUuid queueId = coreQueue(QStringLiteral("Warteschlange 1"))->id;
+        QTRY_VERIFY_WITH_TIMEOUT(list->currentItem() && list->currentItem()->text(0) == QStringLiteral("Warteschlange 1"),
+                                 3000);
+        QCOMPARE(list->currentItem()->checkState(1), Qt::Unchecked);
+        QTRY_VERIFY_WITH_TIMEOUT(remove->isEnabled(), 3000);
+
+        // Umbenennen per Doppelklick: «Standard» abgewiesen mit Meldung im Dialog, nicht in der Statuszeile
+        const auto renameTo = [&](const QString &name) {
+            bool asked = false;
+            answerModal<QInputDialog>([&asked, name](QInputDialog *input) {
+                asked = true;
+                input->setTextValue(name);
+                input->accept();
+            });
+            const QPoint center = list->visualItemRect(list->currentItem()).center();
+            QTest::mouseClick(list->viewport(), Qt::LeftButton, {}, center);
+            QTest::mouseDClick(list->viewport(), Qt::LeftButton, {}, center);
+            QTRY_VERIFY_WITH_TIMEOUT(asked, 3000);
+        };
+        m_window->statusBar()->clearMessage();
+        renameTo(QStringLiteral("standard"));
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(), QStringLiteral("Die Warteschlange «Standard» gibt es schon."), 3000);
+        QVERIFY(m_window->statusBar()->currentMessage().isEmpty());
+        QVERIFY(coreQueue(QStringLiteral("Warteschlange 1")));
+        renameTo(QStringLiteral("DSS-Test Schlange"));
+        QTRY_COMPARE_WITH_TIMEOUT(coreQueue(QStringLiteral("DSS-Test Schlange"))->id, queueId, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(), QStringLiteral("Gespeichert: DSS-Test Schlange"), 3000);
+        QVERIFY(m_window->statusBar()->currentMessage().isEmpty());
+        QCOMPARE(list->currentItem()->text(0), QStringLiteral("DSS-Test Schlange"));
+
+        // Kästchen «Nacheinander» → queue_put
+        list->currentItem()->setCheckState(1, Qt::Checked);
+        QTRY_VERIFY_WITH_TIMEOUT(coreQueue(QStringLiteral("DSS-Test Schlange"))->blocking, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(list->currentItem() && list->currentItem()->checkState(1) == Qt::Checked, 3000);
+
+        // Kontextmenü an der Zeile wie bei den Gruppen in «Aktionen»: «Umbenennen …» und «Löschen …».
+        // Das Menü ist kein modaler Dialog: Warten auf das offene Menü, dann den Eintrag auslösen.
+        const auto chooseInMenu = [&](const QString &name, const QString &entry) {
+            QTreeWidgetItem *item = nullptr;
+            for (int i = 0; i < list->topLevelItemCount(); ++i)
+                if (list->topLevelItem(i)->text(0) == name)
+                    item = list->topLevelItem(i);
+            QVERIFY(item);
+            auto *timer = new QTimer(this);
+            timer->setInterval(20);
+            connect(timer, &QTimer::timeout, timer, [timer, entry] {
+                auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+                if (!menu)
+                    return;
+                timer->stop();
+                timer->deleteLater();
+                QStringList texts;
+                QAction *found = nullptr;
+                for (QAction *a : menu->actions()) {
+                    texts.append(a->text());
+                    if (a->text() == entry)
+                        found = a;
+                }
+                menu->hide();
+                QCOMPARE(texts, (QStringList{QStringLiteral("Umbenennen …"), QStringLiteral("Löschen …")}));
+                QVERIFY(found);
+                found->trigger();
+            });
+            timer->start();
+            emit list->customContextMenuRequested(list->visualItemRect(item).center());
+        };
+        // Zeigt ein Rechtsklick an position ein Menü? (sofort geschlossen)
+        const auto menuShownAt = [&](const QPoint &position) {
+            bool shown = false;
+            auto *watch = new QTimer(this);
+            watch->setInterval(20);
+            connect(watch, &QTimer::timeout, watch, [&shown] {
+                if (QWidget *popup = QApplication::activePopupWidget()) {
+                    shown = true;
+                    popup->hide();
+                }
+            });
+            watch->start();
+            emit list->customContextMenuRequested(position);
+            QTest::qWait(200);
+            delete watch;
+            return shown;
+        };
+        QVERIFY(!menuShownAt(list->visualItemRect(list->topLevelItem(0)).center())); // «Standard»
+        const auto renameByMenu = [&](const QString &from, const QString &to) {
+            bool asked = false;
+            answerModal<QInputDialog>([&asked, to](QInputDialog *input) {
+                asked = true;
+                input->setTextValue(to);
+                input->accept();
+            });
+            chooseInMenu(from, QStringLiteral("Umbenennen …"));
+            QTRY_VERIFY_WITH_TIMEOUT(asked, 3000);
+        };
+        renameByMenu(QStringLiteral("DSS-Test Schlange"), QStringLiteral("DSS-Test Reihe"));
+        QTRY_VERIFY_WITH_TIMEOUT(coreQueue(QStringLiteral("DSS-Test Reihe")), 3000);
+        QCOMPARE(coreQueue(QStringLiteral("DSS-Test Reihe"))->id, queueId);
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(), QStringLiteral("Gespeichert: DSS-Test Reihe"), 3000);
+        renameByMenu(QStringLiteral("DSS-Test Reihe"), QStringLiteral("DSS-Test Schlange"));
+        QTRY_VERIFY_WITH_TIMEOUT(coreQueue(QStringLiteral("DSS-Test Schlange")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(list->currentItem() && list->currentItem()->text(0) == QStringLiteral("DSS-Test Schlange"),
+                                 3000);
+
+        // Löschen mit Rückfrage, weil die Aktion die Warteschlange benutzt: abbrechen, dann löschen
+        std::optional<actions::Action> action = coreAction(actionId);
+        QVERIFY(action);
+        action->queue = queueId;
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(*action)}}});
+        QVERIFY(put && put->ok);
+        QTRY_COMPARE_WITH_TIMEOUT(queue->currentText(), QStringLiteral("DSS-Test Schlange (nacheinander)"), 3000);
+        // Rückfrage beantworten wie answerQuestion, neben dem offenen Dialog
+        const auto answerRemove = [](const QString &button, QString *text) {
+            answerModal<QMessageBox>([button, text](QMessageBox *box) {
+                *text = box->text();
+                for (QAbstractButton *b : box->buttons())
+                    if (b->text() == button)
+                        b->click();
+            });
+        };
+        QString question;
+        answerRemove(QStringLiteral("Abbrechen"), &question);
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!question.isEmpty(), 3000);
+        QVERIFY2(question.startsWith(QStringLiteral("Warteschlange «DSS-Test Schlange» löschen?")), qPrintable(question));
+        QTest::qWait(300);
+        QVERIFY(coreQueue(QStringLiteral("DSS-Test Schlange")));
+        question.clear();
+        // Bestätigt über das Kontextmenü «Löschen …» (gleiche Rückfrage wie der Knopf)
+        answerRemove(QStringLiteral("Löschen"), &question);
+        chooseInMenu(QStringLiteral("DSS-Test Schlange"), QStringLiteral("Löschen …"));
+        QTRY_VERIFY_WITH_TIMEOUT(!question.isEmpty(), 3000);
+        QVERIFY2(question.startsWith(QStringLiteral("Warteschlange «DSS-Test Schlange» löschen?")), qPrintable(question));
+        QTRY_VERIFY_WITH_TIMEOUT(!coreQueue(QStringLiteral("DSS-Test Schlange")), 3000);
+        // Die Aktion läuft danach in «Standard» (Entscheid des Nutzers, 16.11.)
+        QTRY_VERIFY_WITH_TIMEOUT(coreAction(actionId) && coreAction(actionId)->queue.isNull(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(), QStringLiteral("Gelöscht: DSS-Test Schlange"), 3000);
+        // Auswahl auf der Nachbarzeile (keptSelection), «Standard» bleibt
+        QTRY_VERIFY_WITH_TIMEOUT(list->currentItem(), 3000);
+        QCOMPARE(list->topLevelItem(0)->text(0), QStringLiteral("Standard"));
+
+        // Ohne Kern kein Menü
+        m_client->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!m_client->isConnected(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!add->isEnabled(), 3000);
+        const int last = list->topLevelItemCount() - 1;
+        QVERIFY(!menuShownAt(last >= 0 ? list->visualItemRect(list->topLevelItem(last)).center() : QPoint(5, 5)));
+        m_client->start();
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->isConnected(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(add->isEnabled(), 5000);
+
+        // «Schliessen»: Die Auswahl in «Aktionen» zeigt «Standard», nicht «Warteschlange fehlt»
+        QTest::mouseClick(buttons->buttons().constFirst(), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectAction(actionId), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(queue->currentText(), QStringLiteral("Standard"), 3000);
+
+        const std::optional<ChangeResult> removeAction = request(
+            {QString::fromLatin1(msg::kActionRemove),
+             QJsonObject{{QStringLiteral("action_id"), actionId.toString(QUuid::WithoutBraces)}}});
         QVERIFY(removeAction && removeAction->ok);
         QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
     }

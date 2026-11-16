@@ -1191,10 +1191,31 @@ private slots:
         QVERIFY(setQueueBlocking(config, kQueueAlerts, true).edits.isEmpty());
         QVERIFY(setQueueBlocking(config, QUuid(), true).edits.isEmpty());
 
-        // Löschen, «Standard» abgewiesen
-        QCOMPARE(removeQueue(config, kQueueAlerts).edits,
-                 (QList<ActionsEdit>{{QStringLiteral("queue_remove"),
-                                      {{QStringLiteral("queue_id"), uuidText(kQueueAlerts)}}}}));
+        // Löschen, «Standard» abgewiesen; Aktionen der Warteschlange im selben Stapel auf «Standard»
+        // (Entscheid des Nutzers, 16.11.)
+        {
+            QList<QUuid> users;
+            for (const Action &a : config.actions) {
+                if (a.queue == kQueueAlerts)
+                    users.append(a.id);
+            }
+            QCOMPARE(users.size(), 1);
+            const QList<ActionsEdit> edits = removeQueue(config, kQueueAlerts).edits;
+            QCOMPARE(edits.size(), 2);
+            QCOMPARE(edits[0].type, QStringLiteral("action_put"));
+            const QJsonObject a = edits[0].fields.value(QStringLiteral("action")).toObject();
+            QCOMPARE(QUuid::fromString(a.value(QStringLiteral("id")).toString()), users.first());
+            QVERIFY(a.value(QStringLiteral("queue")).isNull());
+            QCOMPARE(edits[1], (ActionsEdit{QStringLiteral("queue_remove"),
+                                            {{QStringLiteral("queue_id"), uuidText(kQueueAlerts)}}}));
+            // Ohne Aktionen in der Warteschlange nur queue_remove
+            ActionsConfig unused = config;
+            const QUuid unusedId = QUuid::createUuid();
+            unused.queues.append({unusedId, QStringLiteral("Leer"), false, {}});
+            QCOMPARE(removeQueue(unused, unusedId).edits,
+                     (QList<ActionsEdit>{{QStringLiteral("queue_remove"),
+                                          {{QStringLiteral("queue_id"), uuidText(unusedId)}}}}));
+        }
         QVERIFY(removeQueue(config, QUuid()).edits.isEmpty());
         QVERIFY(removeQueue(config, QUuid::createUuid()).edits.isEmpty());
 
