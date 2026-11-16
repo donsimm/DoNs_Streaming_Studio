@@ -21,6 +21,9 @@ class QTimer;
 //   übernommen, sobald twitch.stream_online denselben started_at meldet (at_start, Plan 2.5); sonst
 //   verworfen. Ohne laufenden Stream wird nichts geschrieben. Bei twitch.stream_offline wird die Datei
 //   gelöscht.
+// - Nur für Zuschauer (Entscheid des Nutzers, 2026-11-16, em-7b): Nachrichten des eigenen Kanals und
+//   des eigenen Bots lösen kein twitch.first_message aus. Erkennung über die user_id, nicht über
+//   Namen; eine leere Kennung (zum Beispiel kein Bot angemeldet) zählt nicht.
 
 namespace dss::twitch {
 
@@ -33,6 +36,13 @@ public:
     // vor dem Schreiben (mehrere neue Zuschauer in einem Zug).
     ChatSession(events::EventBus *bus, const QString &stateFile, int saveDelayMs = 2000, QObject *parent = nullptr);
     ~ChatSession() override;
+
+    // Kennungen von Kanal und Bot (leer = nicht angemeldet); deren Nachrichten zählen nicht.
+    void setOwnUserIds(const QString &channelId, const QString &botId)
+    {
+        m_channelId = channelId;
+        m_botId = botId;
+    }
 
     // Für Tests und Anzeige
     bool isLive() const { return !m_startedAt.isEmpty(); }
@@ -57,6 +67,8 @@ private:
     QSet<QString> m_chatters;     // user_id, die in diesem Stream geschrieben haben
     QString m_storedStartedAt;    // aus der Datei, bis twitch.stream_online kommt
     QSet<QString> m_storedChatters;
+    QString m_channelId;
+    QString m_botId;
 };
 
 } // namespace dss::twitch

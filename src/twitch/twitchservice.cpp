@@ -398,7 +398,9 @@ void TwitchService::update()
     const QString channelId = m_channel->userId();
     // Plan 2.1: Der Bot darf nicht das Kanal-Konto sein.
     m_bot->setRejectedUserId(channelId);
-    m_connection->setBotUserId(m_bot->state() == TwitchAuth::State::Ok ? m_bot->userId() : QString());
+    const QString botId = m_bot->state() == TwitchAuth::State::Ok ? m_bot->userId() : QString();
+    m_connection->setBotUserId(botId);
+    m_chatSession->setOwnUserIds(channelId, botId);
     // EventSub läuft, solange der Kanal angemeldet ist. Kennung vor start/stop setzen: Beide melden
     // changed() sofort, update() läuft dann noch einmal.
     if (m_active && channel == TwitchAuth::State::Ok && !channelId.isEmpty()) {

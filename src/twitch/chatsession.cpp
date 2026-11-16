@@ -81,6 +81,8 @@ void ChatSession::onChatMessage(const events::Event &event)
     const QString userId = event.data.value(QStringLiteral("user_id")).toString();
     if (userId.isEmpty() || m_chatters.contains(userId))
         return;
+    if ((!m_channelId.isEmpty() && userId == m_channelId) || (!m_botId.isEmpty() && userId == m_botId))
+        return; // eigener Kanal oder eigener Bot (em-7b)
     m_chatters.insert(userId);
     events::Event first;
     first.type = QStringLiteral("twitch.first_message");

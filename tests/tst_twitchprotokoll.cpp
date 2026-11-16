@@ -531,6 +531,39 @@ private slots:
         QCOMPARE(session.chatterCount(), 2);
     }
 
+    // em-7b: Zuschauer bekommt «Erste Nachricht», Kanal und Bot nicht (Erkennung über user_id).
+    void firstMessageOnlyForViewers_data()
+    {
+        QTest::addColumn<QString>("channelId");
+        QTest::addColumn<QString>("botId");
+        QTest::addColumn<QStringList>("expected");
+        const QStringList all{QStringLiteral("100"), QStringLiteral("200"), QStringLiteral("300")};
+        QTest::newRow("Kanal und Bot") << QStringLiteral("100") << QStringLiteral("200") << QStringList{"300"};
+        QTest::newRow("ohne Bot") << QStringLiteral("100") << QString() << QStringList{"200", "300"};
+        QTest::newRow("ohne Kennungen") << QString() << QString() << all;
+    }
+
+    void firstMessageOnlyForViewers()
+    {
+        QFETCH(QString, channelId);
+        QFETCH(QString, botId);
+        QFETCH(QStringList, expected);
+        EventBus bus;
+        ChatSession session(&bus, QString());
+        session.setOwnUserIds(channelId, botId);
+        FirstMessages first(&bus);
+        // 100 = Kanal, 200 = Bot, 300 = Zuschauer
+        for (const char *id : {"100", "200", "300", "100", "200"})
+            QVERIFY(bus.publish(chatEvent(QString::fromLatin1(id), QStringLiteral("user_intro"))));
+        QTRY_COMPARE_WITH_TIMEOUT(first.received.size(), expected.size(), kWait);
+        QTest::qWait(50);
+        QStringList received;
+        for (const Event &event : std::as_const(first.received))
+            received.append(event.data.value(QStringLiteral("user_id")).toString());
+        QCOMPARE(received, expected);
+        QCOMPARE(session.chatterCount(), expected.size());
+    }
+
     void streamOnlineAndOfflineClear()
     {
         QTemporaryDir dir;

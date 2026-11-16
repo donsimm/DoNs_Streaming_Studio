@@ -83,13 +83,14 @@ Jede Suche hat die Referenz oder ihre Nachbarn in `chatbotpage.cpp` getroffen (`
 
 - Kontextmenü: «Emotes neu laden», «Emotes animieren»
 - Tooltip: «<Name> (Twitch)», «<Name> (BTTV)», «<Name> (7TV)», «<Name> (FFZ)»
-- Statuszeile (aus der Logik, Wortlaut im Plan, em-3):
+- Statuszeile (aus der Logik, `emoteStatusText`, Stand em-7): «Emotes» steht nur einmal vorne, weitere Teile folgen mit « · »:
   - «Emotes geladen: BTTV 74, 7TV 312, FFZ 15» (Zahlen als Beispiel)
   - «Emotes: 7TV nicht erreichbar, die Wörter bleiben Text»
   - «Emotes: Ohne Netz, Listen vom letzten Mal» bzw. «Emotes: Ohne Netz und ohne gespeicherte Listen»
   - «Emotes: WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text»
-  - «Emotes erst in 30 s wieder ladbar»
   - «Emotes: kein Kanal angemeldet»
+  - zusammen zum Beispiel «Emotes geladen: BTTV 56, 7TV 45, FFZ 9 · kein Kanal angemeldet» oder «Emotes geladen: FFZ 9 · WebP fehlt (…), BTTV und 7TV bleiben Text»
+  - entfallen: «Emotes erst in 30 s wieder ladbar» (es gibt keinen Knopf zum Neuladen)
 
 ---
 

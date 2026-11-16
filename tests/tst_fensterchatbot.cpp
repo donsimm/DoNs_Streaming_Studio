@@ -2910,16 +2910,26 @@ private slots:
             echo.insert(QStringLiteral("data"), echoData);
             QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), echo}}));
             QTRY_COMPARE_WITH_TIMEOUT(own->data(1, Qt::UserRole + 3).toString(), QStringLiteral("#FF4040"), 3000);
-            // Keine zweite Nachricht; der Kern meldet zum Echo höchstens eine graue Ereigniszeile
-            // (zum Beispiel «Erste Nachricht»)
+            // Marke danach: Nachricht des schon bekannten Zuschauers (keine graue Zeile). Erscheint sie,
+            // ist alles, was der Kern zum Echo meldet, schon angekommen.
+            const QString marker = QStringLiteral("DSS-Test Zuschauer: DSS-Test Marke");
+            QVERIFY(post(QString::fromLatin1(msg::kTestEvent),
+                         {{QStringLiteral("event"), chatEvent(QStringLiteral("DSS-Test Marke"), false, QStringLiteral("#40C0FF"))}}));
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, marker), 3000);
+            // Keine zweite Nachricht und keine graue Zeile zum Echo: «Erste Nachricht» gibt es nur für
+            // Zuschauer, nie für den eigenen Kanal (em-7b). Der Zuschauer oben hat seine bekommen.
+            const QString firstPrefix = QStringLiteral("Erste Nachricht: ");
             int ownRows = 0;
+            int viewerFirst = 0;
             for (int i = 0; i < chat->topLevelItemCount(); ++i) {
                 QTreeWidgetItem *item = chat->topLevelItem(i);
                 const bool isEvent = item->data(1, Qt::UserRole).toBool();
                 ownRows += !isEvent && item->text(1).endsWith(twitchEmote.name) ? 1 : 0;
+                viewerFirst += isEvent && item->text(1) == firstPrefix + QStringLiteral("DSS-Test Zuschauer") ? 1 : 0;
                 if (i >= rows)
-                    qInfo("Zeile nach dem Echo: %s (%s)", qPrintable(item->text(1)), isEvent ? "grau" : "Nachricht");
+                    QVERIFY2(!isEvent, qPrintable(QStringLiteral("graue Zeile nach dem Echo: ") + item->text(1)));
             }
+            QCOMPARE(viewerFirst, 1);
             QCOMPARE(ownRows, 1);
             QCOMPARE(findRow(chat, 1, ownLine), own);
             QTRY_VERIFY_WITH_TIMEOUT(cellShowsColor(chat, own, Qt::cyan, 1), 5000);
