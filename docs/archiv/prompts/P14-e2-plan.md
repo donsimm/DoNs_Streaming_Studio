@@ -25,6 +25,11 @@ Entscheide des Nutzers vom 2026-11-16 (Checkliste, Abschnitt 7), in seinen Worte
 - «Aktion abgeschaltet oder gelöscht während eines Laufs: laufende Läufe dieser Aktion sofort abbrechen» — überstimmt die Empfehlung von Lotse (Läufe zu Ende laufen lassen) — 2026-11-16; gibt e2-1 frei.
 - «Gruppennamen ohne Rücksicht auf Gross- und Kleinschreibung eindeutig» — überstimmt das Verhalten aus c7 (genauer Vergleich) — 2026-11-16; gibt e2-3 frei.
 - «`settingsdialog.cpp` bleibt unverändert» — überstimmt die Herauslösung auch dort (Checkliste Frage 1) — 2026-11-16.
+- Antworten auf die Fragen unten (2026-11-16, alle nach Empfehlung):
+  1. Hauptschalter «Chat-Bot aktiv» aus: alle laufenden Läufe abbrechen, wartende verwerfen, wie beim Abschalten einer Aktion (Meldung «abgebrochen: Chat-Bot aus»). Gehört zu e2-1.
+  2. Senden aus dem Fenster bei «Chat-Bot aus»: erlaubt; bei «stumm» abgewiesen. Gehört zu e2-2.
+  3. «Anhören» beim Schritt «Ton abspielen»: in e2 ausgegraut sichtbar, Wirkung mit e3.
+  4. «Testwerte: Benutzer»: «Testzuschauer» (erfunden) und «eigener Kanal». Gehört zu e2-7.
 
 ## Schnittstelle
 
