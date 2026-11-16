@@ -23,6 +23,9 @@ struct Theme
     int fontSize = 10;      // --font_base in Punkt
     int fontSizeSmall = 8;  // --font_small in Punkt (Titel der Docks)
     int fontSizeLarge = 16; // P13: Code der Anmeldung bei Twitch
+    // P14 Emotes em-6: Zeilen im Bereich «Chat», so gross, dass eine Textzeile so hoch ist wie
+    // ein Emote (dss::kEmoteHeight, 28 px; Frage 2 des Plans, Entscheid des Nutzers 2026-11-16)
+    int fontSizeChat = 15;
 
     // Grundfarben
     QColor window;          // --bg_window (--grey7): Fenster, Menüleiste, Statuszeile

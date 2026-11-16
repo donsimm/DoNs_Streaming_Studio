@@ -8,6 +8,8 @@
 // P14 e2-14: «Aktionen» links (Suche, Baum, Leiste, Gruppen umbenennen und löschen).
 // P14 e3-5: «Befehle» (Zeilen, Filter, Kästchen, Formular, Prüfmeldung, Löschen, «Öffnen», Testen).
 // P14 e3-7: «Variablen» (Zeilen aus dem Import, Suche, Filter, Wert ändern, Prüfmeldung, Löschen).
+// P14 Emotes em-6: Delegat mit Emotes und Plattform-Symbol (eigene Seite ohne Kern, Testbilder
+// aus emotetestbilder.h).
 
 #include "actionfields.h"
 #include "actionfieldspanel.h"
@@ -18,6 +20,8 @@
 #include "commandspage.h"
 #include "coreclient.h"
 #include "coresession.h"
+#include "emoteimages.h"
+#include "emotetestbilder.h"
 #include "listdetailpage.h"
 #include "mainwindow.h"
 #include "prozesshilfe.h"
@@ -36,8 +40,10 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHeaderView>
+#include <QHelpEvent>
 #include <QImage>
 #include <QInputDialog>
 #include <QJsonArray>
@@ -60,6 +66,7 @@
 #include <QTest>
 #include <QTimer>
 #include <QToolButton>
+#include <QToolTip>
 #include <QTreeWidget>
 
 #include <functional>
@@ -2435,6 +2442,248 @@ private slots:
              QJsonObject{{QStringLiteral("action_id"), actionId.toString(QUuid::WithoutBraces)}}});
         QVERIFY(removeAction && removeAction->ok);
         QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
+    }
+
+    // P14 Emotes em-6: eigene Seite ohne Kern, Zeilen und Bilder direkt (Verdrahtung erst em-7).
+    // Zeilenhöhe gleich mit und ohne Emote; Plattform-Symbol (Platzhalter twitch-farbig.svg) nur vor
+    // Nachrichten mit Plattform; ohne Bild das Wort als Text; Bild kommt später → dieselben Zeilen,
+    // Bild an der erwarteten Stelle; Zero-Width darüber; «…» statt eines Emotes, das nicht passt;
+    // Tooltip; Takt nur mit sichtbarem «Live» und animiertem Bild; Echo ersetzt die Zeile.
+    void chatEmotes()
+    {
+        const Theme theme = darkTheme();
+        ChatBotPage page(theme);
+        page.resize(1800, 600);
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page));
+        auto *chat = page.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+        auto *timer = page.findChild<QTimer *>(QStringLiteral("chatBotEmoteTimer"));
+        QVERIFY(chat && timer);
+
+        // Testbilder (Grössen bei 28 px Höhe unverändert): grün 40x28, Hut gelb 20x28, GIF rot/blau
+        const Emote green{EmoteProvider::Twitch, QStringLiteral("dsstest1"), QStringLiteral("DSSGruen"), false, false, 0, 0};
+        const Emote hat{EmoteProvider::Ffz, QStringLiteral("dsstest2"), QStringLiteral("DSSHut"), false, true, 0, 0};
+        const Emote blink{EmoteProvider::Twitch, QStringLiteral("dsstest3"), QStringLiteral("DSSBlink"), true, false, 0, 0};
+        const Emote missing{EmoteProvider::Ffz, QStringLiteral("dsstest4"), QStringLiteral("DSSFehlt"), false, false, 0, 0};
+        const auto emote = [](const Emote &e) { return ChatSegment{e.name, e}; };
+        const auto text = [](const QString &t) { return ChatSegment{t, std::nullopt}; };
+        const auto message = [](const QString &name, const QList<ChatSegment> &segments, ChatPlatform platform) {
+            ChatRow row;
+            row.time = QStringLiteral("12:00:00");
+            row.name = name;
+            row.color = QStringLiteral("#40C0FF");
+            row.platform = platform;
+            row.segments = segments;
+            for (const ChatSegment &s : segments)
+                row.text += s.text;
+            return row;
+        };
+        ChatRow first = message(QStringLiteral("Zuschauer"),
+                                {emote(green), text(QStringLiteral(" ")), emote(hat), text(QStringLiteral(" Hallo ")),
+                                 emote(missing)},
+                                ChatPlatform::Twitch);
+        first.badges = {QStringLiteral("Mod")};
+        ChatRow event;
+        event.time = QStringLiteral("12:00:01");
+        event.isEvent = true;
+        event.platform = ChatPlatform::Twitch; // twitch.* ohne Nachricht: grau, ohne Symbol
+        event.text = QStringLiteral("Folgt jetzt: Zuschauer");
+        // Name mit «B» wie «Blinker» (Ausrichtung unten)
+        const ChatRow none = message(QStringLiteral("Bot ohne Plattform"), {text(QStringLiteral("Hallo"))},
+                                     ChatPlatform::None);
+        QList<ChatSegment> many;
+        for (int i = 0; i < 60; ++i)
+            many << emote(green) << text(QStringLiteral(" "));
+        const ChatRow tooLong = message(QStringLiteral("Lang"), many, ChatPlatform::Twitch);
+        const ChatRow animated = message(QStringLiteral("Blinker"), {emote(blink), text(QStringLiteral(" blinkt"))},
+                                         ChatPlatform::Twitch);
+        page.resetChat({first, event, none, tooLong, animated});
+        QCOMPARE(chat->topLevelItemCount(), 5);
+        QTreeWidgetItem *firstItem = chat->topLevelItem(0);
+        QApplication::processEvents();
+
+        const auto cell = [&](int row) {
+            const QRect r = chat->visualItemRect(chat->topLevelItem(row));
+            return QRect(chat->header()->sectionViewportPosition(1), r.top(), chat->header()->sectionSize(1), r.height());
+        };
+        const auto grabCell = [&](int row) { return chat->viewport()->grab(cell(row)).toImage(); };
+        // Pixel genau in color (Toleranz tolerance je Kanal)
+        const auto pixels = [](const QImage &image, const QColor &color, int tolerance = 0) {
+            QList<QPoint> found;
+            for (int y = 0; y < image.height(); ++y)
+                for (int x = 0; x < image.width(); ++x) {
+                    const QColor p = image.pixelColor(x, y);
+                    if (qAbs(p.red() - color.red()) <= tolerance && qAbs(p.green() - color.green()) <= tolerance
+                        && qAbs(p.blue() - color.blue()) <= tolerance)
+                        found.append(QPoint(x, y));
+                }
+            return found;
+        };
+        const auto bounds = [](const QList<QPoint> &points) {
+            QRect r;
+            for (const QPoint &p : points)
+                r |= QRect(p, QSize(1, 1));
+            return r;
+        };
+
+        // Zeilenhöhe: jede Zeile gleich, mindestens ein Emote; zum Vergleich «Ereignisse» (Schrift
+        // und Polsterung wie «Chat» vor em-6)
+        const int rowHeight = chat->visualItemRect(firstItem).height();
+        for (int i = 1; i < chat->topLevelItemCount(); ++i)
+            QCOMPARE(chat->visualItemRect(chat->topLevelItem(i)).height(), rowHeight);
+        QVERIFY(rowHeight >= kEmoteHeight);
+        auto *events = page.findChild<QTreeWidget *>(QStringLiteral("chatBotEvents"));
+        events->addTopLevelItem(new QTreeWidgetItem(QStringList{QStringLiteral("12:00:00"), QStringLiteral("Chat")}));
+        qInfo("Zeilenhöhe: Chat %d px, Ereignisse (Schrift %d pt, wie Chat vor em-6) %d px", rowHeight,
+              theme.fontSize, events->visualItemRect(events->topLevelItem(0)).height());
+        for (int size = theme.fontSize; size <= theme.fontSizeLarge; ++size)
+            qInfo("Schrift %s %d pt: Textzeile %d px", qPrintable(theme.fontFamily), size,
+                  QFontMetrics(QFont(theme.fontFamily, size)).height());
+        qInfo("Schrift der Chat-Liste: %d pt, Textzeile %d px", chat->font().pointSize(), chat->fontMetrics().height());
+        QCOMPARE(chat->font().pointSize(), theme.fontSizeChat);
+
+        // Plattform-Symbol (Platzhalter in Twitch-Violett) vor der Twitch-Nachricht, links vor dem
+        // Abzeichen; nicht vor einer Zeile ohne Plattform und nicht vor der grauen Ereigniszeile
+        const QColor purple(0x91, 0x46, 0xff);
+        const QImage withoutImages = grabCell(0);
+        const QList<QPoint> symbol = pixels(withoutImages, purple, 24);
+        QVERIFY(!symbol.isEmpty());
+        const QList<QPoint> badge = pixels(withoutImages, theme.badgeMod);
+        QVERIFY(!badge.isEmpty());
+        QVERIFY(bounds(symbol).right() < bounds(badge).left());
+        QVERIFY(pixels(grabCell(1), purple, 24).isEmpty());
+        QVERIFY(pixels(grabCell(2), purple, 24).isEmpty());
+        // Platz für das Symbol in jeder Zeile (Entscheid des Nutzers 2026-11-16): Name der
+        // Twitch-Nachricht und der Nachricht ohne Plattform an derselben Stelle (beide fett, «B»);
+        // Text der grauen Ereigniszeile («F», nicht fett) nur um den Rand des Buchstabens daneben
+        const QColor nameColor(0x40, 0xc0, 0xff);
+        const int twitchName = bounds(pixels(grabCell(4), nameColor)).left();
+        const int noneName = bounds(pixels(grabCell(2), nameColor)).left();
+        const int eventText = bounds(pixels(grabCell(1), theme.text)).left();
+        qInfo("Beginn des Namens: Twitch %d px, ohne Plattform %d px, Ereignis %d px; Symbol bis %d px",
+              twitchName, noneName, eventText, bounds(symbol).right());
+        QVERIFY(twitchName > bounds(symbol).right());
+        QCOMPARE(noneName, twitchName);
+        QVERIFY(qAbs(eventText - twitchName) <= 2);
+        // Zeitspalte in Ziffern der Schrift der Liste (fontMetrics, nach dem Stylesheet)
+        QCOMPARE(chat->columnWidth(0), chat->fontMetrics().horizontalAdvance(QLatin1Char('0')) * 10);
+
+        // Ohne Bilder: Wörter als Text, kein Bild
+        QVERIFY(pixels(withoutImages, Qt::green).isEmpty());
+        QVERIFY(!pixels(withoutImages, theme.text).isEmpty());
+        QVERIFY(!timer->isActive());
+
+        // Bilder kommen später: dieselben Zeilen, nur neu gezeichnet
+        EmoteImages images;
+        QVERIFY(images.add(chatEmoteImageKey(green), filled(40, 28, Qt::green)));
+        QVERIFY(images.add(chatEmoteImageKey(hat), filled(20, 28, Qt::yellow)));
+        QVERIFY(images.add(chatEmoteImageKey(blink), twoFrameGif()));
+        page.setEmoteImages(&images);
+        QApplication::processEvents();
+        QCOMPARE(chat->topLevelItemCount(), 5);
+        QCOMPARE(chat->topLevelItem(0), firstItem);
+        QCOMPARE(chat->visualItemRect(firstItem).height(), rowHeight);
+
+        // Grün an der erwarteten Stelle: nach dem Namen, 40x28, senkrecht mittig; der Hut (Zero-Width)
+        // mittig darüber, ohne Leerzeichen dazwischen
+        const QImage withImages = grabCell(0);
+        const QList<QPoint> greenPixels = pixels(withImages, Qt::green);
+        const QRect hatRect = bounds(pixels(withImages, Qt::yellow));
+        const QRect emoteRect = bounds(greenPixels) | hatRect;
+        QCOMPARE(emoteRect.size(), QSize(40, 28));
+        QCOMPARE(hatRect.size(), QSize(20, 28));
+        QCOMPARE(hatRect.left(), emoteRect.left() + 10);
+        QCOMPARE(greenPixels.size(), 20 * 28);
+        QVERIFY(qAbs(emoteRect.center().y() - withImages.height() / 2) <= 1);
+        QVERIFY(emoteRect.left() > bounds(badge).right());
+        // Rechts vom Emote steht noch Text («Hallo DSSFehlt», Emote ohne Bild bleibt Text)
+        bool textRight = false;
+        for (const QPoint &p : pixels(withImages, theme.text))
+            textRight = textRight || p.x() > emoteRect.right() + 4;
+        QVERIFY(textRight);
+
+        // Zu lang: ganze grüne Emotes, an Stelle des ersten, das nicht passt, «…» in Textfarbe
+        const QImage longImage = grabCell(3);
+        const QList<QPoint> longGreen = pixels(longImage, Qt::green);
+        QVERIFY(!longGreen.isEmpty());
+        QCOMPARE(longGreen.size() % (40 * 28), 0);
+        bool ellipsis = false;
+        for (const QPoint &p : pixels(longImage, theme.text, 40))
+            ellipsis = ellipsis || p.x() > bounds(longGreen).right();
+        QVERIFY(ellipsis);
+
+        // Tooltip über dem Emote mit Hut: beide Namen mit Anbieter; über Text nicht
+        const QPoint onEmote = cell(0).topLeft() + emoteRect.center();
+        QHelpEvent help(QEvent::ToolTip, onEmote, chat->viewport()->mapToGlobal(onEmote));
+        QApplication::sendEvent(chat->viewport(), &help);
+        QTRY_VERIFY_WITH_TIMEOUT(QToolTip::isVisible(), 3000);
+        QCOMPARE(QToolTip::text(), QStringLiteral("DSSGruen (Twitch)\nDSSHut (FFZ)"));
+        QToolTip::hideText();
+        QTRY_VERIFY_WITH_TIMEOUT(!QToolTip::isVisible(), 3000);
+        const QPoint onText = cell(2).topLeft() + QPoint(cell(2).width() - 10, cell(2).height() / 2);
+        QHelpEvent helpText(QEvent::ToolTip, onText, chat->viewport()->mapToGlobal(onText));
+        QApplication::sendEvent(chat->viewport(), &helpText);
+        QApplication::processEvents();
+        QVERIFY(!QToolTip::isVisible() || !QToolTip::text().contains(QStringLiteral("(Twitch)")));
+        QToolTip::hideText();
+
+        // Takt: läuft mit sichtbarem «Live» und animiertem Bild; das GIF wechselt rot und blau
+        QVERIFY(timer->isActive());
+        QCOMPARE(timer->interval(), 30);
+        bool red = false;
+        bool blue = false;
+        const auto sawBoth = [&] {
+            const QImage image = grabCell(4);
+            red = red || !pixels(image, Qt::red).isEmpty();
+            blue = blue || !pixels(image, Qt::blue).isEmpty();
+            return red && blue;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(sawBoth(), 3000);
+        // Bild des Bereichs für den Bericht (vor dem Wechsel des Unterreiters)
+        const QString picture = QCoreApplication::applicationDirPath() + QStringLiteral("/../emotes-chat.png");
+        QVERIFY(chat->parentWidget()->grab().save(picture));
+        qInfo("Bild: %s", qPrintable(QFileInfo(picture).canonicalFilePath()));
+        page.setCurrentSubTab(ChatBotPage::Actions);
+        QVERIFY(!timer->isActive());
+        page.setCurrentSubTab(ChatBotPage::Live);
+        QVERIFY(timer->isActive());
+        page.hide();
+        QVERIFY(!timer->isActive());
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page));
+        QVERIFY(timer->isActive());
+        // Ohne animiertes Bild steht der Takt
+        EmoteImages still;
+        QVERIFY(still.add(chatEmoteImageKey(green), filled(40, 28, Qt::green)));
+        page.setEmoteImages(&still);
+        QVERIFY(!timer->isActive());
+        page.setEmoteImages(&images);
+        QVERIFY(timer->isActive());
+
+        // Echo der eigenen Nachricht: dieselbe Zeile bekommt das Emote und die Chatfarbe
+        ChatRow own = message(QStringLiteral("dsstestbot"), {text(QStringLiteral("DSSGruen"))}, ChatPlatform::Twitch);
+        own.badges = {QStringLiteral("Bot")};
+        own.color.clear();
+        RowsAppend added;
+        added.appended = true;
+        page.appendChat(added, own);
+        QCOMPARE(chat->topLevelItemCount(), 6);
+        QTreeWidgetItem *ownItem = chat->topLevelItem(5);
+        QApplication::processEvents();
+        QVERIFY(pixels(grabCell(5), Qt::green).isEmpty());
+        ChatRow echo = own;
+        echo.segments = {emote(green)};
+        echo.color = QStringLiteral("#FF4040");
+        RowsAppend changed;
+        changed.changed = 5;
+        page.appendChat(changed, echo);
+        QApplication::processEvents();
+        QCOMPARE(chat->topLevelItemCount(), 6);
+        QCOMPARE(chat->topLevelItem(5), ownItem);
+        QCOMPARE(ownItem->data(1, Qt::UserRole + 3).toString(), QStringLiteral("#FF4040"));
+        QCOMPARE(pixels(grabCell(5), Qt::green).size(), 40 * 28);
+        QVERIFY(!pixels(grabCell(5), QColor(0xff, 0x40, 0x40), 12).isEmpty());
+        page.setEmoteImages(nullptr);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

@@ -4,9 +4,13 @@
 #include "theme.h"
 #include "windowdata.h"
 
+#include <QElapsedTimer>
 #include <QUuid>
 #include <QWidget>
 
+namespace dss {
+class EmoteImages;
+}
 class ActionsPage;
 class CommandForm;
 class ListDetailPage;
@@ -21,8 +25,15 @@ class QLineEdit;
 class QPushButton;
 class QSplitter;
 class QStackedWidget;
+class QTimer;
 class QTreeWidget;
 class QTreeWidgetItem;
+
+// P14 Emotes em-6: Schlüssel, unter dem der Delegat das Bild eines Emotes in dss::EmoteImages
+// sucht. Gleich wie dss::EmoteLoader::image(emote, true), solange der Loader mit
+// dss::EmoteImages::webpAvailable() lädt (Emotes sind immer animiert, Frage 1 des Plans). Im
+// Header, weil wer die Bilder füllt (Verdrahtung ab em-7, Tests) denselben Schlüssel braucht.
+QString chatEmoteImageKey(const dss::Emote &emote);
 
 // P13: Reiter «Chat-Bot» (Plan P13, 2.7; Entwurf 1-gesamtansicht). Oben die Kopfzeile mit den
 // Unterreitern im Stil der Modul-Reiter und rechts dem Zustand von Kanal und Bot, darunter der
@@ -56,9 +67,16 @@ public:
     // nach dss::EventRows::add; row gilt nur bei change.appended.
     void resetEvents(const QList<dss::EventRow> &rows);
     void appendEvent(const dss::RowsAppend &change, const dss::EventRow &row);
-    // Bereich «Chat»: ganze Liste neu bzw. eine Änderung nach dss::ChatRows::add (wie oben).
+    // Bereich «Chat»: ganze Liste neu bzw. eine Änderung nach dss::ChatRows::add (wie oben). Bei
+    // change.changed >= 0 ist row die geänderte Zeile an dieser Stelle (Echo der eigenen
+    // Nachricht, P14 Emotes em-3): ihre Daten werden ersetzt, es kommt keine Zeile dazu.
     void resetChat(const QList<dss::ChatRow> &rows);
     void appendChat(const dss::RowsAppend &change, const dss::ChatRow &row);
+    // P14 Emotes em-6: Bilder der Emotes (gehören dem Aufrufer, nullptr = nur Text). Ein Emote
+    // erscheint, sobald images ein Bild unter dem Schlüssel chatEmoteImageKey hat; danach
+    // emoteImagesChanged() aufrufen (zeichnet nur neu, keine neuen Zeilen).
+    void setEmoteImages(const dss::EmoteImages *images);
+    void emoteImagesChanged();
     // Eingabezeile nur aus dss::chatSendView (Zähler, «zu lang», Freigabe, Konten, Grund).
     void setChatSend(const dss::ChatSendView &view);
     QString chatText() const;
@@ -91,8 +109,13 @@ signals:
     // P14 e3-5: anderer Unterreiter gezeigt (SubTab)
     void subTabChanged(int tab);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     void sendChat();
+    // Gemeinsamer Takt der Emotes: läuft nur, wenn «Chat» sichtbar ist und ein Bild animiert ist.
+    void refreshEmoteTimer();
 
     QTreeWidgetItem *runItem(const dss::RunRow &row) const;
     void fillRunItem(QTreeWidgetItem *item, const dss::RunRow &row) const;
@@ -112,6 +135,9 @@ private:
     QTreeWidget *m_events = nullptr;
     QCheckBox *m_hideChat = nullptr;
     QTreeWidget *m_chat = nullptr;
+    const dss::EmoteImages *m_emoteImages = nullptr; // liest der Delegat der Liste «Chat»
+    QTimer *m_emoteTimer = nullptr;
+    QElapsedTimer m_emoteClock; // eine Uhr für alle Emotes (Recherche Emotes, Abschnitt 6)
     QComboBox *m_chatAccount = nullptr;
     QLineEdit *m_chatText = nullptr;
     QLabel *m_chatCounter = nullptr;

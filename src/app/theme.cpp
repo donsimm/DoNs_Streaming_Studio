@@ -17,6 +17,7 @@ Theme darkTheme()
     t.fontSize = 10;
     t.fontSizeSmall = 8;
     t.fontSizeLarge = 16;
+    t.fontSizeChat = 15;
     t.window = QColor(0x1d, 0x1f, 0x26);
     t.base = QColor(0x27, 0x2a, 0x33);
     t.text = QColor(0xff, 0xff, 0xff);
@@ -374,6 +375,8 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
 /* P14 e2: Prüfmeldung am Feld, eine Zeile unter dem Abschnitt (Entscheid des Nutzers 2026-11-16). */
 #fieldProblem { color: @stateError@; }
+/* P14 Emotes em-6: Chat-Zeilen in der Schrift, deren Zeile so hoch ist wie ein Emote (28 px). */
+#chatBotChat { font-size: @fontSizeChat@pt; }
 /* P14 e2-13: Zähler der Eingabezeile «Chat», zu lang wie eine Prüfmeldung. */
 #chatBotChatCounter { color: @textMuted@; }
 #chatBotChatCounter[state="error"] { color: @stateError@; }
@@ -422,5 +425,6 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
     css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
     css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));
     css.replace(QStringLiteral("@fontSizeLarge@"), QString::number(t.fontSizeLarge));
+    css.replace(QStringLiteral("@fontSizeChat@"), QString::number(t.fontSizeChat));
     return css;
 }

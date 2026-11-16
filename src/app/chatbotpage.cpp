@@ -2,6 +2,8 @@
 
 #include "actionspage.h"
 #include "commandspage.h"
+#include "emoteimages.h"
+#include "symbols.h"
 #include "timerspage.h"
 #include "headerbar.h"
 #include "listdetailpage.h"
@@ -12,9 +14,13 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QHeaderView>
+#include <QHelpEvent>
+#include <QImageReader>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
@@ -26,7 +32,9 @@
 #include <QStandardItemModel>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QTimer>
 #include <QToolButton>
+#include <QToolTip>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -69,35 +77,90 @@ constexpr int kChatBadgesRole = Qt::UserRole + 1;
 constexpr int kChatNameRole = Qt::UserRole + 2;
 constexpr int kChatColorRole = Qt::UserRole + 3;
 constexpr int kChatTextRole = Qt::UserRole + 4;
+constexpr int kChatSegmentsRole = Qt::UserRole + 5; // QList<dss::ChatSegment> (P14 Emotes em-6)
+constexpr int kChatPlatformRole = Qt::UserRole + 6; // dss::ChatPlatform als int
 
-QTreeWidgetItem *chatItem(const dss::ChatRow &row)
+// Takt der Animation (Plan P14 Emotes, «Annahmen»: 30 ms mit gemeinsamer Uhr)
+constexpr int kEmoteTickMs = 30;
+// Abstand zwischen Emote und Text bzw. Symbol und Abzeichen: 4 px wie zwischen den Abzeichen
+constexpr int kChatGap = 4;
+
+// Höhe des Kastens für YouTube im Verhältnis zum Symbol selbst: Die Datei youtube-farbig.svg
+// enthält den Schutzraum (viewBox 602,187 × 515,868, das Symbol selbst von y 119,168 bis
+// 396,570); so wirkt es so gross wie das Twitch-Symbol, ohne die Datei zu ändern.
+constexpr double kYouTubeBoxFactor = 515.868 / (396.570 - 119.168);
+
+void fillChatItem(QTreeWidgetItem *item, const dss::ChatRow &row)
 {
     // Angezeigter Text auch als Text der Zelle (Suche, Tooltip, Tests); gezeichnet vom Delegaten
     const QString message = row.name.isEmpty() ? row.text : row.name + QStringLiteral(": ") + row.text;
-    auto *item = new QTreeWidgetItem(QStringList{row.time, message});
+    item->setText(0, row.time);
+    item->setText(1, message);
     for (int column = 0; column < 2; ++column)
         item->setData(column, kChatEventRole, row.isEvent);
     item->setData(1, kChatBadgesRole, row.badges);
     item->setData(1, kChatNameRole, row.name);
     item->setData(1, kChatColorRole, row.color);
     item->setData(1, kChatTextRole, row.text);
+    item->setData(1, kChatSegmentsRole, QVariant::fromValue(row.segments));
+    item->setData(1, kChatPlatformRole, int(row.platform));
+}
+
+QTreeWidgetItem *chatItem(const dss::ChatRow &row)
+{
+    auto *item = new QTreeWidgetItem;
+    fillChatItem(item, row);
     return item;
 }
+
+// Ein Stück der gezeichneten Nachricht: Text oder ein Emote; mit Zero-Width-Emotes darüber
+// mehrere Bilder, mittig übereinander, Breite die grösste.
+struct ChatPiece
+{
+    QString text;
+    QList<dss::Emote> emotes;
+    QList<const QImage *> images; // gilt nur während paint bzw. helpEvent (EmoteImages::frame)
+    int x = 0;
+    int width = 0;
+
+    bool isEmote() const { return !images.isEmpty(); }
+};
 
 // Zeilen «Chat»: graue Ereigniszeilen (chatEventRow), Abzeichen in badgeBot/badgeChannel/badgeMod,
 // Name in der Chatfarbe der Zeile. Wie ForegroundDelegate (panels.h) selbst gezeichnet, weil das Stylesheet
 // Text- und Hintergrundfarbe aus den Rollen überdeckt. Farben nur aus dem Theme und der Chatfarbe.
+// P14 Emotes em-6: vor einer Nachricht das farbige Symbol der Plattform, danach die Abschnitte
+// (Text und Emotes). Ein Emote ohne Bild bleibt sein Name als Text. Jede Zeile hält den Platz
+// des Symbols frei, auch ohne Symbol (Entscheid des Nutzers 2026-11-16): Namen und Texte der
+// Ereigniszeilen stehen bündig in einer Spalte.
 class ChatRowDelegate : public QStyledItemDelegate
 {
 public:
-    ChatRowDelegate(const Theme &theme, QObject *parent) : QStyledItemDelegate(parent), m_theme(theme) {}
+    // clock und images gehören der Seite; *images = nullptr heisst nur Text.
+    ChatRowDelegate(const Theme &theme, const QElapsedTimer *clock, const dss::EmoteImages *const *images,
+                    QObject *parent)
+        : QStyledItemDelegate(parent), m_theme(theme), m_clock(clock), m_images(images)
+    {
+    }
+
+    // Jede Zeile gleich hoch (setUniformRowHeights): mindestens ein Emote plus die Polsterung
+    // des Stylesheets (#chatBotChat::item), die der Stil schon um die Textzeile legt.
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QSize size = QStyledItemDelegate::sizeHint(option, index);
+        QStyleOptionViewItem opt(option);
+        initStyleOption(&opt, index);
+        const int padding = size.height() - opt.fontMetrics.height();
+        size.setHeight(qMax(size.height(), dss::kEmoteHeight + padding));
+        return size;
+    }
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         const bool event = index.data(kChatEventRole).toBool();
         if (event && !option.state.testFlag(QStyle::State_Selected))
             painter->fillRect(option.rect, m_theme.chatEventRow);
-        if (event || index.column() == 0) {
+        if (index.column() == 0) {
             QStyledItemDelegate::paint(painter, option, index);
             return;
         }
@@ -105,50 +168,257 @@ public:
         initStyleOption(&opt, index);
         const QWidget *widget = opt.widget;
         QStyle *style = widget ? widget->style() : QApplication::style();
-        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
-        const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
-        const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
-                                   .adjusted(margin, 0, -margin, 0);
+        const Layout layout = layoutRow(opt, index);
         opt.text.clear();
         style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
 
         painter->save();
-        painter->setClipRect(textRect);
+        painter->setClipRect(layout.textRect);
         painter->setRenderHint(QPainter::Antialiasing);
-        const QFontMetrics &fm = opt.fontMetrics;
-        const int height = fm.height();
-        const int top = textRect.top() + (textRect.height() - height) / 2;
-        int x = textRect.left();
+        const QRect &textRect = layout.textRect;
+        // Symbol unverändert (nicht eingefärbt, Seitenverhältnis der Datei), mittig in der Zeile
+        if (!layout.symbol.isNull())
+            painter->drawImage(QPoint(textRect.left(), textRect.top() + (textRect.height() - layout.symbol.height()) / 2),
+                               layout.symbol);
         // Abzeichen: Kästchen mit Rundung 4 px wie die Listen, Innenabstand 4 px, Abstand 4 px
-        QFont badgeFont = opt.font;
-        badgeFont.setBold(true);
-        const QFontMetrics badgeMetrics(badgeFont);
-        painter->setFont(badgeFont);
-        for (const QString &badge : index.data(kChatBadgesRole).toStringList()) {
-            const QRect box(x, top, badgeMetrics.horizontalAdvance(badge) + 8, height);
+        painter->setFont(layout.badgeFont);
+        for (const auto &[box, badge] : layout.badges) {
             painter->setPen(Qt::NoPen);
             painter->setBrush(badgeColor(badge));
             painter->drawRoundedRect(box, 4, 4);
             painter->setPen(m_theme.text);
             painter->drawText(box, Qt::AlignCenter, badge);
-            x = box.right() + 1 + 4;
         }
         // Name fett in der Chatfarbe (leer = Text), danach die Nachricht
-        const QString name = index.data(kChatNameRole).toString() + QStringLiteral(": ");
         const QColor nameColor(index.data(kChatColorRole).toString());
         painter->setPen(nameColor.isValid() ? nameColor : m_theme.text);
-        painter->drawText(QRect(x, textRect.top(), textRect.right() - x + 1, textRect.height()),
-                          Qt::AlignLeft | Qt::AlignVCenter, name);
-        x += badgeMetrics.horizontalAdvance(name);
+        painter->drawText(QRect(layout.nameX, textRect.top(), textRect.right() - layout.nameX + 1, textRect.height()),
+                          Qt::AlignLeft | Qt::AlignVCenter, layout.name);
         painter->setFont(opt.font);
         painter->setPen(m_theme.text);
-        const QRect rest(x, textRect.top(), textRect.right() - x + 1, textRect.height());
-        painter->drawText(rest, Qt::AlignLeft | Qt::AlignVCenter,
-                          fm.elidedText(index.data(kChatTextRole).toString(), Qt::ElideRight, rest.width()));
+        for (const ChatPiece &piece : layout.pieces) {
+            if (!piece.isEmote()) {
+                painter->drawText(QRect(piece.x, textRect.top(), textRect.right() - piece.x + 1, textRect.height()),
+                                  Qt::AlignLeft | Qt::AlignVCenter, piece.text);
+                continue;
+            }
+            for (const QImage *image : piece.images)
+                painter->drawImage(QPoint(piece.x + (piece.width - image->width()) / 2,
+                                          textRect.top() + (textRect.height() - image->height()) / 2),
+                                   *image);
+        }
+        if (layout.ellipsisX >= 0)
+            painter->drawText(QRect(layout.ellipsisX, textRect.top(), textRect.right() - layout.ellipsisX + 1,
+                                    textRect.height()),
+                              Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("…"));
         painter->restore();
     }
 
+    // Tooltip über einem Emote: «<Name> (<Anbieter>)» aus dss::emoteToolTip, bei Zero-Width eine
+    // Zeile je Emote; sonst wie bisher der Text der Zelle.
+    bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option,
+                   const QModelIndex &index) override
+    {
+        if (event->type() == QEvent::ToolTip && index.column() == 1 && !index.data(kChatEventRole).toBool()) {
+            QStyleOptionViewItem opt(option);
+            initStyleOption(&opt, index);
+            const Layout layout = layoutRow(opt, index);
+            for (const ChatPiece &piece : layout.pieces) {
+                if (!piece.isEmote() || event->pos().x() < piece.x || event->pos().x() >= piece.x + piece.width)
+                    continue;
+                QStringList tips;
+                for (const dss::Emote &emote : piece.emotes)
+                    tips.append(dss::emoteToolTip(emote));
+                QToolTip::showText(event->globalPos(), tips.join(QLatin1Char('\n')), view);
+                return true;
+            }
+        }
+        return QStyledItemDelegate::helpEvent(event, view, option, index);
+    }
+
 private:
+    struct Layout
+    {
+        QRect textRect;
+        QImage symbol;
+        QFont badgeFont;
+        QList<QPair<QRect, QString>> badges;
+        int nameX = 0;
+        QString name;
+        QList<ChatPiece> pieces;
+        int ellipsisX = -1; // «…» an Stelle eines Emotes, das nicht mehr ganz passt
+    };
+
+    // Lage aller Teile einer Nachricht; gemeinsam für paint und helpEvent.
+    Layout layoutRow(const QStyleOptionViewItem &opt, const QModelIndex &index) const
+    {
+        Layout layout;
+        const QWidget *widget = opt.widget;
+        QStyle *style = widget ? widget->style() : QApplication::style();
+        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
+        const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
+        layout.textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
+                              .adjusted(margin, 0, -margin, 0);
+        const QRect &textRect = layout.textRect;
+        const QFontMetrics &fm = opt.fontMetrics;
+        const int height = fm.height();
+        const int top = textRect.top() + (textRect.height() - height) / 2;
+        int x = textRect.left();
+
+        // Graue Ereigniszeile: ohne Symbol, Abzeichen und Namen, nur der Text der Zelle
+        const bool event = index.data(kChatEventRole).toBool();
+        if (!event)
+            layout.symbol = platformSymbol(dss::ChatPlatform(index.data(kChatPlatformRole).toInt()), height);
+        x += symbolColumn(height);
+
+        layout.badgeFont = opt.font;
+        layout.badgeFont.setBold(true);
+        layout.nameX = x;
+        QList<dss::ChatSegment> segments;
+        if (event) {
+            segments.append(dss::ChatSegment{index.data(Qt::DisplayRole).toString(), std::nullopt});
+        } else {
+            const QFontMetrics badgeMetrics(layout.badgeFont);
+            for (const QString &badge : index.data(kChatBadgesRole).toStringList()) {
+                const QRect box(x, top, badgeMetrics.horizontalAdvance(badge) + 8, height);
+                layout.badges.append({box, badge});
+                x = box.right() + 1 + kChatGap;
+            }
+            layout.nameX = x;
+            layout.name = index.data(kChatNameRole).toString() + QStringLiteral(": ");
+            x += badgeMetrics.horizontalAdvance(layout.name);
+            segments = index.data(kChatSegmentsRole).value<QList<dss::ChatSegment>>();
+            if (segments.isEmpty())
+                segments.append(dss::ChatSegment{index.data(kChatTextRole).toString(), std::nullopt});
+        }
+        QList<ChatPiece> pieces = chatPieces(segments);
+
+        // Eine Zeile wie bisher: Text mit «…» gekürzt; ein Emote, das nicht ganz passt, fällt weg
+        // und an seiner Stelle steht «…».
+        const int right = textRect.right() + 1;
+        for (int i = 0; i < pieces.size(); ++i) {
+            ChatPiece &piece = pieces[i];
+            if (i > 0 && (piece.isEmote() || pieces.at(i - 1).isEmote()))
+                x += kChatGap;
+            piece.width = piece.isEmote() ? 0 : fm.horizontalAdvance(piece.text);
+            for (const QImage *image : std::as_const(piece.images))
+                piece.width = qMax(piece.width, image->width());
+            piece.x = x;
+            if (x + piece.width > right) {
+                if (piece.isEmote()) {
+                    layout.ellipsisX = x;
+                    pieces.resize(i);
+                } else {
+                    piece.text = fm.elidedText(piece.text, Qt::ElideRight, right - x);
+                    piece.width = fm.horizontalAdvance(piece.text);
+                    pieces.resize(i + 1);
+                }
+                break;
+            }
+            x += piece.width;
+        }
+        layout.pieces = pieces;
+        return layout;
+    }
+
+    // Abschnitte → Stücke. Emote mit Bild: eigenes Stück; ohne Bild der Name als Text. Ein
+    // Zero-Width-Emote liegt über dem letzten Emote, wenn dazwischen nur Leerzeichen stehen (die
+    // fallen dann weg). Neben einem Emote ersetzt der feste Abstand kChatGap ein Leerzeichen.
+    QList<ChatPiece> chatPieces(const QList<dss::ChatSegment> &segments) const
+    {
+        QList<ChatPiece> pieces;
+        const qint64 elapsed = m_clock->elapsed();
+        int lastEmote = -1;
+        for (const dss::ChatSegment &segment : segments) {
+            const QImage *image = segment.emote && *m_images
+                                      ? (*m_images)->frame(chatEmoteImageKey(*segment.emote), elapsed)
+                                      : nullptr;
+            if (!image) {
+                if (!pieces.isEmpty() && !pieces.last().isEmote())
+                    pieces.last().text += segment.text;
+                else
+                    pieces.append(ChatPiece{segment.text, {}, {}});
+                if (!segment.text.trimmed().isEmpty())
+                    lastEmote = -1;
+                continue;
+            }
+            if (segment.emote->zeroWidth && lastEmote >= 0) {
+                pieces.resize(lastEmote + 1);
+                pieces[lastEmote].emotes.append(*segment.emote);
+                pieces[lastEmote].images.append(image);
+                continue;
+            }
+            pieces.append(ChatPiece{{}, {*segment.emote}, {image}});
+            lastEmote = int(pieces.size()) - 1;
+        }
+        for (int i = 0; i < pieces.size(); ++i) {
+            ChatPiece &piece = pieces[i];
+            if (piece.isEmote())
+                continue;
+            if (i > 0 && pieces.at(i - 1).isEmote() && piece.text.startsWith(QLatin1Char(' ')))
+                piece.text.remove(0, 1);
+            if (i + 1 < pieces.size() && pieces.at(i + 1).isEmote() && piece.text.endsWith(QLatin1Char(' ')))
+                piece.text.chop(1);
+        }
+        pieces.removeIf([](const ChatPiece &piece) { return !piece.isEmote() && piece.text.isEmpty(); });
+        return pieces;
+    }
+
+    // Farbiges Symbol der Plattform (Nachtrag Plattform-Symbol im Plan): Datei über symbolPath
+    // (zuerst der Ordner des Nutzers), unverändert gezeichnet, Seitenverhältnis der Datei, so hoch
+    // wie die Textzeile; YouTube im grösseren Kasten (kYouTubeBoxFactor). Leer ohne Plattform.
+    QImage platformSymbol(dss::ChatPlatform platform, int height) const
+    {
+        if (platform == dss::ChatPlatform::None)
+            return {};
+        const double factor = platform == dss::ChatPlatform::YouTube ? kYouTubeBoxFactor : 1.0;
+        const int boxHeight = qRound(height * factor);
+        Symbol &cached = m_symbols[int(platform)];
+        if (cached.height == boxHeight)
+            return cached.image;
+        cached.height = boxHeight;
+        cached.image = QImage();
+        const QString path = symbolPath(symbolFile(platform));
+        QImageReader reader(path);
+        const QSize size = reader.size();
+        if (size.isValid()) {
+            reader.setScaledSize(size.scaled(QSize(boxHeight * 4, boxHeight), Qt::KeepAspectRatio));
+            cached.image = reader.read();
+        }
+        if (cached.image.isNull())
+            qWarning("Symbol nicht lesbar: %s", qPrintable(path));
+        return cached.image;
+    }
+
+    static QString symbolFile(dss::ChatPlatform platform)
+    {
+        switch (platform) {
+        case dss::ChatPlatform::None:
+            break;
+        case dss::ChatPlatform::Twitch:
+            return QStringLiteral("twitch-farbig.svg");
+        case dss::ChatPlatform::YouTube:
+            return QStringLiteral("youtube-farbig.svg");
+        }
+        return {};
+    }
+
+    // Breite der Symbolspalte, die jede Zeile freihält: das breiteste Symbol der Plattformen,
+    // deren Datei es gibt (youtube-farbig.svg erst mit der Anbindung), plus Abstand. Neu nur bei
+    // anderer Höhe, nicht bei jedem Zeichnen.
+    int symbolColumn(int height) const
+    {
+        if (m_symbolColumn.height != height) {
+            int width = 0;
+            for (const dss::ChatPlatform platform : {dss::ChatPlatform::Twitch, dss::ChatPlatform::YouTube}) {
+                if (QFileInfo::exists(symbolPath(symbolFile(platform))))
+                    width = qMax(width, platformSymbol(platform, height).width());
+            }
+            m_symbolColumn = {height, width > 0 ? width + kChatGap : 0};
+        }
+        return m_symbolColumn.width;
+    }
+
     QColor badgeColor(const QString &badge) const
     {
         // Texte der Abzeichen aus dss::chatRow (chatbotlive.cpp)
@@ -159,10 +429,30 @@ private:
         return m_theme.badgeChannel;
     }
 
+    struct Symbol
+    {
+        int height = -1;
+        QImage image;
+    };
+    struct SymbolColumn
+    {
+        int height = -1;
+        int width = 0;
+    };
+
     Theme m_theme;
+    const QElapsedTimer *m_clock;
+    const dss::EmoteImages *const *m_images;
+    mutable QHash<int, Symbol> m_symbols; // je Plattform, neu nur bei anderer Höhe
+    mutable SymbolColumn m_symbolColumn;
 };
 
 } // namespace
+
+QString chatEmoteImageKey(const dss::Emote &emote)
+{
+    return dss::emoteImageUrl(emote, true, dss::EmoteImages::webpAvailable()).toString();
+}
 
 ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent), m_theme(theme)
 {
@@ -302,8 +592,16 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_chat->setSelectionMode(QAbstractItemView::SingleSelection);
     m_chat->setFocusPolicy(Qt::NoFocus);
     m_chat->header()->setStretchLastSection(true);
-    m_chat->setColumnWidth(0, digit * 10);
-    m_chat->setItemDelegate(new ChatRowDelegate(m_theme, m_chat));
+    // P14 Emotes em-6: Schrift der Liste aus dem Stylesheet (#chatBotChat, Theme fontSizeChat);
+    // die Breite der Zeitspalte setzt eventFilter, sobald die Schrift gilt
+    m_emoteClock.start();
+    m_chat->setItemDelegate(new ChatRowDelegate(m_theme, &m_emoteClock, &m_emoteImages, m_chat));
+    // Gemeinsamer Takt: nur neu zeichnen, die Bilder wählt der Delegat nach der Uhr
+    m_emoteTimer = new QTimer(this);
+    m_emoteTimer->setObjectName(QStringLiteral("chatBotEmoteTimer"));
+    m_emoteTimer->setInterval(kEmoteTickMs);
+    connect(m_emoteTimer, &QTimer::timeout, m_chat->viewport(), qOverload<>(&QWidget::update));
+    m_chat->installEventFilter(this);
 
     m_chatAccount = new QComboBox;
     m_chatAccount->setObjectName(QStringLiteral("chatBotChatAccount"));
@@ -425,7 +723,48 @@ void ChatBotPage::resetChat(const QList<dss::ChatRow> &rows)
 
 void ChatBotPage::appendChat(const dss::RowsAppend &change, const dss::ChatRow &row)
 {
+    // Echo der eigenen Nachricht: dieselbe Zeile mit neuen Abschnitten und Chatfarbe
+    if (change.changed >= 0) {
+        if (QTreeWidgetItem *item = m_chat->topLevelItem(change.changed))
+            fillChatItem(item, row);
+    }
     appendItem(m_chat, change.removedFront, change.appended ? chatItem(row) : nullptr);
+}
+
+void ChatBotPage::setEmoteImages(const dss::EmoteImages *images)
+{
+    m_emoteImages = images; // liest der Delegat
+    emoteImagesChanged();
+}
+
+void ChatBotPage::emoteImagesChanged()
+{
+    refreshEmoteTimer();
+    m_chat->viewport()->update();
+}
+
+void ChatBotPage::refreshEmoteTimer()
+{
+    // isVisible: Modul «Chat-Bot», Unterreiter «Live» und das Fenster sind sichtbar
+    const bool run = m_emoteImages && m_emoteImages->hasAnimated() && m_chat->isVisible();
+    if (run && !m_emoteTimer->isActive())
+        m_emoteTimer->start();
+    else if (!run)
+        m_emoteTimer->stop();
+}
+
+bool ChatBotPage::eventFilter(QObject *watched, QEvent *event)
+{
+    // Show und Hide kommen auch, wenn ein Elternteil (Unterreiter, Modul, Fenster) wechselt
+    if (watched == m_chat && event->type() == QEvent::Show)
+        refreshEmoteTimer();
+    else if (watched == m_chat && event->type() == QEvent::Hide)
+        m_emoteTimer->stop();
+    // Zeitspalte in Ziffern der Schrift der Liste: Das Stylesheet setzt sie erst beim Polieren
+    // (FontChange), im Konstruktor gilt noch die Schrift der Anwendung. Polish ohne Stylesheet.
+    else if (watched == m_chat && (event->type() == QEvent::Polish || event->type() == QEvent::FontChange))
+        m_chat->setColumnWidth(0, m_chat->fontMetrics().horizontalAdvance(QLatin1Char('0')) * 10);
+    return QWidget::eventFilter(watched, event);
 }
 
 void ChatBotPage::setChatSend(const dss::ChatSendView &view)
