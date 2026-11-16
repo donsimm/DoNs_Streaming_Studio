@@ -24,3 +24,6 @@ libqt6websockets6 6.8.2-3
 # libpipewire-0.3-dev installiert vom Nutzer für P12b b1).
 libswresample-dev 7:7.1.5-0+deb13u1
 libpipewire-0.3-dev 1.4.2-1
+# Seit P14 Emotes em-5: dss-app dekodiert Emotes von BTTV und 7TV als WebP (Laufzeit-Plugin
+# libqwebp.so). Gemessen 2026-11-16 mit dpkg-query (installiert vom Nutzer für P14 Emotes).
+qt6-image-formats-plugins 6.8.2-4

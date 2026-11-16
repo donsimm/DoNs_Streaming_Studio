@@ -164,6 +164,14 @@ if(DSS_BUILD_APP)
   add_test(NAME tst_fonts COMMAND tst_fonts)
   set_tests_properties(tst_fonts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+  # P14 Emotes em-5: Bilder dekodieren und gemeinsamer Takt, ohne Fenster. Testbilder macht der
+  # Test selbst (PNG und WebP mit QImageWriter, GIF89a von Hand), keine fremden Bilder im Repo.
+  qt_add_executable(tst_emotebilder tst_emotebilder.cpp ${PROJECT_SOURCE_DIR}/src/app/emoteimages.cpp)
+  target_include_directories(tst_emotebilder PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
+  target_link_libraries(tst_emotebilder PRIVATE dss_common dss_warnings Qt6::Gui Qt6::Test)
+  add_test(NAME tst_emotebilder COMMAND tst_emotebilder)
+  set_tests_properties(tst_emotebilder PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
   # Symbole einfarbig (P06, Punkt 28), in der X11-Sitzung; ohne X11 übersprungen (77).
   qt_add_executable(tst_symbols tst_symbols.cpp ${PROJECT_SOURCE_DIR}/src/app/symbols.cpp)
   target_include_directories(tst_symbols PRIVATE ${PROJECT_SOURCE_DIR}/src/app)
