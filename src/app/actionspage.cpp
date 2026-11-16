@@ -57,6 +57,7 @@ QTreeWidget *detailTree(const QString &objectName, const QString &accessibleName
     tree->setHeaderHidden(true);
     tree->setColumnCount(2);
     tree->setSelectionMode(QAbstractItemView::SingleSelection);
+    tree->setUniformRowHeights(true);
     tree->setIndentation(14);
     tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
@@ -119,6 +120,7 @@ ActionsPage::ActionsPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_tree->setHeaderHidden(true);
     m_tree->setColumnCount(2);
     m_tree->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_tree->setUniformRowHeights(true);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tree->setIndentation(14);
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
