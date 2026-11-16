@@ -117,7 +117,7 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Tests: `tst_fensterchatbot` (fünf Unterreiter in der Reihenfolge; `ListDetailPage`: Spalten, Kästchen sendet `enabledToggled`, nicht beim Füllen; Auswahl bleibt beim Neufüllen; Wechsel ohne neue Widgets). `scripts/testen.sh -R '^tst_fensterchatbot$'`.
   - Handtest: H1.
 
-- [ ] **e3-5 «Befehle».** Schreibt neu `src/app/commandspage.{h,cpp}` (Formular rechts, setzt `ListDetailPage` ein), `chatbotpage.cpp`, `mainwindow.cpp` (Zeilen, Bearbeitungen, Rückfragen, Testen, «Öffnen», Variablen holen beim Zeigen des Unterreiters und nach `actions.run_finished`, solange er sichtbar ist).
+- [x] **e3-5 «Befehle».** Schreibt neu `src/app/commandspage.{h,cpp}` (Formular rechts, setzt `ListDetailPage` ein), `chatbotpage.cpp`, `mainwindow.cpp` (Zeilen, Bearbeitungen, Rückfragen, Testen, «Öffnen», Variablen holen beim Zeigen des Unterreiters und nach `actions.run_finished`, solange er sichtbar ist).
   - Checkliste:
     - Links «Befehle», rechts `commandTitle()`; ohne Auswahl «Kein Befehl gewählt».
     - Suchfeld wie oben; Filter `QComboBox` aus `commandGroupChoices()`/`commandGroupLabel()` («Alle Gruppen»).

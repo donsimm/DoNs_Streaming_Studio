@@ -1,6 +1,7 @@
 #include "chatbotpage.h"
 
 #include "actionspage.h"
+#include "commandspage.h"
 #include "headerbar.h"
 #include "listdetailpage.h"
 #include "panels.h"
@@ -203,6 +204,7 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_pages = new QStackedWidget(this);
     column->addWidget(m_pages, 1);
     connect(m_tabs, &QButtonGroup::idClicked, m_pages, &QStackedWidget::setCurrentIndex);
+    connect(m_pages, &QStackedWidget::currentChanged, this, &ChatBotPage::subTabChanged);
 
     // P14 e2-12: Bereiche mit verschiebbaren Teilern (QSplitter::handle im Theme wie der Teiler
     // der Docks), keiner lässt sich ganz zuschieben (wie ActionsPage).
@@ -336,26 +338,12 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     addSubTab(QStringLiteral("Aktionen"), m_actions);
 
     // P14 e3-4: «Befehle» und «Zeitnachrichten» als Tabelle links, Gewähltes rechts. Spalten aus
-    // CommandRow bzw. TimerRow (actionview.h), Breiten in Ziffern der Schrift.
-    ListDetailPage::Setup commands;
-    commands.name = QStringLiteral("commands");
-    commands.listTitle = QStringLiteral("Befehle");
-    commands.detailTitle = QStringLiteral("Befehl");
-    commands.emptyHint = QStringLiteral("Kein Befehl gewählt");
-    commands.tableName = QStringLiteral("Befehle");
-    commands.columns = {{QStringLiteral("Aktiv"), 8},         {QStringLiteral("Auslöser"), 18},
-                        {QStringLiteral("Gruppe"), 12},       {QStringLiteral("Wer darf"), 18},
-                        {QStringLiteral("Abkl. Kanal"), 13},  {QStringLiteral("Abkl. Person"), 14},
-                        {QStringLiteral("Aktionen"), 20},     {QStringLiteral("Benutzt"), 0}};
-    commands.search = true;
-    commands.searchName = QStringLiteral("Befehle suchen");
-    commands.filter = true;
-    commands.filterName = QStringLiteral("Gruppe der Befehle");
-    commands.addTip = QStringLiteral("Befehl hinzufügen");
-    commands.copyTip = QStringLiteral("Befehl kopieren");
-    commands.removeTip = QStringLiteral("Befehl löschen");
-    commands.listHint = true;
-    m_commands = new ListDetailPage(m_theme, commands, m_pages);
+    // CommandRow bzw. TimerRow (actionview.h), Breiten in Ziffern der Schrift. P14 e3-5: Aufbau und
+    // Formular von «Befehle» in commandspage.h.
+    m_commands = new ListDetailPage(m_theme, commandsPageSetup(), m_pages);
+    m_commandForm = new CommandForm;
+    m_commands->setDetailForm(m_commandForm);
+    m_commands->setDetailBar(m_commandForm->testBar());
     addSubTab(QStringLiteral("Befehle"), m_commands);
 
     ListDetailPage::Setup timers;

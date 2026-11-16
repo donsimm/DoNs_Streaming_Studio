@@ -120,6 +120,7 @@ ListDetailPage::ListDetailPage(const Theme &theme, const Setup &setup, QWidget *
     auto *detailColumn = new QVBoxLayout(detail);
     detailColumn->setContentsMargins(0, 0, 0, 0);
     detailColumn->setSpacing(0);
+    m_detailColumn = detailColumn;
     auto *scroll = new QScrollArea(detail);
     scroll->setObjectName(setup.name + QStringLiteral("Scroll"));
     scroll->setWidgetResizable(true);
@@ -247,9 +248,24 @@ void ListDetailPage::setDetailForm(QWidget *form)
         m_detailPages->addWidget(m_form);
 }
 
+void ListDetailPage::setDetailBar(QWidget *bar)
+{
+    if (m_detailBar) {
+        m_detailColumn->removeWidget(m_detailBar);
+        m_detailBar->deleteLater();
+    }
+    m_detailBar = bar;
+    if (m_detailBar) {
+        m_detailColumn->addWidget(m_detailBar);
+        m_detailBar->setVisible(detailShown());
+    }
+}
+
 void ListDetailPage::showDetail(bool show)
 {
     m_detailPages->setCurrentIndex(show && m_form ? 1 : 0);
+    if (m_detailBar)
+        m_detailBar->setVisible(detailShown());
 }
 
 bool ListDetailPage::detailShown() const

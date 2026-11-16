@@ -244,6 +244,7 @@ void MainWindow::onModuleSelected(int module)
         docks.at(i)->setVisible(next.at(i));
     // Im Reiter «Chat-Bot» kein Dock über das Menü einblenden.
     m_docksMenu->setEnabled(editor);
+    requestShownVariables();
 }
 
 QList<QDockWidget *> MainWindow::editorDocks() const
@@ -571,13 +572,8 @@ void MainWindow::connectChatBot()
         m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kActionRunCancel),
                                    QJsonObject{{QStringLiteral("run_id"), runId.toString(QUuid::WithoutBraces)}}});
     });
-    // «Im Editor öffnen»: Unterreiter «Aktionen», die Aktion im Baum gewählt (steht sie wegen der
-    // Suche nicht da, wird die Suche geleert).
-    connect(m_chatBot, &ChatBotPage::openActionClicked, this, [this](const QUuid &id) {
-        m_chatBot->setCurrentSubTab(ChatBotPage::Actions);
-        if (!m_chatBot->actionsPage()->selectAction(id) && !m_chatBot->actionsPage()->searchText().isEmpty())
-            m_chatBot->actionsPage()->clearSearch();
-    });
+    // «Im Editor öffnen»: Unterreiter «Aktionen», die Aktion im Baum gewählt
+    connect(m_chatBot, &ChatBotPage::openActionClicked, this, &MainWindow::openAction);
     // P14 e2-13: «Chat-Nachrichten ausblenden» füllt nur die Liste «Ereignisse» neu.
     connect(m_chatBot, &ChatBotPage::hideChatToggled, this, [this](bool hideChat) {
         m_eventRows.setHideChat(hideChat);
@@ -606,6 +602,14 @@ void MainWindow::connectChatBot()
     refreshChatSend();
     m_client->subscribeEvents(dss::chatBotLiveFilters());
     connectActions();
+    connectCommands();
+}
+
+void MainWindow::openAction(const QUuid &actionId)
+{
+    m_chatBot->setCurrentSubTab(ChatBotPage::Actions);
+    if (!m_chatBot->actionsPage()->selectAction(actionId) && !m_chatBot->actionsPage()->searchText().isEmpty())
+        m_chatBot->actionsPage()->clearSearch();
 }
 
 void MainWindow::connectActions()

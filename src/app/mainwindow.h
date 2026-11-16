@@ -3,6 +3,7 @@
 #include "actionspage.h"
 #include "actionview.h"
 #include "canvasedit.h"
+#include "commandspage.h"
 #include "connectionstate.h"
 #include "docks.h"
 #include "theme.h"
@@ -130,6 +131,25 @@ private:
     void startActionTest();
     void askRenameActionGroup(const QString &group);
     void askRemoveActionGroup(const QString &group);
+    // Unterreiter «Aktionen» mit der Aktion gewählt (steht sie wegen der Suche nicht da, wird die
+    // Suche geleert); aus «Läufe der Aktionen» und «Befehle».
+    void openAction(const QUuid &actionId);
+    // P14 e3-5: Unterreiter «Befehle» (mainwindowcommands.cpp). Bearbeitungen gehen nacheinander an
+    // den Kern wie bei «Aktionen»; Prüfmeldungen unter dem Abschnitt des Formulars.
+    void connectCommands();
+    void refreshCommandList();
+    // resetFields wie refreshActionDetail
+    void refreshCommandDetail(bool resetFields = false);
+    void refreshCommandTest();
+    void runCommandEdits(const dss::EditResult &result, const QString &savedName,
+                         CommandForm::Section section = CommandForm::NoSection, bool deleted = false);
+    void sendNextCommandEdit();
+    // Bearbeitung des gezeigten Befehls: change ändert eine Kopie des Befehls aus dem Kern (putCommand)
+    void editShownCommand(CommandForm::Section section, const std::function<void(dss::actions::Command &)> &change);
+    void startCommandTest(int userIndex);
+    void sendNextCommandTest();
+    // Variablen holen, solange «Befehle» sichtbar ist (Spalte «Benutzt»)
+    void requestShownVariables();
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -265,6 +285,16 @@ private:
     qint64 m_actionTestRequest = 0;     // offene Anfrage action_test
     QString m_actionTestName;
     bool m_actionTestReal = false;
+    // P14 e3-5: «Befehle», wie die Bearbeitungen der Aktionen
+    QList<dss::ActionsEdit> m_commandEdits;
+    qint64 m_commandEditRequest = 0;
+    QString m_commandEditSaved;
+    QUuid m_commandEditCreated;
+    CommandForm::Section m_commandEditSection = CommandForm::NoSection;
+    bool m_commandEditDeleted = false;
+    QList<dss::ActionsEdit> m_commandTests; // noch zu schickende action_test von «▶ Testen als …»
+    qint64 m_commandTestRequest = 0;
+    QString m_commandTestName;
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

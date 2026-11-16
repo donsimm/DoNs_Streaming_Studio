@@ -6,6 +6,7 @@
 // P14 e2-13: Bereich «Chat» (Zeilen über test_event, Senden gegen den Twitch-Testserver, nie Twitch)
 // und «Chat-Nachrichten ausblenden».
 // P14 e2-14: «Aktionen» links (Suche, Baum, Leiste, Gruppen umbenennen und löschen).
+// P14 e3-5: «Befehle» (Zeilen, Filter, Kästchen, Formular, Prüfmeldung, Löschen, «Öffnen», Testen).
 
 #include "actionfields.h"
 #include "actionfieldspanel.h"
@@ -13,6 +14,7 @@
 #include "actionmodel.h"
 #include "actionspage.h"
 #include "chatbotpage.h"
+#include "commandspage.h"
 #include "coreclient.h"
 #include "listdetailpage.h"
 #include "mainwindow.h"
@@ -38,9 +40,11 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalSpy>
+#include <QSpinBox>
 #include <QStandardItemModel>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -370,10 +374,16 @@ private slots:
     {
         auto *chatBot = child<ChatBotPage>("chatBotPage");
         QVERIFY(chatBot);
-        ListDetailPage *commands = chatBot->commandsPage();
-        QVERIFY(commands && commands->objectName() == QStringLiteral("commandsPage"));
+        QVERIFY(chatBot->commandsPage() && chatBot->commandsPage()->objectName() == QStringLiteral("commandsPage"));
         QTest::mouseClick(child<QToolButton>("chatBotTab2"), Qt::LeftButton);
-        QTRY_VERIFY_WITH_TIMEOUT(commands->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(chatBot->commandsPage()->isVisible(), 3000);
+        // Seit e3-5 füllt das MainWindow die Seite im Fenster; die Bausteine prüft eine eigene Seite
+        // mit demselben Aufbau (commandsPageSetup).
+        ListDetailPage standalone(darkTheme(), commandsPageSetup());
+        standalone.resize(1000, 600);
+        standalone.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&standalone));
+        ListDetailPage *commands = &standalone;
 
         auto *splitter = commands->findChild<QSplitter *>(QStringLiteral("commandsSplitter"));
         QVERIFY(splitter);
@@ -1501,6 +1511,238 @@ private slots:
 
         QTest::mouseClick(child<QToolButton>("actionRemove"), Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!coreAction(a.id), 3000);
+    }
+
+    // P14 e3-5: «Befehle» gegen den Testkern. Zeilen aus commandRows, Filter und Suche, Kästchen
+    // «Aktiv», Formular ohne Neuaufbau, Speichern mit «Gespeichert: <Name>», Prüfmeldung unter dem
+    // Abschnitt und danach der Wert des Kerns, «Öffnen», «▶ Testen als …» im Probelauf, Löschen mit
+    // Rückfrage («Gelöscht: <Name>»).
+    void commandsTab()
+    {
+        auto *chatBot = child<ChatBotPage>("chatBotPage");
+        ListDetailPage *page = chatBot->commandsPage();
+        CommandForm *form = chatBot->commandForm();
+        QVERIFY(page && form);
+        const auto coreCommand = [this](const QUuid &id) -> std::optional<actions::Command> {
+            const std::optional<ActionsConfigInfo> info = m_client->actionsConfig();
+            const actions::Command *c = info && info->config ? info->config->command(id) : nullptr;
+            return c ? std::optional<actions::Command>(*c) : std::nullopt;
+        };
+        const auto status = [this] { return m_window->statusBar()->currentMessage(); };
+
+        actions::Command info;
+        info.id = QUuid::createUuid();
+        info.name = QStringLiteral("DSS-Test Info");
+        info.group = QStringLiteral("Info");
+        info.commands = {QStringLiteral("!info"), QStringLiteral("!i")};
+        info.globalCooldownS = 30;
+        actions::Command game;
+        game.id = QUuid::createUuid();
+        game.name = QStringLiteral("DSS-Test Spiel");
+        game.group = QStringLiteral("Spiele");
+        game.commands = {QStringLiteral("!spiel")};
+        game.enabled = false;
+        for (const actions::Command &c : {info, game}) {
+            const std::optional<ChangeResult> put = request(
+                {QStringLiteral("command_put"), QJsonObject{{QStringLiteral("command"), actions::commandToJson(c)}}});
+            QVERIFY2(put && put->ok, put ? qPrintable(put->message) : "keine Antwort");
+        }
+        actions::Action action;
+        action.id = QUuid::createUuid();
+        action.name = QStringLiteral("DSS-Test Info-Aktion");
+        actions::Trigger trigger = actions::newTrigger(QString::fromLatin1(actions::kTriggerCommand));
+        trigger.fields.insert(QStringLiteral("command_id"), info.id.toString(QUuid::WithoutBraces));
+        action.triggers = {trigger};
+        actions::Step wait = actions::newStep(QString::fromLatin1(actions::kStepDelay));
+        wait.fields.insert(QStringLiteral("value_ms"), 10);
+        action.steps = {wait};
+        const std::optional<ChangeResult> putAction = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(action)}}});
+        QVERIFY2(putAction && putAction->ok, putAction ? qPrintable(putAction->message) : "keine Antwort");
+
+        QTest::mouseClick(child<QToolButton>("chatBotTab2"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        // Beim Zeigen holt das Fenster die Variablen (Spalte «Benutzt»)
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->variables().has_value(), 3000);
+        // «▶ Testen als …» unter dem Bildlauf, ohne Auswahl verborgen (Befund e3-5b)
+        auto *test = page->findChild<QPushButton *>(QStringLiteral("commandTest"));
+        auto *scroll = page->findChild<QScrollArea *>(QStringLiteral("commandsScroll"));
+        QVERIFY(test && scroll);
+        QVERIFY(!scroll->isAncestorOf(test) && !form->isAncestorOf(test));
+        QVERIFY(page->selectedRow().isNull());
+        QVERIFY(!test->isVisible());
+
+        // Zeilen: Spalten aus CommandRow, abgeschaltet grau, Hinweis aus commandListHint
+        auto *table = page->findChild<QTreeWidget *>(QStringLiteral("commandsTable"));
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(table, 1, QStringLiteral("!info, !i")) && findRow(table, 1, QStringLiteral("!spiel")),
+                                 3000);
+        QTreeWidgetItem *infoItem = findRow(table, 1, QStringLiteral("!info, !i"));
+        QCOMPARE(infoItem->text(2), QStringLiteral("Info"));
+        QCOMPARE(infoItem->text(4), QStringLiteral("30 s"));
+        QCOMPARE(infoItem->text(6), QStringLiteral("DSS-Test Info-Aktion"));
+        QTreeWidgetItem *gameItem = findRow(table, 1, QStringLiteral("!spiel"));
+        QCOMPARE(gameItem->checkState(0), Qt::Unchecked);
+        QCOMPARE(gameItem->foreground(1).color(), darkTheme().textDisabled);
+        QCOMPARE(page->hint(), commandListHint(*m_client->actionsConfig()->config));
+        QVERIFY(page->findChild<QToolButton *>(QStringLiteral("commandsAdd"))->isEnabled());
+
+        // Filter «Gruppe» und Suche füllen nur die Tabelle neu
+        auto *filter = page->findChild<QComboBox *>(QStringLiteral("commandsFilter"));
+        QCOMPARE(filter->itemText(0), QStringLiteral("Alle Gruppen"));
+        QVERIFY(filter->findText(QStringLiteral("Spiele")) > 0);
+        filter->setCurrentIndex(filter->findText(QStringLiteral("Spiele")));
+        QTRY_COMPARE_WITH_TIMEOUT(table->topLevelItemCount(), 1, 3000);
+        QCOMPARE(table->topLevelItem(0)->text(1), QStringLiteral("!spiel"));
+        filter->setCurrentIndex(0);
+        auto *search = page->findChild<QLineEdit *>(QStringLiteral("commandsSearch"));
+        search->setText(QStringLiteral("dss-test info"));
+        QTRY_COMPARE_WITH_TIMEOUT(table->topLevelItemCount(), 1, 3000);
+        QCOMPARE(table->topLevelItem(0)->text(1), QStringLiteral("!info, !i"));
+        search->clear();
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(table, 1, QStringLiteral("!spiel")), 3000);
+
+        // Kästchen «Aktiv» → command_put mit enabled
+        findRow(table, 1, QStringLiteral("!spiel"))->setCheckState(0, Qt::Checked);
+        QTRY_VERIFY_WITH_TIMEOUT(coreCommand(game.id) && coreCommand(game.id)->enabled, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: DSS-Test Spiel"), 3000);
+
+        // Auswahl: Titel und Werte; ein Wechsel schafft keine neuen Felder
+        QVERIFY(page->selectRow(info.id));
+        QVERIFY(page->detailShown());
+        QVERIFY(test->isVisible());
+        QVERIFY(test->mapTo(page, QPoint(0, 0)).y() >= scroll->mapTo(page, QPoint(0, scroll->height())).y());
+        QCOMPARE(page->detailTitle(), QStringLiteral("Befehl «!info»"));
+        auto *name = form->findChild<QLineEdit *>(QStringLiteral("commandName"));
+        auto *triggers = form->findChild<QPlainTextEdit *>(QStringLiteral("commandTriggers"));
+        auto *globalCooldown = form->findChild<QSpinBox *>(QStringLiteral("commandGlobalCooldown"));
+        auto *actionChoice = form->findChild<QComboBox *>(QStringLiteral("commandAction"));
+        QVERIFY(name && triggers && globalCooldown && actionChoice);
+        QCOMPARE(name->text(), QStringLiteral("DSS-Test Info"));
+        QCOMPARE(triggers->toPlainText(), QStringLiteral("!info\n!i"));
+        QCOMPARE(globalCooldown->value(), 30);
+        QCOMPARE(globalCooldown->suffix(), QStringLiteral(" s"));
+        QVERIFY(!globalCooldown->keyboardTracking());
+        QCOMPARE(globalCooldown->maximum(), kMaxCooldownS); // Grenze aus der Logik
+        QCOMPARE(actionChoice->currentText(), QStringLiteral("DSS-Test Info-Aktion"));
+        QCOMPARE(actionChoice->itemText(0), QStringLiteral("Keine"));
+        const int widgetCount = int(form->findChildren<QWidget *>().size());
+        QVERIFY(page->selectRow(game.id));
+        QCOMPARE(name->text(), QStringLiteral("DSS-Test Spiel"));
+        QCOMPARE(actionChoice->currentIndex(), 0);
+        QVERIFY(!form->findChild<QPushButton *>(QStringLiteral("commandOpenAction"))->isEnabled());
+        QCOMPARE(int(form->findChildren<QWidget *>().size()), widgetCount);
+        QVERIFY(page->selectRow(info.id));
+
+        // Name mit Enter speichern
+        name->selectAll();
+        QTest::keyClicks(name, QStringLiteral("DSS-Test Info 2"));
+        QTest::keyClick(name, Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(coreCommand(info.id) && coreCommand(info.id)->name == QStringLiteral("DSS-Test Info 2"),
+                                 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: DSS-Test Info 2"), 3000);
+
+        // Prüfmeldung unter dem Abschnitt «Befehl», danach zeigt das Feld wieder den Wert des Kerns
+        auto *commandSection = form->findChild<QWidget *>(QStringLiteral("commandSection"));
+        auto *problem = commandSection->findChild<QLabel *>(QStringLiteral("fieldProblem"));
+        QVERIFY(problem && problem->isVisible() && problem->text().isEmpty()); // Zeile immer da
+        name->clear();
+        QTest::keyClick(name, Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(!problem->text().isEmpty(), 3000);
+        QCOMPARE(name->text(), QStringLiteral("DSS-Test Info 2"));
+        QVERIFY(problem->geometry().top() > name->geometry().bottom());
+
+        // Abklingzeit: ganze Sekunden
+        globalCooldown->setValue(45);
+        QTRY_VERIFY_WITH_TIMEOUT(coreCommand(info.id) && coreCommand(info.id)->globalCooldownS == 45, 3000);
+        QVERIFY(form->findChild<QWidget *>(QStringLiteral("commandCooldownSection"))
+                    ->findChild<QLabel *>(QStringLiteral("fieldProblem"))->text().isEmpty());
+
+        // «Wer darf»: eine Rolle hebt «Alle» auf, «Alle» leert die Rollen wieder
+        auto *all = form->findChild<QCheckBox *>(QStringLiteral("commandPermissionAll"));
+        auto *subscriber = form->findChild<QCheckBox *>(QStringLiteral("commandPermissionSubscriber"));
+        QVERIFY(all->isChecked() && !subscriber->isChecked());
+        QTest::mouseClick(subscriber, Qt::LeftButton, {}, QPoint(4, subscriber->height() / 2));
+        QTRY_VERIFY_WITH_TIMEOUT(coreCommand(info.id)
+                                     && coreCommand(info.id)->permissions.roles == QStringList{QStringLiteral("subscriber")},
+                                 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!all->isChecked() && subscriber->isChecked(), 3000);
+        QTest::mouseClick(all, Qt::LeftButton, {}, QPoint(4, all->height() / 2));
+        QTRY_VERIFY_WITH_TIMEOUT(coreCommand(info.id) && coreCommand(info.id)->permissions.roles.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(all->isChecked() && !subscriber->isChecked(), 3000);
+
+        // «Ausführen»: «Keine» gibt den Auslöser ab, die Aktion bekommt ihn wieder
+        actionChoice->setCurrentIndex(0);
+        emit actionChoice->activated(0);
+        QTRY_VERIFY_WITH_TIMEOUT(commandAction(*m_client->actionsConfig()->config, info.id).isNull(), 3000);
+        const int actionIndex = actionChoice->findText(QStringLiteral("DSS-Test Info-Aktion"));
+        QVERIFY(actionIndex > 0);
+        actionChoice->setCurrentIndex(actionIndex);
+        emit actionChoice->activated(actionIndex);
+        QTRY_COMPARE_WITH_TIMEOUT(commandAction(*m_client->actionsConfig()->config, info.id), action.id, 3000);
+
+        // «▶ Testen als …» → «Testzuschauer»: action_test im Probelauf
+        QCOMPARE(test->text(), QStringLiteral("▶ Testen als …"));
+        QTRY_VERIFY_WITH_TIMEOUT(test->isEnabled(), 3000);
+        QVERIFY(test->menu());
+        QCOMPARE(test->menu()->actions().value(0) ? test->menu()->actions().at(0)->text() : QString(),
+                 QStringLiteral("Testzuschauer"));
+        test->menu()->actions().at(0)->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Probelauf gestartet: DSS-Test Info 2"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(runItem(QStringLiteral("DSS-Test Info-Aktion")), 3000);
+        // Ohne Aktion: Prüfmeldung unter «Ausführen»
+        QVERIFY(page->selectRow(game.id));
+        QTRY_VERIFY_WITH_TIMEOUT(test->isEnabled(), 3000);
+        test->menu()->actions().at(0)->trigger();
+        auto *runProblem = form->findChild<QWidget *>(QStringLiteral("commandRunSection"))
+                               ->findChild<QLabel *>(QStringLiteral("fieldProblem"));
+        QCOMPARE(runProblem->text(), QStringLiteral("Keine aktive Aktion führt diesen Befehl aus."));
+        // Ein neuer Test leert die Prüfzeile zuerst, auch wenn er früh abbricht (Befund e3-5b)
+        emit form->testChosen(-1);
+        QVERIFY(runProblem->text().isEmpty());
+
+        // «Öffnen» springt nach «Aktionen» und wählt die Aktion
+        QVERIFY(page->selectRow(info.id));
+        auto *open = form->findChild<QPushButton *>(QStringLiteral("commandOpenAction"));
+        QTRY_VERIFY_WITH_TIMEOUT(open->isEnabled(), 3000);
+        QTest::mouseClick(open, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(chatBot->actionsPage()->isVisible(), 3000);
+        QCOMPARE(chatBot->actionsPage()->selectedAction(), action.id);
+        QTest::mouseClick(child<QToolButton>("chatBotTab2"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+
+        // Hinzufügen: neuer Befehl gewählt
+        QTest::mouseClick(page->findChild<QToolButton *>(QStringLiteral("commandsAdd")), Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(name->text(), QStringLiteral("Neuer Befehl"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: Neuer Befehl"), 3000);
+        const QUuid added = page->selectedRow();
+        QVERIFY(coreCommand(added));
+
+        // Löschen: unbenutzt ohne Rückfrage, benutzt mit Rückfrage («Abbrechen» lässt ihn stehen)
+        auto *remove = page->findChild<QToolButton *>(QStringLiteral("commandsRemove"));
+        QVERIFY(remove->isEnabled());
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreCommand(added), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gelöscht: Neuer Befehl"), 3000);
+        QVERIFY(page->selectRow(info.id));
+        QString question;
+        answerQuestion(QStringLiteral("Abbrechen"), &question);
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QCOMPARE(question, QStringLiteral("Befehl «!info» löschen? Er wird von 1 Aktion benutzt."));
+        QVERIFY(coreCommand(info.id));
+        question.clear();
+        answerQuestion(QStringLiteral("Löschen"), &question);
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreCommand(info.id), 3000);
+        QVERIFY(!question.isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gelöscht: DSS-Test Info 2"), 3000);
+        QVERIFY(page->selectRow(game.id));
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreCommand(game.id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectedRow().isNull() && !page->detailShown(), 3000);
+        QCOMPARE(page->detailTitle(), QStringLiteral("Befehl"));
+        const std::optional<ChangeResult> removeAction = request(
+            {QStringLiteral("action_remove"), QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
+        QVERIFY(removeAction && removeAction->ok);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

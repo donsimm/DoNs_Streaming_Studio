@@ -327,6 +327,17 @@ QStringList commandGroupChoices(const actions::ActionsConfig &config);
 QString commandGroupLabel(const QString &group); // leer → «Alle Gruppen»
 // Zeile unter der Liste: «10 Befehle, 1 abgeschaltet · Der Kanal darf immer und hat keine Abklingzeit.»
 QString commandListHint(const actions::ActionsConfig &config);
+// Hinweise im Formular rechts, je Abschnitt (Befund e3-5b, Regel 9)
+struct CommandFormHints
+{
+    QString triggers;    // «ein Auslöser pro Zeile»
+    QString permissions; // «Mit «Alle» sind die anderen eingeschlossen. Der Kanal darf immer.»
+    QString cooldown;    // «0 s = keine Abklingzeit. Abgewiesene Aufrufe stehen in «Läufe der Aktionen».»
+    QString run;         // «Die Aktion bekommt %rawInput%, %input0% …, %user%.»
+};
+CommandFormHints commandFormHints();
+// Obere Grenze der Abklingzeiten (24 h); putCommand weist grössere Werte ab, das Feld nutzt sie
+inline constexpr int kMaxCooldownS = 86400;
 QString commandTitle(const actions::Command &command); // «Befehl «!discord»»
 QString permissionsText(const actions::Permissions &permissions, const actions::ActionsConfig &config);
 
@@ -388,7 +399,7 @@ EditResult removeCommand(const actions::ActionsConfig &config, const QUuid &comm
 // Rückfrage (siehe removeActionQuestion): «Befehl «!so» löschen? Er wird von 1 Aktion benutzt.»
 QString removeCommandQuestion(const actions::ActionsConfig &config, const QUuid &commandId);
 // command_put; Name nicht leer, Befehle ohne Leerzeichen am Rand und ohne leere, Abklingzeiten
-// ab 0, sonst wie der Kern beim Lesen (commandFromJson). Gleich wie before: nichts.
+// von 0 bis kMaxCooldownS, sonst wie der Kern beim Lesen (commandFromJson). Gleich wie before: nichts.
 EditResult putCommand(const actions::Command &before, const actions::Command &after);
 
 // --- Unterreiter «Zeitnachrichten» ---

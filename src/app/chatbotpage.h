@@ -8,6 +8,7 @@
 #include <QWidget>
 
 class ActionsPage;
+class CommandForm;
 class ListDetailPage;
 class QButtonGroup;
 class QCheckBox;
@@ -45,6 +46,7 @@ public:
     // P14 e3-4: Unterreiter «Befehle» und «Zeitnachrichten» (listdetailpage.h); «Variablen» mit den
     // Bereichen «Für alle» und «Je Zuschauer» nebeneinander (Inhalt ab e3-7).
     ListDetailPage *commandsPage() const { return m_commands; }
+    CommandForm *commandForm() const { return m_commandForm; } // P14 e3-5: rechts in «Befehle»
     ListDetailPage *timersPage() const { return m_timers; }
     QWidget *variablesArea(int which) const { return m_variableAreas[which]; } // 0 Für alle, 1 Je Zuschauer
     // Bereich «Ereignisse»: sichtbare Liste neu (dss::EventRows::visibleRows) bzw. eine Änderung
@@ -83,6 +85,8 @@ signals:
     void chatInputChanged();
     void chatSendClicked(const QString &text, const QString &account);
     void hideChatToggled(bool hideChat);
+    // P14 e3-5: anderer Unterreiter gezeigt (SubTab)
+    void subTabChanged(int tab);
 
 private:
     void sendChat();
@@ -112,6 +116,7 @@ private:
     bool m_chatSendEnabled = false;
     ActionsPage *m_actions = nullptr;
     ListDetailPage *m_commands = nullptr;
+    CommandForm *m_commandForm = nullptr;
     ListDetailPage *m_timers = nullptr;
     QWidget *m_variableAreas[2] = {};
 };

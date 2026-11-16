@@ -1335,6 +1335,16 @@ QString commandGroupLabel(const QString &group)
     return group.isEmpty() ? QStringLiteral("Alle Gruppen") : group;
 }
 
+namespace {
+
+// Gemeinsamer Satz der Zeile unter der Liste und des Hinweises in «Wer darf»
+QString channelAlwaysAllowed()
+{
+    return QStringLiteral("Der Kanal darf immer");
+}
+
+} // namespace
+
 QString commandListHint(const ActionsConfig &config)
 {
     const qsizetype total = config.commands.size();
@@ -1343,7 +1353,17 @@ QString commandListHint(const ActionsConfig &config)
     QString s = total == 1 ? QStringLiteral("1 Befehl") : QStringLiteral("%1 Befehle").arg(total);
     if (off > 0)
         s += QStringLiteral(", %1 abgeschaltet").arg(off);
-    return s + QStringLiteral(" · Der Kanal darf immer und hat keine Abklingzeit.");
+    return s + QStringLiteral(" · %1 und hat keine Abklingzeit.").arg(channelAlwaysAllowed());
+}
+
+CommandFormHints commandFormHints()
+{
+    CommandFormHints h;
+    h.triggers = QStringLiteral("ein Auslöser pro Zeile");
+    h.permissions = QStringLiteral("Mit «Alle» sind die anderen eingeschlossen. %1.").arg(channelAlwaysAllowed());
+    h.cooldown = QStringLiteral("0 s = keine Abklingzeit. Abgewiesene Aufrufe stehen in «Läufe der Aktionen».");
+    h.run = QStringLiteral("Die Aktion bekommt %rawInput%, %input0% …, %user%.");
+    return h;
 }
 
 QString commandTitle(const Command &command)
@@ -1516,6 +1536,8 @@ EditResult putCommand(const Command &before, const Command &after)
         return problem(emptyNameProblem());
     if (c.globalCooldownS < 0 || c.userCooldownS < 0)
         return problem(QStringLiteral("Die Abklingzeit darf nicht negativ sein."));
+    if (c.globalCooldownS > kMaxCooldownS || c.userCooldownS > kMaxCooldownS)
+        return problem(QStringLiteral("Die Abklingzeit darf höchstens %1 s sein.").arg(kMaxCooldownS));
     const QJsonObject json = commandToJson(c);
     Command check;
     QString error;

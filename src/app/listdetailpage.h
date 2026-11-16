@@ -15,6 +15,7 @@ class QSplitter;
 class QStackedWidget;
 class QToolButton;
 class QTreeWidget;
+class QVBoxLayout;
 
 // P14 e3-4: Aufbau «Tabelle links, Gewähltes rechts» für die Unterreiter «Befehle» und
 // «Zeitnachrichten» (Entscheid des Nutzers 2026-11-16, Checkliste P14 e3). Zwei Bereiche wie ein
@@ -81,7 +82,10 @@ public:
     QString detailTitle() const;
     // Formular rechts; die Seite übernimmt es. Einmal beim Aufbau, die Felder bleiben (Regel 9).
     void setDetailForm(QWidget *form);
-    // Formular statt des Hinweises zeigen; schaltet nur die Seite um
+    // Optionale Leiste unter dem Bildlauf rechts, immer sichtbar wie die Leiste der Mitte in
+    // «Aktionen», aber nur mit dem Formular (Befund e3-5b). Die Seite übernimmt sie.
+    void setDetailBar(QWidget *bar);
+    // Formular statt des Hinweises zeigen; schaltet nur die Seite um und zeigt die Leiste dazu
     void showDetail(bool show);
     bool detailShown() const;
 
@@ -113,6 +117,8 @@ private:
     QLabel *m_listHint = nullptr;
     QStackedWidget *m_detailPages = nullptr;
     QWidget *m_form = nullptr;
+    QVBoxLayout *m_detailColumn = nullptr;
+    QWidget *m_detailBar = nullptr;
     QList<QUuid> m_rowIds; // Zeilen in der Reihenfolge der Tabelle (für keptSelection)
     QUuid m_wantedRow;     // selectRow() vor dem Eintreffen der Zeile
     bool m_filling = false;

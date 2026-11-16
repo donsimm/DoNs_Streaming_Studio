@@ -823,6 +823,13 @@ private slots:
         changed.commands.removeLast();
         QCOMPARE(commandListHint(changed),
                  QStringLiteral("1 Befehl, 1 abgeschaltet · Der Kanal darf immer und hat keine Abklingzeit."));
+        // Hinweise im Formular rechts kommen aus der Logik (Befund e3-5b)
+        const CommandFormHints hints = commandFormHints();
+        QCOMPARE(hints.triggers, QStringLiteral("ein Auslöser pro Zeile"));
+        QCOMPARE(hints.permissions, QStringLiteral("Mit «Alle» sind die anderen eingeschlossen. Der Kanal darf immer."));
+        QCOMPARE(hints.cooldown,
+                 QStringLiteral("0 s = keine Abklingzeit. Abgewiesene Aufrufe stehen in «Läufe der Aktionen»."));
+        QCOMPARE(hints.run, QStringLiteral("Die Aktion bekommt %rawInput%, %input0% …, %user%."));
         QCOMPARE(commandTitle(*config.command(kCommandDiscord)), QStringLiteral("Befehl «!discord»"));
         QCOMPARE(commandLocations().first().label, QStringLiteral("am Anfang der Nachricht"));
     }
@@ -866,6 +873,16 @@ private slots:
         after.name = QStringLiteral("Discord");
         after.userCooldownS = -1;
         QCOMPARE(putCommand(before, after).problem, QStringLiteral("Die Abklingzeit darf nicht negativ sein."));
+        // Obere Grenze aus der Logik, auch für das Feld (Befund e3-5b)
+        QCOMPARE(kMaxCooldownS, 86400);
+        after.userCooldownS = kMaxCooldownS + 1;
+        QCOMPARE(putCommand(before, after).problem, QStringLiteral("Die Abklingzeit darf höchstens 86400 s sein."));
+        after.userCooldownS = 0;
+        after.globalCooldownS = kMaxCooldownS + 1;
+        QCOMPARE(putCommand(before, after).problem, QStringLiteral("Die Abklingzeit darf höchstens 86400 s sein."));
+        after.globalCooldownS = kMaxCooldownS;
+        QVERIFY(putCommand(before, after).problem.isEmpty());
+        after.globalCooldownS = before.globalCooldownS;
         after.userCooldownS = 10;
         after.commands = commandsFromText(QStringLiteral("!discord\n!dc\n!server"));
         EditResult r = putCommand(before, after);
