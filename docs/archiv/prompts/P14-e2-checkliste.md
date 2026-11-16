@@ -184,3 +184,19 @@ Die Texte des Plans gelten als vorgegeben. Neu formuliert sind nur die Platzhalt
 - **Aktion abgeschaltet oder gelöscht während eines Laufs:** laufende Läufe dieser Aktion **sofort abbrechen** (wie «Lauf abbrechen», Töne verstummen, Entscheid Abbruch 16.11.). Abweichend von Lotses Empfehlung; Änderung im Kern.
 - **«Warteschlangen verwalten …»:** in e2 ausgegraut sichtbar, Wirkung mit e3.
 - **Texte:** alle neuen Texte aus Abschnitt 4 und die Rückfragetexte aus c7 so übernehmen.
+
+## 8. Nachträge Dominik (2026-11-16, im Lauf von e2)
+
+- Plan-Fragen: «Chat-Bot aktiv» aus bricht alle Läufe ab (e2-1); Senden bei «Chat-Bot aus» erlaubt (e2-2); «Anhören» ausgegraut bis e3; Testwerte «Testzuschauer» und «eigener Kanal» (e2-7).
+- Verschachtelter Lauf (Aktion ausführen → abgeschaltete Aktion): A läuft fertig, nichts ändern.
+- Kopfzeile «stumm»: Schalter mit echtem Stand, ausgegraut (e2-4b); «aus» grau passt.
+- Beschriftungen der rechten Spalte aus e2-8 und der Auslöser aus e2-9 so übernommen.
+- Zeiten (Pause, Dauer, Dauer weich) in Sekunden mit Komma eingeben («8,5 s»), intern ms; Umrechnung in der Logik (`FieldRow`, e2-16).
+- Einblenden/Ausblenden «weich»: in e2 ausgegraut sichtbar bis P14-2 (Flag in `FieldRow`).
+- Cheer: Hinweis unter «Bits» «Nur «bis»: genau dieser Wert» aus `FieldSection::hint` (e2-5b).
+- «Läufe»: bei «error» die erste Fehlermeldung als Meldung des Laufs («Fehler: …», e2-5b); bei stumm nur «stumm».
+- Dauern mit Komma: `durationText` («1,5 s», e2-5b) und `mediaDurationText` im Fenster («2,5 s», e2-11).
+- Nach dem Löschen (Aktion, Gruppe) Statuszeile «Gelöscht: <Name>» aus `deletedStatusText` (e2-15).
+- Kontextmenü der Gruppe «Umbenennen …», «Löschen …» mit Auslassung wie Dock «Overlays»; Doppelklick auf eine Gruppe nur umbenennen, nicht auf-/zuklappen (e2-14).
+- Knöpfe zum Entfernen heissen «… löschen»: «Aktion löschen», «Schritt löschen», «Auslöser löschen», «Element löschen», «Testwert löschen» (e2-15, e2-16).
+- Rechte Spalte: ohne Auswahl «Kein Schritt oder Auslöser gewählt»; Art ohne Einstellungen zeigt grau «Keine Einstellungen» aus `emptyFormHint()` (e2-16).
