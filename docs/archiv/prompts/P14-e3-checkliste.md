@@ -229,3 +229,4 @@ Dialog «Warteschlangen» gegen «Dialog» (eigener Rahmen `QDialog`), Referenz 
 - **Frage 4, Dialog «Warteschlangen»:** jede Änderung gilt sofort, unten nur «Schliessen»; «Neu» legt «Warteschlange 1» an, Doppelklick benennt um.
 - **Frage 5, «Variablen»:** «Für alle» und «Je Zuschauer» nebeneinander mit Teiler wie «Live».
 - Aus e2 weiter gültig: Zeiten in Sekunden mit Komma («8,5 s»), Prüfmeldung am Feld als Zeile unter dem Abschnitt (`#fieldProblem`), Kontextmenü mit «…», Doppelklick nur umbenennen (`setExpandsOnDoubleClick(false)`), «Gelöscht: <Name>» nach dem Löschen (`deletedStatusText`, e2-15), zugängliche Namen für Felder ohne Beschriftung, `settingsdialog.cpp` bleibt unverändert.
+- **Frage «▶ Testen als …» (Plan e3):** Knopf mit Menü «Testzuschauer»/«eigener Kanal», immer Probelauf; «echt ausführen» nur in «Aktionen» (Dominik 2026-11-16 ~13:05).
