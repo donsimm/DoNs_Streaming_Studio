@@ -194,6 +194,14 @@ class ControlManager:
         """Steckende Kamera (Kopie); sonst `404 not_found` oder `409 camera_absent`."""
         return self._camera(camera_id)
 
+    def known(self, camera_id: str) -> Camera:
+        """Je gesehene Kamera (Kopie), auch ausgesteckt, mit den zuletzt gelesenen Werten;
+        sonst `404 not_found`. Für Einstellungen, die kein Gerät brauchen."""
+        for camera in self._watcher.cameras():
+            if camera.id == camera_id:
+                return camera
+        raise ApiError(404, "not_found", f"Unbekannte Kamera «{camera_id}».")
+
     def _tiny2(self, camera_id: str) -> Camera:
         camera = self._camera(camera_id)
         if not obsbot.is_tiny2(camera.model):

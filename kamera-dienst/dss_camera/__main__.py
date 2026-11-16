@@ -83,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         manager = ControlManager(devices, store, open_device)
         devices.add_listener(manager.restore_pending)
         mover = Mover(manager, store)
+        backend.camera_store = store
         backend.preset_store = PresetStore(default_data_dir())
         presets = CameraPresets(backend.preset_store, mover, manager)
         # Lampen aus licht.json, Licht-Presets aus licht-presets.json (Plan 2.6, 3).
@@ -94,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     events = Events(backend, None if manager is None else manager.get)
     if manager is not None:
         manager.on_change = events.controls_changed
+        mover.on_config = events.config_changed
     data_dir = default_data_dir()
     api = Api(backend, fake=args.attrappe, controls=manager, mover=mover, presets=presets,
               lights=lights, light_presets=light_presets, events=events,

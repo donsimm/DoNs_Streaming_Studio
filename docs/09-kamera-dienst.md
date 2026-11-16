@@ -29,6 +29,7 @@ Es gibt keine Zugangsdaten. Im Protokoll stehen Adressen anderer Absender nur be
 | `GET status` | Versionen, Kameras, Lampen, Listen der Presets (`id`, `name`) |
 | `GET cameras/{cam}/controls` | alle Bildwerte der Kamera |
 | `PUT cameras/{cam}/controls` | Bildwerte setzen und merken; `null` = Standard des Geräts, vergessen |
+| `GET`, `PUT cameras/{cam}/config` | Einstellungen der Kamera lesen, ändern (Name, Grenzen, Richtung, Tempo, Schrittweite, Mitte, Wecken, KI aus) |
 | `POST cameras/{cam}/move` | Dauerbewegung (Totmann: alle 200 ms wiederholen) |
 | `POST cameras/{cam}/stop` | anhalten |
 | `POST cameras/{cam}/step` | ein Schritt |
@@ -97,6 +98,43 @@ curl -X POST "$D/cameras/$CAM/wake"
 - Schläft die Tiny 2, kommt `409 camera_asleep`; mit `"wake": true` (oder `auto_wake` in den Einstellungen) weckt der Dienst sie und wartet, bis sie bereit ist.
 - Wird die Kamera während einer Dauerbewegung unerreichbar, bricht der Dienst ab und sendet nichts nach (`409 camera_absent`, bis `stop` kommt).
 
+### Einstellungen je Kamera
+
+```sh
+curl "$D/cameras/$CAM/config"
+curl -X PUT "$D/cameras/$CAM/config" -d '{"name": "Kamera oben", "tilt_min": -50, "invert_pan": true}'
+curl -X PUT "$D/cameras/$CAM/config" -d '{"tilt_min": null}'
+```
+
+```json
+{"ok": true,
+ "config": {"name": "Kamera oben", "pan_min": null, "pan_max": null, "tilt_min": -50, "tilt_max": null,
+            "invert_pan": true, "invert_tilt": false, "invert_zoom": false, "step_deg": 2,
+            "zoom_step_percent": 10, "home_pan": 0, "home_tilt": 0, "speed": 50,
+            "auto_wake": false, "ai_off_before_move": true},
+ "ranges": {"speed": [1, 100], "pan_min": [-130, 130], "pan_max": [-130, 130], "home_pan": [-130, 130],
+            "tilt_min": [-75, 90], "tilt_max": [-75, 90], "home_tilt": [-75, 90],
+            "step_deg": [1, 90], "zoom_step_percent": [1, 100]},
+ "limits": {"pan": [-130, 130], "tilt": [-50, 90]}}
+```
+
+| Feld | Bedeutung | Standard |
+|---|---|---|
+| `name` | Anzeigename (1 bis 40 Zeichen), erscheint als `name` in `GET status` | Modell |
+| `pan_min`, `pan_max`, `tilt_min`, `tilt_max` | Grenzen in Grad | Bereich des Geräts; Tiny 2 `tilt_min` −66° |
+| `invert_pan`, `invert_tilt`, `invert_zoom` | Richtung umkehren | `false` |
+| `step_deg`, `zoom_step_percent` | Schrittweite für `step` (Grad, Prozent des Zoombereichs) | 2, 10 |
+| `home_pan`, `home_tilt` | eigene Mitte für `home` in Grad | 0, 0 |
+| `speed` | Tempo von `move` ohne `speed` | 50 |
+| `auto_wake` | Tiny 2 bei Bewegen ohne `wake` wecken | `false` |
+| `ai_off_before_move` | KI-Verfolgung vor Bewegung aus (Befehl noch gesperrt, siehe Einschränkungen) | `true` |
+
+- `PUT` mit beliebig vielen Feldern; `null` setzt den Standard (beim Namen das Modell). Ist ein Feld ungültig, ändert sich nichts (`400 invalid`, die Meldung nennt den Bereich).
+- `ranges`: erlaubte Bereiche aus dem Gerät, in Grad. Bei der Tiny 2 geht `tilt_min` nie unter −75° (sie schläft bei −76° ein). Die untere Grenze muss unter der oberen liegen, mit den Standards für `null`. Felder zu Achsen, die die Kamera nicht hat, fehlen in `ranges` und werden abgewiesen.
+- `limits`: wirksame Grenzen in Grad. Sie gelten sofort für jedes Ziel (`move`, auch eine laufende Dauerbewegung, `step`, `home`, Presets); die eigene Mitte wird ebenso begrenzt.
+- Geht auch bei ausgesteckter Kamera (mit den zuletzt gelesenen Bereichen). Eine Kamera, die der Dienst nie gesehen hat: `404 not_found`. Ist `kameras.json` ungültig: `409 file_error`, die Datei bleibt unverändert.
+- Nach jedem `PUT` kommt das Ereignis `config`; ein neuer Name kommt zudem mit `status`.
+
 ### Kamera-Presets
 
 ```sh
@@ -161,14 +199,15 @@ Server-Sent Events, jedes Ereignis mit dem ganzen neuen Stand seines Teils:
 
 | `event` | `data` | kommt bei |
 |---|---|---|
-| `status` | `{"cameras": […]}` wie in `GET status` | Kamera erschienen oder verschwunden, wach, Schlaf, Privatsphäre |
+| `status` | `{"cameras": […]}` wie in `GET status` | Kamera erschienen oder verschwunden, wach, Schlaf, Privatsphäre, neuer Name |
+| `config` | `{"camera": "<kennung>", "config": {…}, "ranges": {…}, "limits": {…}}` wie `GET …/config` | Einstellungen der Kamera geändert (`PUT …/config`) |
 | `controls` | `{"camera": "<kennung>", "controls": […]}` wie `GET …/controls` | Bildwerte gesetzt, Ende einer Bewegung (`stop`, Totmann), `step`, `home`, Abruf eines Kamera-Presets, gemerkte Werte neu gesetzt |
 | `presets` | `{"camera_presets": […], "light_presets": […]}` mit allen Feldern | Preset angelegt, geändert, gelöscht |
 | `lights` | `{"lights": […]}` wie in `GET status` | Lampe geschaltet, Abfrage alle 5 s mit neuem Stand, Lampe angelegt, geändert, entfernt |
 
-- Beim Anmelden kommt zuerst der aktuelle Stand von `status`, `presets` und `lights` (nicht `controls`; die liest der Abonnent mit `GET …/controls`).
+- Beim Anmelden kommt zuerst der aktuelle Stand von `status`, `presets` und `lights` (nicht `controls` und `config`; die liest der Abonnent mit `GET …/controls` und `GET …/config`).
 - `id` steigt; alle Abonnenten sehen dieselben Ereignisse mit derselben `id` in derselben Reihenfolge.
-- `status`, `presets` und `lights` vergleicht der Dienst alle 0,2 s mit dem letzten Stand. Schnelle Folgen von Änderungen können zu einem Ereignis zusammenfallen; das letzte Ereignis zeigt immer den neuesten Stand. `controls` kommt nach jeder gemeldeten Änderung, auch wenn die Werte gleich geblieben sind.
+- `status`, `presets` und `lights` vergleicht der Dienst alle 0,2 s mit dem letzten Stand. Schnelle Folgen von Änderungen können zu einem Ereignis zusammenfallen; das letzte Ereignis zeigt immer den neuesten Stand. `controls` und `config` kommen nach jeder gemeldeten Änderung, auch wenn die Werte gleich geblieben sind.
 - Ohne Ereignis kommt alle 15 s eine Kommentarzeile (`: `).
 - Mehrere Abonnenten sind möglich. Ein Abonnent, der nicht liest, hält weder andere Abonnenten noch andere Anfragen auf: Hat er mehr als 200 Ereignisse offen oder nimmt er 10 s lang nichts an, meldet der Dienst ihn ab und schliesst die Verbindung. Nach dem Schliessen verbindet der Abonnent neu und liest den Stand neu.
 
@@ -221,8 +260,7 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 ## Einschränkungen
 
 - **Tiny 2, Bildwinkel und KI-Modus:** In Schritt 0 nicht bestätigt, darum gesperrt und nicht angeboten. Der Befehl «KI-Verfolgung aus» vor einer Bewegung (`ai_off_before_move`) wird nicht gesendet, bis er am Gerät mit laufendem Videostrom geprüft ist (`obsbot.AI_OFF_UNLOCKED`); `ai_mode` gibt es in `controls` nicht. Auto-Schlaf wird nur gelesen.
-- **Einstellungen je Kamera** (`PUT cameras/{cam}/config` aus dem Plan) gibt es noch nicht über die Schnittstelle. Grenzen, Richtung, Tempo, Schrittweite, Mitte, `auto_wake` und `ai_off_before_move` stehen in `kameras.json` unter `motion` und werden beim Start gelesen.
-- Der Anzeigename einer Kamera ist vorerst ihr Modell.
+- **Richtung und Tempo:** Die Standards von «Richtung umkehren» und das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
 
 ## Dateien im Datenordner
 
@@ -230,7 +268,7 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 
 | Datei | Inhalt |
 |---|---|
-| `kameras.json` | je Kamera gemerkte Bildwerte (`controls`) und Einstellungen zum Bewegen (`motion`) |
+| `kameras.json` | je Kamera Anzeigename (`name`), gemerkte Bildwerte (`controls`) und Einstellungen zum Bewegen (`motion`) |
 | `kamera-presets.json` | Kamera-Presets (`presets`) |
 | `licht.json` | Lampen (`lights`: `id`, `name`, `host`) |
 | `licht-presets.json` | Licht-Presets (`presets`) |

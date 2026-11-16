@@ -32,6 +32,12 @@ add_test(NAME kd_bewegen
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_bewegen.py)
 set_tests_properties(kd_bewegen PROPERTIES TIMEOUT 120)
 
+# Einstellungen je Kamera (GET/PUT config): Grenzen sofort wirksam, Tiny 2 nie unter −75°,
+# Richtung umkehren, eigene Mitte, Name, ungültige Datei, Ereignis, Neustart (Attrappe, HTTP).
+add_test(NAME kd_einstellungen
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_einstellungen.py)
+set_tests_properties(kd_einstellungen PROPERTIES TIMEOUT 120)
+
 # Kamera-Presets: speichern aus der Position, Abruf aus dem Schlaf, Grenzen, Bildwerte wahlweise,
 # Kennungen, ungültige Datei (ersetzbare Uhr und über HTTP).
 add_test(NAME kd_presets

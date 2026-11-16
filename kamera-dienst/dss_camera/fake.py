@@ -58,7 +58,7 @@ class FakeBackend(Backend):
 
     def cameras(self) -> list[dict]:
         if self.devices is not None:
-            return self.devices.status()
+            return self.named(self.devices.status())
         return [dict(camera) for camera in self._cameras]
 
     def lights(self) -> list[dict]:

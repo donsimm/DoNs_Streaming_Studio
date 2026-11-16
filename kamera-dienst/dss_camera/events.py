@@ -8,6 +8,8 @@ Arten, jede mit dem ganzen neuen Stand ihres Teils:
   nach dem Neusetzen gemerkter Werte
 - `presets`  `{"camera_presets": […], "light_presets": […]}` mit allen Feldern
 - `lights`   `{"lights": […]}` wie in GET status (Schalten, Nachführen, Lampen verwalten)
+- `config`   `{"camera": "<kennung>", "config": {…}, "ranges": {…}, "limits": {…}}` wie
+  GET cameras/{cam}/config; nach jedem PUT config (ein neuer Name kommt zudem mit `status`)
 
 `status`, `presets` und `lights` vergleicht ein eigener Faden alle `INTERVAL_S` mit dem
 letzten Stand; schnelle Folgen von Änderungen können so zu einem Ereignis zusammenfallen.
@@ -157,6 +159,11 @@ class Events:
         with self._pending_lock:
             self._pending.add(camera_id)
         self._wake.set()
+
+    def config_changed(self, camera_id: str, config: dict) -> None:
+        """Neue Einstellungen einer Kamera; blockiert nie (aus der Anfrage PUT config)."""
+        self.hub.update("config", {"camera": camera_id, **config}, key=("config", camera_id),
+                        force=True)
 
     def _presets(self) -> dict:
         backend = self._backend

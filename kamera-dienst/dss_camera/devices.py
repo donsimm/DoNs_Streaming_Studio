@@ -79,7 +79,7 @@ class Camera:
         return v4l2.V4L2_CID_PAN_ABSOLUTE in ids or v4l2.V4L2_CID_TILT_ABSOLUTE in ids
 
     def status(self) -> dict:
-        # Anzeigename: vorerst das Modell; frei wählbar kommt später (Plan 2.2).
+        # Anzeigename: das Modell; einen eigenen setzt Backend.named (kameras.json).
         return {"id": self.id, "name": self.model, "model": self.model, "present": self.present,
                 "state": self.state, "ptz": self.ptz}
 

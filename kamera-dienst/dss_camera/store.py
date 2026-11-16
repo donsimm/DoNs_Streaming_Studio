@@ -3,12 +3,14 @@
 Aufbau (`format_version` 1):
 
     {"format_version": 1,
-     "cameras": {"<kennung>": {"controls": {"power_line_frequency": 1}}}}
+     "cameras": {"<kennung>": {"name": "Kamera oben", "controls": {"power_line_frequency": 1},
+                               "motion": {"tilt_min": -60}}}}
 
-Unter `controls` stehen nur die Bildwerte, die der Nutzer verstellt hat (Plan 2.5).
-Unter `motion` stehen die Einstellungen zum Bewegen (Grenzen, Richtung, Tempo,
-Schrittweite, Mitte; `motion.DEFAULTS`). Weitere Felder je Kamera bleiben beim Speichern
-erhalten. Geschrieben wird atomar (temporäre Datei, dann `os.replace`). Eine ungültige
+`name` ist der Anzeigename (fehlt er, gilt das Modell). Unter `controls` stehen nur die
+Bildwerte, die der Nutzer verstellt hat (Plan 2.5). Unter `motion` stehen die Einstellungen
+zum Bewegen (Grenzen, Richtung, Tempo, Schrittweite, Mitte; `motion.DEFAULTS`); `name` und
+`motion` setzt `PUT cameras/{cam}/config` (`motion.Mover.put_config`). Weitere Felder je
+Kamera bleiben beim Speichern erhalten. Geschrieben wird atomar (temporäre Datei, dann `os.replace`). Eine ungültige
 Datei wird gemeldet und nie überschrieben; Änderungen werden dann abgewiesen.
 """
 
@@ -59,6 +61,8 @@ def _check(data) -> str | None:
     for camera_id, entry in cameras.items():
         if not isinstance(entry, dict):
             return f"Eintrag der Kamera «{camera_id}» ist kein Objekt."
+        if "name" in entry and not (isinstance(entry["name"], str) and entry["name"].strip()):
+            return f"«name» der Kamera «{camera_id}» ist kein Text."
         controls = entry.get("controls", {})
         if not isinstance(controls, dict):
             return f"«controls» der Kamera «{camera_id}» ist kein Objekt."
@@ -113,18 +117,33 @@ class CameraStore:
             entry = self._data["cameras"].get(camera_id, {})
             return dict(entry.get("motion", {}))
 
+    def name(self, camera_id: str) -> str | None:
+        """Anzeigename, None wenn keiner gesetzt ist."""
+        with self._lock:
+            return self._data["cameras"].get(camera_id, {}).get("name")
+
     def update_motion(self, camera_id: str, changes: dict) -> None:
         """Einstellungen zum Bewegen ändern (None = Standard) und speichern."""
+        self.update_config(camera_id, changes)
+
+    def update_config(self, camera_id: str, changes: dict, name=...) -> None:
+        """Einstellungen zum Bewegen (None = Standard) und wahlweise den Anzeigenamen
+        (None = Modell, `...` = unverändert) in einem Schreibvorgang speichern."""
         error = check_settings({key: value for key, value in changes.items() if value is not None})
         if self.error is not None or error is not None:
             raise ValueError(self.error or error)
         with self._lock:
-            settings = self._data["cameras"].setdefault(camera_id, {}).setdefault("motion", {})
+            entry = self._data["cameras"].setdefault(camera_id, {})
+            settings = entry.setdefault("motion", {})
             for key, value in changes.items():
                 if value is None:
                     settings.pop(key, None)
                 else:
                     settings[key] = value
+            if name is None:
+                entry.pop("name", None)
+            elif name is not ...:
+                entry["name"] = name
             write_atomic(self.path, self._data)
 
     def update_controls(self, camera_id: str, changes: dict[str, int | bool | None]) -> None:

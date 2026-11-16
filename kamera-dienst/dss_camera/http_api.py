@@ -117,6 +117,8 @@ class Api:
         self.router.add("GET", "export", self.get_export)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
         self.router.add("PUT", "cameras/{cam}/controls", self.put_controls)
+        self.router.add("GET", "cameras/{cam}/config", self.get_config)
+        self.router.add("PUT", "cameras/{cam}/config", self.put_config)
         self.router.add("POST", "cameras/{cam}/wake", self.post_wake)
         self.router.add("POST", "cameras/{cam}/sleep", self.post_sleep)
         self.router.add("POST", "cameras/{cam}/move", self.post_move)
@@ -185,6 +187,12 @@ class Api:
             raise ApiError(404, "not_found",
                            "Bewegen gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
         return self.mover
+
+    def get_config(self, request: Request, cam: str) -> dict:
+        return self._mover().get_config(cam)
+
+    def put_config(self, request: Request, cam: str) -> dict:
+        return self._mover().put_config(cam, request.json())
 
     def post_move(self, request: Request, cam: str) -> dict:
         return self._mover().move(cam, request.json())

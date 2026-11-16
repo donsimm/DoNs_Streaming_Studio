@@ -18,6 +18,9 @@ Plan 4: POST cameras/{cam}/move, stop, step, home).
   abgebrochenen Bewegung werden abgewiesen, bis `stop` kommt oder sie `DEADMAN_S` ausbleiben.
 - Jeder Befehl an die Tiny 2 läuft in `ControlManager.movable` (Regeln 1 und 2). Die Sperre
   dort hält die Dauerbewegung nur je Schritt, nicht dauerhaft.
+- Einstellungen (Plan 4: GET/PUT cameras/{cam}/config): Anzeigename und `DEFAULTS`, geprüft
+  gegen den Bereich des Geräts (`ranges`, in Grad), ohne Gerätezugriff, auch für ausgesteckte
+  Kameras. Jede Bewegung liest sie neu; eine laufende Dauerbewegung übernimmt sie sofort.
 
 Quellen:
 https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html
@@ -61,6 +64,9 @@ DEFAULTS: dict = {
 }
 _BOOLS = {"invert_pan", "invert_tilt", "invert_zoom", "auto_wake", "ai_off_before_move"}
 _OPTIONAL = {"pan_min", "pan_max", "tilt_min", "tilt_max"}
+CONFIG_FIELDS = {"name"} | set(DEFAULTS)
+NAME_MAX = 40
+STEP_DEG_MAX = 90
 
 
 def is_number(value) -> bool:
@@ -132,6 +138,45 @@ def axes(model: str, controls: list[v4l2.Control], settings: dict) -> dict[str, 
     return result
 
 
+def ranges(model: str, controls: list[v4l2.Control]) -> dict[str, tuple[float, float]]:
+    """Erlaubte Bereiche der Zahlen in `config`: Grenzen und Mitte im Bereich des Geräts in
+    Grad (Tiny 2 Tilt nie unter `TINY2_TILT_FLOOR_DEG`), Schrittweite ab dem Raster des
+    Geräts. Einstellungen zu fehlenden Achsen fehlen."""
+    by_id = {control.id: control for control in controls}
+    result: dict[str, tuple[float, float]] = {"speed": (1, 100)}
+    steps = []
+    for name, control_id in AXES[:2]:
+        control = by_id.get(control_id)
+        if control is None:
+            continue
+        lo, hi = control.minimum / ARCSEC_PER_DEG, control.maximum / ARCSEC_PER_DEG
+        if name == "tilt" and obsbot.is_tiny2(model):
+            lo = max(lo, TINY2_TILT_FLOOR_DEG)
+        for key in (f"{name}_min", f"{name}_max", f"home_{name}"):
+            result[key] = (lo, hi)
+        steps.append(max(1, control.step) / ARCSEC_PER_DEG)
+    if steps:
+        result["step_deg"] = (max(steps), STEP_DEG_MAX)
+    if v4l2.V4L2_CID_ZOOM_ABSOLUTE in by_id:
+        result["zoom_step_percent"] = (1, 100)
+    return result
+
+
+def _check_order(model: str, settings: dict, allowed: dict) -> None:
+    """Untere Grenze unter der oberen, mit den Standards (Gerät, Tiny 2 −66°) für `null`."""
+    for name in ("pan", "tilt"):
+        if f"{name}_min" not in allowed:
+            continue
+        lo, hi = allowed[f"{name}_min"]
+        if name == "tilt" and obsbot.is_tiny2(model):
+            lo = TINY2_TILT_MIN_DEG
+        lo = lo if settings[f"{name}_min"] is None else settings[f"{name}_min"]
+        hi = hi if settings[f"{name}_max"] is None else settings[f"{name}_max"]
+        if lo >= hi:
+            raise ApiError(400, "invalid", f"«{name}_min» ({lo:g}°) muss kleiner sein als "
+                                           f"«{name}_max» ({hi:g}°).")
+
+
 def position(found: dict[str, Axis], values: dict[str, float]) -> dict:
     """Position für die Antwort: Pan und Tilt in Grad, Zoom im Wert des Geräts."""
     result = {}
@@ -193,9 +238,74 @@ class Mover:
         self._motions: dict[str, Motion] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Gerufen mit Kennung und neuem Stand nach PUT config (Ereignis «config», events.py).
+        self.on_config: Callable[[str, dict], None] = lambda camera_id, config: None
 
     def settings(self, camera_id: str) -> dict:
         return {**DEFAULTS, **self._store.motion(camera_id)}
+
+    # --- Einstellungen ---------------------------------------------------------------
+
+    def _config(self, camera) -> dict:
+        settings = self.settings(camera.id)
+        found = axes(camera.model, camera.controls, settings)
+        return {"config": {"name": self._store.name(camera.id) or camera.model, **settings},
+                "ranges": {key: list(value) for key, value in
+                           ranges(camera.model, camera.controls).items()},
+                "limits": {name: [axis.lo / ARCSEC_PER_DEG, axis.hi / ARCSEC_PER_DEG]
+                           for name, axis in found.items() if name != "zoom"}}
+
+    def get_config(self, camera_id: str) -> dict:
+        """GET config: Name, Einstellungen, erlaubte Bereiche, wirksame Grenzen (Grad)."""
+        return self._config(self._manager.known(camera_id))
+
+    def put_config(self, camera_id: str, body: dict) -> dict:
+        """PUT config: Felder wahlweise, `null` = Standard (beim Namen: das Modell)."""
+        if self._store.error is not None:
+            raise ApiError(409, "file_error", f"{self._store.path} ist ungültig ({self._store.error}); "
+                                              "Änderungen werden abgewiesen.")
+        camera = self._manager.known(camera_id)
+        _fields(body, CONFIG_FIELDS)
+        name = body.get("name", ...)
+        if isinstance(name, str):
+            name = name.strip()
+        if name not in (None, ...) and not (isinstance(name, str) and 1 <= len(name) <= NAME_MAX):
+            raise ApiError(400, "invalid", f"«name» erwartet einen Text mit 1 bis {NAME_MAX} "
+                                           "Zeichen oder null.")
+        changes = {key: value for key, value in body.items() if key != "name"}
+        allowed = ranges(camera.model, camera.controls)
+        for key, value in changes.items():
+            if value is None:
+                continue
+            if key in _BOOLS:
+                if not isinstance(value, bool):
+                    raise ApiError(400, "invalid", f"«{key}» erwartet true oder false.")
+                continue
+            if key not in allowed:
+                raise ApiError(400, "invalid", f"«{key}» gibt es bei «{camera.model}» nicht.")
+            lo, hi = allowed[key]
+            if not is_number(value) or not lo <= value <= hi:
+                raise ApiError(400, "invalid", f"«{key}» erwartet eine Zahl von {lo:g} bis {hi:g} "
+                                               "oder null.")
+        settings = {**self.settings(camera_id),
+                    **{key: DEFAULTS[key] if value is None else value for key, value in changes.items()}}
+        _check_order(camera.model, settings, allowed)
+        try:
+            self._store.update_config(camera_id, changes, name)
+        except (OSError, ValueError) as error:
+            log.error("%s nicht gespeichert: %s", self._store.path, error)
+            raise ApiError(409, "file_error", f"{self._store.path} nicht gespeichert: {error}.") from None
+        # Eine laufende Dauerbewegung übernimmt Grenzen und Richtung sofort.
+        found = axes(camera.model, camera.controls, settings)
+        with self._lock:
+            motion = self._motions.get(camera_id)
+            if motion is not None and motion.running:
+                motion.axes = {name: axis for name, axis in found.items() if name in motion.axes}
+        result = self._config(camera)
+        log.info("Einstellungen %s geändert: %s", camera_id,
+                 ", ".join(sorted(body)) or "keine")
+        self.on_config(camera_id, result)
+        return result
 
     def _ptz_camera(self, camera_id: str):
         camera = self._manager.camera(camera_id)

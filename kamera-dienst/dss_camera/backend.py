@@ -12,11 +12,20 @@ class Backend:
     preset_store = None
     light_controller = None
     light_preset_store = None
+    # store.CameraStore für die Anzeigenamen (PUT cameras/{cam}/config).
+    camera_store = None
 
     # Einträge je Kamera: id, name, model, present, state, ptz.
     # state: awake, asleep, privacy, absent, unknown.
     def cameras(self) -> list[dict]:
         return []
+
+    def named(self, cameras: list[dict]) -> list[dict]:
+        """Anzeigename aus kameras.json statt des Modells, wo einer gesetzt ist."""
+        if self.camera_store is None:
+            return cameras
+        return [{**camera, "name": self.camera_store.name(camera["id"]) or camera["name"]}
+                for camera in cameras]
 
     # Einträge je Lampe: id, name, reachable, on, brightness, temperature.
     def lights(self) -> list[dict]:
@@ -37,4 +46,4 @@ class DeviceBackend(Backend):
         self.devices = devices
 
     def cameras(self) -> list[dict]:
-        return self.devices.status()
+        return self.named(self.devices.status())
