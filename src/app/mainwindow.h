@@ -5,6 +5,7 @@
 #include "docks.h"
 #include "theme.h"
 #include "transform.h"
+#include "chatbotlive.h"
 #include "windowdata.h"
 
 #include <QHash>
@@ -98,6 +99,7 @@ private:
     QList<QDockWidget *> editorDocks() const;
     void refreshChatBotHeader();
     void connectChatBot();
+    void requestActionRuns();
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
     void connectCore();
     void onCoreConnectedChanged(bool connected);
@@ -218,6 +220,8 @@ private:
     ChatBotPage *m_chatBot = nullptr;  // P13
     dss::EventRows m_eventRows;        // P13: Bereich «Ereignisse»
     qint64 m_actionsEnabledRequest = 0; // P14 e2-11: offene Anfrage «Chat-Bot aktiv»
+    dss::RunRows m_runRows;             // P14 e2-12: Bereich «Läufe der Aktionen»
+    bool m_runsRequested = false;       // get_action_runs in dieser Verbindung geschickt
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

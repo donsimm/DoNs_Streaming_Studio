@@ -2,12 +2,16 @@
 // eigenen dss-core, in der X11-Sitzung (CLAUDE.md Regel 6). Prüft den Schalter «Chat-Bot aktiv»
 // (an, aus, ausgegraut bei «stumm» mit einem zweiten Kern unter der Verbindung der Version im
 // Einsatz), die Zustände der Kopfzeile und den Unterreiter «Aktionen». Muster: tst_fensterbearbeiten.
+// P14 e2-12: «Live» mit Teilern und Bereich «Läufe der Aktionen» (Probeläufe über den Testkern).
 
+#include "actionjson.h"
+#include "actionmodel.h"
 #include "actionspage.h"
 #include "chatbotpage.h"
 #include "coreclient.h"
 #include "mainwindow.h"
 #include "prozesshilfe.h"
+#include "steptypes.h"
 #include "symbols.h"
 #include "theme.h"
 #include "version.h"
@@ -15,12 +19,16 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QFrame>
+#include <QHeaderView>
+#include <QImage>
 #include <QLabel>
+#include <QPushButton>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QToolButton>
+#include <QTreeWidget>
 
 #include <memory>
 
@@ -68,6 +76,72 @@ class TestFensterChatBot : public QObject
             const std::optional<ActionsStatus> s = m_client->actionsStatus();
             return s && s->enabled == wanted && box->isChecked() == wanted;
         }, 3000);
+    }
+
+    // Anfrage an das Aktionssystem und Antwort des Kerns (change_result)
+    std::optional<ChangeResult> request(const ActionsEdit &edit)
+    {
+        std::optional<ChangeResult> answer;
+        const qint64 id = m_client->sendActionsEdit(edit);
+        if (id == 0)
+            return answer;
+        const QMetaObject::Connection c = connect(m_client.get(), &CoreClient::changeFinished, this,
+                                                  [&](const ChangeResult &r) { if (r.requestId == id) answer = r; });
+        if (!QTest::qWaitFor([&] { return answer.has_value(); }, 3000))
+            qWarning("keine Antwort auf %s", qPrintable(edit.type));
+        disconnect(c);
+        return answer;
+    }
+
+    // Legt eine Aktion an und startet einen Probelauf; Rückgabe: Kennung des Laufs
+    QUuid testRun(const QString &name, const actions::Step &step)
+    {
+        actions::Action a;
+        a.id = QUuid::createUuid();
+        a.name = name;
+        a.steps = {step};
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(a)}}});
+        if (!put || !put->ok) {
+            qWarning("action_put: %s", put ? qPrintable(put->message) : "keine Antwort");
+            return QUuid();
+        }
+        const std::optional<ChangeResult> run = request(
+            {QString::fromLatin1(msg::kActionTest),
+             QJsonObject{{QStringLiteral("action_id"), a.id.toString(QUuid::WithoutBraces)},
+                         {QStringLiteral("arguments"), QJsonObject()}, {QStringLiteral("dry_run"), true}}});
+        if (!run || !run->ok) {
+            qWarning("action_test: %s", run ? qPrintable(run->message) : "keine Antwort");
+            return QUuid();
+        }
+        return run->id;
+    }
+
+    QTreeWidgetItem *runItem(const QString &action)
+    {
+        QTreeWidget *runs = child<QTreeWidget>("chatBotRuns");
+        for (int i = 0; i < runs->topLevelItemCount(); ++i)
+            if (runs->topLevelItem(i)->text(1) == action)
+                return runs->topLevelItem(i);
+        return nullptr;
+    }
+
+    // Kommt die Farbe von setForeground im Bild an (Stylesheet setzt QTreeView::item color)?
+    bool cellShowsColor(QTreeWidget *list, QTreeWidgetItem *item, const QColor &color)
+    {
+        list->scrollToItem(item);
+        QApplication::processEvents();
+        const QRect row = list->visualItemRect(item);
+        const QRect cell(list->header()->sectionViewportPosition(3), row.top(), list->header()->sectionSize(3), row.height());
+        const QImage image = list->viewport()->grab(cell).toImage();
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor p = image.pixelColor(x, y);
+                if (qAbs(p.red() - color.red()) < 12 && qAbs(p.green() - color.green()) < 12
+                    && qAbs(p.blue() - color.blue()) < 12)
+                    return true;
+            }
+        return false;
     }
 
 private slots:
@@ -217,6 +291,124 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(m_client->actionsStatus()->state, QStringLiteral("off"), 6000);
         QVERIFY(box->isEnabled());
         QCOMPARE(state->text(), QStringLiteral("aus"));
+    }
+
+    // «Live»: Bereiche nur über addLivePanel in einem QSplitter, Teiler 4 px, keiner zuzuschieben.
+    void liveSplitter()
+    {
+        auto *splitter = child<QSplitter>("chatBotLiveSplitter");
+        QVERIFY(splitter && splitter->isVisible());
+        QVERIFY(!splitter->childrenCollapsible());
+        QCOMPARE(splitter->count(), 2);
+        QStringList titles;
+        for (int i = 0; i < splitter->count(); ++i) {
+            auto *title = splitter->widget(i)->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"));
+            QVERIFY(title);
+            QVERIFY(splitter->widget(i)->findChild<QFrame *>(QStringLiteral("chatBotPanelBody")));
+            titles << title->text();
+        }
+        QCOMPARE(titles, QStringList({QStringLiteral("Ereignisse"), QStringLiteral("Läufe der Aktionen")}));
+        QCOMPARE(splitter->handle(1)->width(), 4);
+        // Teiler verschieben: beide Bereiche bleiben sichtbar
+        const QList<int> before = splitter->sizes();
+        splitter->setSizes({before.at(0) + 100, before.at(1) - 100});
+        QCOMPARE(splitter->sizes().at(0), before.at(0) + 100);
+        splitter->setSizes(before);
+
+        auto *runs = child<QTreeWidget>("chatBotRuns");
+        QVERIFY(runs);
+        QCOMPARE(runs->columnCount(), 4);
+        QCOMPARE(runs->headerItem()->text(0), QStringLiteral("Zeit"));
+        QCOMPARE(runs->headerItem()->text(1), QStringLiteral("Aktion"));
+        QCOMPARE(runs->headerItem()->text(2), QStringLiteral("Auslöser"));
+        QCOMPARE(runs->headerItem()->text(3), QStringLiteral("Ergebnis"));
+        QVERIFY(runs->header()->stretchLastSection());
+        QCOMPARE(runs->focusPolicy(), Qt::NoFocus);
+        auto *open = child<QPushButton>("chatBotRunOpenAction");
+        auto *cancel = child<QPushButton>("chatBotRunCancel");
+        auto *onlyErrors = child<QCheckBox>("chatBotRunsOnlyErrors");
+        QVERIFY(open && cancel && onlyErrors);
+        QCOMPARE(open->text(), QStringLiteral("Im Editor öffnen"));
+        QCOMPARE(cancel->text(), QStringLiteral("Lauf abbrechen"));
+        QCOMPARE(onlyErrors->text(), QStringLiteral("Nur Fehler"));
+        QCOMPARE(open->parentWidget()->objectName(), QStringLiteral("dockButtons"));
+        QVERIFY(!open->isEnabled() && !cancel->isEnabled());
+        QVERIFY(open->geometry().right() < cancel->geometry().left());
+        QVERIFY(cancel->geometry().right() < onlyErrors->geometry().left());
+    }
+
+    // Probeläufe erscheinen; «Lauf abbrechen» schickt action_run_cancel; Ergebnisfarben aus dem
+    // Theme; «Nur Fehler»; «Im Editor öffnen» wechselt auf «Aktionen»; Verlauf nach neuer Verbindung.
+    void actionRuns()
+    {
+        const Theme theme = darkTheme();
+        QVERIFY(clickSwitch(true) || child<QCheckBox>("chatBotEnabled")->isChecked());
+        auto *runs = child<QTreeWidget>("chatBotRuns");
+        auto *open = child<QPushButton>("chatBotRunOpenAction");
+        auto *cancel = child<QPushButton>("chatBotRunCancel");
+        auto *onlyErrors = child<QCheckBox>("chatBotRunsOnlyErrors");
+        QVERIFY(runs && open && cancel && onlyErrors);
+
+        // Lauf, der wartet: erscheint, abbrechen
+        actions::Step wait = actions::newStep(QString::fromLatin1(actions::kStepDelay));
+        wait.fields.insert(QStringLiteral("value_ms"), 10000);
+        const QUuid waitRun = testRun(QStringLiteral("DSS-Test Warten"), wait);
+        QVERIFY(!waitRun.isNull());
+        QTRY_VERIFY_WITH_TIMEOUT(runItem(QStringLiteral("DSS-Test Warten")), 3000);
+        QTreeWidgetItem *item = runItem(QStringLiteral("DSS-Test Warten"));
+        QTRY_VERIFY_WITH_TIMEOUT(item->text(3).contains(QStringLiteral("läuft")), 3000);
+        QVERIFY(item->text(3).startsWith(QStringLiteral("Probelauf")));
+        QVERIFY(!item->text(0).isEmpty() && !item->text(2).isEmpty());
+        QVERIFY(!cancel->isEnabled());
+        runs->setCurrentItem(item);
+        QVERIFY(cancel->isEnabled() && open->isEnabled());
+        QTest::mouseClick(cancel, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!item->text(3).contains(QStringLiteral("läuft")), 3000);
+        QCOMPARE(item->foreground(3).color(), theme.stateConnecting); // abgebrochen: warning
+        QVERIFY(!cancel->isEnabled());
+        QVERIFY(open->isEnabled());
+
+        // Lauf mit Fehler (leerer Text) in stateError, auch im Bild
+        actions::Step empty = actions::newStep(QString::fromLatin1(actions::kStepChatSend));
+        empty.fields.insert(QStringLiteral("text"), QString());
+        QVERIFY(!testRun(QStringLiteral("DSS-Test Fehler"), empty).isNull());
+        QTRY_VERIFY_WITH_TIMEOUT(runItem(QStringLiteral("DSS-Test Fehler"))
+                                     && runItem(QStringLiteral("DSS-Test Fehler"))->foreground(3).color() == theme.stateError,
+                                 3000);
+        QTreeWidgetItem *failed = runItem(QStringLiteral("DSS-Test Fehler"));
+        QVERIFY2(cellShowsColor(runs, failed, theme.stateError), qPrintable(failed->text(3)));
+
+        // «Nur Fehler»: nur der Fehler bleibt; Auswahl weg, Knöpfe ausgegraut
+        const int all = runs->topLevelItemCount();
+        QVERIFY(all >= 2);
+        QTest::mouseClick(onlyErrors, Qt::LeftButton, {}, QPoint(4, onlyErrors->height() / 2));
+        QVERIFY(onlyErrors->isChecked());
+        QCOMPARE(runs->topLevelItemCount(), 1);
+        QCOMPARE(runs->topLevelItem(0)->text(1), QStringLiteral("DSS-Test Fehler"));
+        QVERIFY(!cancel->isEnabled() && !open->isEnabled());
+        QTest::mouseClick(onlyErrors, Qt::LeftButton, {}, QPoint(4, onlyErrors->height() / 2));
+        QCOMPARE(runs->topLevelItemCount(), all);
+
+        // «Im Editor öffnen»: Wechsel auf den Unterreiter «Aktionen»
+        runs->setCurrentItem(runItem(QStringLiteral("DSS-Test Warten")));
+        QTest::mouseClick(open, Qt::LeftButton);
+        auto *page = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        QVERIFY(child<QToolButton>("chatBotTab1")->isChecked());
+        QTest::mouseClick(child<QToolButton>("chatBotTab0"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(runs->isVisible(), 3000);
+
+        // Neue Verbindung: get_action_runs liefert den Verlauf, die Liste bleibt gleich
+        int received = 0;
+        const QMetaObject::Connection c = connect(m_client.get(), &CoreClient::actionRunsReceived, this,
+                                                  [&](const QList<actions::RunRecord> &) { ++received; });
+        m_client->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!m_client->isConnected(), 3000);
+        m_client->start();
+        QTRY_COMPARE_WITH_TIMEOUT(received, 1, 5000);
+        disconnect(c);
+        QCOMPARE(runs->topLevelItemCount(), all);
+        QVERIFY(runItem(QStringLiteral("DSS-Test Fehler")));
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

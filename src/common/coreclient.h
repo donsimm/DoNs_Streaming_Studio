@@ -121,7 +121,8 @@ public:
     // ohne Verbindung leer.
     std::optional<ActionsStatus> actionsStatus() const { return m_actionsStatus; }
     // Schickt eine Anfrage an das Aktionssystem (actionsEditMessage, z. B. actionsSetEnabledEdit);
-    // requestId wird hier vergeben. Antwort über changeFinished. 0 = nicht verbunden.
+    // requestId wird hier vergeben. Antwort über changeFinished. 0 = nicht verbunden. Abfragen
+    // (z. B. get_action_runs) antworten mit eigener Nachricht, Fehler über changeFinished.
     qint64 sendActionsEdit(const ActionsEdit &edit);
 
     // P14 d: Laufzustand eines Overlays (overlay_live, nach hello und bei jeder Änderung); die
@@ -197,6 +198,9 @@ signals:
     void twitchStatusChanged();
     // actionsStatus() hat sich geändert (P14 e2-11).
     void actionsStatusChanged();
+    // P14 e2-12: Antwort action_runs auf get_action_runs (älteste zuerst, ohne Schritte); nicht
+    // gespeichert, darum nichts zurückzusetzen bei der Trennung.
+    void actionRunsReceived(const QList<dss::actions::RunRecord> &runs);
     void twitchRequestFinished(const dss::ChangeResult &result);
     // P13: Verlauf nach einer Bestellung (älteste zuerst), neues Ereignis, verworfene Ereignisse.
     void eventHistoryReceived(const QList<dss::events::Event> &events);

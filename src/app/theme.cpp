@@ -334,7 +334,8 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
    jede Spalte ein eigenes Kästchen), Spaltenkopf wie die Dock-Titel, Zeile zur Auswahl gedämpft. */
 #mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
 #mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
-#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover { border-radius: 0px;
+#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover, #chatBotRuns::item,
+#chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;

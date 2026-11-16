@@ -214,7 +214,7 @@ void MainWindow::createCentralArea()
 #endif
 
     // P13: Reiter «Chat-Bot» (chatbotpage.h); ohne Kern zeigt die Kopfzeile «Twitch: –».
-    m_chatBot = new ChatBotPage(m_modules);
+    m_chatBot = new ChatBotPage(m_theme, m_modules);
     m_chatBot->setHeader(dss::chatBotHeaderView(dss::ConnectionState::Off, std::nullopt));
     m_modules->addWidget(m_chatBot);
     column->addWidget(m_modules, 1);
@@ -509,6 +509,18 @@ void MainWindow::connectChatBot()
         m_chatBot->resetEvents(m_eventRows.rows());
     });
     connect(m_client, &dss::CoreClient::eventReceived, this, [this](const dss::events::Event &event) {
+        // P14 e2-12: Meldungen der Läufe (actions.run_*) nur in «Läufe der Aktionen»
+        if (event.type.startsWith(QLatin1String("actions."))) {
+            dss::actions::RunRecord record;
+            QString error;
+            if (!dss::runFromJson(event.data, &record, &error)) {
+                qWarning("Kern: %s ungültig: %s", qPrintable(event.type), qPrintable(error));
+                return;
+            }
+            const dss::RunRows::Change change = m_runRows.apply(record);
+            m_chatBot->applyRun(change, change.index >= 0 ? m_runRows.row(record.runId) : nullptr);
+            return;
+        }
         const int removed = m_eventRows.append(event);
         m_chatBot->appendEvent(m_eventRows.rows().last(), removed);
     });
@@ -529,7 +541,41 @@ void MainWindow::connectChatBot()
         if (!result.ok)
             refreshChatBotHeader();
     });
-    m_client->subscribeEvents(dss::chatBotEventFilters());
+    // P14 e2-12: «Läufe der Aktionen». Verlauf mit get_action_runs, danach der Fluss actions.;
+    // Ablehnungen von «Lauf abbrechen» zeigt onChangeFinished in der Statuszeile.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::requestActionRuns);
+    connect(m_client, &dss::CoreClient::actionRunsReceived, this,
+            [this](const QList<dss::actions::RunRecord> &runs) {
+                m_runRows.reset(runs);
+                m_chatBot->resetRuns(m_runRows.visibleRows());
+            });
+    connect(m_chatBot, &ChatBotPage::onlyErrorsToggled, this, [this](bool onlyErrors) {
+        m_runRows.setOnlyErrors(onlyErrors);
+        m_chatBot->resetRuns(m_runRows.visibleRows());
+    });
+    connect(m_chatBot, &ChatBotPage::cancelRunClicked, this, [this](const QUuid &runId) {
+        m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kActionRunCancel),
+                                   QJsonObject{{QStringLiteral("run_id"), runId.toString(QUuid::WithoutBraces)}}});
+    });
+    // [OFFEN] e2-14: die Aktion im Unterreiter «Aktionen» auch wählen; bis dahin nur der Wechsel.
+    connect(m_chatBot, &ChatBotPage::openActionClicked, this,
+            [this](const QUuid &) { m_chatBot->setCurrentSubTab(ChatBotPage::Actions); });
+    // Bis e2-13 ohne die Chat-Nachrichten (chatBotLiveFilters), nur zusätzlich die Läufe
+    m_client->subscribeEvents(dss::chatBotEventFilters() + QStringList{QStringLiteral("actions.")});
+}
+
+void MainWindow::requestActionRuns()
+{
+    // Einmal je Verbindung, sobald das Aktionssystem antwortet (nicht bei abgeschaltetem Schalter,
+    // sonst stünde bei jeder Verbindung ein Fehler in der Statuszeile).
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    if (!m_client->isConnected() || !status) {
+        m_runsRequested = false;
+        return;
+    }
+    if (m_runsRequested || status->state == QLatin1String("unavailable"))
+        return;
+    m_runsRequested = m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kGetActionRuns), QJsonObject()}) != 0;
 }
 
 void MainWindow::refreshChatBotHeader()

@@ -576,6 +576,13 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_actionsStatus = status;
         emit actionsStatusChanged();
+    } else if (type == QLatin1String(msg::kActionRuns)) {
+        QList<actions::RunRecord> runs;
+        if (!parseActionRuns(message, &runs, &error)) {
+            qWarning("Kern: action_runs ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit actionRunsReceived(runs);
     } else if (type == QLatin1String(msg::kEventHistory)) {
         QList<events::Event> list;
         if (!parseEventHistory(message, &list, &error)) {
