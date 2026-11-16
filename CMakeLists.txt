@@ -40,6 +40,10 @@ option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P
 # P12b b3: Ton der Videos über PipeWire im Kern (libpipewire-0.3, Thread von PipeWire im Dienst).
 # Aus: Kern ohne Ton und ohne libpipewire (Stand P11).
 option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
+# P14 b3: Aktionssystem im Kern (Chat-Bot: Läufe aus Ereignissen, Befehlen, Zeitnachrichten).
+# Schalter, weil der Bot selbständig öffentlich handelt (Plan 5). Aus: Kern ohne ActionService,
+# actions_status «unavailable», Anfragen des Aktionssystems werden abgewiesen.
+option(DSS_CORE_ACTIONS "Aktionssystem (Chat-Bot) im Kern (P14 b3)" ON)
 # P13 (Plan 2.7): Anbindung an Twitch im Kern (EventSub, Anmeldung, Helix; neue externe Verbindung
 # mit TLS und Token). Aus: Kern ohne Twitch, der Knopf bleibt grau, twitch_status mit enabled false.
 option(DSS_CORE_TWITCH "Anbindung an Twitch im Kern (P13)" ON)
@@ -74,6 +78,7 @@ add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
 add_subdirectory(src/events) # P13: Ereignisfluss (dss_events)
+add_subdirectory(src/actions) # P14 a: Modell des Aktionssystems, nur Qt Core
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER) OR DSS_CORE_AUDIO)
   add_subdirectory(src/media)

@@ -59,6 +59,10 @@ Theme darkTheme()
     t.graphCpu = QColor(0x47, 0x6b, 0xd7);
     t.graphRam = QColor(0x99, 0x7f, 0xdc);
     t.graphLan = QColor(0x59, 0xd9, 0x66);
+    t.badgeBot = QColor(0x99, 0x7f, 0xdc);
+    t.badgeChannel = QColor(0x28, 0x4c, 0xb8);
+    t.badgeMod = QColor(0x25, 0xa2, 0x31);
+    t.chatEventRow = QColor(0x32, 0x35, 0x40);
     return t;
 }
 
@@ -112,6 +116,9 @@ QWidget:disabled { color: @textDisabled@; }
 QDialog, QMainWindow, QMenuBar, QMenu { background-color: @window@; }
 QMainWindow::separator { background: transparent; width: 4px; height: 4px; margin: 0px; }
 QMainWindow::separator:hover { border: 1px solid @text@; margin: 1px; }
+/* P14 e2: Teiler zwischen Bereichen wie ein Dock, Werte von QMainWindow::separator. */
+QSplitter::handle { background: transparent; width: 4px; height: 4px; margin: 0px; }
+QSplitter::handle:hover { border: 1px solid @text@; margin: 1px; }
 
 QLabel, QCheckBox { background: transparent; }
 QComboBox, QCheckBox, QPushButton, QSpinBox, QDoubleSpinBox { margin-top: 2px; margin-bottom: 2px; }
@@ -266,6 +273,15 @@ QCheckBox::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
 QCheckBox::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
 QCheckBox::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
 QCheckBox::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
+/* P14: Kästchen in Bäumen (Aktionen im Chat-Bot) mit denselben Symbolen; nur Zeilen mit
+   Qt::ItemIsUserCheckable zeichnen eines, die übrigen Bäume bleiben unverändert. */
+QTreeView::indicator { width: 16px; height: 16px; }
+QTreeView::indicator:unchecked { image: url("@symbols@/kaestchen-aus.svg"); }
+QTreeView::indicator:unchecked:hover { image: url("@symbols@/kaestchen-aus-fokus.svg"); }
+QTreeView::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
+QTreeView::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
+QTreeView::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
+QTreeView::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
 
 /* Eigene Bereiche (in OBS nicht vorhanden), mit den Werten von Yami gestaltet. */
 #headerBar { background: @base@; border: 1px solid @border@; border-radius: 4px; }
@@ -327,7 +343,15 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
    jede Spalte ein eigenes Kästchen), Spaltenkopf wie die Dock-Titel, Zeile zur Auswahl gedämpft. */
 #mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
 #mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
-#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover { border-radius: 0px;
+#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover, #chatBotRuns::item,
+#chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover, #chatBotChat::item,
+#chatBotChat::item:hover, #chatBotChat::item:selected, #chatBotChat::item:selected:hover, #commandsTable::item,
+#commandsTable::item:hover, #commandsTable::item:selected, #commandsTable::item:selected:hover, #timersTable::item,
+#timersTable::item:hover, #timersTable::item:selected, #timersTable::item:selected:hover, #globalVariables::item,
+#globalVariables::item:hover, #globalVariables::item:selected, #globalVariables::item:selected:hover,
+#userVariables::item, #userVariables::item:hover, #userVariables::item:selected,
+#userVariables::item:selected:hover, #queuesList::item, #queuesList::item:hover, #queuesList::item:selected,
+#queuesList::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
@@ -345,9 +369,14 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #serverMessage { font-weight: bold; color: @coreDisconnected@; }
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
-#obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+#obsSourceState[state="problem"], #audioOutputState[state="problem"], #actionsAudioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
 /* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
 #settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
+/* P14 e2: Prüfmeldung am Feld, eine Zeile unter dem Abschnitt (Entscheid des Nutzers 2026-11-16). */
+#fieldProblem { color: @stateError@; }
+/* P14 e2-13: Zähler der Eingabezeile «Chat», zu lang wie eine Prüfmeldung. */
+#chatBotChatCounter { color: @textMuted@; }
+#chatBotChatCounter[state="error"] { color: @stateError@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},
@@ -378,6 +407,10 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
         {"coreDisconnected", t.coreDisconnected},
         {"preview", t.preview},
         {"graph", t.graph},
+        {"badgeBot", t.badgeBot},
+        {"badgeChannel", t.badgeChannel},
+        {"badgeMod", t.badgeMod},
+        {"chatEventRow", t.chatEventRow},
     };
     for (const auto &[name, color] : colors)
         css.replace(QLatin1Char('@') + QLatin1String(name) + QLatin1Char('@'), color.name());

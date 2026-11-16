@@ -83,6 +83,39 @@ bool readVideoCodec(const QString &path, QString *codec, QString *error)
     return ok;
 }
 
+bool readMediaDuration(const QString &path, qint64 *durationMs, QString *error)
+{
+    quietAvLog();
+    AVFormatContext *format = nullptr;
+    const QByteArray name = path.toUtf8();
+    if (avformat_open_input(&format, name.constData(), nullptr, nullptr) < 0) {
+        *error = QStringLiteral("Datei nicht lesbar");
+        return false;
+    }
+    bool ok = false;
+    if (avformat_find_stream_info(format, nullptr) >= 0) {
+        const int stream = av_find_best_stream(format, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+        double seconds = -1.0;
+        if (stream < 0) {
+            *error = QStringLiteral("kein Ton in der Datei");
+        } else if (format->duration != AV_NOPTS_VALUE && format->duration > 0) {
+            seconds = double(format->duration) / AV_TIME_BASE;
+        } else if (const AVStream *s = format->streams[stream]; s->duration != AV_NOPTS_VALUE && s->duration > 0) {
+            seconds = double(s->duration) * av_q2d(s->time_base);
+        } else {
+            *error = QStringLiteral("Länge unbekannt");
+        }
+        if (seconds >= 0.0) {
+            *durationMs = std::llround(seconds * 1000.0);
+            ok = true;
+        }
+    } else {
+        *error = QStringLiteral("Angaben der Ströme nicht lesbar");
+    }
+    avformat_close_input(&format);
+    return ok;
+}
+
 int readVideoOrientation(const QString &path)
 {
     AvInput input;

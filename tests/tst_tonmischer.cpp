@@ -33,11 +33,18 @@
 // - softKeepsLevel: beim weichen Nachführen bleibt ein Gleichwert gleich (Interpolation).
 // - decoderThreads: echter Decoder (tests/daten/ton/blitz-piep.mp4) und Abruf in einem eigenen
 //   Thread, Steuerung aus dem Testthread; Pieps an der richtigen Stelle, kein leerer Ring.
+// - freeVoice (P14 t): freie Stimme ohne Uhr und ohne Versatz, Einblenden, Proben genau, Ende des
+//   Durchgangs (ended, keine Wiederholung), Stopp.
+// - freeMixLimit (P14 t): 200 %, Begrenzung je Stimme und der Summe auf ±1,0, 8 Stimmen
+//   gleichzeitig, eine 9. Stelle gibt es nicht.
+// - freeDecoder (P14 t): echter Decoder mit tests/daten/ton/ton-piep.wav als freie Stimme, Piep
+//   bei 0,1 s, gespielte = geschriebene Rahmen.
 // In allen Fällen legt render() keinen Speicher an (operator new gezählt).
 
 #include "audiodecoder.h"
 #include "mixer.h"
 
+#include <QElapsedTimer>
 #include <QTest>
 
 #include <algorithm>
@@ -125,6 +132,10 @@ float dcLow(int64_t, int)
 float dc03(int64_t, int)
 {
     return 0.3f;
+}
+float dc075(int64_t, int)
+{
+    return 0.75f;
 }
 float tone(int64_t pos, int channel)
 {
@@ -436,6 +447,9 @@ private slots:
     void exactSamples();
     void softKeepsLevel();
     void decoderThreads();
+    void freeVoice();
+    void freeMixLimit();
+    void freeDecoder();
 };
 
 void TstTonMischer::audibleFormula()
@@ -1023,6 +1037,145 @@ void TstTonMischer::decoderThreads()
     QVERIFY2(m.maxAbsMs() <= 1.0, qPrintable(QString::number(m.maxAbsMs())));
     QCOMPARE(mixer.sourceStats(id).emptyFrames, uint64_t(0));
     QCOMPARE(mixer.sourceStats(id).hardCorrections, 1u);
+    QCOMPARE(sim.allocations, uint64_t(0));
+}
+
+void TstTonMischer::freeVoice()
+{
+    Mixer mixer(2);
+    const int id = mixer.addSource();
+    // 0,1 s Ton; danach schreibt die Quelle einen neuen Durchgang (Ende des ersten)
+    FakeSource src(mixer.ring(id), dcB, 4800, true);
+    Sim sim(mixer);
+    sim.sources = {&src};
+    sim.keepOutput = true;
+    mixer.setExtraDelayNs(50 * kMs); // wirkt bei freien Stimmen nicht
+    mixer.setVolume(id, 1.0f, false);
+    mixer.startFree(id, src.pass);
+    auto frameAt = [&](uint64_t n, int ch) { return sim.output[size_t(2 * n + uint64_t(ch))]; };
+    for (int i = 0; i < 10; ++i)
+        sim.cycle();
+    // Einsatz sofort im ersten Abruf, eingeblendet über 240 Rahmen
+    QVERIFY(std::fabs(frameAt(0, 0) - 0.5f / 240) < 1e-6f);
+    for (uint64_t n = 1; n < 240; ++n)
+        QVERIFY(frameAt(n, 0) > frameAt(n - 1, 0));
+    for (uint64_t n = 241; n < 4800; ++n) {
+        QCOMPARE(frameAt(n, 0), 0.5f);
+        QCOMPARE(frameAt(n, 1), 0.5f);
+    }
+    // nach dem Durchgang still, keine Wiederholung
+    for (uint64_t n = 4800; n < sim.frame; ++n)
+        QCOMPARE(frameAt(n, 0), 0.0f);
+    Mixer::SourceStats stats = mixer.sourceStats(id);
+    QVERIFY(stats.ended);
+    QCOMPARE(stats.frames, uint64_t(4800));
+    QCOMPARE(stats.hardCorrections, 0u);
+    QCOMPARE(stats.softCorrections, 0u);
+
+    // Neuer Start auf derselben Stelle: ended zurück, Stopp blendet aus
+    const uint32_t pass = src.restart();
+    src.passLength = 0;
+    mixer.startFree(id, pass);
+    sim.cycle();
+    sim.cycle();
+    stats = mixer.sourceStats(id);
+    QVERIFY(!stats.ended);
+    QVERIFY(stats.playing);
+    QCOMPARE(sim.output[sim.output.size() - 2], 0.5f);
+    mixer.stop(id);
+    const uint64_t n1 = sim.frame;
+    sim.cycle();
+    for (uint64_t n = n1 + 300; n < sim.frame; ++n)
+        QCOMPARE(frameAt(n, 0), 0.0f);
+    QVERIFY(!mixer.sourceStats(id).playing);
+    QCOMPARE(sim.allocations, uint64_t(0));
+}
+
+void TstTonMischer::freeMixLimit()
+{
+    Mixer mixer(8);
+    std::vector<int> ids;
+    for (int i = 0; i < 8; ++i)
+        ids.push_back(mixer.addSource());
+    QVERIFY(std::find(ids.cbegin(), ids.cend(), -1) == ids.cend());
+    QCOMPARE(mixer.addSource(), -1); // keine 9. Stelle
+    std::vector<std::unique_ptr<FakeSource>> sources;
+    const Signal shapes[8] = {dc03, dc075, dcLow, dcB, dcB, dcB, dcB, dcB};
+    Sim sim(mixer);
+    for (int i = 0; i < 8; ++i) {
+        sources.push_back(std::make_unique<FakeSource>(mixer.ring(ids[size_t(i)]), shapes[i]));
+        sim.sources.push_back(sources.back().get());
+    }
+    sim.keepOutput = true;
+    auto last = [&](int ch) { return sim.output[sim.output.size() - 2 + size_t(ch)]; };
+    auto startVoice = [&](int i, float gain) {
+        mixer.setVolume(ids[size_t(i)], gain, false);
+        mixer.startFree(ids[size_t(i)], sources[size_t(i)]->pass);
+    };
+
+    // 200 %: 0,3 → 0,6
+    startVoice(0, 2.0f);
+    sim.cycle();
+    QCOMPARE(last(0), 0.6f);
+    // Begrenzung je Stimme: 0,75 · 200 % → 1,0 (nicht 1,5), dazu −0,25 → 0,75
+    mixer.stop(ids[0]);
+    startVoice(1, 2.0f);
+    startVoice(2, 1.0f);
+    sim.cycle();
+    sim.cycle();
+    QCOMPARE(last(0), 0.75f);
+    QCOMPARE(last(1), 0.75f);
+    // 8 Stimmen gleichzeitig: Summe begrenzt auf 1,0, alle spielen
+    startVoice(0, 2.0f);
+    for (int i = 3; i < 8; ++i)
+        startVoice(i, 2.0f);
+    sim.cycle();
+    sim.cycle();
+    for (int i = 0; i < 8; ++i)
+        QVERIFY(mixer.sourceStats(ids[size_t(i)]).playing);
+    float peak = 0.0f;
+    for (float v : sim.output)
+        peak = std::max(peak, std::fabs(v));
+    QCOMPARE(peak, 1.0f);
+    QCOMPARE(last(0), 1.0f);
+    QCOMPARE(last(1), 1.0f);
+    QCOMPARE(sim.allocations, uint64_t(0));
+}
+
+void TstTonMischer::freeDecoder()
+{
+    Mixer mixer(2);
+    const int id = mixer.addSource();
+    AudioDecoder decoder(QStringLiteral(DSS_TEST_TON_DIR "/ton-piep.wav"), mixer.ring(id), false);
+    mixer.setVolume(id, 1.0f, false);
+    mixer.startFree(id, decoder.firstPass());
+    Sim sim(mixer);
+    sim.keepOutput = true;
+    QTRY_VERIFY_WITH_TIMEOUT(mixer.ring(id)->readable() >= 8192, 5000);
+    // Abruf langsamer als der Decoder schreibt; 1 s Ton und etwas Stille danach
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 10000
+           && !(decoder.state() == AudioDecoder::State::Ended
+                && mixer.sourceStats(id).frames >= decoder.statistics().frames)) {
+        sim.cycle();
+        QTest::qWait(1);
+    }
+    QCOMPARE(decoder.state(), AudioDecoder::State::Ended);
+    QCOMPARE(mixer.sourceStats(id).frames, decoder.statistics().frames);
+    QCOMPARE(decoder.statistics().frames, uint64_t(48000));
+    // Piep von 0,1 bis 0,3 s (Amplitude 0,5): erster deutlicher Wert bei Rahmen 4800 ±6
+    int64_t first = -1;
+    int64_t lastLoud = -1;
+    for (size_t n = 0; n < sim.output.size() / 2; ++n) {
+        if (std::fabs(sim.output[2 * n]) > 0.05f) {
+            if (first < 0)
+                first = int64_t(n);
+            lastLoud = int64_t(n);
+        }
+    }
+    QVERIFY2(std::llabs(first - 4800) <= 6, qPrintable(QString::number(first)));
+    QVERIFY2(std::llabs(lastLoud - 14400) <= 6, qPrintable(QString::number(lastLoud)));
     QCOMPARE(sim.allocations, uint64_t(0));
 }
 

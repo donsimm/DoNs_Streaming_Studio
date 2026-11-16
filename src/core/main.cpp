@@ -3,6 +3,7 @@
 // Läuft als Benutzerdienst von systemd (scripts/dienst-einrichten.sh), lässt sich aber auch
 // direkt starten. Schnittstelle: docs/08-kern-schnittstelle.md
 
+#include "actionservice.h"
 #include "configpaths.h"
 #include "coreservice.h"
 #include "coresettings.h"
@@ -21,11 +22,13 @@
 #include "mediainfo.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "actionsound.h"
 #include "mixer.h"
 #include "nulloutput.h"
 #include "pwoutput.h"
 #endif
 #if DSS_CORE_TWITCH
+#include "twitchchat.h"
 #include "twitchservice.h"
 #endif
 #include "systemdnotify.h"
@@ -155,6 +158,20 @@ int main(int argc, char *argv[])
                        "für Tests).").arg(QLatin1String(dss::NullOutput::kDeviceName)));
     parser.addOption(substituteOutputOption);
 #endif
+    // P14 b3, Stumm-Regel (Plan 3.4): Verbindung des Kerns der Version im Einsatz; Tests geben
+    // einen eigenen Pfad, damit ein laufender Kern im Einsatz sie nicht stumm schaltet.
+    const QCommandLineOption inUseOption(
+        QStringLiteral("einsatz-verbindung"),
+        QStringLiteral("Unix-Socket des Kerns der Version im Einsatz; antwortet dort ein Kern, startet "
+                       "dieser Kern keine Läufe aus Ereignissen (Standard in Arbeit: %1; für Tests).")
+            .arg(dss::defaultConnectionPath(dss::Edition::Installed)),
+        QStringLiteral("PFAD"));
+    const QCommandLineOption testEventsOption(
+        QStringLiteral("testereignisse"),
+        QStringLiteral("Nachricht test_event erlauben: Ereignisse vom Fenster auf den Ereignisfluss "
+                       "(nur für Tests)."));
+    parser.addOption(inUseOption);
+    parser.addOption(testEventsOption);
 #if DSS_CORE_TWITCH
     // P13 (Plan 2.6): Testserver statt id.twitch.tv, api.twitch.tv und eventsub.wss.twitch.tv. Nur
     // http://127.0.0.1:PORT, damit die Option kein Token an einen fremden Rechner schicken kann.
@@ -269,6 +286,8 @@ int main(int argc, char *argv[])
     store.setMediaSizeReader(dss::readMediaSize);
     // Format der Videos (P10b, Punkt 81): Hinweis, wenn die Browserquelle es nicht abspielt
     store.setVideoCodecReader(dss::readVideoCodec);
+    // P14 t: Länge der Töne im Dock «Medien»
+    store.setMediaDurationReader(dss::readMediaDuration);
 #endif
     if (!store.load(&error)) {
         qCritical("Datenordner %s: %s", qPrintable(store.dataDir()), qPrintable(error));
@@ -328,6 +347,42 @@ int main(int argc, char *argv[])
     service.setTwitchService(&twitch);
 #endif
 
+#if DSS_CORE_ACTIONS
+    // Aktionssystem (P14 b3). Nach service angelegt, also vor ihm zerstört (speichert dabei).
+    ActionService::Options actionOptions;
+    actionOptions.dataDir = dataDir;
+    if (parser.isSet(inUseOption))
+        actionOptions.inUseSocket = parser.value(inUseOption);
+    else if (dss::buildEdition() == dss::Edition::Development)
+        actionOptions.inUseSocket = dss::defaultConnectionPath(dss::Edition::Installed);
+    if (QFileInfo(actionOptions.inUseSocket).absoluteFilePath() == QFileInfo(socketPath).absoluteFilePath())
+        actionOptions.inUseSocket.clear(); // nie sich selbst prüfen
+    actionOptions.testEvents = parser.isSet(testEventsOption);
+#if DSS_CORE_TWITCH
+    // c1a: Chat senden über Twitch; nach twitch angelegt, also vor ihm zerstört
+    TwitchChatTransport chatTransport(&twitch);
+    actionOptions.chatTransport = &chatTransport;
+    actionOptions.broadcasterId = [&chatTransport] { return chatTransport.broadcasterId(); };
+    // c1b: Benutzerinfo, Shoutout, Ansage
+    TwitchActions twitchActions(&twitch);
+    actionOptions.twitchApi = &twitchActions;
+#endif
+    // c2: Laufzustand der Overlays und Töne des Chat-Bots (ActionSound legt erst der Block «Ton» an)
+    actionOptions.overlayLive = service.overlayLive();
+#if DSS_CORE_AUDIO
+    actionOptions.actionSound = [&service] { return service.actionSound(); };
+#endif
+    ActionService actions(service.eventBus(), actionOptions);
+    actions.load();
+    service.setActionService(&actions);
+#if DSS_CORE_TWITCH
+    QObject::connect(&twitch, &dss::twitch::TwitchService::stateChanged, &actions, &ActionService::accountsChanged);
+#endif
+#else
+    if (parser.isSet(testEventsOption))
+        qWarning("--testereignisse ohne Aktionssystem (DSS_CORE_ACTIONS aus)");
+#endif
+
 #if DSS_CORE_AUDIO
     // Ton der Videos über PipeWire (P12b b3): eigener Strom mit dem Ausgang aus kern.ini
     // ([ton-video]), standardmässig «kein Ausgang». Ohne PipeWire läuft der Kern ohne Ton weiter.
@@ -349,6 +404,23 @@ int main(int argc, char *argv[])
     service.setAudioOutput(audioOutput.get(), &audioMixer);
     if (!audioOutput->start(&error))
         qWarning("Ton: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
+
+    // Töne des Chat-Bots (P14 t): zweiter Strom mit eigenem Mischer und Ausgang aus kern.ini
+    // ([ton-aktionen]), standardmässig «kein Ausgang». Freie Stimmen ohne Seitentakt (mixer.h).
+    dss::Mixer actionMixer(dss::ActionSound::kMaxSounds);
+    std::unique_ptr<dss::AudioOutput> actionOutput;
+    if (parser.isSet(substituteOutputOption)) {
+        actionOutput = std::make_unique<dss::NullOutput>(&actionMixer);
+    } else {
+        actionOutput = std::make_unique<dss::PwOutput>(&actionMixer, QStringLiteral("ton-aktionen"),
+                                                       installed ? QStringLiteral("dss_core_ton_aktionen")
+                                                                 : QStringLiteral("dss_core_entwicklung_ton_aktionen"),
+                                                       QStringLiteral("DoNs Streaming Studio (%1): Ton des Chat-Bots")
+                                                           .arg(dss::editionLabel()));
+    }
+    service.setActionAudioOutput(actionOutput.get(), &actionMixer);
+    if (!actionOutput->start(&error))
+        qWarning("Ton Chat-Bot: kein PipeWire, Kern läuft ohne Ton: %s", qPrintable(error));
 #endif
 
     QObject::connect(&signalWatcher, &dss::UnixSignalWatcher::terminationRequested, &app,

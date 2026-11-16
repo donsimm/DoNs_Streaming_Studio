@@ -1,0 +1,38 @@
+[
+  {
+    "_id": "6540b0000000000000000001",
+    "commandId": "c1000000-0000-4000-8000-000000000001",
+    "name": "!testbefehl",
+    "platform": "twitch",
+    "source": 0,
+    "usedAt": "2026-11-01T18:00:00.0000000Z",
+    "userId": "100000001"
+  },
+  {
+    "_id": "6540b0000000000000000002",
+    "commandId": "c1000000-0000-4000-8000-000000000001",
+    "name": "!testbefehl",
+    "platform": "twitch",
+    "source": 0,
+    "usedAt": "2026-11-02T18:00:00.0000000Z",
+    "userId": "100000001"
+  },
+  {
+    "_id": "6540b0000000000000000003",
+    "commandId": "c1000000-0000-4000-8000-000000000001",
+    "name": "!testbefehl",
+    "platform": "twitch",
+    "source": 0,
+    "usedAt": "2026-11-03T18:00:00.0000000Z",
+    "userId": "100000002"
+  },
+  {
+    "_id": "6540b0000000000000000004",
+    "commandId": "c1000000-0000-4000-8000-000000000002",
+    "name": "!zweiterbefehl",
+    "platform": "youtube",
+    "source": 0,
+    "usedAt": "2026-11-04T18:00:00.0000000Z",
+    "userId": "youtube-testzuschauer1"
+  }
+]

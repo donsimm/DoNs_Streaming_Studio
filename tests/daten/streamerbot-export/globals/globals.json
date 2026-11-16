@@ -1,0 +1,31 @@
+[
+  {
+    "_id": "testZaehler",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "value": 42
+  },
+  {
+    "_id": "testText",
+    "lastWrite": "2026-11-01T18:00:00.1234567Z",
+    "value": "Hallo Testwert"
+  },
+  {
+    "_id": "testGross",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "value": 5000000000
+  },
+  {
+    "_id": "testSchalter",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "value": true
+  },
+  {
+    "_id": "testPaket",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "value": "{\"farbe\":\"testfarbe\",\"stufe\":3}"
+  },
+  {
+    "_id": "testOhneWert",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z"
+  }
+]

@@ -16,6 +16,7 @@
 #include "browsersource.h"
 #include "canvaswidget.h"
 #include "coreclient.h"
+#include "coresession.h"
 #include "configpaths.h"
 #include "coresettings.h"
 #include "dockviews.h"
@@ -891,6 +892,47 @@ private slots:
         QVERIFY(name->text().isEmpty());
         selectSourceRow(0);
         QCOMPARE(name->text(), sourceAtRow(0).name);
+    }
+
+    // P14 d: Laufzustand im Fenster: Markierung «live» im Dock «Quellen», Bereich «Chat-Bot» mit
+    // «Jetzt» und «Ausblenden». Die Overlay-Datei (Auge, Text) bleibt.
+    void liveMark()
+    {
+        auto *list = child<SourceList>("sourceList");
+        auto *state = child<QLabel>("liveState");
+        auto *hide = child<QPushButton>("hideLiveButton");
+        QVERIFY(list && state && hide);
+        selectOverlayNamed(QStringLiteral("Test Szene"));
+        selectSourceRow(0);
+        const Source source = sourceAtRow(0);
+        QCOMPARE(state->text(), QStringLiteral("nicht live"));
+        QVERIFY(!hide->isEnabled());
+        QVERIFY(!list->item(0)->data(SourceList::kLiveRole).toBool());
+
+        CoreSession session;
+        QString error;
+        QVERIFY2(session.open(m_run->filePath(QStringLiteral("kern.sock")), QStringLiteral("tst_fensterbearbeiten"), &error),
+                 qPrintable(error));
+        LiveSetRequest set;
+        set.overlayId = m_scene;
+        set.mode = LiveMode::Hide;
+        set.elements = {{source.id, std::nullopt, QString()}};
+        set.durationMs = 60000;
+        const auto result = session.request(liveSetMessage(set), &error);
+        QVERIFY2(result && result->ok, qPrintable(error));
+        QTRY_VERIFY_WITH_TIMEOUT(list->item(0)->data(SourceList::kLiveRole).toBool(), 3000);
+        QVERIFY(list->item(0)->toolTip().contains(QStringLiteral("live")));
+        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("live versteckt, noch ")), 3000);
+        QVERIFY(hide->isEnabled());
+        // Datei unverändert: Auge wie vorher
+        QCOMPARE(sourceAtRow(0).visible, source.visible);
+        QCOMPARE(list->item(0)->toolTip().startsWith(visibilityToolTip(source.visible)), true);
+
+        hide->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!list->item(0)->data(SourceList::kLiveRole).toBool(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(state->text(), QStringLiteral("nicht live"), 3000);
+        QVERIFY(!hide->isEnabled());
+        QCOMPARE(sourceAtRow(0).visible, source.visible);
     }
 
     void overlays()
@@ -2028,7 +2070,7 @@ private slots:
         QCOMPARE(header->sizePolicy().verticalPolicy(), QSizePolicy::Fixed);
         QCOMPARE(live->text(), QStringLiteral("Live"));
         QVERIFY(live->isChecked());
-        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 1);
+        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 5); // «Live», «Aktionen» (P14 e2-11), «Befehle», «Zeitnachrichten», «Variablen» (e3-4)
         QCOMPARE(events->columnCount(), 4);
         const QTreeWidgetItem *labels = events->headerItem();
         QCOMPARE(QStringList({labels->text(0), labels->text(1), labels->text(2), labels->text(3)}),
@@ -2037,7 +2079,9 @@ private slots:
         for (QLabel *l : page->findChildren<QLabel *>(QStringLiteral("chatBotPanelTitle")))
             panelTitle = panelTitle || l->text() == QStringLiteral("Ereignisse");
         QVERIFY(panelTitle);
-        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("Twitch: ")) && state->text() != QStringLiteral("Twitch: –"), 3000);
+        // P14 e2-11: mit actions_status zeigt die Kopfzeile «aus» oder «stumm: …» (ohne
+        // --einsatz-verbindung je nach laufender Version im Einsatz), sonst den Text von Twitch.
+        QTRY_VERIFY_WITH_TIMEOUT(!state->text().isEmpty() && state->text() != QStringLiteral("Twitch: –"), 3000);
 
         // Reiter wechseln: alle Docks aus, Menü «Docks» gesperrt; zurück: die vorher offenen wieder
         const QList<QDockWidget *> docks = m_window->findChildren<QDockWidget *>();

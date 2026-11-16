@@ -4,6 +4,7 @@
 // Schleifen), «verwendet in», Löschen abgewiesen, ungültige Datei, nur der Kern schreibt, Liste
 // der Videoformate. Daten wie im Handtest: Bilder und Videos aus prototypes/media.
 
+#include "mediaimport.h"
 #include "medialibrary.h"
 #include "overlaystore.h"
 #include "videoformat.h"
@@ -24,6 +25,7 @@ using namespace dss;
 namespace {
 
 const QString kMediaDir = QStringLiteral(DSS_TEST_MEDIA_DIR);
+const QString kTonDir = QStringLiteral(DSS_TEST_TON_DIR); // P14 t: Tondateien ohne Bild
 
 QString ref(char c, const char *suffix)
 {
@@ -175,6 +177,63 @@ private slots:
         QString error;
         QVERIFY(!parseMediaLibrary(data, &l, &error));
         QVERIFY2(error.contains(message), qPrintable(error));
+    }
+
+    // P14 t: Medienart «Ton» (mp3, wav, ogg, m4a): Art, Name, Schlüssel, Medienliste, Ersatzname,
+    // Übernehmen nur als Ton, Länge über den Leser des Kerns (einmal je Datei), Reste von QSaveFile.
+    void audioFiles()
+    {
+        for (const char *suffix : {"mp3", "wav", "ogg", "m4a", "MP3"}) {
+            QCOMPARE(mediaKindOf(ref('a', suffix)), std::optional<MediaKind>(MediaKind::Audio));
+        }
+        QCOMPARE(mediaKindOf(ref('a', "flac")), std::nullopt);
+        QCOMPARE(mediaKindName(MediaKind::Audio), QStringLiteral("Ton"));
+        QCOMPARE(mediaKindKey(MediaKind::Audio), QStringLiteral("audio"));
+        QCOMPARE(mediaKindFromKey(QStringLiteral("audio")), std::optional<MediaKind>(MediaKind::Audio));
+        QCOMPARE(mediaUseOf(MediaKind::Audio), MediaUse::Audio);
+        for (MediaKind kind : kMediaKinds)
+            QCOMPARE(mediaKindFromKey(mediaKindKey(kind)), std::optional<MediaKind>(kind));
+        QVERIFY(isSaveFileLeftover(QString(64, QLatin1Char('a')) + QStringLiteral(".m4a.AbCdEf")));
+
+        MediaLibrary l = sampleLibrary();
+        l.files.append({ref('d', "mp3"), QStringLiteral("Glocke.mp3"), uuid(1)});
+        MediaLibrary back;
+        QString error;
+        QVERIFY2(parseMediaLibrary(serializeMediaLibrary(l), &back, &error), qPrintable(error));
+        QCOMPARE(back, l);
+        MediaLibrary fresh;
+        QVERIFY(reconcileMediaLibrary(&fresh, {{ref('e', "ogg"), QDateTime(QDate(2026, 11, 15), QTime(9, 0)), 10}}));
+        QCOMPARE(fresh.entry(ref('e', "ogg"))->name, QStringLiteral("Ton vom 2026-11-15"));
+
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        OverlayStore store(dir.path());
+        QVERIFY2(store.load(&error), qPrintable(error));
+        int reads = 0;
+        store.setMediaDurationReader([&reads](const QString &path, qint64 *ms, QString *) {
+            ++reads;
+            *ms = path.endsWith(QLatin1String(".wav")) ? 1000 : 0;
+            return true;
+        });
+        const QString wav = kTonDir + QStringLiteral("/ton-piep.wav");
+        QVERIFY(store.importMedia(wav, MediaUse::Video, &error).isEmpty());
+        QVERIFY2(error.contains(QStringLiteral("Endung «wav» nicht erlaubt")), qPrintable(error));
+        const QString sound = store.importMedia(wav, MediaUse::Audio, &error);
+        QVERIFY2(!sound.isEmpty(), qPrintable(error));
+        QCOMPARE(sound, QStringLiteral("media/") + sha256Name(wav));
+        QCOMPARE(store.mediaName(sound), QStringLiteral("ton-piep.wav"));
+        QCOMPARE(store.mediaDurationMs(sound), qint64(1000));
+        QCOMPARE(store.mediaDurationMs(sound), qint64(1000));
+        QCOMPARE(reads, 1);
+        // Kein Ton: kein Lesen
+        const QString image = store.importMedia(kMediaDir + QStringLiteral("/bild1.png"), MediaUse::Image, &error);
+        QVERIFY2(!image.isEmpty(), qPrintable(error));
+        QCOMPARE(store.mediaDurationMs(image), qint64(0));
+        QCOMPARE(reads, 1);
+        // Töne sind in keinem Overlay verwendet und lassen sich löschen
+        QVERIFY(store.mediaUsages().value(sound).isEmpty());
+        QVERIFY2(store.removeMedia(sound, &error), qPrintable(error));
+        QVERIFY(!store.mediaLibrary().entry(sound));
     }
 
     void reconcile()

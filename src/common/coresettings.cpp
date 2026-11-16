@@ -287,6 +287,7 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# [ton-video]: Ausgang für den Ton der Videos (Name in PipeWire, leer = kein Ton) und\n"
             "# versatz_ms (" + QByteArray::number(kAudioOffsetMinMs) + " bis "
             + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n"
+            "# [ton-aktionen]: Ausgang für die Töne des Chat-Bots; versatz_ms wirkt dort nicht.\n"
             "# [twitch]: aktiv ja oder nein, Client-ID der App bei Twitch. Token und Client Secret stehen\n"
             "# nicht hier, sondern verschlüsselt in twitch-token.cred, twitch-bot-token.cred und\n"
             "# twitch-client-secret.cred.\n";

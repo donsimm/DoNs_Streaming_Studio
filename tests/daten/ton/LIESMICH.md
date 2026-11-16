@@ -25,6 +25,24 @@ und «blip» aus EBU R37-2007. Schlüsselbilder alle 2 s, auf dem Blitz.
 Alle MP4 haben dasselbe Bild (einmal kodiert, dann kopiert). Zusammen rund 4,7 MB; die Bildqualität
 ist niedrig gewählt (H.264 `-crf 32`, VP9 `-crf 50`), der Zähler bleibt lesbar.
 
+## Töne ohne Bild (P14 t)
+
+Für die Medienart «Ton» des Chat-Bots (`tst_tondecoder` «audioOnly», `tst_medienliste`). Erzeugt am
+2026-11-15 mit `sh tests/daten/ton/erzeugen-toene.sh` (FFmpeg 7.1.5-0+deb13u1, aufgerufen über den
+Test `toene_vorbereiten` in `ctest`, der das Skript nur startet, wenn die Dateien fehlen) und
+eingefroren. Je 1 s: 0,1 s Stille, 0,2 s Sinus 1 kHz mit halber Vollaussteuerung, danach Stille.
+
+| Datei | Ton |
+|---|---|
+| `ton-piep.wav` | PCM 16 bit, 48 kHz, Stereo |
+| `ton-piep.mp3` | MP3 (LAME), 44,1 kHz, Stereo, 128 kbit/s |
+| `ton-piep.ogg` | Vorbis, 48 kHz, Stereo |
+| `ton-piep.m4a` | AAC, 48 kHz, Mono |
+
+Gemessen mit dem Decoder des Kerns (`tst_tondecoder`, 2026-11-15): WAV und M4A Einsatz bei 4802
+bzw. 4803 Rahmen (Soll 4800); MP3 um 1203 Rahmen (25 ms) später, die Verzögerung des Encoders;
+Ogg Vorbis um 128 Rahmen (2,7 ms) später.
+
 ## Bildrate
 
 Die Bildrate soll der von OBS entsprechen (Messgenauigkeit ±½ Bild). In M3 (2026-11-13) hat Lotse

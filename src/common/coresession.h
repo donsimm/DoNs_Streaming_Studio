@@ -31,18 +31,31 @@ public:
     // P10b: Medienliste und Änderungen (request.requestId wird hier vergeben).
     std::optional<MediaListData> getMediaList(QString *error);
     std::optional<ChangeResult> change(ChangeRequest request, QString *error);
+    // P14 d: Overlay-Liste und ganzes Overlay (für dss-cli live-…)
+    std::optional<OverlayListData> getOverlayList(QString *error);
+    std::optional<Overlay> getOverlay(const QUuid &id, QString *error);
+    // P14 d: Anfrage mit eigener request_id (wird hier eingesetzt), Antwort change_result
+    // (overlay_live_set, overlay_live_reset).
+    std::optional<ChangeResult> request(QJsonObject message, QString *error);
+    // Nächste Nachricht vom Typ type; error-Nachrichten des Kerns brechen mit deren Text ab,
+    // andere (overlay_list, stats, …) werden übersprungen. P14 d: öffentlich für overlay_live.
+    std::optional<QJsonObject> waitFor(const QString &type, QString *error,
+                                       qint64 requestId = -1);
     // P13: Ereignisse bestellen (request.history wird gesetzt) und den Verlauf zurückgeben.
     std::optional<QList<events::Event>> subscribeEvents(const QStringList &filters, QString *error);
     // P13: nächste Nachricht event oder events_dropped, ohne Zeitgrenze; std::nullopt mit
     // Meldung, wenn der Kern trennt.
     std::optional<QJsonObject> nextEventMessage(QString *error);
+    // P14 b3: Anfrage des Aktionssystems (request_id wird hier vergeben) und Antwort vom Typ
+    // replyType (change_result oder eigene Nachricht) mit derselben request_id. Ein change_result
+    // mit ok false ist eine Antwort, kein Fehler.
+    std::optional<QJsonObject> actionsRequest(const QString &type, const QJsonObject &fields,
+                                              const QString &replyType, QString *error);
+    // P14 b3: nächste Nachricht vom Typ type (zum Beispiel actions_config nach hello)
+    std::optional<QJsonObject> waitForMessage(const QString &type, QString *error);
 
 private:
     bool send(const QJsonObject &message, QString *error);
-    // Nächste Nachricht vom Typ type; error-Nachrichten des Kerns brechen mit deren Text ab,
-    // andere (overlay_list, stats, …) werden übersprungen.
-    std::optional<QJsonObject> waitFor(const QString &type, QString *error,
-                                       qint64 requestId = -1);
     // Wie waitFor, für mehrere Typen; timeoutMs < 0 = ohne Grenze.
     std::optional<QJsonObject> waitForAny(const QStringList &types, QString *error, qint64 requestId,
                                           int timeoutMs);

@@ -314,6 +314,7 @@ Ein Ereignis startet alle aktiven Aktionen mit passendem Auslöser in der Reihen
 ### 4.3 Ton abspielen
 
 - `file` aus der Mediathek, `volume` 0 bis 200 %, `wait` (Standard an). Höchstens 8 Töne gleichzeitig. Im Bereich des Schritts «Anhören» über denselben Ausgang.
+- **Abbruch:** Entscheid Nutzer 2026-11-16: Abbruch beendet die Töne des Laufs, sofort und mit und ohne `wait` (Schritt «Abbruch», «Lauf abbrechen», Zeit- und Schrittgrenze, Grenze der Ebenen). Beim normalen Ende nach dem letzten Schritt (auch mit Fehler in einem Schritt) spielen Töne ohne `wait` zu Ende.
 - **Ausgang:** eigener Zweck `aktionen` neben `video` (Entscheid 2026-11-09: «je Zweck oder Modul ein eigener Ausgang»): `{"aktionen", "ton-aktionen"}` in `kAudioPurposes`, Abschnitt `[ton-aktionen]` in `kern.ini`, `audio_routes.aktionen`, Zeile «Ton Chat-Bot» im Dock «Steuerung» (Ausgang und Zustand, ohne Versatz). Standard: kein Ausgang gewählt; der Schritt meldet das.
 - **Was fehlt (Abschnitt t):**
   1. Medienart «Ton» in der Mediathek: `mp3`, `wav`, `ogg`, `m4a`; Dock «Medien» zeigt Symbol und Länge.

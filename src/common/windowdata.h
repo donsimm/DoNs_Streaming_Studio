@@ -1,9 +1,12 @@
 #pragma once
 
+#include "actionprotocol.h"
 #include "overlay.h"
+#include "overlaylive.h"
 #include "protocol.h"
 #include "systemstats.h"
 
+#include <QDateTime>
 #include <QList>
 #include <QString>
 #include <QUuid>
@@ -56,6 +59,18 @@ struct SourceRow
 };
 QList<SourceRow> sourceRows(const Overlay &overlay);
 QString visibilityToolTip(bool visible); // «eingeblendet» / «ausgeblendet»
+
+// P14 d: Bereich «Chat-Bot» im Dock «Eigenschaften» zur gewählten Quelle (Laufzustand vom Kern).
+struct LiveRow
+{
+    QString text;         // «nicht live», «live sichtbar, noch 6 s», ohne Quelle leer
+    bool live = false;    // Markierung «live» im Dock «Quellen»
+    bool canHide = false; // Knopf «Ausblenden»: live und verbunden
+};
+LiveRow liveRow(const LiveElements &elements, const QUuid &sourceId, bool connected);
+// Abstand bis zur nächsten Anzeige der Restdauer in ms (auf die nächste volle Sekunde, mindestens
+// 50 ms); -1, wenn kein Element eine Dauer hat.
+int liveRefreshMs(const LiveElements &elements);
 
 // Quelle mit der Kennung, nullptr wenn es sie nicht gibt.
 const Source *findSource(const Overlay &overlay, const QUuid &sourceId);
@@ -130,41 +145,77 @@ QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInf
 
 // P13, Reiter «Chat-Bot»: Kopfzeile rechts. state für die Farbe im Theme: «ok» (Kanal verbunden,
 // Bot angemeldet), «warning» (Kanal verbunden, Bot fehlt), «error» (Kanal mit Fehler), «off».
+// P14 e2-4: mit actions_status dazu der Schalter «Chat-Bot aktiv». Reihenfolge: unavailable,
+// file_error (Text aus message, error, Schalter aus und ausgegraut), Twitch-Kanal mit Fehler (wie
+// ohne actions), off («aus»), muted («stumm: Version im Einsatz läuft», warning), on ohne Bot («Bot
+// nicht angemeldet: sendet als Kanal», warning), on («läuft · liest als … · sendet als …», ok).
+// Ohne actions_status oder ohne verbundenen Kanal: Text wie ohne actions.
 struct ChatBotHeaderView
 {
     QString text;
     QString toolTip; // Einzelheiten wie im Bereich «Twitch» (twitchStatusText)
     QString state = QStringLiteral("off");
+    bool switchChecked = false; // «Chat-Bot aktiv»
+    bool switchEnabled = false;
 };
-ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status);
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status,
+                                    const std::optional<ActionsStatus> &actions = std::nullopt);
+// Klick auf «Chat-Bot aktiv»: Anfrage actions_set_enabled
+ActionsEdit actionsSetEnabledEdit(bool enabled);
 
 // P13, Bereich «Ereignisse» im Unterreiter «Live»: was das Fenster bestellt (subscribe_events). Ohne
 // Chat-Nachrichten (die zeigt P14 im Bereich «Chat») und ohne Kanalpunkte und OBS (nicht im Entwurf).
 QStringList chatBotEventFilters();
-// Eine Zeile: Zeit (lokal, hh:mm:ss), Art, Name, Details.
+// P14 e2-6: Bestellung des Unterreiters «Live» (Bereiche «Chat», «Ereignisse», «Läufe der Aktionen»):
+// chatBotEventFilters() und dazu twitch.chat_message, twitch.chat_sent, twitch.chat_dropped und actions.
+QStringList chatBotLiveFilters();
+// Zeit einer Zeile: lokal, hh:mm:ss; ungültig «–»
+QString rowTimeText(const QDateTime &time);
+// Eine Zeile: Zeit (lokal, hh:mm:ss), Art, Name, Details. isChat: twitch.chat_message (P14 e2-6).
 struct EventRow
 {
     QString time;
     QString kind;
     QString name;
     QString details;
+    bool isChat = false;
 
     bool operator==(const EventRow &) const = default;
 };
 EventRow eventRow(const events::Event &event);
+// Was das Fenster an einer sichtbaren Liste ändern muss, wenn eine Zeile hinten dazukommt: erst
+// removedFront Zeilen vorne entfernen, dann bei appended die neue Zeile anhängen (P14 e2-6).
+struct RowsAppend
+{
+    bool appended = false;
+    int removedFront = 0;
+
+    bool operator==(const RowsAppend &) const = default;
+};
 // Liste der Zeilen, älteste zuerst, höchstens kMaxRows (Plan 2.7).
 class EventRows
 {
 public:
     static constexpr int kMaxRows = 200;
-    // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten.
+    // Typen mit Zeile im Bereich «Ereignisse»: chatBotEventFilters() und twitch.chat_message
+    static bool shows(const QString &type);
+    // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten. Typen
+    // ohne Zeile (shows) fallen weg.
     void reset(const QList<events::Event> &events);
-    // Hängt eine Zeile an; Rückgabe: wie viele alte Zeilen vorne dafür wegfallen (0 oder 1).
-    int append(const events::Event &event);
+    // P14 e2-6: Hängt eine Zeile an, wenn der Typ eine hat (shows); Rückgabe für visibleRows.
+    RowsAppend add(const events::Event &event);
+    // «Chat-Nachrichten ausblenden» (Standard an): visibleRows ohne isChat. Danach baut das Fenster
+    // die Liste neu.
+    void setHideChat(bool hideChat) { m_hideChat = hideChat; }
+    bool hideChat() const { return m_hideChat; }
     const QList<EventRow> &rows() const { return m_rows; }
+    QList<EventRow> visibleRows() const;
 
 private:
+    bool visible(const EventRow &row) const { return !m_hideChat || !row.isChat; }
+
     QList<EventRow> m_rows;
+    bool m_hideChat = true;
 };
 // Statuszeile bei events_dropped (Gegendruck im Kern).
 QString eventsDroppedText(qint64 count);

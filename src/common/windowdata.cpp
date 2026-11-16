@@ -82,6 +82,35 @@ QString visibilityToolTip(bool visible)
     return visible ? QStringLiteral("eingeblendet") : QStringLiteral("ausgeblendet");
 }
 
+LiveRow liveRow(const LiveElements &elements, const QUuid &sourceId, bool connected)
+{
+    LiveRow row;
+    if (sourceId.isNull())
+        return row;
+    const auto it = elements.constFind(sourceId);
+    if (it == elements.constEnd()) {
+        row.text = liveStateText(std::nullopt, -1);
+        return row;
+    }
+    row.text = liveStateText(*it, it->remainingMs);
+    row.live = true;
+    row.canHide = connected;
+    return row;
+}
+
+int liveRefreshMs(const LiveElements &elements)
+{
+    qint64 next = -1;
+    for (const LiveElement &e : elements) {
+        if (e.remainingMs < 0)
+            continue;
+        // Anzeige rundet auf: Wechsel bei jeder vollen Sekunde der Restdauer
+        const qint64 toSecond = e.remainingMs % 1000 == 0 ? 1000 : e.remainingMs % 1000;
+        next = next < 0 ? toSecond : std::min(next, toSecond);
+    }
+    return next < 0 ? -1 : int(std::max<qint64>(50, next));
+}
+
 const Source *findSource(const Overlay &overlay, const QUuid &sourceId)
 {
     const int index = sourceIndex(overlay, sourceId);
@@ -292,7 +321,10 @@ QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInf
     return lines.join(QLatin1Char('\n'));
 }
 
-ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status)
+namespace {
+
+// Kopfzeile nur aus dem Stand von Twitch (P13)
+ChatBotHeaderView twitchHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status)
 {
     ChatBotHeaderView v;
     v.toolTip = twitchStatusText(status);
@@ -323,6 +355,56 @@ ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::opt
     return v;
 }
 
+} // namespace
+
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status,
+                                    const std::optional<ActionsStatus> &actions)
+{
+    ChatBotHeaderView v = twitchHeaderView(channelState, status);
+    if (!actions)
+        return v;
+    const QString &state = actions->state;
+    if (state == QLatin1String("unavailable") || state == QLatin1String("file_error")) {
+        // Der Kern nimmt keine Änderung an: Schalter aus und ausgegraut
+        v.text = actions->message;
+        v.state = QStringLiteral("error");
+        return v;
+    }
+    // Stumm: echter Stand des Hauptschalters, ausgegraut, weil die Version ohnehin nicht sendet
+    // (Entscheid des Nutzers, 2026-11-16)
+    const bool muted = state == QLatin1String("muted");
+    v.switchEnabled = !muted;
+    v.switchChecked = muted ? actions->enabled : state == QLatin1String("on");
+    if (channelState == ConnectionState::Error)
+        return v;
+    if (state == QLatin1String("off")) {
+        v.text = QStringLiteral("aus");
+        v.state = QStringLiteral("off");
+        return v;
+    }
+    if (state == QLatin1String("muted")) {
+        v.text = QStringLiteral("stumm: Version im Einsatz läuft");
+        v.state = QStringLiteral("warning");
+        return v;
+    }
+    // on: ohne verbundenen Kanal bleibt der Text von Twitch (verbinde, nicht eingerichtet)
+    if (channelState != ConnectionState::Connected || !status || !twitchAccountValid(status->channel))
+        return v;
+    if (!twitchBotProblem(status).isEmpty()) {
+        v.text = QStringLiteral("Bot nicht angemeldet: sendet als Kanal");
+        v.state = QStringLiteral("warning");
+        return v;
+    }
+    v.text = QStringLiteral("läuft · liest als %1 · sendet als %2").arg(status->channel.login, status->bot.login);
+    v.state = QStringLiteral("ok");
+    return v;
+}
+
+ActionsEdit actionsSetEnabledEdit(bool enabled)
+{
+    return {QString::fromLatin1(msg::kActionsSetEnabled), QJsonObject{{QStringLiteral("enabled"), enabled}}};
+}
+
 QStringList chatBotEventFilters()
 {
     // twitch.gift_sub nicht: Jedes Geschenk kommt schon als twitch.gift_bomb (mit Anzahl), sonst
@@ -332,6 +414,19 @@ QStringList chatBotEventFilters()
             QStringLiteral("twitch.subscribe"),     QStringLiteral("twitch.resubscribe"),
             QStringLiteral("twitch.gift_bomb"),     QStringLiteral("twitch.cheer"),
             QStringLiteral("twitch.raid")};
+}
+
+QStringList chatBotLiveFilters()
+{
+    // Präfix actions. statt der einzelnen run_*: alle Meldungen der Läufe (Plan 3.5)
+    return chatBotEventFilters()
+           + QStringList{QStringLiteral("twitch.chat_message"), QStringLiteral("twitch.chat_sent"),
+                         QStringLiteral("twitch.chat_dropped"), QStringLiteral("actions.")};
+}
+
+QString rowTimeText(const QDateTime &time)
+{
+    return time.isValid() ? time.toLocalTime().toString(QStringLiteral("HH:mm:ss")) : QStringLiteral("–");
 }
 
 namespace {
@@ -359,8 +454,7 @@ QString tierText(const QJsonObject &data)
 EventRow eventRow(const events::Event &event)
 {
     EventRow row;
-    row.time = event.time.isValid() ? event.time.toLocalTime().toString(QStringLiteral("HH:mm:ss"))
-                                    : QStringLiteral("–");
+    row.time = rowTimeText(event.time);
     const QJsonObject &d = event.data;
     const QString user = QStringLiteral("user");
     const QString &t = event.type;
@@ -400,6 +494,11 @@ EventRow eventRow(const events::Event &event)
         row.kind = QStringLiteral("Raid");
         row.name = viewerName(d, QStringLiteral("from_user"));
         row.details = QStringLiteral("%1 Zuschauer").arg(d.value(QStringLiteral("viewers")).toInt());
+    } else if (t == QLatin1String("twitch.chat_message")) {
+        row.kind = QStringLiteral("Chat");
+        row.name = viewerName(d, user);
+        row.details = d.value(QStringLiteral("text")).toString();
+        row.isChat = true;
     } else {
         // Typen ohne eigene Zeile (später bestellt): Typ als Art
         row.kind = t;
@@ -408,20 +507,43 @@ EventRow eventRow(const events::Event &event)
     return row;
 }
 
+bool EventRows::shows(const QString &type)
+{
+    return type == QLatin1String("twitch.chat_message") || chatBotEventFilters().contains(type);
+}
+
 void EventRows::reset(const QList<events::Event> &events)
 {
     m_rows.clear();
-    for (qsizetype i = std::max<qsizetype>(0, events.size() - kMaxRows); i < events.size(); ++i)
-        m_rows.append(eventRow(events.at(i)));
+    for (qsizetype i = events.size() - 1; i >= 0 && m_rows.size() < kMaxRows; --i) {
+        if (shows(events.at(i).type))
+            m_rows.prepend(eventRow(events.at(i)));
+    }
 }
 
-int EventRows::append(const events::Event &event)
+RowsAppend EventRows::add(const events::Event &event)
 {
+    RowsAppend change;
+    if (!shows(event.type))
+        return change;
+    if (m_rows.size() >= kMaxRows) {
+        if (visible(m_rows.first()))
+            change.removedFront = 1;
+        m_rows.removeFirst();
+    }
     m_rows.append(eventRow(event));
-    if (m_rows.size() <= kMaxRows)
-        return 0;
-    m_rows.removeFirst();
-    return 1;
+    change.appended = visible(m_rows.last());
+    return change;
+}
+
+QList<EventRow> EventRows::visibleRows() const
+{
+    QList<EventRow> result;
+    for (const EventRow &r : m_rows) {
+        if (visible(r))
+            result.append(r);
+    }
+    return result;
 }
 
 QString eventsDroppedText(qint64 count)

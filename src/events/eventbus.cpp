@@ -132,9 +132,11 @@ bool EventBus::publish(Event event)
     else
         event.time = event.time.toUTC();
 
-    m_history.append(event);
-    if (m_history.size() > kHistorySize)
-        m_history.remove(0, m_history.size() - kHistorySize);
+    if (keepsHistory(event.type)) {
+        m_history.append(event);
+        if (m_history.size() > kHistorySize)
+            m_history.remove(0, m_history.size() - kHistorySize);
+    }
 
     for (qsizetype i = 0; i < m_subscribers.size();) {
         const std::shared_ptr<detail::SubscriberState> state = m_subscribers.at(i);

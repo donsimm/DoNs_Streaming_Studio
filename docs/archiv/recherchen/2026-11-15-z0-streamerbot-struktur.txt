@@ -1,0 +1,254 @@
+
+Datei: commands.db (LiteDB, Log-Datei keine, 3 Sammlung(en))
+  Sammlung: commandUsage (4485 Dokumente)
+    Feld       Typ       in Dokumenten
+    _id        ObjectId  4485
+    commandId  Guid      4485
+    name       String    4485
+    platform   String    4485
+    source     Int32     4485
+    usedAt     DateTime  4485
+    userId     String    4485
+  Sammlung: commandUsageUserCounts (0 Dokumente)
+  Sammlung: commandUsageUserCounts_temp (0 Dokumente)
+
+Datei: firstwords.db (LiteDB, Log-Datei keine, 1 Sammlung(en))
+  Sammlung: last_update (0 Dokumente)
+
+Datei: globals.db (LiteDB, Log-Datei keine, 3 Sammlung(en))
+  Sammlung: globals (84 Dokumente)
+    Feld       Typ                         in Dokumenten
+    _id        String                      84
+    lastWrite  DateTime                    84
+    value      Boolean|Int32|Int64|String  80
+  Sammlung: temp_user_globals (0 Dokumente)
+  Sammlung: user_globals (881 Dokumente)
+    Feld       Typ                 in Dokumenten
+    _id        ObjectId            881
+    lastWrite  DateTime            881
+    name       String              881
+    platform   String              881
+    userId     String              881
+    value      Int32|Int64|String  881
+
+Datei: kick_data.db (LiteDB, Log-Datei keine, 7 Sammlung(en))
+  Sammlung: channelRewards (0 Dokumente)
+  Sammlung: kicksHistory (0 Dokumente)
+  Sammlung: rewardRedemptionUserCounts (0 Dokumente)
+  Sammlung: rewardRedemptionUserCounts_temp (0 Dokumente)
+  Sammlung: rewardRedemptions (0 Dokumente)
+  Sammlung: settings (1 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  1
+    value  String  1
+  Sammlung: subscriptionHistory (0 Dokumente)
+
+Datei: pronouns.db (LiteDB, Log-Datei keine, 2 Sammlung(en))
+  Sammlung: pronouns (271 Dokumente)
+    Feld     Typ          in Dokumenten
+    _id      ObjectId     271
+    pronoun  String       271
+    type     String       271
+    value    Null|String  271
+  Sammlung: user_custom_pronouns (0 Dokumente)
+
+Datei: quotes.dat (JSON-Text, Wurzel Object, 1 Einträge)
+    Feld                Typ     in Dokumenten
+    quotes              Array   1
+    quotes[]            Object  1
+    quotes[].gameName   String  1
+    quotes[].id         Number  1
+    quotes[].platform   String  1
+    quotes[].quote      String  1
+    quotes[].timestamp  String  1
+    quotes[].user       String  1
+    quotes[].userId     String  1
+    t                   String  1
+    version             Number  1
+
+Datei: simulated_events_data.db (LiteDB, Log-Datei keine, 2 Sammlung(en))
+  Sammlung: eventHistory (17 Dokumente)
+    Feld       Typ       in Dokumenten
+    _id        ObjectId  17
+    settings   String    17
+    timestamp  DateTime  17
+    type       Int32     17
+  Sammlung: eventSettings (2 Dokumente)
+    Feld      Typ     in Dokumenten
+    _id       Int32   2
+    settings  String  2
+
+Datei: trovo_data.db (LiteDB, Log-Datei keine, 0 Sammlung(en))
+
+Datei: twitch_data.db (LiteDB, Log-Datei keine, 25 Sammlung(en))
+  Sammlung: bits (85 Dokumente)
+    Feld       Typ       in Dokumenten
+    _id        ObjectId  85
+    amount     Int32     85
+    timestamp  DateTime  85
+    userId     String    85
+  Sammlung: customPowerUpRedemptionUserCounts (0 Dokumente)
+  Sammlung: customPowerUpRedemptionUserCounts_temp (0 Dokumente)
+  Sammlung: customPowerUpRedemptions (0 Dokumente)
+  Sammlung: giftBombHistory (6 Dokumente)
+    Feld             Typ       in Dokumenten
+    _id              ObjectId  6
+    numberOfBonus    Int32     6
+    numberOfGifts    Int32     6
+    tier             String    6
+    timestamp        DateTime  6
+    totalSubsGifted  Int32     6
+    userId           String    6
+    userLogin        String    6
+    userName         String    6
+  Sammlung: hypeTrainHistory (7 Dokumente)
+    Feld              Typ       in Dokumenten
+    _id               ObjectId  7
+    contributorCount  Int32     7
+    hypeTrainId       String    7
+    level             Int64     7
+    percent           Double    7
+    startedAt         DateTime  7
+    timestamp         DateTime  7
+  Sammlung: moderators (6 Dokumente)
+    Feld  Typ     in Dokumenten
+    _id   String  6
+  Sammlung: powerUpsRedemptionCollection (16 Dokumente)
+    Feld          Typ       in Dokumenten
+    _id           ObjectId  16
+    cost          Int32     16
+    redeemedAt    DateTime  16
+    redemptionId  String    16
+    type          String    16
+    userId        String    16
+  Sammlung: powerUpsRedemptionCountsCollection (3 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  3
+    count  Int32   3
+  Sammlung: powerUpsRedemptionUserCountsCollection (6 Dokumente)
+    Feld    Typ       in Dokumenten
+    _id     ObjectId  6
+    count   Int32     6
+    type    String    6
+    userId  String    6
+  Sammlung: powerUpsRedemptionUserCountsCollection_temp (0 Dokumente)
+  Sammlung: pyramids (0 Dokumente)
+  Sammlung: pyramidsBroken (0 Dokumente)
+  Sammlung: raidHistory (39 Dokumente)
+    Feld       Typ       in Dokumenten
+    _id        ObjectId  39
+    timestamp  DateTime  39
+    userId     String    39
+    viewers    Int32     39
+  Sammlung: rewardRedemptionCounts (2 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  2
+    count  Int32   2
+  Sammlung: rewardRedemptionUserCounts (3 Dokumente)
+    Feld      Typ       in Dokumenten
+    _id       ObjectId  3
+    count     Int32     3
+    rewardId  String    3
+    userId    String    3
+  Sammlung: rewardRedemptionUserCounts_temp (0 Dokumente)
+  Sammlung: rewardRedemptions (1152 Dokumente)
+    Feld          Typ       in Dokumenten
+    _id           ObjectId  1152
+    cost          Int32     1152
+    isAutomatic   Boolean   1150
+    name          String    1150
+    redeemedAt    DateTime  1152
+    redemptionId  String    1150
+    rewardId      String    1150
+    type          String    2
+    userId        String    1152
+  Sammlung: settings (1 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  1
+    value  String  1
+  Sammlung: subCounter (3 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  3
+    value  Int32   3
+  Sammlung: subscribers (3 Dokumente)
+    Feld  Typ     in Dokumenten
+    _id   String  3
+    tier  String  3
+  Sammlung: subscriptionHistory (87 Dokumente)
+    Feld              Typ       in Dokumenten
+    _id               ObjectId  87
+    cumulativeMonths  Int32     87
+    gifterUserId      String    40
+    gifterUserLogin   String    40
+    gifterUserName    String    40
+    isGift            Boolean   87
+    multiMonth        Int32     87
+    resub             Boolean   87
+    subscribedAt      DateTime  87
+    tier              String    87
+    userId            String    87
+    userLogin         String    87
+    userName          String    87
+  Sammlung: userColors (17 Dokumente)
+    Feld   Typ     in Dokumenten
+    _id    String  17
+    color  String  10
+  Sammlung: vips (1 Dokumente)
+    Feld  Typ     in Dokumenten
+    _id   String  1
+  Sammlung: watchStreak (4 Dokumente)
+    Feld         Typ     in Dokumenten
+    _id          String  4
+    watchStreak  Int32   4
+
+Datei: users.dat (JSON-Text, Wurzel Object, 1 Einträge)
+    Feld                    Typ      in Dokumenten
+    groups                  Array    1
+    groups[]                Object   1
+    groups[].bots           Boolean  1
+    groups[].id             String   1
+    groups[].name           String   1
+    groups[].userIds        Array    1
+    t                       String   1
+    users                   Array    1
+    users[]                 Object   1
+    users[].display         String   1
+    users[].exempt          Boolean  1
+    users[].firstMessage    String   1
+    users[].id              String   1
+    users[].lastActive      String   1
+    users[].name            String   1
+    users[].present         Boolean  1
+    users[].previousActive  String   1
+    users[].role            Number   1
+    users[].subscribed      Boolean  1
+    users[].type            String   1
+    version                 Number   1
+
+Datei: webview_settings.db (LiteDB, Log-Datei keine, 3 Sammlung(en))
+  Sammlung: general (1 Dokumente)
+    Feld   Typ      in Dokumenten
+    _id    String   1
+    key    String   1
+    value  Boolean  1
+  Sammlung: settings (2 Dokumente)
+    Feld      Typ     in Dokumenten
+    _id       String  2
+    settings  String  2
+  Sammlung: window_location (2 Dokumente)
+    Feld    Typ     in Dokumenten
+    _id     String  2
+    bottom  Int32   2
+    left    Int32   2
+    right   Int32   2
+    top     Int32   2
+
+Datei: youtube_data.db (LiteDB, Log-Datei keine, 6 Sammlung(en))
+  Sammlung: jewelsGifted (0 Dokumente)
+  Sammlung: jewelsGiftedUserCounts (0 Dokumente)
+  Sammlung: jewelsGiftedUserCounts_temp (0 Dokumente)
+  Sammlung: memberHistory (0 Dokumente)
+  Sammlung: superChat (0 Dokumente)
+  Sammlung: superSticker (0 Dokumente)
+
+12 Datei(en), 0 mit Fehlern

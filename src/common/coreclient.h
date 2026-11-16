@@ -1,7 +1,10 @@
 #pragma once
 
+#include "actionprotocol.h"
+#include "overlaylive.h"
 #include "protocol.h"
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QList>
 #include <QLocalSocket>
@@ -114,6 +117,33 @@ public:
     // Gilt auch für spätere Verbindungen: nach hello geht die Bestellung mit Verlauf erneut los.
     // Antworten über eventHistoryReceived, eventReceived und eventsDropped.
     void subscribeEvents(const QStringList &filters);
+    // P14 e2-11: Zustand des Aktionssystems (actions_status, nach hello und bei jeder Änderung);
+    // ohne Verbindung leer.
+    std::optional<ActionsStatus> actionsStatus() const { return m_actionsStatus; }
+    // P14 e2-14: Aktionen, Befehle und Zeitnachrichten (actions_config, nach hello und bei jeder
+    // Änderung); ohne Verbindung leer.
+    std::optional<ActionsConfigInfo> actionsConfig() const { return m_actionsConfig; }
+    // Schickt eine Anfrage an das Aktionssystem (actionsEditMessage, z. B. actionsSetEnabledEdit);
+    // requestId wird hier vergeben. Antwort über changeFinished. 0 = nicht verbunden. Abfragen
+    // (z. B. get_action_runs) antworten mit eigener Nachricht, Fehler über changeFinished.
+    qint64 sendActionsEdit(const ActionsEdit &edit);
+    // P14 e3-3: Variablen holen (get_variables). Läuft schon eine Anfrage, geht nach deren Antwort
+    // genau eine weitere los (Zusammenfassen). Nach einem erfolgreichen variable_set oder
+    // variable_remove aus sendActionsEdit holt der Client von selbst neu. Ohne Verbindung nichts.
+    void requestVariables();
+    // Letzte Antwort variables; leer bis dahin und ohne Verbindung.
+    std::optional<VariablesInfo> variables() const { return m_variables; }
+    // Zuschauer zu den Twitch-IDs aus variables() (persisted.users und volatileUsers), nach jeder
+    // Antwort variables für die noch nicht erfragten IDs nachgeholt (get_viewers). Nur die dem Kern
+    // bekannten; zwischengespeichert bis zur Trennung.
+    actions::ViewersData viewers() const { return m_viewers; }
+
+    // P14 d: Laufzustand eines Overlays (overlay_live, nach hello und bei jeder Änderung); die
+    // Restdauer ist ab dem Empfang heruntergezählt (nie unter 0). Ohne Verbindung leer.
+    LiveElements live(const QUuid &overlayId) const;
+    // Schickt overlay_live_reset (leere Liste = alle Elemente); Antwort über changeFinished.
+    // Rückgabe: request_id, 0 ohne Verbindung.
+    qint64 sendLiveReset(const QUuid &overlayId, const QList<QUuid> &sources = {});
 
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
@@ -179,6 +209,16 @@ signals:
     void obsRequestFinished(const dss::ChangeResult &result);
     // twitchStatus() hat sich geändert bzw. Antwort auf sendTwitchAccountRequest (P13), nur hier.
     void twitchStatusChanged();
+    // actionsStatus() hat sich geändert (P14 e2-11).
+    void actionsStatusChanged();
+    // actionsConfig() hat sich geändert (P14 e2-14).
+    void actionsConfigChanged();
+    // P14 e3-3: Antwort variables (bei jeder, auch ohne Änderung) bzw. viewers() hat sich geändert.
+    void variablesChanged();
+    void viewersChanged();
+    // P14 e2-12: Antwort action_runs auf get_action_runs (älteste zuerst, ohne Schritte); nicht
+    // gespeichert, darum nichts zurückzusetzen bei der Trennung.
+    void actionRunsReceived(const QList<dss::actions::RunRecord> &runs);
     void twitchRequestFinished(const dss::ChangeResult &result);
     // P13: Verlauf nach einer Bestellung (älteste zuerst), neues Ereignis, verworfene Ereignisse.
     void eventHistoryReceived(const QList<dss::events::Event> &events);
@@ -187,6 +227,8 @@ signals:
     // P10b: mediaList() bzw. imports() hat sich geändert.
     void mediaListChanged();
     void importProgressChanged();
+    // P14 d: live() hat sich geändert (der Kern schickt den Laufzustand aller Overlays).
+    void liveChanged();
 
 private:
     void tryConnect();
@@ -201,6 +243,9 @@ private:
     void setStatus(const QString &text);
     void clearData();
     qint64 transmit(ChangeRequest request, const QString &coalesceKey);
+    void sendGetVariables();
+    void variablesRequestDone();
+    void requestMissingViewers();
 
     Options m_options;
     QLocalSocket *m_socket = nullptr;
@@ -236,11 +281,22 @@ private:
     QSet<qint64> m_obsRequests;
     std::optional<TwitchStatusInfo> m_twitchStatus;
     QSet<qint64> m_twitchRequests;
+    std::optional<ActionsStatus> m_actionsStatus;
+    std::optional<ActionsConfigInfo> m_actionsConfig;
+    std::optional<VariablesInfo> m_variables;
+    qint64 m_variablesRequest = 0;    // get_variables unterwegs (0 = keine)
+    bool m_variablesAgain = false;    // nach der Antwort noch einmal holen
+    QSet<qint64> m_variableEdits;     // variable_set und variable_remove unterwegs
+    QSet<qint64> m_viewersRequests;   // get_viewers unterwegs
+    actions::ViewersData m_viewers;
+    QSet<QString> m_viewersAsked;     // schon erfragte Twitch-IDs (auch dem Kern unbekannte)
     QStringList m_eventFilters;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
+    QHash<QUuid, LiveElements> m_live;
+    QElapsedTimer m_liveReceived;
 };
 
 } // namespace dss

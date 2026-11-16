@@ -3,7 +3,7 @@
 #include "coresettings.h"
 #include "dockviews.h"
 #include "overlay.h"
-#include "symbols.h"
+#include "panels.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -37,53 +37,6 @@ QDockWidget *dock(const QString &title, const QString &objectName, QWidget *cont
     return d;
 }
 
-// Ausgegrauter Symbolknopf; ohne Symboldatei steht der Ersatztext da.
-QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
-                          const QString &toolTip, QWidget *parent)
-{
-    auto *button = new QToolButton(parent);
-    button->setText(fallback);
-    const QIcon icon = loadSymbol(symbolFile, QSize(14, 14));
-    if (!icon.isNull())
-        button->setIcon(icon);
-    button->setIconSize(QSize(14, 14));
-    button->setToolTip(toolTip);
-    button->setAccessibleName(toolTip);
-    button->setEnabled(false);
-    return button;
-}
-
-// Liste mit einer Knopfleiste darunter.
-QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent)
-{
-    auto *box = new QWidget(parent);
-    auto *column = new QVBoxLayout(box);
-    column->setContentsMargins(0, 0, 0, 0);
-    column->setSpacing(0);
-    list->setParent(box);
-    column->addWidget(list, 1);
-    auto *bar = new QWidget(box);
-    bar->setObjectName(QStringLiteral("dockButtons"));
-    bar->setAttribute(Qt::WA_StyledBackground);
-    auto *row = new QHBoxLayout(bar);
-    row->setContentsMargins(6, 4, 6, 4);
-    row->setSpacing(6);
-    for (QToolButton *b : buttons) {
-        b->setParent(bar);
-        row->addWidget(b);
-    }
-    row->addStretch(1);
-    column->addWidget(bar);
-    return box;
-}
-
-// Zahlenfeld nie schmaler als sein sizeHint (längster Wert mit Einheit), damit der Wert
-// neben den Pfeilknöpfen ganz sichtbar bleibt (P06). Ändert nur die Mindestbreite.
-void keepValueVisible(QAbstractSpinBox *spin)
-{
-    spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
-}
-
 // Ganze Pixel der Overlay-Auflösung (CLAUDE.md Regel 11). Ohne keyboardTracking meldet das Feld
 // einen Wert erst nach Enter, beim Verlassen oder mit den Pfeilen, nicht bei jeder Ziffer.
 // https://doc.qt.io/qt-6.8/qabstractspinbox.html#keyboardTracking-prop
@@ -103,41 +56,6 @@ void nameWidgets(std::initializer_list<std::pair<QObject *, const char *>> widge
 {
     for (const auto &[w, name] : widgets)
         w->setObjectName(QString::fromLatin1(name));
-}
-
-// Bereich im Dock «Eigenschaften» (P09b, E-26): kleiner Titel, darunter eine feine Linie wie
-// der Rahmen des Kopfbereichs (Farbe border), darunter die Felder im Raster *grid. Knöpfe in
-// titleButtons stehen in der Titelzeile am rechten Rand (P10a, Teil A 2).
-QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
-                 const QList<QToolButton *> &titleButtons = {})
-{
-    auto *w = new QWidget(parent);
-    auto *column = new QVBoxLayout(w);
-    column->setContentsMargins(8, 6, 8, 8);
-    column->setSpacing(4);
-    auto *titleRow = new QHBoxLayout;
-    titleRow->setContentsMargins(0, 0, 0, 0);
-    titleRow->setSpacing(4);
-    auto *label = new QLabel(title, w);
-    label->setObjectName(QStringLiteral("propertySectionTitle"));
-    titleRow->addWidget(label);
-    titleRow->addStretch(1);
-    for (QToolButton *b : titleButtons) {
-        b->setParent(w);
-        titleRow->addWidget(b);
-    }
-    column->addLayout(titleRow);
-    auto *line = new QFrame(w);
-    line->setObjectName(QStringLiteral("propertySectionLine"));
-    line->setFixedHeight(1);
-    column->addWidget(line);
-    column->addSpacing(2);
-    *grid = new QGridLayout;
-    (*grid)->setContentsMargins(0, 0, 0, 0);
-    (*grid)->setHorizontalSpacing(8);
-    (*grid)->setVerticalSpacing(6);
-    column->addLayout(*grid);
-    return w;
 }
 
 } // namespace
@@ -386,6 +304,22 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     g->setRowStretch(6, 1);
     r.kindPages->addWidget(textPage);
     formColumn->addWidget(r.kindPages);
+
+    // P14 d: Bereich «Chat-Bot» (Entwurf 5): Zustand im Laufzustand, Knopf «Ausblenden». Immer da,
+    // damit der Wechsel der Quelle die Anordnung nicht ändert; ohne Quelle leer und ausgegraut.
+    QWidget *live = section(QStringLiteral("Chat-Bot"), form, &g);
+    live->setObjectName(QStringLiteral("propertyLive"));
+    r.liveState = new QLabel(live);
+    r.liveState->setTextFormat(Qt::PlainText);
+    r.hideLive = new QPushButton(QStringLiteral("Ausblenden"), live);
+    r.hideLive->setToolTip(QStringLiteral("Element wieder wie im Overlay zeigen (Laufzustand beenden)"));
+    r.hideLive->setEnabled(false);
+    nameWidgets({{r.liveState, "liveState"}, {r.hideLive, "hideLiveButton"}});
+    g->addWidget(new QLabel(QStringLiteral("Jetzt"), live), 0, 0);
+    g->addWidget(r.liveState, 0, 1);
+    g->addWidget(r.hideLive, 1, 1, Qt::AlignLeft);
+    g->setColumnStretch(1, 1);
+    formColumn->addWidget(live);
     formColumn->addStretch(1);
     scroll->setWidget(form);
     column->addWidget(scroll, 1);
@@ -490,6 +424,23 @@ ControlDock createControlDock(QWidget *parent)
     result.audioOutput = audioOutput;
     result.audioOffset = audioOffset;
     result.audioOutputState = audioState;
+    // P14 t (Plan P14, 4.3): Zeile «Ton Chat-Bot» wie «Ton Videos», ohne Versatz (freie Stimmen
+    // haben keinen Bildbezug). Der Zustand belegt die Spalte des Versatzes mit.
+    auto *actionsOutput = new QComboBox(content);
+    actionsOutput->setAccessibleName(QStringLiteral("Ausgang für den Ton des Chat-Bots"));
+    actionsOutput->setToolTip(QStringLiteral("Ausgang für den Ton des Chat-Bots"));
+    actionsOutput->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    actionsOutput->setMinimumContentsLength(6);
+    actionsOutput->addItem(QStringLiteral("Kein Ausgang"), QString());
+    auto *actionsState = new QLabel(QStringLiteral("–"), content);
+    actionsState->setWordWrap(true);
+    actionsState->setFixedHeight(actionsState->fontMetrics().size(0, QStringLiteral("a\nb")).height());
+    actionsState->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    actionsOutput->setEnabled(false);
+    actionsState->setEnabled(false);
+    nameWidgets({{actionsOutput, "actionsAudioOutput"}, {actionsState, "actionsAudioOutputState"}});
+    result.actionsAudioOutput = actionsOutput;
+    result.actionsAudioOutputState = actionsState;
     auto *output = new QComboBox(content);
     output->addItem(QStringLiteral("Browserquelle"));
     auto *outputState = new QLabel(QStringLiteral("Ausgabe: –"), content);
@@ -539,17 +490,20 @@ ControlDock createControlDock(QWidget *parent)
     grid->addWidget(audioOutput, 4, 1);
     grid->addWidget(audioOffset, 4, 2);
     grid->addWidget(audioState, 4, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 5, 0);
-    grid->addWidget(preview, 5, 1);
-    grid->addWidget(previewSmall, 5, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Ton Chat-Bot"), content), 5, 0);
+    grid->addWidget(actionsOutput, 5, 1);
+    grid->addWidget(actionsState, 5, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 6, 0);
+    grid->addWidget(preview, 6, 1);
+    grid->addWidget(previewSmall, 6, 2, 1, 2);
     auto *snapRow = new QHBoxLayout;
     snapRow->setSpacing(8);
     snapRow->addWidget(snap);
     snapRow->addStretch(1);
     snapRow->addWidget(gridCheck);
-    grid->addLayout(snapRow, 6, 0, 1, 2);
-    grid->addWidget(gridSize, 6, 2);
-    grid->addWidget(clearGuides, 6, 3);
+    grid->addLayout(snapRow, 7, 0, 1, 2);
+    grid->addWidget(gridSize, 7, 2);
+    grid->addWidget(clearGuides, 7, 3);
     // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
     result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
     result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
@@ -562,13 +516,13 @@ ControlDock createControlDock(QWidget *parent)
     result.overlayWidth->setEnabled(false);
     result.overlayHeight->setEnabled(false);
     nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
-    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 7, 0);
-    grid->addWidget(result.overlayWidth, 7, 1);
-    grid->addWidget(result.overlayHeight, 7, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 8, 0);
+    grid->addWidget(result.overlayWidth, 8, 1);
+    grid->addWidget(result.overlayHeight, 8, 2);
 
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(8, 1);
+    grid->setRowStretch(9, 1);
     result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
     return result;
 }

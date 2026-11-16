@@ -14,6 +14,40 @@ class TestWindowData : public QObject
     Q_OBJECT
 
 private slots:
+    // P14 d: Bereich «Chat-Bot» und Markierung «live»
+    void liveRows()
+    {
+        const QUuid shown = QUuid::createUuid();
+        const QUuid changed = QUuid::createUuid();
+        const QUuid other = QUuid::createUuid();
+        LiveElements elements;
+        elements.insert(shown, {true, std::nullopt, QString(), 5200});
+        elements.insert(changed, {std::nullopt, QStringLiteral("Hallo"), QString(), -1});
+
+        QCOMPARE(liveRow(elements, QUuid(), true).text, QString());
+        QVERIFY(!liveRow(elements, QUuid(), true).live);
+        LiveRow row = liveRow(elements, other, true);
+        QCOMPARE(row.text, QStringLiteral("nicht live"));
+        QVERIFY(!row.live && !row.canHide);
+        row = liveRow(elements, shown, true);
+        QCOMPARE(row.text, QStringLiteral("live sichtbar, noch 6 s"));
+        QVERIFY(row.live && row.canHide);
+        QVERIFY(!liveRow(elements, shown, false).canHide); // ohne Verbindung
+        QCOMPARE(liveRow(elements, changed, true).text, QStringLiteral("live geändert"));
+        elements[changed].visible = false;
+        QCOMPARE(liveRow(elements, changed, true).text, QStringLiteral("live versteckt"));
+
+        // Nächste Anzeige: bei 5200 ms nach 200 ms («noch 5 s»), ohne Dauer nie
+        QCOMPARE(liveRefreshMs(elements), 200);
+        elements[shown].remainingMs = 3000;
+        QCOMPARE(liveRefreshMs(elements), 1000);
+        elements[shown].remainingMs = 3010;
+        QCOMPARE(liveRefreshMs(elements), 50);
+        elements.remove(shown);
+        QCOMPARE(liveRefreshMs(elements), -1);
+        QCOMPARE(liveRefreshMs({}), -1);
+    }
+
     void gaugeTexts()
     {
         QCOMPARE(cpuText(std::nullopt), QStringLiteral("–"));
@@ -312,6 +346,94 @@ private slots:
                                         "Bot: Anmeldung abgelaufen"));
         QCOMPARE(h.state, QStringLiteral("error"));
         QCOMPARE(h.toolTip, twitchStatusText(s));
+        QVERIFY(!h.switchChecked);
+        QVERIFY(!h.switchEnabled);
+    }
+
+    void chatBotHeaderWithActions()
+    {
+        TwitchStatusInfo s;
+        s.enabled = true;
+        s.channel.state = QStringLiteral("ok");
+        s.channel.login = QStringLiteral("testkanal");
+        s.bot.state = QStringLiteral("ok");
+        s.bot.login = QStringLiteral("testbot");
+        const QString tip = twitchStatusText(s);
+        const auto header = [&](const QString &state, const QString &message = QString(),
+                                ConnectionState channel = ConnectionState::Connected, bool enabled = false) {
+            ActionsStatus a;
+            a.state = state;
+            a.message = message;
+            a.enabled = enabled;
+            return chatBotHeaderView(channel, s, a);
+        };
+        const auto check = [&](const ChatBotHeaderView &h, const QString &text, const QString &state, bool checked,
+                               bool enabled) {
+            QCOMPARE(h.text, text);
+            QCOMPARE(h.state, state);
+            QCOMPARE(h.toolTip, tip);
+            QCOMPARE(h.switchChecked, checked);
+            QCOMPARE(h.switchEnabled, enabled);
+        };
+
+        // Aktionssystem nicht gebaut oder Datei ungültig: Text vom Kern, rot, Schalter ausgegraut
+        check(header(QStringLiteral("unavailable"), QStringLiteral("Aktionssystem nicht gebaut")),
+              QStringLiteral("Aktionssystem nicht gebaut"), QStringLiteral("error"), false, false);
+        check(header(QStringLiteral("file_error"), QStringLiteral("aktionen.json ungültig, Chat-Bot aus: Zeile 3")),
+              QStringLiteral("aktionen.json ungültig, Chat-Bot aus: Zeile 3"), QStringLiteral("error"), false, false);
+        // Datei ungültig geht vor Twitch mit Fehler
+        check(header(QStringLiteral("file_error"), QStringLiteral("kaputt"), ConnectionState::Error),
+              QStringLiteral("kaputt"), QStringLiteral("error"), false, false);
+
+        // Läuft, aus, stumm
+        check(header(QStringLiteral("on")), QStringLiteral("läuft · liest als testkanal · sendet als testbot"),
+              QStringLiteral("ok"), true, true);
+        check(header(QStringLiteral("off")), QStringLiteral("aus"), QStringLiteral("off"), false, true);
+        // e2-4b: stumm zeigt den echten Stand des Hauptschalters, ausgegraut
+        check(header(QStringLiteral("muted")), QStringLiteral("stumm: Version im Einsatz läuft"),
+              QStringLiteral("warning"), false, false);
+        check(header(QStringLiteral("muted"), QString(), ConnectionState::Connected, true),
+              QStringLiteral("stumm: Version im Einsatz läuft"), QStringLiteral("warning"), true, false);
+        check(header(QStringLiteral("muted"), QString(), ConnectionState::Error, true),
+              chatBotHeaderView(ConnectionState::Error, s).text,
+              QStringLiteral("error"), true, false);
+
+        // Twitch-Kanal mit Fehler: Text wie ohne Aktionen, der Schalter bleibt bedienbar
+        const ChatBotHeaderView twitchError = chatBotHeaderView(ConnectionState::Error, s);
+        check(header(QStringLiteral("on"), QString(), ConnectionState::Error), twitchError.text,
+              QStringLiteral("error"), true, true);
+        check(header(QStringLiteral("off"), QString(), ConnectionState::Error), twitchError.text,
+              QStringLiteral("error"), false, true);
+
+        // Kanal verbindet noch: Text von Twitch, Schalter an
+        const ChatBotHeaderView connecting = chatBotHeaderView(ConnectionState::Connecting, s);
+        check(header(QStringLiteral("on"), QString(), ConnectionState::Connecting), connecting.text,
+              connecting.state, true, true);
+
+        // Bot fehlt: gelb, der Kanal sendet
+        s.bot = TwitchAccountInfo();
+        check(header(QStringLiteral("on")), QStringLiteral("Bot nicht angemeldet: sendet als Kanal"),
+              QStringLiteral("warning"), true, true);
+        // Ohne Twitch vom Kern: Text wie ohne Aktionen
+        ActionsStatus on;
+        on.state = QStringLiteral("on");
+        ChatBotHeaderView h = chatBotHeaderView(ConnectionState::Off, std::nullopt, on);
+        QCOMPARE(h.text, QStringLiteral("Twitch: –"));
+        QCOMPARE(h.state, QStringLiteral("off"));
+        QVERIFY(h.switchChecked);
+        QVERIFY(h.switchEnabled);
+
+        // Schalter: Anfrage actions_set_enabled
+        QCOMPARE(actionsSetEnabledEdit(true),
+                 (ActionsEdit{QStringLiteral("actions_set_enabled"), QJsonObject{{QStringLiteral("enabled"), true}}}));
+        QCOMPARE(actionsSetEnabledEdit(false),
+                 (ActionsEdit{QStringLiteral("actions_set_enabled"), QJsonObject{{QStringLiteral("enabled"), false}}}));
+        // Die Anfrage besteht die Prüfung des Protokolls
+        ActionsRequest request;
+        QString error;
+        QVERIFY2(parseActionsRequest(actionsEditMessage(actionsSetEnabledEdit(true), 7), &request, &error),
+                 qPrintable(error));
+        QCOMPARE(request.type, QStringLiteral("actions_set_enabled"));
     }
 
     void chatBotEvents()
@@ -367,14 +489,57 @@ private slots:
         QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
         QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer50"));
         QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer249"));
-        QCOMPARE(rows.append(history.first()), 1);
+        QCOMPARE(rows.add(history.first()), (RowsAppend{true, 1}));
         QCOMPARE(rows.rows().size(), EventRows::kMaxRows);
         QCOMPARE(rows.rows().first().name, QStringLiteral("Zuschauer51"));
         QCOMPARE(rows.rows().last().name, QStringLiteral("Zuschauer0"));
         rows.reset({});
-        QCOMPARE(rows.append(history.first()), 0);
+        QCOMPARE(rows.add(history.first()), (RowsAppend{true, 0}));
         QCOMPARE(rows.rows().size(), 1);
         QCOMPARE(eventsDroppedText(5), QStringLiteral("5 Ereignisse nicht angezeigt: Das Fenster kam nicht nach."));
+
+        // P14 e2-6: Bestellung «Live», Chat-Nachrichten im Bereich «Ereignisse» ausblenden
+        const QStringList live = chatBotLiveFilters();
+        for (const QString &f : live)
+            QVERIFY2(events::isValidFilter(f), qPrintable(f));
+        for (const QString &f : filters)
+            QVERIFY(live.contains(f));
+        for (const char *f : {"twitch.chat_message", "twitch.chat_sent", "twitch.chat_dropped", "actions."})
+            QVERIFY2(live.contains(QString::fromLatin1(f)), f);
+        QVERIFY(!live.contains(QStringLiteral("twitch.gift_sub")));
+        QCOMPARE(time.toLocalTime().toString(QStringLiteral("HH:mm:ss")), rowTimeText(time));
+        QCOMPARE(rowTimeText(QDateTime()), QStringLiteral("–"));
+
+        const events::Event chat = event("twitch.chat_message", {{"user_name", "Zuschauer42"}, {"text", "Hallo"}});
+        QCOMPARE(eventRow(chat), (EventRow{localTime, QStringLiteral("Chat"), QStringLiteral("Zuschauer42"),
+                                           QStringLiteral("Hallo"), true}));
+        const events::Event follow = event("twitch.follow", {{"user_name", "Zuschauer42"}});
+        EventRows live2;
+        QVERIFY(live2.hideChat()); // Standard an
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 0}));
+        QCOMPARE(live2.add(chat), RowsAppend{});
+        QCOMPARE(live2.add(event("twitch.chat_sent", {{"text", "Hallo"}})), RowsAppend{});
+        QCOMPARE(live2.add(event("actions.run_started", {})), RowsAppend{});
+        QCOMPARE(live2.rows().size(), 2);
+        QCOMPARE(live2.visibleRows().size(), 1);
+        live2.setHideChat(false);
+        QCOMPARE(live2.visibleRows().size(), 2);
+        QCOMPARE(live2.add(chat), (RowsAppend{true, 0}));
+        // Verlauf: Typen ohne Zeile fallen weg, die neuesten 200 Zeilen bleiben
+        QList<events::Event> mixed{follow};
+        for (int i = 0; i < EventRows::kMaxRows; ++i) {
+            mixed.append(chat);
+            mixed.append(event("actions.run_changed", {}));
+        }
+        live2.reset(mixed);
+        QCOMPARE(live2.rows().size(), EventRows::kMaxRows);
+        QVERIFY(live2.rows().first().isChat);
+        // Volle Liste: vorne fällt eine ausgeblendete Chat-Zeile weg, sichtbar ändert sich nur das Anhängen
+        live2.setHideChat(true);
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 0}));
+        live2.setHideChat(false);
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 1}));
+        QCOMPARE(live2.rows().size(), EventRows::kMaxRows);
     }
 
     void moduleDocks()

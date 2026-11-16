@@ -1,5 +1,6 @@
 #include "coresession.h"
 
+#include "actionprotocol.h"
 #include "coreclient.h"
 #include "version.h"
 
@@ -98,6 +99,51 @@ std::optional<ChangeResult> CoreSession::change(ChangeRequest request, QString *
     return result;
 }
 
+std::optional<OverlayListData> CoreSession::getOverlayList(QString *error)
+{
+    if (!send(simpleMessage(msg::kGetOverlayList), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlayList), error);
+    if (!reply)
+        return std::nullopt;
+    OverlayListData data;
+    if (!parseOverlayList(*reply, &data, error))
+        return std::nullopt;
+    return data;
+}
+
+std::optional<Overlay> CoreSession::getOverlay(const QUuid &id, QString *error)
+{
+    if (!send(overlayIdMessage(msg::kGetOverlay, id), error))
+        return std::nullopt;
+    for (;;) {
+        const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlay), error);
+        if (!reply)
+            return std::nullopt;
+        Overlay overlay;
+        MediaSizes sizes;
+        if (!parseOverlayMessage(*reply, &overlay, &sizes, error))
+            return std::nullopt;
+        if (overlay.id == id)
+            return overlay;
+    }
+}
+
+std::optional<ChangeResult> CoreSession::request(QJsonObject message, QString *error)
+{
+    const qint64 requestId = m_nextRequestId++;
+    message.insert(QStringLiteral("request_id"), double(requestId));
+    if (!send(message, error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kChangeResult), error, requestId);
+    if (!reply)
+        return std::nullopt;
+    ChangeResult result;
+    if (!parseChangeResult(*reply, &result, error))
+        return std::nullopt;
+    return result;
+}
+
 bool CoreSession::send(const QJsonObject &message, QString *error)
 {
     m_socket.write(encodeMessage(message));
@@ -125,6 +171,20 @@ std::optional<QJsonObject> CoreSession::nextEventMessage(QString *error)
 {
     return waitForAny({QString::fromLatin1(msg::kEvent), QString::fromLatin1(msg::kEventsDropped)}, error,
                       -1, -1);
+}
+
+std::optional<QJsonObject> CoreSession::actionsRequest(const QString &type, const QJsonObject &fields,
+                                                       const QString &replyType, QString *error)
+{
+    const qint64 id = m_nextRequestId++;
+    if (!send(actionsRequestMessage({id, type, fields}), error))
+        return std::nullopt;
+    return waitForAny({replyType, QString::fromLatin1(msg::kChangeResult)}, error, id, m_timeoutMs);
+}
+
+std::optional<QJsonObject> CoreSession::waitForMessage(const QString &type, QString *error)
+{
+    return waitFor(type, error);
 }
 
 std::optional<QJsonObject> CoreSession::waitFor(const QString &type, QString *error, qint64 requestId)

@@ -6,10 +6,12 @@
 // Daten: Bilder und Videos aus tests/daten/exif/ und tests/daten/video-drehung/ (wie im Handtest),
 // WebM mit Drehangabe aus tests/daten/bildvergleich/ (P11, Punkt 80).
 
+#include "bildserver.h"
 #include "browsersource.h"
 #include "httpmessage.h"
 #include "imageorientation.h"
 #include "mediapatch.h"
+#include "overlaylivestate.h"
 #include "overlayserver.h"
 #include "overlaystore.h"
 #include "mediainfo.h"
@@ -526,6 +528,107 @@ private slots:
         // Gleiches Overlay noch einmal: kein Ereignis
         m_server->overlayChanged(m_id);
         QCOMPARE(events.next(300).first, QByteArray());
+    }
+
+    // P14 d: Laufzustand als «event: live», Bilder des Laufzustands nur für dieses Overlay
+    void liveEventsAndImages()
+    {
+        testhelp::ImageServer images;
+        const QByteArray png = [] {
+            QFile f(kExif + QStringLiteral("/orientierung-6.png"));
+            return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+        }();
+        images.bodies.insert("/profil.png", png);
+        OverlayLiveState::Options options;
+        options.imageDir = m_store->dataDir() + QStringLiteral("/live-bilder");
+        options.imageHosts = {QStringLiteral("127.0.0.1")};
+        options.allowHttp = true;
+        OverlayLiveState live(m_store.get(), options);
+        m_server->setLiveState(&live);
+        connect(&live, &OverlayLiveState::changed, m_server.get(), &OverlayServer::liveChanged);
+        const auto setAndWait = [&live](const LiveSetRequest &r) {
+            std::optional<OverlayLiveState::Result> result;
+            live.set(r, [&result](const OverlayLiveState::Result &x) { result = x; });
+            static_cast<void>(QTest::qWaitFor([&result] { return result.has_value(); }, 5000));
+            return result.value_or(OverlayLiveState::Result{});
+        };
+        const Overlay o = *m_store->overlay(m_id);
+        const QUuid imageId = o.sources.at(0).id;
+        const QString otherFile = m_store->overlayByAddress(QStringLiteral("andere"))->sources.value(0).file;
+
+        // Ohne Laufzustand: nach «overlay» kein «live»
+        EventClient events(m_port, base() + "events");
+        QCOMPARE(events.next().first, QByteArray("overlay"));
+        QCOMPARE(events.next(300).first, QByteArray());
+        QCOMPARE(request(m_port, "GET", base() + otherFile.toUtf8()).status, 404);
+
+        // Datei eines anderen Overlays über den Laufzustand: jetzt auch für dieses Overlay
+        LiveSetRequest r;
+        r.overlayId = m_id;
+        r.elements = {{imageId, std::nullopt, otherFile}, {m_textId, QStringLiteral("Hallo %user%"), QString()}};
+        r.arguments = {{QStringLiteral("user"), QStringLiteral("Zuschauer42")}};
+        QVERIFY(setAndWait(r).ok);
+        auto e = events.next();
+        QCOMPARE(e.first, QByteArray("live"));
+        QJsonObject data = QJsonDocument::fromJson(e.second).object();
+        QJsonObject element = data.value(QStringLiteral("elements")).toObject()
+                                  .value(imageId.toString(QUuid::WithoutBraces)).toObject();
+        QCOMPARE(element.value(QStringLiteral("visible")).toBool(), true);
+        QCOMPARE(element.value(QStringLiteral("image")).toString(), otherFile);
+        QVERIFY(element.value(QStringLiteral("text")).isNull());
+        QCOMPARE(data.value(QStringLiteral("media")).toObject().value(otherFile).toObject()
+                     .value(QStringLiteral("orientation")).toInt(), 1);
+        QCOMPARE(data.value(QStringLiteral("elements")).toObject().value(m_textId.toString(QUuid::WithoutBraces))
+                     .toObject().value(QStringLiteral("text")).toString(), QStringLiteral("Hallo Zuschauer42"));
+        QCOMPARE(request(m_port, "GET", base() + otherFile.toUtf8()).status, 200);
+
+        // Profilbild: …/live/<sha256>.png mit neutralisierter Ausrichtung, Orientierung 6 für die Seite
+        r.elements = {{imageId, std::nullopt, images.url("/profil.png")}};
+        const OverlayLiveState::Result loaded = setAndWait(r);
+        QVERIFY2(loaded.ok && loaded.warning.isEmpty(), qPrintable(loaded.message + loaded.warning));
+        e = events.next();
+        QCOMPARE(e.first, QByteArray("live"));
+        data = QJsonDocument::fromJson(e.second).object();
+        const QString livePath = data.value(QStringLiteral("elements")).toObject()
+                                     .value(imageId.toString(QUuid::WithoutBraces)).toObject()
+                                     .value(QStringLiteral("image")).toString();
+        QVERIFY2(livePath.startsWith(QStringLiteral("live/")) && livePath.endsWith(QStringLiteral(".png")), qPrintable(livePath));
+        QCOMPARE(data.value(QStringLiteral("media")).toObject().value(livePath).toObject()
+                     .value(QStringLiteral("orientation")).toInt(), 6);
+        Response served = request(m_port, "GET", base() + livePath.toUtf8());
+        QCOMPARE(served.status, 200);
+        QCOMPARE(served.body.size(), png.size());
+        QCOMPARE(served.headers.value("content-type"), QByteArray("image/png"));
+        QTemporaryDir out;
+        {
+            QFile f(out.filePath(QStringLiteral("geliefert.png")));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(served.body);
+        }
+        QCOMPARE(imageFileOrientation(out.filePath(QStringLiteral("geliefert.png"))), 1);
+        // Die vorige Datei gilt nicht mehr, ein anderes Overlay bekommt das Profilbild nicht
+        QCOMPARE(request(m_port, "GET", base() + otherFile.toUtf8()).status, 404);
+        const Overlay *other = m_store->overlayByAddress(QStringLiteral("andere"));
+        const QByteArray otherBase = browserSourcePath(other->address, m_store->token(other->id)).toUtf8();
+        QCOMPARE(request(m_port, "GET", otherBase + livePath.toUtf8()).status, 404);
+        QCOMPARE(request(m_port, "GET", base() + "live/../tokens.json").status, 404);
+        QCOMPARE(request(m_port, "GET", base() + "live/" + QByteArray(64, 'a') + ".png").status, 404);
+
+        // Neue Verbindung mit Laufzustand: zuerst «overlay», dann «live»
+        EventClient second(m_port, base() + "events");
+        QCOMPARE(second.next().first, QByteArray("overlay"));
+        QCOMPARE(second.next().first, QByteArray("live"));
+
+        // Zurücksetzen: leerer Laufzustand an beide, Bild nicht mehr erreichbar
+        QVERIFY(live.reset({0, m_id, {}}).isEmpty());
+        for (EventClient *c : {&events, &second}) {
+            e = c->next();
+            QCOMPARE(e.first, QByteArray("live"));
+            QVERIFY(QJsonDocument::fromJson(e.second).object().value(QStringLiteral("elements")).toObject().isEmpty());
+        }
+        QCOMPARE(request(m_port, "GET", base() + livePath.toUtf8()).status, 404);
+        QVERIFY(!logHasToken());
+        m_server->setLiveState(nullptr);
     }
 
     void oldAddressesBecomeInvalid()

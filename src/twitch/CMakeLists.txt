@@ -7,6 +7,8 @@ add_library(dss_twitch STATIC
   twitchendpoints.h
   twitchauth.h twitchauth.cpp
   helixclient.h helixclient.cpp
+  chatmessage.h chatmessage.cpp # P14 c1a: Send Chat Message
+  helixactions.h helixactions.cpp # P14 c1b: Benutzerinfo, Shoutout, Ansage
   eventsubconnection.h eventsubconnection.cpp
   twitchservice.h twitchservice.cpp
 )

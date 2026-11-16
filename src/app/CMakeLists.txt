@@ -8,13 +8,24 @@ add_library(dss_app_ui STATIC
   fonts.h fonts.cpp
   headerbar.h headerbar.cpp
   chatbotpage.h chatbotpage.cpp
+  actionfieldspanel.h actionfieldspanel.cpp
+  actionspage.h actionspage.cpp
+  listdetailpage.h listdetailpage.cpp
+  commandspage.h commandspage.cpp
+  timerspage.h timerspage.cpp
+  variablespage.h variablespage.cpp
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp
+  panels.h panels.cpp
   dockviews.h dockviews.cpp
   dialogs.h dialogs.cpp
   obssourcedialog.h obssourcedialog.cpp
+  queuesdialog.h queuesdialog.cpp
   mainwindowedit.cpp
+  mainwindowcommands.cpp
+  mainwindowtimers.cpp
+  mainwindowvariables.cpp
   translation.h translation.cpp
 )
 target_include_directories(dss_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

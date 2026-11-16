@@ -78,6 +78,9 @@ QStringList allowedMediaSuffixes(MediaUse use)
         return {QStringLiteral("webm"), QStringLiteral("mp4")};
     case MediaUse::Font:
         return {QStringLiteral("ttf"), QStringLiteral("otf")};
+    case MediaUse::Audio:
+        // Plan P14, Abschnitt 4.3 (Medienart «Ton»)
+        return {QStringLiteral("mp3"), QStringLiteral("wav"), QStringLiteral("ogg"), QStringLiteral("m4a")};
     }
     return {};
 }
@@ -185,7 +188,7 @@ bool isSaveFileLeftover(const QString &fileName)
     // <SHA-256>.<Endung> wie in importMediaFile, dazu «.XXXXXX» von QTemporaryFileName
     // (sechs Zeichen aus A–Z, a–z; Quellen oben in mediaimport.h).
     static const QRegularExpression pattern(QStringLiteral(
-        "\\A[0-9a-f]{64}\\.(png|jpg|jpeg|webm|mp4|ttf|otf)\\.[A-Za-z]{6}\\z"));
+        "\\A[0-9a-f]{64}\\.(png|jpg|jpeg|webm|mp4|ttf|otf|mp3|wav|ogg|m4a)\\.[A-Za-z]{6}\\z"));
     return pattern.match(fileName).hasMatch();
 }
 

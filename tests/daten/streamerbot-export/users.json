@@ -1,0 +1,72 @@
+{
+  "groups": [
+    {
+      "bots": false,
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Testgruppe",
+      "userIds": ["100000001", "100000002"]
+    },
+    {
+      "bots": true,
+      "id": "keine-guid",
+      "name": "Testgruppe ohne GUID",
+      "userIds": []
+    }
+  ],
+  "t": "Testart",
+  "users": [
+    {
+      "display": "TestZuschauer1",
+      "exempt": false,
+      "firstMessage": "2026-01-02T10:00:00",
+      "id": "100000001",
+      "lastActive": "2026-11-01T20:00:00",
+      "name": "testzuschauer1",
+      "present": false,
+      "previousActive": "2026-10-30T20:00:00",
+      "role": 1,
+      "subscribed": true,
+      "type": "twitch"
+    },
+    {
+      "display": "TestZuschauer2Alt",
+      "exempt": false,
+      "firstMessage": "2026-02-03T10:00:00",
+      "id": "100000002",
+      "lastActive": "2026-10-01T20:00:00",
+      "name": "testzuschauer2",
+      "present": false,
+      "previousActive": "2026-09-30T20:00:00",
+      "role": 1,
+      "subscribed": false,
+      "type": "twitch"
+    },
+    {
+      "display": "TestZuschauer2",
+      "exempt": false,
+      "firstMessage": "2026-02-03T10:00:00",
+      "id": "100000002",
+      "lastActive": "2026-11-02T20:00:00",
+      "name": "testzuschauer2",
+      "present": true,
+      "previousActive": "2026-10-01T20:00:00",
+      "role": 2,
+      "subscribed": false,
+      "type": "twitch"
+    },
+    {
+      "display": "KickTestzuschauer1",
+      "exempt": false,
+      "firstMessage": "2026-03-04T10:00:00",
+      "id": "kick-testzuschauer1",
+      "lastActive": "2026-11-01T20:00:00",
+      "name": "kicktestzuschauer1",
+      "present": false,
+      "previousActive": "2026-10-30T20:00:00",
+      "role": 1,
+      "subscribed": false,
+      "type": "kick"
+    }
+  ],
+  "version": 1
+}

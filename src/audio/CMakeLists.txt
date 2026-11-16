@@ -8,10 +8,12 @@ target_include_directories(dss_audio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_audio PUBLIC dss_audiodecoder PRIVATE dss_warnings)
 
 # P12b b4: Schnittstelle eines Ausgangs (audiooutput.h) und Ersatzausgang ohne Gerät (Testoption
-# --ersatzausgang des Kerns, tst_kernton), Qt Core, ohne libpipewire.
+# --ersatzausgang des Kerns, tst_kernton), Qt Core, ohne libpipewire. P14 t: Töne des Chat-Bots
+# (actionsound.h) über einen eigenen Ausgang.
 add_library(dss_audiooutput STATIC
   audiooutput.h audiooutput.cpp
   nulloutput.h nulloutput.cpp
+  actionsound.h actionsound.cpp
 )
 target_include_directories(dss_audiooutput PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_audiooutput PUBLIC dss_audio Qt6::Core PRIVATE dss_warnings)
