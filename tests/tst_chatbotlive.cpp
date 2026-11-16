@@ -3,6 +3,7 @@
 #include "chatbotlive.h"
 
 #include <QTest>
+#include <QTimeZone>
 
 using namespace dss;
 using actions::RunRecord;
@@ -256,6 +257,226 @@ private slots:
         QVERIFY(rows.visibleRows().isEmpty());
         // Vorne fällt eine nicht sichtbare Zeile weg
         QCOMPARE(rows.apply(record(RunState::Error)), (RunRows::Change{0, true, 0}));
+    }
+
+    // --- Bereich «Chat» (e2-6) ---
+
+    void chatMessageRow()
+    {
+        const events::Event e = chatEvent("m1", {{"is_bot_account", true}, {"is_broadcaster", true}, {"is_moderator", true}});
+        const std::optional<ChatRow> row = chatRow(e);
+        QVERIFY(row);
+        QCOMPARE(row->time, rowTimeText(kTime));
+        QCOMPARE(row->badges, (QStringList{"Bot", "Kanal", "Mod"}));
+        QCOMPARE(row->name, QStringLiteral("Zuschauer42"));
+        QCOMPARE(row->color, QStringLiteral("#1E90FF"));
+        QCOMPARE(row->text, QStringLiteral("Hallo zusammen"));
+        QCOMPARE(row->messageId, QStringLiteral("m1"));
+        QVERIFY(!row->isEvent);
+        QVERIFY(chatRow(chatEvent("m2"))->badges.isEmpty());
+        QCOMPARE(chatRow(chatEvent("m3", {{"is_moderator", true}}))->badges, QStringList{"Mod"});
+    }
+
+    void sentAndDroppedRows()
+    {
+        TwitchStatusInfo twitch;
+        twitch.bot.login = QStringLiteral("testbot");
+        twitch.channel.login = QStringLiteral("testkanal");
+        const events::Event bot = event("twitch.chat_sent", {{"message_id", "s1"}, {"account", "bot"}, {"text", "Hallo"}});
+        QCOMPARE(*chatRow(bot, twitch),
+                 (ChatRow{rowTimeText(kTime), {"Bot"}, "testbot", QString(), "Hallo", false, "s1"}));
+        const events::Event channel = event("twitch.chat_sent", {{"message_id", "s2"}, {"account", "broadcaster"}, {"text", "Hi"}});
+        QCOMPARE(chatRow(channel, twitch)->badges, QStringList{"Kanal"});
+        QCOMPARE(chatRow(channel, twitch)->name, QStringLiteral("testkanal"));
+        QCOMPARE(chatRow(channel)->name, QStringLiteral("—"));
+        const std::optional<ChatRow> dropped =
+            chatRow(event("twitch.chat_dropped", {{"account", "bot"}, {"text", "Hallo"}, {"code", "expired"},
+                                                  {"message", "zu alt"}}));
+        QVERIFY(dropped->isEvent);
+        QCOMPARE(dropped->text, QStringLiteral("Nicht gesendet: zu alt"));
+    }
+
+    void greyRows()
+    {
+        const std::optional<ChatRow> follow = chatRow(event("twitch.follow", {{"user_name", "Zuschauer42"}}));
+        QCOMPARE(*follow, (ChatRow{rowTimeText(kTime), {}, QString(), QString(), "Follow: Zuschauer42", true, QString()}));
+        QCOMPARE(chatRow(event("twitch.raid", {{"from_user_name", "Zuschauer7"}, {"viewers", 23}}))->text,
+                 QStringLiteral("Raid: Zuschauer7, 23 Zuschauer"));
+        QCOMPARE(chatRow(event("twitch.stream_online", {}))->text, QStringLiteral("Stream online"));
+
+        RunRecord run = record(RunState::Running);
+        QCOMPARE(chatRow(event("actions.run_started", runEventData(run)))->text,
+                 QStringLiteral("Aktion «Begrüssung» ausgelöst"));
+        run.dryRun = true;
+        const std::optional<ChatRow> dry = chatRow(event("actions.run_started", runEventData(run)));
+        QVERIFY(dry->isEvent);
+        QCOMPARE(dry->text, QStringLiteral("Probelauf · Aktion «Begrüssung» ausgelöst"));
+
+        // Ohne Zeile im Chat
+        QVERIFY(!chatRow(event("actions.run_changed", runEventData(run))));
+        QVERIFY(!chatRow(event("actions.run_finished", runEventData(run))));
+        QVERIFY(!chatRow(event("twitch.gift_sub", {{"recipient_user_name", "Zuschauer7"}})));
+        QVERIFY(!chatRow(event("obs.scene_changed", {{"scene_name", "Live"}})));
+    }
+
+    void chatLimit()
+    {
+        QList<events::Event> history;
+        for (int i = 0; i < 250; ++i)
+            history.append(chatEvent(QString::number(i)));
+        ChatRows rows;
+        rows.reset(history);
+        QCOMPARE(rows.rows().size(), ChatRows::kMaxRows);
+        QCOMPARE(rows.rows().first().messageId, QStringLiteral("50"));
+        QCOMPARE(rows.add(chatEvent("neu")), (RowsAppend{true, 1}));
+        QCOMPARE(rows.rows().first().messageId, QStringLiteral("51"));
+        QCOMPARE(rows.rows().last().messageId, QStringLiteral("neu"));
+        QCOMPARE(rows.add(event("actions.run_changed", runEventData(record(RunState::Ok)))), RowsAppend{});
+        rows.reset({});
+        QCOMPARE(rows.add(chatEvent("a")), (RowsAppend{true, 0}));
+    }
+
+    void noDuplicates()
+    {
+        // Eigene Nachricht: erst chat_sent, dann das Echo über EventSub (falls es kommt)
+        const events::Event sent = event("twitch.chat_sent", {{"message_id", "s1"}, {"account", "bot"}, {"text", "Hallo"}});
+        ChatRows rows;
+        QCOMPARE(rows.add(sent), (RowsAppend{true, 0}));
+        QCOMPARE(rows.add(chatEvent("s1", {{"is_bot_account", true}})), RowsAppend{});
+        // Umgekehrte Reihenfolge
+        QCOMPARE(rows.add(chatEvent("s2")), (RowsAppend{true, 0}));
+        QCOMPARE(rows.add(event("twitch.chat_sent", {{"message_id", "s2"}, {"account", "bot"}, {"text", "x"}})),
+                 RowsAppend{});
+        // Graue Zeilen haben keine Kennung und kommen jedes Mal
+        QCOMPARE(rows.add(event("twitch.follow", {{"user_name", "A"}})), (RowsAppend{true, 0}));
+        QCOMPARE(rows.add(event("twitch.follow", {{"user_name", "A"}})), (RowsAppend{true, 0}));
+        QCOMPARE(rows.rows().size(), 4);
+    }
+
+    // --- Senden (e2-6, Plan 4.1) ---
+
+    void sendCounter()
+    {
+        QCOMPARE(chatSendView(QString(), "bot", std::nullopt).counter, QStringLiteral("0 / 500"));
+        const ChatSendView empty = chatSendView(QStringLiteral("   "), "bot", status());
+        QVERIFY(!empty.sendEnabled);
+        QVERIFY(empty.problem.isEmpty());
+        // Emoji: zwei UTF-16-Einheiten je Zeichen (wie der Kern zählt)
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80");
+        QCOMPARE(emoji.size(), 2);
+        QCOMPARE(chatSendView(QStringLiteral("Hallo ") + emoji, "bot", status()).counter, QStringLiteral("8 / 500"));
+        const QString full = QString(498, QLatin1Char('a')) + emoji;
+        ChatSendView v = chatSendView(full, "broadcaster", status());
+        QCOMPARE(v.counter, QStringLiteral("500 / 500"));
+        QVERIFY(!v.tooLong);
+        QVERIFY(v.sendEnabled);
+        v = chatSendView(full + QLatin1Char('a'), "broadcaster", status());
+        QCOMPARE(v.counter, QStringLiteral("501 / 500"));
+        QVERIFY(v.tooLong);
+        QVERIFY(!v.sendEnabled);
+        QCOMPARE(v.problem, QStringLiteral("Die Nachricht ist länger als 500 Zeichen"));
+    }
+
+    void sendRejections_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<QString>("account");
+        QTest::addColumn<QString>("state");
+        QTest::addColumn<QString>("problem");
+        const QString ok = QStringLiteral("Hallo");
+        QTest::newRow("leer") << QString() << "bot" << "on" << "Die Nachricht ist leer";
+        QTest::newRow("nur Leerzeichen") << "  " << "bot" << "on" << "Die Nachricht ist leer";
+        QTest::newRow("zu lang") << QString(501, QLatin1Char('a')) << "bot" << "on"
+                                 << "Die Nachricht ist länger als 500 Zeichen";
+        QTest::newRow("Schrägstrich") << "/ban x" << "bot" << "on" << "Twitch-Befehle sind nicht möglich";
+        QTest::newRow("Punkt") << ".me x" << "bot" << "on" << "Twitch-Befehle sind nicht möglich";
+        QTest::newRow("Schrägstrich nach Leerzeichen") << "  /ban x" << "bot" << "on"
+                                                       << "Twitch-Befehle sind nicht möglich";
+        QTest::newRow("Punkt nach Leerzeichen") << " .me x" << "broadcaster" << "on"
+                                                << "Twitch-Befehle sind nicht möglich";
+        QTest::newRow("Konto") << ok << "kanal" << "on" << "account muss bot oder broadcaster sein";
+        QTest::newRow("stumm") << ok << "broadcaster" << "muted" << "stumm: Version im Einsatz läuft";
+        QTest::newRow("nicht verfügbar") << ok << "bot" << "unavailable" << "Aktionen sind abgeschaltet";
+        QTest::newRow("Bot kann nicht senden") << ok << "bot" << "on" << "Bot nicht angemeldet";
+        QTest::newRow("aus: Kanal sendet") << ok << "broadcaster" << "off" << "";
+        QTest::newRow("Dateifehler: Kanal sendet") << ok << "broadcaster" << "file_error" << "";
+        QTest::newRow("Punkt in der Mitte") << "Hallo." << "broadcaster" << "on" << "";
+    }
+
+    void sendRejections()
+    {
+        QFETCH(QString, text);
+        QFETCH(QString, account);
+        QFETCH(QString, state);
+        QFETCH(QString, problem);
+        const std::optional<ActionsStatus> s = status(state, state == QLatin1String("unavailable") ? "Aktionen sind abgeschaltet" : "");
+        QCOMPARE(chatSendProblem(text, account, s), problem);
+        const EditResult r = chatSendEdit(text, account, s);
+        QCOMPARE(r.problem, problem);
+        QCOMPARE(r.edits.isEmpty(), !problem.isEmpty());
+        if (!r.edits.isEmpty()) {
+            QCOMPARE(r.edits.first().type, QStringLiteral("chat_send"));
+            QCOMPARE(r.edits.first().fields.value("text").toString(), text);
+            QCOMPARE(r.edits.first().fields.value("account").toString(), account);
+            QVERIFY(r.edits.first().fields.value("reply_to").isNull());
+        }
+        const ChatSendView v = chatSendView(text, account, s);
+        QCOMPARE(v.sendEnabled, problem.isEmpty());
+        // Leerer Text: ohne Meldung
+        QCOMPARE(v.problem, text.trimmed().isEmpty() ? QString() : problem);
+    }
+
+    void sendAccounts()
+    {
+        // Ohne actions_status: beide wählbar, der Kern entscheidet
+        ChatSendView v = chatSendView("Hallo", "bot", std::nullopt);
+        QCOMPARE(v.accounts, (QList<ChatSendAccount>{{"bot", "als Bot", true, QString()},
+                                                     {"broadcaster", "als Kanal", true, QString()}}));
+        QVERIFY(v.sendEnabled);
+        QCOMPARE(chatSendEdit("Hallo", "bot", std::nullopt).edits.size(), 1);
+        // Bot kann nicht senden: «als Bot» ausgegraut mit Grund
+        v = chatSendView("Hallo", "broadcaster", status());
+        QCOMPARE(v.accounts.at(0), (ChatSendAccount{"bot", "als Bot", false, "Bot nicht angemeldet"}));
+        QVERIFY(v.accounts.at(1).enabled);
+        QVERIFY(v.sendEnabled);
+        v = chatSendView("Hallo", "bot", status());
+        QVERIFY(!v.sendEnabled);
+        QCOMPARE(v.problem, QStringLiteral("Bot nicht angemeldet"));
+        // Stumm: nicht senden, auch als Kanal
+        v = chatSendView("Hallo", "broadcaster", status("muted"));
+        QVERIFY(!v.sendEnabled);
+        QCOMPARE(v.problem, QStringLiteral("stumm: Version im Einsatz läuft"));
+    }
+
+private:
+    static inline const QDateTime kTime{QDate(2026, 11, 16), QTime(20, 5, 9), QTimeZone::UTC};
+
+    static events::Event event(const char *type, const QJsonObject &data)
+    {
+        events::Event e;
+        e.type = QString::fromLatin1(type);
+        e.time = kTime;
+        e.data = data;
+        return e;
+    }
+
+    static events::Event chatEvent(const QString &messageId, const QJsonObject &extra = {})
+    {
+        QJsonObject data{{"message_id", messageId}, {"user_name", "Zuschauer42"}, {"user_login", "zuschauer42"},
+                         {"text", "Hallo zusammen"}, {"color", "#1E90FF"}};
+        for (auto it = extra.begin(); it != extra.end(); ++it)
+            data.insert(it.key(), it.value());
+        return event("twitch.chat_message", data);
+    }
+
+    // Bot nicht angemeldet, Kanal kann senden
+    static ActionsStatus status(const QString &state = QStringLiteral("on"), const QString &message = QString())
+    {
+        ActionsStatus s;
+        s.state = state;
+        s.message = message;
+        s.accounts = {{"bot", false, "Bot nicht angemeldet"}, {"broadcaster", true, QString()}};
+        return s;
     }
 };
 

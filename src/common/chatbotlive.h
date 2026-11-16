@@ -1,10 +1,14 @@
 #pragma once
 
 #include "actionengine.h"
+#include "windowdata.h"
 
 #include <QList>
 #include <QString>
+#include <QStringList>
 #include <QUuid>
+
+#include <optional>
 
 // P14 e2-5: Ansichtslogik des Unterreiters «Live» im Reiter «Chat-Bot» (Plan 3.5), ohne Fenster
 // (Regel 9). windowdata.h bleibt für P13.
@@ -73,5 +77,81 @@ private:
     QList<RunRow> m_rows;
     bool m_onlyErrors = false;
 };
+
+// --- Bereich «Chat» (P14 e2-6) ---
+
+// Eine Zeile: Zeit (lokal, hh:mm:ss), Abzeichen («Bot», «Kanal», «Mod»; Farben aus dem Theme),
+// Name, Chatfarbe des Absenders (#RRGGBB, leer = Standard), Text. isEvent: graue Zeile für ein
+// Ereignis, eine ausgelöste Aktion oder eine nicht gesendete Nachricht, dann Name und badges leer.
+// messageId: Kennung der Nachricht bei Twitch (nicht angezeigt), gegen doppelte Zeilen.
+struct ChatRow
+{
+    QString time;
+    QStringList badges;
+    QString name;
+    QString color;
+    QString text;
+    bool isEvent = false;
+    QString messageId;
+
+    bool operator==(const ChatRow &) const = default;
+};
+// Zeile zu einem Ereignis aus chatBotLiveFilters(); nullopt, wenn der Typ im Chat keine Zeile hat.
+// twitch: Namen der Konten für Zeilen aus twitch.chat_sent (ohne Angabe «—»).
+std::optional<ChatRow> chatRow(const events::Event &event,
+                               const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
+
+// Liste des Chats, älteste zuerst, höchstens kMaxRows; Zeilen kommen nur hinten dazu. Eine
+// Nachricht steht nur einmal: Nach twitch.chat_sent bringt twitch.chat_message mit derselben
+// message_id (Echo über EventSub, nicht belegt) keine zweite Zeile, und umgekehrt.
+class ChatRows
+{
+public:
+    static constexpr int kMaxRows = 200;
+
+    // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten.
+    void reset(const QList<events::Event> &events, const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
+    RowsAppend add(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
+    const QList<ChatRow> &rows() const { return m_rows; }
+
+private:
+    bool contains(const QString &messageId) const;
+
+    QList<ChatRow> m_rows;
+};
+
+// --- Senden (Plan 4.1, chat_send) ---
+
+inline constexpr int kChatSendMaxLength = 500; // wie im Kern; UTF-16-Einheiten (Plan 4.1)
+
+// Auswahl «als Bot» / «als Kanal». account: bot, broadcaster (chat_send). enabled false
+// (ausgegraut), wenn actions_status das Konto nicht senden lässt; toolTip dann der Grund.
+struct ChatSendAccount
+{
+    QString account;
+    QString label;
+    bool enabled = true;
+    QString toolTip;
+
+    bool operator==(const ChatSendAccount &) const = default;
+};
+// Eingabezeile: counter «12 / 500», tooLong (Zähler als Fehler), sendEnabled («Senden» und Enter),
+// problem: Grund, warum nicht gesendet werden kann (leer bei leerem Text).
+struct ChatSendView
+{
+    QString counter;
+    bool tooLong = false;
+    bool sendEnabled = false;
+    QList<ChatSendAccount> accounts;
+    QString problem;
+
+    bool operator==(const ChatSendView &) const = default;
+};
+// status fehlt (noch kein actions_status): Konten wählbar, der Kern entscheidet.
+ChatSendView chatSendView(const QString &text, const QString &account, const std::optional<ActionsStatus> &status);
+// Prüfung wie im Kern (actionservice.cpp, handleChatSend) mit denselben Texten; leer = senden
+QString chatSendProblem(const QString &text, const QString &account, const std::optional<ActionsStatus> &status);
+// «Senden»: Anfrage chat_send, sonst problem. Der Text geht unverändert (der Kern kürzt nicht).
+EditResult chatSendEdit(const QString &text, const QString &account, const std::optional<ActionsStatus> &status);
 
 } // namespace dss

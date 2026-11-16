@@ -497,6 +497,49 @@ private slots:
         QCOMPARE(rows.append(history.first()), 0);
         QCOMPARE(rows.rows().size(), 1);
         QCOMPARE(eventsDroppedText(5), QStringLiteral("5 Ereignisse nicht angezeigt: Das Fenster kam nicht nach."));
+
+        // P14 e2-6: Bestellung «Live», Chat-Nachrichten im Bereich «Ereignisse» ausblenden
+        const QStringList live = chatBotLiveFilters();
+        for (const QString &f : live)
+            QVERIFY2(events::isValidFilter(f), qPrintable(f));
+        for (const QString &f : filters)
+            QVERIFY(live.contains(f));
+        for (const char *f : {"twitch.chat_message", "twitch.chat_sent", "twitch.chat_dropped", "actions."})
+            QVERIFY2(live.contains(QString::fromLatin1(f)), f);
+        QVERIFY(!live.contains(QStringLiteral("twitch.gift_sub")));
+        QCOMPARE(time.toLocalTime().toString(QStringLiteral("HH:mm:ss")), rowTimeText(time));
+        QCOMPARE(rowTimeText(QDateTime()), QStringLiteral("–"));
+
+        const events::Event chat = event("twitch.chat_message", {{"user_name", "Zuschauer42"}, {"text", "Hallo"}});
+        QCOMPARE(eventRow(chat), (EventRow{localTime, QStringLiteral("Chat"), QStringLiteral("Zuschauer42"),
+                                           QStringLiteral("Hallo"), true}));
+        const events::Event follow = event("twitch.follow", {{"user_name", "Zuschauer42"}});
+        EventRows live2;
+        QVERIFY(live2.hideChat()); // Standard an
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 0}));
+        QCOMPARE(live2.add(chat), RowsAppend{});
+        QCOMPARE(live2.add(event("twitch.chat_sent", {{"text", "Hallo"}})), RowsAppend{});
+        QCOMPARE(live2.add(event("actions.run_started", {})), RowsAppend{});
+        QCOMPARE(live2.rows().size(), 2);
+        QCOMPARE(live2.visibleRows().size(), 1);
+        live2.setHideChat(false);
+        QCOMPARE(live2.visibleRows().size(), 2);
+        QCOMPARE(live2.add(chat), (RowsAppend{true, 0}));
+        // Verlauf: Typen ohne Zeile fallen weg, die neuesten 200 Zeilen bleiben
+        QList<events::Event> mixed{follow};
+        for (int i = 0; i < EventRows::kMaxRows; ++i) {
+            mixed.append(chat);
+            mixed.append(event("actions.run_changed", {}));
+        }
+        live2.reset(mixed);
+        QCOMPARE(live2.rows().size(), EventRows::kMaxRows);
+        QVERIFY(live2.rows().first().isChat);
+        // Volle Liste: vorne fällt eine ausgeblendete Chat-Zeile weg, sichtbar ändert sich nur das Anhängen
+        live2.setHideChat(true);
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 0}));
+        live2.setHideChat(false);
+        QCOMPARE(live2.add(follow), (RowsAppend{true, 1}));
+        QCOMPARE(live2.rows().size(), EventRows::kMaxRows);
     }
 
     void moduleDocks()

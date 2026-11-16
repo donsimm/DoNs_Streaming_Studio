@@ -416,6 +416,19 @@ QStringList chatBotEventFilters()
             QStringLiteral("twitch.raid")};
 }
 
+QStringList chatBotLiveFilters()
+{
+    // Präfix actions. statt der einzelnen run_*: alle Meldungen der Läufe (Plan 3.5)
+    return chatBotEventFilters()
+           + QStringList{QStringLiteral("twitch.chat_message"), QStringLiteral("twitch.chat_sent"),
+                         QStringLiteral("twitch.chat_dropped"), QStringLiteral("actions.")};
+}
+
+QString rowTimeText(const QDateTime &time)
+{
+    return time.isValid() ? time.toLocalTime().toString(QStringLiteral("HH:mm:ss")) : QStringLiteral("–");
+}
+
 namespace {
 
 // Anzeigename eines Zuschauers aus data (prefix «user» oder «from_user»); anonym oder leer: Ersatz
@@ -441,8 +454,7 @@ QString tierText(const QJsonObject &data)
 EventRow eventRow(const events::Event &event)
 {
     EventRow row;
-    row.time = event.time.isValid() ? event.time.toLocalTime().toString(QStringLiteral("HH:mm:ss"))
-                                    : QStringLiteral("–");
+    row.time = rowTimeText(event.time);
     const QJsonObject &d = event.data;
     const QString user = QStringLiteral("user");
     const QString &t = event.type;
@@ -482,6 +494,11 @@ EventRow eventRow(const events::Event &event)
         row.kind = QStringLiteral("Raid");
         row.name = viewerName(d, QStringLiteral("from_user"));
         row.details = QStringLiteral("%1 Zuschauer").arg(d.value(QStringLiteral("viewers")).toInt());
+    } else if (t == QLatin1String("twitch.chat_message")) {
+        row.kind = QStringLiteral("Chat");
+        row.name = viewerName(d, user);
+        row.details = d.value(QStringLiteral("text")).toString();
+        row.isChat = true;
     } else {
         // Typen ohne eigene Zeile (später bestellt): Typ als Art
         row.kind = t;
@@ -490,11 +507,43 @@ EventRow eventRow(const events::Event &event)
     return row;
 }
 
+bool EventRows::shows(const QString &type)
+{
+    return type == QLatin1String("twitch.chat_message") || chatBotEventFilters().contains(type);
+}
+
 void EventRows::reset(const QList<events::Event> &events)
 {
     m_rows.clear();
-    for (qsizetype i = std::max<qsizetype>(0, events.size() - kMaxRows); i < events.size(); ++i)
-        m_rows.append(eventRow(events.at(i)));
+    for (qsizetype i = events.size() - 1; i >= 0 && m_rows.size() < kMaxRows; --i) {
+        if (shows(events.at(i).type))
+            m_rows.prepend(eventRow(events.at(i)));
+    }
+}
+
+RowsAppend EventRows::add(const events::Event &event)
+{
+    RowsAppend change;
+    if (!shows(event.type))
+        return change;
+    if (m_rows.size() >= kMaxRows) {
+        if (visible(m_rows.first()))
+            change.removedFront = 1;
+        m_rows.removeFirst();
+    }
+    m_rows.append(eventRow(event));
+    change.appended = visible(m_rows.last());
+    return change;
+}
+
+QList<EventRow> EventRows::visibleRows() const
+{
+    QList<EventRow> result;
+    for (const EventRow &r : m_rows) {
+        if (visible(r))
+            result.append(r);
+    }
+    return result;
 }
 
 int EventRows::append(const events::Event &event)

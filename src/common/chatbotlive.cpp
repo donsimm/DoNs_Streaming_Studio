@@ -4,7 +4,11 @@
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <QJsonObject>
+#include <QJsonValue>
+
 #include <algorithm>
+#include <utility>
 
 namespace dss {
 
@@ -57,10 +61,26 @@ QString timeText(const RunRecord &record)
 {
     for (const QDateTime &t : {record.queuedAt, record.startedAt, record.finishedAt}) {
         if (t.isValid())
-            return t.toLocalTime().toString(QStringLiteral("HH:mm:ss"));
+            return rowTimeText(t);
     }
-    return QStringLiteral("–");
+    return rowTimeText(QDateTime());
 }
+
+// Graue Zeile zu einem Ereignis aus dem Bereich «Ereignisse»: «Follow: Name», «Raid: Name, 23 Zuschauer»
+QString eventChatText(const events::Event &event)
+{
+    const EventRow row = eventRow(event);
+    QString text = row.kind;
+    if (!row.name.isEmpty() && row.name != QStringLiteral("—"))
+        text += QStringLiteral(": ") + row.name;
+    if (!row.details.isEmpty())
+        text += QStringLiteral(", ") + row.details;
+    return text;
+}
+
+// account in chat_send und actions_status (chatAccountKey in chatoutbox.h)
+constexpr QLatin1String kAccountBot("bot");
+constexpr QLatin1String kAccountBroadcaster("broadcaster");
 
 } // namespace
 
@@ -202,6 +222,157 @@ int RunRows::visibleIndex(int index) const
             ++n;
     }
     return n;
+}
+
+std::optional<ChatRow> chatRow(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch)
+{
+    ChatRow row;
+    row.time = rowTimeText(event.time);
+    const QJsonObject &d = event.data;
+    const QString &t = event.type;
+    if (t == QLatin1String("twitch.chat_message")) {
+        if (d.value(QStringLiteral("is_bot_account")).toBool())
+            row.badges.append(QStringLiteral("Bot"));
+        if (d.value(QStringLiteral("is_broadcaster")).toBool())
+            row.badges.append(QStringLiteral("Kanal"));
+        if (d.value(QStringLiteral("is_moderator")).toBool())
+            row.badges.append(QStringLiteral("Mod"));
+        row.name = eventRow(event).name;
+        row.color = d.value(QStringLiteral("color")).toString();
+        row.text = d.value(QStringLiteral("text")).toString();
+        row.messageId = d.value(QStringLiteral("message_id")).toString();
+        return row;
+    }
+    if (t == QLatin1String("twitch.chat_sent")) {
+        // Eigene Nachricht: Name aus twitch_status; die Chatfarbe kennt erst ein Echo
+        const bool bot = d.value(QStringLiteral("account")).toString() == kAccountBot;
+        row.badges.append(bot ? QStringLiteral("Bot") : QStringLiteral("Kanal"));
+        if (twitch)
+            row.name = bot ? twitch->bot.login : twitch->channel.login;
+        if (row.name.isEmpty())
+            row.name = QStringLiteral("—");
+        row.text = d.value(QStringLiteral("text")).toString();
+        row.messageId = d.value(QStringLiteral("message_id")).toString();
+        return row;
+    }
+    row.isEvent = true;
+    if (t == QLatin1String("twitch.chat_dropped")) {
+        row.text = withReason(QStringLiteral("Nicht gesendet"), d.value(QStringLiteral("message")).toString());
+        return row;
+    }
+    if (t == QLatin1String("actions.run_started")) {
+        RunRecord record;
+        QString error;
+        if (!runFromJson(d, &record, &error))
+            return std::nullopt;
+        row.text = QStringLiteral("Aktion «%1» ausgelöst").arg(record.actionName);
+        if (record.dryRun)
+            row.text.prepend(QStringLiteral("Probelauf · "));
+        return row;
+    }
+    if (chatBotEventFilters().contains(t)) {
+        row.text = eventChatText(event);
+        return row;
+    }
+    return std::nullopt;
+}
+
+void ChatRows::reset(const QList<events::Event> &events, const std::optional<TwitchStatusInfo> &twitch)
+{
+    m_rows.clear();
+    for (const events::Event &e : events)
+        add(e, twitch);
+}
+
+RowsAppend ChatRows::add(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch)
+{
+    RowsAppend change;
+    const std::optional<ChatRow> row = chatRow(event, twitch);
+    if (!row || (!row->messageId.isEmpty() && contains(row->messageId)))
+        return change;
+    if (m_rows.size() >= kMaxRows) {
+        m_rows.removeFirst();
+        change.removedFront = 1;
+    }
+    m_rows.append(*row);
+    change.appended = true;
+    return change;
+}
+
+bool ChatRows::contains(const QString &messageId) const
+{
+    return std::any_of(m_rows.cbegin(), m_rows.cend(), [&](const ChatRow &r) { return r.messageId == messageId; });
+}
+
+namespace {
+
+std::optional<ActionsAccountStatus> accountStatus(const QString &account, const std::optional<ActionsStatus> &status)
+{
+    if (status) {
+        for (const ActionsAccountStatus &a : status->accounts) {
+            if (a.account == account)
+                return a;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+QString chatSendProblem(const QString &text, const QString &account, const std::optional<ActionsStatus> &status)
+{
+    const QString trimmed = text.trimmed();
+    if (account != kAccountBot && account != kAccountBroadcaster)
+        return QStringLiteral("account muss bot oder broadcaster sein");
+    if (trimmed.isEmpty())
+        return QStringLiteral("Die Nachricht ist leer");
+    if (text.size() > kChatSendMaxLength)
+        return QStringLiteral("Die Nachricht ist länger als %1 Zeichen").arg(kChatSendMaxLength);
+    if (trimmed.startsWith(QLatin1Char('/')) || trimmed.startsWith(QLatin1Char('.')))
+        return QStringLiteral("Twitch-Befehle sind nicht möglich");
+    if (!status)
+        return QString();
+    // unavailable: Kern ohne Aktionen, nimmt chat_send nicht an; file_error sendet trotzdem
+    if (status->state == QLatin1String("unavailable"))
+        return status->message;
+    if (status->state == QLatin1String("muted"))
+        return QStringLiteral("stumm: Version im Einsatz läuft");
+    const std::optional<ActionsAccountStatus> a = accountStatus(account, status);
+    if (a && !a->canSend)
+        return a->message;
+    return QString();
+}
+
+ChatSendView chatSendView(const QString &text, const QString &account, const std::optional<ActionsStatus> &status)
+{
+    ChatSendView v;
+    v.counter = QStringLiteral("%1 / %2").arg(text.size()).arg(kChatSendMaxLength);
+    v.tooLong = text.size() > kChatSendMaxLength;
+    for (const auto &[key, label] : {std::pair{kAccountBot, QStringLiteral("als Bot")},
+                                     std::pair{kAccountBroadcaster, QStringLiteral("als Kanal")}}) {
+        ChatSendAccount choice{key, label, true, QString()};
+        if (const std::optional<ActionsAccountStatus> a = accountStatus(key, status); a && !a->canSend) {
+            choice.enabled = false;
+            choice.toolTip = a->message;
+        }
+        v.accounts.append(choice);
+    }
+    // Leerer Text: «Senden» aus, ohne Meldung
+    if (!text.trimmed().isEmpty())
+        v.problem = chatSendProblem(text, account, status);
+    v.sendEnabled = !text.trimmed().isEmpty() && v.problem.isEmpty();
+    return v;
+}
+
+EditResult chatSendEdit(const QString &text, const QString &account, const std::optional<ActionsStatus> &status)
+{
+    EditResult r;
+    r.problem = chatSendProblem(text, account, status);
+    if (r.problem.isEmpty())
+        r.edits.append({QString::fromLatin1(msg::kChatSend),
+                        QJsonObject{{QStringLiteral("text"), text}, {QStringLiteral("account"), QString(account)},
+                                    {QStringLiteral("reply_to"), QJsonValue::Null}}});
+    return r;
 }
 
 } // namespace dss
