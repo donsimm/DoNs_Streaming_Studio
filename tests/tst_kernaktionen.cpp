@@ -4,17 +4,25 @@
 // Chat-Texte und keine Zuschauernamen im Protokoll. Erfundene Daten, eigener Datenordner.
 // Ereignisse kommen über test_event (dss-core --testereignisse), weil Twitch erst mit c1
 // im Kern angebunden ist.
+//
+// P14 c2 (Plan 4.3, 4.4): «Ton abspielen» über den Zweck «aktionen» mit dem Ersatzausgang
+// (--ersatzausgang, ohne Gerät; tests/daten/ton/ton-piep.wav, 1 s) und «Overlay-Element zeigen/
+// verstecken» über den Laufzustand des Kerns (overlay_live), Overlay-Datei bleibt unverändert.
 
 #include "actionjson.h"
 #include "actionprotocol.h"
+#include "coresettings.h"
 #include "eventbus.h"
 #include "eventtypes.h"
+#include "overlaylive.h"
+#include "overlaystore.h"
 #include "protocol.h"
 #include "prozesshilfe.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -181,6 +189,50 @@ bool ok(const QJsonObject &reply)
     return messageType(reply) == QLatin1String(msg::kChangeResult) && reply.value(QStringLiteral("ok")).toBool();
 }
 
+// c2: Aktion ohne Auslöser (gestartet mit action_test)
+Action newAction(const QString &name, const QList<Step> &steps)
+{
+    Action a;
+    a.id = QUuid::createUuid();
+    a.name = name;
+    a.steps = steps;
+    return a;
+}
+
+Step soundStep(const QString &file, bool wait)
+{
+    Step s = newStep(QString::fromLatin1(kStepPlaySound));
+    s.fields.insert(QStringLiteral("file"), file);
+    s.fields.insert(QStringLiteral("wait"), wait);
+    return s;
+}
+
+struct ElementChoice
+{
+    QUuid source;
+    std::optional<QString> text;
+    std::optional<QString> image;
+};
+
+Step overlayStep(const QUuid &overlay, const QString &mode, const QList<ElementChoice> &elements, int durationMs,
+                 bool wait)
+{
+    Step s = newStep(QString::fromLatin1(kStepOverlaySource));
+    s.fields.insert(QStringLiteral("overlay"), idText(overlay));
+    s.fields.insert(QStringLiteral("mode"), mode);
+    QJsonArray list;
+    for (const ElementChoice &e : elements) {
+        // Format (fieldspec.cpp): text und image immer, null = Text bzw. Bild des Elements
+        list.append(QJsonObject{{QStringLiteral("source"), idText(e.source)},
+                                {QStringLiteral("text"), e.text ? QJsonValue(*e.text) : QJsonValue()},
+                                {QStringLiteral("image"), e.image ? QJsonValue(*e.image) : QJsonValue()}});
+    }
+    s.fields.insert(QStringLiteral("elements"), list);
+    s.fields.insert(QStringLiteral("duration_ms"), durationMs);
+    s.fields.insert(QStringLiteral("wait"), wait);
+    return s;
+}
+
 } // namespace
 
 class TestKernAktionen : public QObject
@@ -244,6 +296,57 @@ private:
         if (!parseActionRuns(reply, &list, &error))
             qWarning("%s", qPrintable(error));
         return list;
+    }
+
+    // c2: legt die Aktion an, startet sie echt (action_test) und wartet auf das Ende des Laufs.
+    // tookMs: vom Start bis zum gemeldeten Ende (Abfrage alle 20 ms).
+    RunRecord runAction(CoreLink &c, const Action &action, const QJsonObject &arguments = {}, qint64 *tookMs = nullptr)
+    {
+        RunRecord run;
+        const QJsonObject put = c.request(QString::fromLatin1(msg::kActionPut), {{QStringLiteral("action"), actionToJson(action)}});
+        if (!ok(put)) {
+            qWarning("action_put: %s", QJsonDocument(put).toJson(QJsonDocument::Compact).constData());
+            return run;
+        }
+        QElapsedTimer timer;
+        timer.start();
+        const QJsonObject started = c.request(QString::fromLatin1(msg::kActionTest),
+                                              {{QStringLiteral("action_id"), idText(action.id)},
+                                               {QStringLiteral("dry_run"), false},
+                                               {QStringLiteral("arguments"), arguments}});
+        if (!ok(started)) {
+            qWarning("action_test: %s", QJsonDocument(started).toJson(QJsonDocument::Compact).constData());
+            return run;
+        }
+        QString error;
+        const QDeadlineTimer deadline(15000);
+        while (!deadline.hasExpired()) {
+            if (parseActionRun(c.request(QString::fromLatin1(msg::kActionRunDetails),
+                                         {{QStringLiteral("run_id"), started.value(QStringLiteral("id"))}},
+                                         QString::fromLatin1(msg::kActionRun)),
+                               &run, &error)
+                && isFinished(run.state))
+                break;
+            QTest::qWait(20);
+        }
+        if (tookMs)
+            *tookMs = timer.elapsed();
+        return run;
+    }
+
+    // c2: Laufzustand eines Overlays, wie ihn ein neues Fenster nach hello bekommt
+    static LiveElements liveElements(const QString &socket, const QUuid &overlay)
+    {
+        CoreLink link(socket);
+        QList<OverlayLiveInfo> infos;
+        QString error;
+        if (!parseOverlayLive(link.waitFor(QString::fromLatin1(msg::kOverlayLive)), &infos, &error))
+            qWarning("overlay_live: %s", qPrintable(error));
+        for (const OverlayLiveInfo &info : std::as_const(infos)) {
+            if (info.overlayId == overlay)
+                return info.elements;
+        }
+        return {};
     }
 
 private slots:
@@ -477,6 +580,157 @@ private slots:
         }
         stop(core);
         QVERIFY2(core.log.contains(QStringLiteral("stumm, die Version im Einsatz läuft")), qPrintable(core.log));
+    }
+
+    // c2 (Plan 4.3): Ton abspielen über den Zweck «aktionen». Ohne gewählten Ausgang meldet der
+    // Schritt das; mit wait wartet der Lauf die Länge ab (1 s), ohne nicht; der 9. gleichzeitige Ton
+    // wird abgewiesen, der Lauf geht weiter. Ohne DSS_CORE_AUDIO: «ohne Ton gebaut».
+    void soundStepPlays()
+    {
+        QTemporaryDir data;
+        QVERIFY(QDir(data.path()).mkpath(QStringLiteral("media")));
+        const QString file = QStringLiteral("media/piep.wav");
+        QVERIFY(QFile::copy(QStringLiteral(DSS_TEST_TON_DIR "/ton-piep.wav"), data.filePath(file)));
+        Core core = start(data.path(), QStringLiteral("ton"), {QStringLiteral("--ersatzausgang")});
+        CoreLink c(core.socket);
+        QVERIFY(c.isConnected());
+#if DSS_CORE_AUDIO
+        // Standard: kein Ausgang gewählt
+        RunRecord run = runAction(c, newAction(QStringLiteral("DSS-Test Ton ohne Ausgang"), {soundStep(file, true)}));
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.size(), 1);
+        QVERIFY2(run.log.at(0).message.contains(QStringLiteral("Kein Ausgang für «Ton Chat-Bot»")),
+                 qPrintable(run.log.at(0).message));
+
+        // Ausgang wählen: der Ersatzausgang
+        SettingsUpdate update;
+        update.requestId = 9001;
+        update.audioRoutes.insert(QStringLiteral("aktionen"), AudioRouteChange{QStringLiteral("dss_ersatzausgang"), std::nullopt});
+        c.send(settingsUpdateMessage(update));
+        QVERIFY(ok(c.waitFor(QString::fromLatin1(msg::kChangeResult))));
+
+        // wait: der Lauf wartet bis zum Ende des Tons
+        qint64 tookMs = 0;
+        run = runAction(c, newAction(QStringLiteral("DSS-Test Ton warten"), {soundStep(file, true)}), {}, &tookMs);
+        QVERIFY2(run.state == RunState::Ok, qPrintable(run.log.isEmpty() ? run.message : run.log.at(0).message));
+        QVERIFY2(tookMs >= 950 && tookMs <= 3000, qPrintable(QString::number(tookMs)));
+
+        // 9 Töne ohne wait: 8 spielen, der 9. wird abgewiesen
+        QList<Step> nine;
+        for (int i = 0; i < 9; ++i)
+            nine.append(soundStep(file, false));
+        run = runAction(c, newAction(QStringLiteral("DSS-Test neun Töne"), nine), {}, &tookMs);
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.size(), 9);
+        for (int i = 0; i < 8; ++i)
+            QCOMPARE(run.log.at(i).result, StepLogEntry::Result::Ok);
+        QCOMPARE(run.log.at(8).result, StepLogEntry::Result::Error);
+        QVERIFY2(run.log.at(8).message.contains(QStringLiteral("Schon 8 Töne")), qPrintable(run.log.at(8).message));
+        QVERIFY2(tookMs < 900, qPrintable(QString::number(tookMs))); // ohne wait: wartet nicht
+
+        // Fehlende Datei: Fehler im Lauf
+        QTest::qWait(1500); // die 8 Töne sind zu Ende
+        run = runAction(c, newAction(QStringLiteral("DSS-Test Ton fehlt"), {soundStep(QStringLiteral("media/fehlt.wav"), true)}));
+        QCOMPARE(run.state, RunState::Error);
+        QVERIFY2(run.log.at(0).message.contains(QStringLiteral("fehlt im Datenordner")), qPrintable(run.log.at(0).message));
+        stop(core);
+        QVERIFY2(core.log.contains(QStringLiteral("Ton Chat-Bot: Start")), qPrintable(core.log));
+#else
+        const RunRecord run = runAction(c, newAction(QStringLiteral("DSS-Test Ton"), {soundStep(file, true)}));
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.at(0).message, QStringLiteral("ohne Ton gebaut"));
+        stop(core);
+#endif
+    }
+
+    // c2 (Plan 4.4): Overlay-Element zeigen/verstecken über den Laufzustand des Kerns
+    void overlayStepShowsElements()
+    {
+        QTemporaryDir data;
+        QUuid overlayId;
+        QUuid greeting;
+        QUuid thanks;
+        QUuid picture;
+        QString otherImage;
+        {
+            OverlayStore store(data.path());
+            QString error;
+            QVERIFY2(store.load(&error), qPrintable(error));
+            overlayId = store.createOverlay(QStringLiteral("DSS-Test Begrüssung"), 640, 360, &error);
+            QVERIFY2(!overlayId.isNull(), qPrintable(error));
+            greeting = store.addTextSource(overlayId, QStringLiteral("Hallo %user%!"), QStringLiteral(DSS_TEST_FONT), &error);
+            thanks = store.addTextSource(overlayId, QStringLiteral("Danke"), QStringLiteral(DSS_TEST_FONT), &error);
+            picture = store.addImageSource(overlayId, QStringLiteral(DSS_TEST_EXIF_DIR "/orientierung-1.png"), &error);
+            const QUuid other = store.addImageSource(overlayId, QStringLiteral(DSS_TEST_EXIF_DIR "/orientierung-2.png"), &error);
+            QVERIFY2(!greeting.isNull() && !thanks.isNull() && !picture.isNull() && !other.isNull(), qPrintable(error));
+            for (const Source &s : store.overlay(overlayId)->sources) {
+                if (s.id == other)
+                    otherImage = s.file;
+            }
+            QVERIFY(otherImage.startsWith(QStringLiteral("media/")));
+        }
+        const QString overlayFile = data.filePath(QStringLiteral("overlays/") + idText(overlayId) + QStringLiteral(".json"));
+        const QByteArray before = readFile(overlayFile);
+        QVERIFY(!before.isEmpty());
+
+        Core core = start(data.path(), QStringLiteral("overlay"));
+        CoreLink c(core.socket);
+        QVERIFY(c.isConnected());
+        const QJsonObject args{{QStringLiteral("user"), QStringLiteral("Zuschauer42")},
+                               {QStringLiteral("amount"), 100},
+                               {QStringLiteral("bild"), otherImage}};
+
+        // Drei Elemente gemeinsam: Platzhalter im eigenen Text, text ersetzt, Bild aus einem Argument
+        qint64 tookMs = 0;
+        RunRecord run = runAction(c, newAction(QStringLiteral("DSS-Test zeigen"),
+                                               {overlayStep(overlayId, QStringLiteral("show"),
+                                                            {{greeting, std::nullopt, std::nullopt},
+                                                             {thanks, QStringLiteral("Danke %user% für %amount% Bits"), std::nullopt},
+                                                             {picture, std::nullopt, QStringLiteral("%bild%")}},
+                                                            3000, false)}),
+                                  args, &tookMs);
+        QVERIFY2(run.state == RunState::Ok, qPrintable(run.log.isEmpty() ? run.message : run.log.at(0).message));
+        QVERIFY2(tookMs < 2000, qPrintable(QString::number(tookMs))); // ohne wait
+        LiveElements live = liveElements(core.socket, overlayId);
+        QCOMPARE(live.size(), 3);
+        QCOMPARE(live.value(greeting).visible, std::optional<bool>(true));
+        QCOMPARE(live.value(greeting).text, std::optional<QString>(QStringLiteral("Hallo Zuschauer42!")));
+        QCOMPARE(live.value(thanks).text, std::optional<QString>(QStringLiteral("Danke Zuschauer42 für 100 Bits")));
+        QCOMPARE(live.value(picture).visible, std::optional<bool>(true));
+        QCOMPARE(live.value(picture).image, otherImage);
+        QVERIFY(live.value(picture).remainingMs > 0 && live.value(picture).remainingMs <= 3000);
+        // Nach der Dauer fällt der ganze Laufzustand der Elemente weg
+        QTRY_VERIFY_WITH_TIMEOUT(liveElements(core.socket, overlayId).isEmpty(), 6000);
+
+        // wait: der Lauf wartet die Dauer ab; «weich» wirkt in P14-1 wie ohne Übergang
+        Step soft = overlayStep(overlayId, QStringLiteral("show"), {{greeting, std::nullopt, std::nullopt}}, 600, true);
+        soft.fields.insert(QStringLiteral("transition_in"), QStringLiteral("fade"));
+        run = runAction(c, newAction(QStringLiteral("DSS-Test warten"), {soft}), args, &tookMs);
+        QCOMPARE(run.state, RunState::Ok);
+        QVERIFY2(tookMs >= 590, qPrintable(QString::number(tookMs)));
+        QVERIFY2(run.log.at(0).message.contains(QStringLiteral("Übergang «weich»")), qPrintable(run.log.at(0).message));
+
+        // Verstecken ohne Dauer bleibt bis zum Neustart
+        run = runAction(c, newAction(QStringLiteral("DSS-Test verstecken"),
+                                     {overlayStep(overlayId, QStringLiteral("hide"), {{greeting, std::nullopt, std::nullopt}}, 0, true)}));
+        QCOMPARE(run.state, RunState::Ok);
+        live = liveElements(core.socket, overlayId);
+        QCOMPARE(live.value(greeting).visible, std::optional<bool>(false));
+        QCOMPARE(live.value(greeting).remainingMs, qint64(-1));
+
+        // Unbekanntes Element und unbekanntes Overlay: Fehler im Lauf, der Lauf geht weiter
+        run = runAction(c, newAction(QStringLiteral("DSS-Test unbekannt"),
+                                     {overlayStep(overlayId, QStringLiteral("show"), {{QUuid::createUuid(), std::nullopt, std::nullopt}}, 0, false),
+                                      overlayStep(QUuid::createUuid(), QStringLiteral("show"), {{greeting, std::nullopt, std::nullopt}}, 0, false)}));
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.size(), 2);
+        QVERIFY2(run.log.at(0).message.contains(QStringLiteral("gibt es im Overlay")), qPrintable(run.log.at(0).message));
+        QVERIFY2(run.log.at(1).message.contains(QStringLiteral("Kein Overlay")), qPrintable(run.log.at(1).message));
+
+        stop(core);
+        // Laufzustand nie in die Overlay-Datei (Plan 4.4)
+        QCOMPARE(readFile(overlayFile), before);
+        QVERIFY2(!core.log.contains(QStringLiteral("Zuschauer42")), qPrintable(core.log));
     }
 
     void protocolMessages()

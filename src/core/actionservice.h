@@ -23,6 +23,8 @@ class QLocalSocket;
 class QTimer;
 
 namespace dss {
+class ActionSound;
+class OverlayLiveState;
 class SaveScheduler;
 }
 
@@ -42,8 +44,12 @@ class SaveScheduler;
 //   twitch.chat_sent und twitch.chat_dropped auf dem Fluss. Eigene Nachrichten gelten bei den
 //   Auslösern als «intern» (Plan 4.1), broadcasterId kommt vom eigenen Kanal.
 // - Benutzerinfo, Shoutout und Ansage (c1b) über Options::twitchApi, ohne «Twitch nicht verbunden».
-//   Eine gefundene Benutzerinfo führt zuschauer.json nach (Login, Anzeigename, Plan 4.8). Ton,
-//   Overlay und OBS sind «nicht verfügbar» (c2, P14-2).
+//   Eine gefundene Benutzerinfo führt zuschauer.json nach (Login, Anzeigename, Plan 4.8).
+// - Ton abspielen (c2, Plan 4.3) über Options::actionSound (Zweck «aktionen»); mit wait meldet der
+//   Schritt erst am Ende des Tons. Ohne DSS_CORE_AUDIO «ohne Ton gebaut».
+// - Overlay-Element zeigen/verstecken (c2, Plan 4.4) über Options::overlayLive, derselbe Weg wie
+//   overlay_live_set: nur im Speicher, nie in die Overlay-Datei. Übergang «fade» wirkt in P14-1
+//   wie «none» (Hinweis im Lauf). OBS ist «nicht verfügbar» (P14-2).
 class ActionService : public QObject
 {
     Q_OBJECT
@@ -63,6 +69,11 @@ public:
         dss::actions::TwitchApi *twitchApi = nullptr;
         // Twitch-ID des eigenen Kanals (geteilter Chat, Kanal darf Befehle immer); leer = unbekannt
         std::function<QString()> broadcasterId;
+        // c2: Töne des Chat-Bots; erst nach dem Dienst angelegt, darum beim Abspielen geholt. Nur
+        // mit DSS_CORE_AUDIO gesetzt; nullptr = nicht verfügbar.
+        std::function<dss::ActionSound *()> actionSound;
+        // c2: Laufzustand der Overlays; nullptr = nicht verfügbar. Lebt länger als der Dienst.
+        dss::OverlayLiveState *overlayLive = nullptr;
     };
 
     ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent = nullptr);
@@ -88,6 +99,8 @@ signals:
 
 private:
     class TwitchForward;
+    class SoundForward;
+    class OverlayForward;
 
     using Reply = std::function<void(const QJsonObject &)>;
     void handleEdit(const dss::ActionsRequest &request, const Reply &reply);
@@ -129,6 +142,8 @@ private:
     std::unique_ptr<dss::actions::TriggerDispatcher> m_dispatcher;
     std::unique_ptr<dss::actions::ChatOutbox> m_chat;
     std::unique_ptr<TwitchForward> m_twitch;
+    std::unique_ptr<SoundForward> m_sound;
+    std::unique_ptr<OverlayForward> m_overlay;
     dss::events::Subscription m_subscription;
 
     dss::actions::ActionsConfig m_config;

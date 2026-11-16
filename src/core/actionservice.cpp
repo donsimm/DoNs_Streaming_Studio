@@ -2,6 +2,8 @@
 
 #include "actionedit.h"
 #include "actionjson.h"
+#include "overlaylivestate.h"
+#include "placeholders.h"
 #include "protocol.h"
 #include "savescheduler.h"
 #include "triggerevent.h"
@@ -16,6 +18,10 @@
 #include <QPointer>
 #include <QSaveFile>
 #include <QTimer>
+
+#if DSS_CORE_AUDIO
+#include "actionsound.h"
+#endif
 
 namespace {
 
@@ -116,6 +122,116 @@ private:
     ActionService *m_service;
 };
 
+// Ton abspielen (c2, Plan 4.3): an dss::ActionSound (Zweck «aktionen»). Die Prüfungen (Ausgang,
+// Lautstärke, Datei, höchstens 8 gleichzeitig) und ihre Meldungen macht ActionSound. Mit wait kommt
+// done erst mit finished(), sonst sobald der Ton begonnen hat.
+class ActionService::SoundForward : public dss::actions::SoundPlayer
+{
+public:
+    explicit SoundForward(ActionService *service)
+        : m_service(service)
+    {
+    }
+
+    void play(const dss::actions::SoundRequest &request, dss::actions::StepDone done) override
+    {
+#if DSS_CORE_AUDIO
+        dss::ActionSound *sound = m_service->m_options.actionSound ? m_service->m_options.actionSound() : nullptr;
+        if (!sound) {
+            done(dss::actions::StepResult::failure(QStringLiteral("nicht verfügbar")));
+            return;
+        }
+        if (m_connected != sound) {
+            m_connected = sound;
+            QObject::connect(sound, &dss::ActionSound::finished, m_service,
+                             [this](quint64 id, bool ok, const QString &message) {
+                                 const dss::actions::StepDone waiting = m_waiting.take(id);
+                                 if (waiting)
+                                     waiting(ok ? dss::actions::StepResult{}
+                                                : dss::actions::StepResult::failure(message));
+                             });
+        }
+        QString error;
+        const quint64 id = sound->play(request.file, request.volume, &error);
+        if (id == 0) {
+            done(dss::actions::StepResult::failure(error));
+            return;
+        }
+        if (request.wait)
+            m_waiting.insert(id, std::move(done));
+        else
+            done({});
+#else
+        Q_UNUSED(request);
+        done(dss::actions::StepResult::failure(QStringLiteral("ohne Ton gebaut")));
+#endif
+    }
+
+private:
+    ActionService *m_service;
+#if DSS_CORE_AUDIO
+    QPointer<dss::ActionSound> m_connected;
+    QHash<quint64, dss::actions::StepDone> m_waiting; // Töne mit wait: Kennung → done
+#endif
+};
+
+// Overlay-Element zeigen/verstecken (c2, Plan 4.4): derselbe Weg wie overlay_live_set
+// (OverlayLiveState::set), nur im Speicher. Unbekanntes Overlay oder Element, zu lange Dauer:
+// Fehler im Lauf. Hinweise des Laufzustands (Bild nicht geladen, Text gekürzt) stehen im Lauf.
+class ActionService::OverlayForward : public dss::actions::OverlayLive
+{
+public:
+    explicit OverlayForward(ActionService *service)
+        : m_service(service)
+    {
+    }
+
+    void apply(const dss::actions::OverlayRequest &request, dss::actions::StepDone done) override
+    {
+        dss::OverlayLiveState *live = m_service->m_options.overlayLive;
+        if (!live) {
+            done(dss::actions::StepResult::failure(QStringLiteral("nicht verfügbar")));
+            return;
+        }
+        if (request.durationMs < 0 || request.durationMs > dss::kLiveMaxDurationMs) {
+            done(dss::actions::StepResult::failure(QStringLiteral("Dauer %1 ms ungültig, erlaubt sind 0 (ohne Ende) bis %2 ms.")
+                                                       .arg(request.durationMs)
+                                                       .arg(dss::kLiveMaxDurationMs)));
+            return;
+        }
+        dss::LiveSetRequest r;
+        r.overlayId = request.overlay;
+        if (request.mode == QLatin1String("hide"))
+            r.mode = dss::LiveMode::Hide;
+        else if (request.mode == QLatin1String("toggle"))
+            r.mode = dss::LiveMode::Toggle;
+        else
+            r.mode = dss::LiveMode::Show;
+        for (const dss::actions::OverlayRequest::Element &e : request.elements)
+            r.elements.append({e.source, e.text, e.image.value_or(QString())});
+        r.durationMs = int(request.durationMs);
+        // Argumente des Laufs für die Platzhalter im eigenen Text der Elemente
+        for (auto it = request.arguments.cbegin(); it != request.arguments.cend(); ++it)
+            r.arguments.insert(it.key(), dss::actions::placeholderText(it.value()));
+        // Plan 4.4: in P14-1 nur ohne Übergang; «fade» kommt mit P14-2
+        QString note;
+        if (request.transitionIn == QLatin1String("fade") || request.transitionOut == QLatin1String("fade"))
+            note = QStringLiteral("Übergang «weich» kommt später, ohne Übergang gezeigt.");
+        live->set(r, [done, note](const dss::OverlayLiveState::Result &result) {
+            if (!result.ok) {
+                done(dss::actions::StepResult::failure(result.message));
+                return;
+            }
+            QStringList messages{note, result.warning};
+            messages.removeAll(QString());
+            done({true, messages.join(QLatin1Char(' ')), {}});
+        });
+    }
+
+private:
+    ActionService *m_service;
+};
+
 ActionService::ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent)
     : QObject(parent)
     , m_bus(bus)
@@ -124,11 +240,15 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     , m_dispatcher(std::make_unique<dss::actions::TriggerDispatcher>(&m_clock, &m_variables))
     , m_chat(std::make_unique<dss::actions::ChatOutbox>(&m_clock, options.chatTransport))
     , m_twitch(std::make_unique<TwitchForward>(this))
+    , m_sound(std::make_unique<SoundForward>(this))
+    , m_overlay(std::make_unique<OverlayForward>(this))
     , m_saver(new dss::SaveScheduler(this))
 {
     dss::actions::ActionServices services;
     services.chat = m_chat.get();
     services.twitch = m_twitch.get();
+    services.sound = m_sound.get();
+    services.overlay = m_overlay.get();
     m_engine->setServices(services);
     m_chat->setResultHandler([this](const dss::actions::ChatOutcome &outcome) { publishChat(outcome); });
     m_engine->setBaseArguments([this] {

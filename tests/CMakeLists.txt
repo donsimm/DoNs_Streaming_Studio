@@ -127,9 +127,13 @@ target_link_libraries(tst_chatsenden PRIVATE dss_actions)
 # test_event mit dss-core --testereignisse, zweiter Kern als «Version im Einsatz»).
 if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
   dss_add_test(tst_kernaktionen)
+  # P14 c2: Ton abspielen (Ersatzausgang, ton-piep.wav) und Overlay-Element zeigen (Bilder aus exif)
   target_compile_definitions(tst_kernaktionen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
-    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>")
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_CORE_AUDIO=$<BOOL:${DSS_CORE_AUDIO}>
+    DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton"
+    DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif" DSS_TEST_FONT="${DSS_TEST_FONT}")
   add_dependencies(tst_kernaktionen dss-core dss-cli)
+  set_tests_properties(tst_kernaktionen PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
 # P14 e1: Ansichtslogik des Editors im Reiter «Chat-Bot» (Listen, Auswahl, Filter, Bearbeiten über
 # Änderungsbefehle, Prüfmeldungen) mit tests/daten/aktionen/vollstaendig.json, ohne Qt Gui.

@@ -367,6 +367,11 @@ int main(int argc, char *argv[])
     TwitchActions twitchActions(&twitch);
     actionOptions.twitchApi = &twitchActions;
 #endif
+    // c2: Laufzustand der Overlays und Töne des Chat-Bots (ActionSound legt erst der Block «Ton» an)
+    actionOptions.overlayLive = service.overlayLive();
+#if DSS_CORE_AUDIO
+    actionOptions.actionSound = [&service] { return service.actionSound(); };
+#endif
     ActionService actions(service.eventBus(), actionOptions);
     actions.load();
     service.setActionService(&actions);
