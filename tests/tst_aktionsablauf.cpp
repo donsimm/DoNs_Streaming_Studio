@@ -52,6 +52,7 @@ public:
         sounds.append(request);
         answer(std::move(done), {});
     }
+    void stopRun(const QUuid &runId) override { stoppedRuns.append(runId); }
     void apply(const OverlayRequest &request, StepDone done) override
     {
         overlays.append(request);
@@ -76,6 +77,7 @@ public:
     QList<AnnounceRequest> announces;
     QList<ObsVisibilityRequest> obs;
     QList<SoundRequest> sounds;
+    QList<QUuid> stoppedRuns;
     QList<OverlayRequest> overlays;
 
 private:
@@ -642,6 +644,57 @@ private slots:
         QCOMPARE(env.services.chats.size(), 1);
         QCOMPARE(env.rec(r1).log.size(), 0);
         QCOMPARE(env.clock.pendingTimers(), 0);
+    }
+
+    // c4 (Entscheid Nutzer 2026-11-16): ein Abbruch beendet die Töne des Laufs (stopRun mit seiner
+    // Kennung), mit und ohne wait; das normale Ende (Ok, Error) nicht. Abbruch sind «Abbruch»,
+    // «Lauf abbrechen», Zeit- und Schrittgrenze.
+    void abortStopsSounds()
+    {
+        Env env;
+        const Step withWait = mk(kStepPlaySound, {{"file", "media/ton.mp3"}, {"wait", true}});
+        const Step noWait = mk(kStepPlaySound, {{"file", "media/ton.mp3"}, {"wait", false}});
+
+        // normales Ende, auch mit Fehler in einem Schritt: kein stopRun
+        QUuid r = env.run(env.add(act(QStringLiteral("Normal"), {noWait})));
+        QCOMPARE(env.state(r), RunState::Ok);
+        QCOMPARE(env.services.sounds.last().runId, r);
+        r = env.run(env.add(act(QStringLiteral("Fehler"), {noWait, chat(QString())})));
+        QCOMPARE(env.state(r), RunState::Error);
+        QVERIFY(env.services.stoppedRuns.isEmpty());
+
+        // Schritt «Abbruch» nach einem Ton ohne wait
+        r = env.run(env.add(act(QStringLiteral("Abbruch"), {noWait, mk(kStepBreak)})));
+        QCOMPARE(env.state(r), RunState::Break);
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{r});
+
+        // Abbruch ohne Ton: kein stopRun
+        env.services.stoppedRuns.clear();
+        r = env.run(env.add(act(QStringLiteral("Ohne Ton"), {chat(QStringLiteral("x")), mk(kStepBreak)})));
+        QCOMPARE(env.state(r), RunState::Break);
+        QVERIFY(env.services.stoppedRuns.isEmpty());
+
+        // «Lauf abbrechen» während eines Tons mit wait; zwei Läufe, nur der abgebrochene
+        env.services.sync = false;
+        const QUuid a = env.add(act(QStringLiteral("Warten"), {withWait, chat(QStringLiteral("danach"))}));
+        const QUuid r1 = env.run(a);
+        const QUuid r2 = env.run(a);
+        QCOMPARE(env.services.pending.size(), 2);
+        QVERIFY(env.engine.cancel(r1));
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{r1});
+        env.services.pending.takeFirst()({}); // spätes Ende des Tons: kein Lauf mehr
+        env.services.sync = true;
+        env.services.pending.takeFirst()({});
+        QCOMPARE(env.state(r2), RunState::Ok);
+        QCOMPARE(env.services.chatTexts().count(QStringLiteral("danach")), 1); // nur r2 geht weiter
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{r1});
+
+        // Zeitgrenze (15 min) nach einem Ton ohne wait
+        env.services.stoppedRuns.clear();
+        r = env.run(env.add(act(QStringLiteral("Lang"), {noWait, delay(kMaxDelayMs), delay(kMaxDelayMs)})));
+        env.clock.advance(kMaxRunDurationMs);
+        QCOMPARE(env.state(r), RunState::Limit);
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{r});
     }
 
     // Probelauf: nichts nach Twitch oder OBS; Benutzerinfo, Overlay, Ton echt; Variablen getrennt

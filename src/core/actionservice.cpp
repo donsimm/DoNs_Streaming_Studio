@@ -17,6 +17,7 @@
 #include <QLocalSocket>
 #include <QPointer>
 #include <QSaveFile>
+#include <QSet>
 #include <QTimer>
 
 #if DSS_CORE_AUDIO
@@ -145,6 +146,7 @@ public:
             m_connected = sound;
             QObject::connect(sound, &dss::ActionSound::finished, m_service,
                              [this](quint64 id, bool ok, const QString &message) {
+                                 forgetSound(id);
                                  const dss::actions::StepDone waiting = m_waiting.take(id);
                                  if (waiting)
                                      waiting(ok ? dss::actions::StepResult{}
@@ -164,6 +166,7 @@ public:
             done(dss::actions::StepResult::failure(error));
             return;
         }
+        m_byRun[request.runId].insert(id);
         if (request.wait)
             m_waiting.insert(id, std::move(done));
         else
@@ -174,11 +177,42 @@ public:
 #endif
     }
 
+    // Abbruch eines Laufs (Entscheid Nutzer 2026-11-16): seine noch spielenden Töne enden sofort.
+    // Der Lauf ist schon beendet; sein wartendes done fällt weg, statt die Meldung «abgebrochen»
+    // von ActionSound::stop an einen beendeten Lauf zu geben.
+    void stopRun(const QUuid &runId) override
+    {
+#if DSS_CORE_AUDIO
+        const QSet<quint64> ids = m_byRun.take(runId);
+        for (quint64 id : ids) {
+            m_waiting.remove(id);
+            if (m_connected)
+                m_connected->stop(id);
+        }
+#else
+        Q_UNUSED(runId);
+#endif
+    }
+
 private:
+#if DSS_CORE_AUDIO
+    void forgetSound(quint64 id)
+    {
+        for (auto it = m_byRun.begin(); it != m_byRun.end(); ++it) {
+            if (it->remove(id)) {
+                if (it->isEmpty())
+                    m_byRun.erase(it);
+                return;
+            }
+        }
+    }
+#endif
+
     ActionService *m_service;
 #if DSS_CORE_AUDIO
     QPointer<dss::ActionSound> m_connected;
     QHash<quint64, dss::actions::StepDone> m_waiting; // Töne mit wait: Kennung → done
+    QHash<QUuid, QSet<quint64>> m_byRun;              // spielende Töne je Lauf (für stopRun)
 #endif
 };
 

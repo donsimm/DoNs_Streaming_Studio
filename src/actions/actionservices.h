@@ -72,6 +72,7 @@ struct SoundRequest
     QString file; // Verweis der Mediathek
     int volume = 100;
     bool wait = true;
+    QUuid runId; // Lauf, der den Ton startet (für stopRun)
 };
 
 // Schritt «OBS-Quelle ein/aus» (Plan 4.5, P14-2)
@@ -111,6 +112,9 @@ class SoundPlayer
 public:
     virtual ~SoundPlayer() = default;
     virtual void play(const SoundRequest &request, StepDone done) = 0;
+    // Beendet alle noch spielenden Töne, die der Lauf runId gestartet hat, mit und ohne wait.
+    // Der Lauf ruft es, wenn er abgebrochen wird (Entscheid Nutzer 2026-11-16, Plan 4.3).
+    virtual void stopRun(const QUuid &runId) = 0;
 };
 
 class OverlayLive

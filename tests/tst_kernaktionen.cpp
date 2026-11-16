@@ -650,6 +650,84 @@ private slots:
 #endif
     }
 
+    // c4 (Entscheid Nutzer 2026-11-16): «Lauf abbrechen» beendet die Töne des Laufs sofort, mit und
+    // ohne wait; das normale Ende lässt Töne ohne wait zu Ende spielen. Zwei Läufe: nur der Ton des
+    // abgebrochenen endet. Je Fall eine eigene Datei, damit das Kernprotokoll den Ton zuordnet.
+    void cancelStopsSounds()
+    {
+#if !DSS_CORE_AUDIO
+        QSKIP("ohne Ton gebaut");
+#else
+        QTemporaryDir data;
+        QVERIFY(QDir(data.path()).mkpath(QStringLiteral("media")));
+        const QStringList names{QStringLiteral("warten"), QStringLiteral("ohne"), QStringLiteral("normal"),
+                                QStringLiteral("a"), QStringLiteral("b")};
+        for (const QString &name : names)
+            QVERIFY(QFile::copy(QStringLiteral(DSS_TEST_TON_DIR "/ton-piep.wav"),
+                                data.filePath(QStringLiteral("media/%1.wav").arg(name))));
+        Core core = start(data.path(), QStringLiteral("tonabbruch"), {QStringLiteral("--ersatzausgang")});
+        CoreLink c(core.socket);
+        QVERIFY(c.isConnected());
+        SettingsUpdate update;
+        update.requestId = 9002;
+        update.audioRoutes.insert(QStringLiteral("aktionen"), AudioRouteChange{QStringLiteral("dss_ersatzausgang"), std::nullopt});
+        c.send(settingsUpdateMessage(update));
+        QVERIFY(ok(c.waitFor(QString::fromLatin1(msg::kChangeResult))));
+
+        // Startet die Aktion, ohne auf das Ende zu warten; Ergebnis: Kennung des Laufs
+        const auto launch = [&](const Action &action) {
+            if (!ok(c.request(QString::fromLatin1(msg::kActionPut), {{QStringLiteral("action"), actionToJson(action)}})))
+                return QJsonValue();
+            const QJsonObject started = c.request(QString::fromLatin1(msg::kActionTest),
+                                                  {{QStringLiteral("action_id"), idText(action.id)},
+                                                   {QStringLiteral("dry_run"), false},
+                                                   {QStringLiteral("arguments"), QJsonObject()}});
+            return ok(started) ? started.value(QStringLiteral("id")) : QJsonValue();
+        };
+        const auto cancel = [&](const QJsonValue &run) {
+            return ok(c.request(QString::fromLatin1(msg::kActionRunCancel), {{QStringLiteral("run_id"), run}}));
+        };
+        const auto file = [](const QString &name) { return QStringLiteral("media/%1.wav").arg(name); };
+        // je Aktion ein neuer Schritt: Schrittkennungen sind in aktionen.json eindeutig
+        const auto longDelay = [] {
+            Step s = newStep(QString::fromLatin1(kStepDelay));
+            s.fields.insert(QStringLiteral("value_ms"), 5000);
+            return s;
+        };
+
+        // mit wait: abbrechen, während der Lauf auf das Ende des Tons wartet
+        QJsonValue run = launch(newAction(QStringLiteral("DSS-Test Ton warten"), {soundStep(file(QStringLiteral("warten")), true)}));
+        QVERIFY(!run.isUndefined() && !run.isNull());
+        QTest::qWait(200);
+        QVERIFY(cancel(run));
+
+        // ohne wait: der Lauf wartet danach, der Ton spielt noch
+        run = launch(newAction(QStringLiteral("DSS-Test Ton ohne"), {soundStep(file(QStringLiteral("ohne")), false), longDelay()}));
+        QVERIFY(!run.isUndefined() && !run.isNull());
+        QTest::qWait(200);
+        QVERIFY(cancel(run));
+
+        // normales Ende mit einem Ton ohne wait: der Ton spielt zu Ende
+        const RunRecord normal = runAction(c, newAction(QStringLiteral("DSS-Test Ton normal"), {soundStep(file(QStringLiteral("normal")), false)}));
+        QCOMPARE(normal.state, RunState::Ok);
+
+        // zwei Läufe, nur a wird abgebrochen
+        const QJsonValue runA = launch(newAction(QStringLiteral("DSS-Test Ton a"), {soundStep(file(QStringLiteral("a")), false), longDelay()}));
+        const QJsonValue runB = launch(newAction(QStringLiteral("DSS-Test Ton b"), {soundStep(file(QStringLiteral("b")), false), longDelay()}));
+        QVERIFY(!runA.isNull() && !runB.isNull());
+        QTest::qWait(200);
+        QVERIFY(cancel(runA));
+        QTest::qWait(1500); // b (1 s) spielt zu Ende
+        QVERIFY(cancel(runB)); // b ist schon zu Ende: nichts mehr zu beenden
+
+        stop(core);
+        for (const QString &name : {QStringLiteral("warten"), QStringLiteral("ohne"), QStringLiteral("a")})
+            QVERIFY2(core.log.contains(QStringLiteral("Ton Chat-Bot: Ende %1: abgebrochen").arg(file(name))), qPrintable(core.log));
+        for (const QString &name : {QStringLiteral("normal"), QStringLiteral("b")})
+            QVERIFY2(core.log.contains(QStringLiteral("Ton Chat-Bot: Ende %1: gespielt").arg(file(name))), qPrintable(core.log));
+#endif
+    }
+
     // c2 (Plan 4.4): Overlay-Element zeigen/verstecken über den Laufzustand des Kerns
     void overlayStepShowsElements()
     {

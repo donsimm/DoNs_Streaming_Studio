@@ -115,6 +115,10 @@ void ActionRun::finish(RunState state, const QString &message)
     m_record.state = state;
     m_record.message = message;
     m_record.finishedAt = m_engine->m_clock->now();
+    // Abbruch (alles ausser dem normalen Ende nach dem letzten Schritt, Ok oder Error): die Töne
+    // des Laufs enden sofort, mit und ohne wait (Entscheid Nutzer 2026-11-16, Plan 4.3)
+    if (m_playedSound && state != RunState::Ok && state != RunState::Error && m_engine->m_services.sound)
+        m_engine->m_services.sound->stopRun(m_record.runId);
     m_engine->finishRun(this);
 }
 
@@ -303,12 +307,15 @@ void ActionRun::execute(const Step &step, const QList<int> &path, int depth)
         request.file = step.fields.value(QStringLiteral("file")).toString();
         request.volume = step.fields.value(QStringLiteral("volume")).toInt(100);
         request.wait = step.fields.value(QStringLiteral("wait")).toBool(true);
-        if (request.file.isEmpty())
+        request.runId = m_record.runId;
+        if (request.file.isEmpty()) {
             log(StepLogEntry::Result::Error, QStringLiteral("keine Datei gewählt"));
-        else if (!services.sound)
+        } else if (!services.sound) {
             log(StepLogEntry::Result::Error, unavailable);
-        else
+        } else {
+            m_playedSound = true;
             services.sound->play(request, waitForService());
+        }
     } else if (type == QLatin1String(kStepOverlaySource)) {
         executeOverlay(step);
     } else if (type == QLatin1String(kStepObsSourceVisible)) {

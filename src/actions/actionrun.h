@@ -83,6 +83,7 @@ private:
     bool m_inLoop = false;
     bool m_resumeAgain = false;
     bool m_hadError = false;
+    bool m_playedSound = false; // Schritt «Ton abspielen» gestartet: beim Abbruch stopRun
 };
 
 } // namespace dss::actions
