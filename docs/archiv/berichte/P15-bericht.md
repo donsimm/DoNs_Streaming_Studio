@@ -40,7 +40,8 @@ Testquelle danach gelöscht (`RemoveInput`), Programm zurück auf «Szene», Tin
 | Presets «Test hell» (80/160) und «Test warm» (15/330) | je 10× abgerufen, ohne Fehler; Antwort Median 181 und 167 ms, höchstens 204 ms; beide Lampen sichtbar gewechselt (Nutzer) |
 | Begrenzung | 150/100 → 100/143, 1/400 → 3/344 |
 | Danach | beide an, 24, 220 Mired (wie vorher, Nutzer), Test-Presets gelöscht |
-| Absender | Streaming-PC über Heimnetz-Adresse `403` mit Protokolleintrag; über `127.0.0.1` `200`; vom Studio-PC keine Antwort (Firewall, Regel kommt mit `system-einrichten.sh`, N7) |
+| Absender | Streaming-PC über Heimnetz-Adresse `403` mit Protokolleintrag; über `127.0.0.1` `200`; vom Studio-PC zuerst keine Antwort (Firewall) |
+| Firewall (Teil von N7) | Nutzer: `sudo …/system-einrichten.sh --zone FedoraWorkstation <studio-pc>` (Trockenlauf vorher gleich), «success» zweimal. Danach vom Studio-PC `200` in 3 ms, Streaming-PC über Heimnetz weiter `403`; `--list-rich-rules`: neue Regel neben 4455 und ssh. Drittes Gerät nicht geprüft |
 
 ### Nicht erledigt, `[OFFEN]`
 
@@ -48,8 +49,9 @@ Testquelle danach gelöscht (`RemoveInput`), Programm zurück auf «Szene», Tin
 - `[OFFEN]` **`zoom_continuous` der Tiny 2** meldet 245 bei Bereich −100…100: Wert mit Vorzeichen wird ohne Vorzeichen gelesen (vermutlich −11).
 - `[OFFEN]` **Blackmagic-Karte** erscheint in `status` als Kamera (`ptz: false`, keine Werte). Ausblenden (nur UVC-Kameras mit Werten) oder lassen.
 - `[OFFEN]` Bildwinkel und KI-Modus sind am Gerät bestätigt und können im Dienst freigeschaltet werden (Bildwinkel `04 01 00/01/02`, KI «Oberkörper» `16 02 02 01`, aus `16 02 00 00` mit Übergang 6).
+- `[OFFEN]` **`system-einrichten.sh` ohne `--zone` bricht ab:** Am Streaming-PC sind zwei Zonen aktiv (`FedoraWorkstation` auf der Kabelkarte, `trusted` auf `tailscale0`). Besser die Zone der Schnittstelle wählen, über die der Studio-PC erreicht wird (`ip route get <studio-pc>`), und `LIESMICH.md` nachführen.
 - `[OFFEN]` Lampe links fiel im WLAN aus (nur Stromtrennung half). Kein Fehler des Dienstes; beobachten.
-- Nicht geprüft: L4, L5, N1–N7 (brauchen Studio-Teil d–f bzw. Installation durch den Nutzer), C922 Netzfrequenz 50 Hz setzen und Umstecken (N2, N3), Firewall-Regel von `system-einrichten.sh`.
+- Nicht geprüft: L4, L5, N1–N6 (brauchen Studio-Teil d–f), N7 ausser der Firewall-Regel (Installation durch den Nutzer, drittes Gerät), C922 Netzfrequenz 50 Hz setzen und Umstecken (N2, N3).
 
 ### Ausserhalb des Studios
 
