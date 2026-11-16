@@ -40,6 +40,7 @@ add_library(dss_common STATIC
   overlaylivestate.h overlaylivestate.cpp
   actionview.h actionview.cpp
   actionprotocol.h actionprotocol.cpp # P14 b3: Nachrichten des Aktionssystems
+  chatbotlive.h chatbotlive.cpp # P14 e2-5: Ansichtslogik «Chat-Bot» › «Live»
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und

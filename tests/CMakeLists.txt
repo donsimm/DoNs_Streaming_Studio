@@ -49,6 +49,7 @@ set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED "dss_media;dss
 # P07: Schnittstelle, Leistungswerte, Aufbereitung für das Fenster (ohne Qt Gui).
 dss_add_test(tst_protocol)
 dss_add_test(tst_windowdata)
+dss_add_test(tst_chatbotlive) # P14 e2-5: «Chat-Bot» › «Live», ohne Fenster
 dss_add_test(tst_systemstats)
 target_compile_definitions(tst_systemstats PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
 # P10-vor: Einstellungen des Kerns (kern.ini), ohne Qt Gui.
