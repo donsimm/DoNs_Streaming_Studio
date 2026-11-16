@@ -112,6 +112,20 @@ class MoverTest(unittest.TestCase):
 
     # --- Tiny 2 über das Tempo ---------------------------------------------------------
 
+    def test_speed_curve(self) -> None:
+        # Nachmessung 2026-11-16: auf einem Messpunkt genau, dazwischen linear, über dem letzten
+        # Punkt mit der Steigung des letzten Abschnitts, negativ mit gleichem Betrag.
+        pan, tilt = obsbot.PAN_SPEED_CURVE, obsbot.TILT_SPEED_CURVE
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(pan, 10), 10.87)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(tilt, 5), 4.58)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(pan, 15), (10.87 + 22.78) / 2)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(tilt, 15), (9.96 + 20.5) / 2)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(pan, 100), 84.8 + (84.8 - 42.6) / 2)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(tilt, 30), 20.5 + (20.5 - 9.96))
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(pan, -20), -22.78)
+        self.assertAlmostEqual(obsbot.speed_deg_per_s(tilt, -7), -(4.58 + (9.96 - 4.58) * 2 / 5))
+        self.assertEqual(obsbot.speed_deg_per_s(pan, 0), 0.0)
+
     def test_tiny2_moves_by_speed(self) -> None:
         # Standardtempo 10 °/s; Tilt halb so schnell. Während der Fahrt keine Zielpositionen.
         self.hold({"pan": 1, "tilt": 0.5}, 2.0)
@@ -119,22 +133,25 @@ class MoverTest(unittest.TestCase):
         self.assertNotIn(PAN, self.folder.values(NODE))  # G_CTRL: nur der letzte gesetzte Wert
         self.mover.stop(TINY2_ID)
         # Halt: Tempo 0, dann Treiberwert absolut auf die geschätzte Lage (Grad gerundet).
-        # Lage = Tempo × Zeit ab dem ersten Schritt (50 ms) nach Messkurve: Pan 10 → 12,0 °/s,
-        # Tilt 5 → 4,75 °/s.
+        # Lage = Tempo × Zeit ab dem ersten Schritt (50 ms) nach Messkurve (Pan 10, Tilt 5).
+        pan_rate = obsbot.speed_deg_per_s(obsbot.PAN_SPEED_CURVE, 10)
+        tilt_rate = obsbot.speed_deg_per_s(obsbot.TILT_SPEED_CURVE, 5)
+        pan, tilt = round(pan_rate * 1.95), round(tilt_rate * 1.95)
         real = self.real()
-        self.assertAlmostEqual(real["pan"], 12.0 * 1.95, delta=0.01)
-        self.assertAlmostEqual(real["tilt"], 4.75 * 1.95, delta=0.01)
-        self.assertEqual(self.log()[2:], [(PAN_SPEED, 0), (PAN, 23 * DEG), (TILT_SPEED, 0), (TILT, 9 * DEG)])
+        self.assertAlmostEqual(real["pan"], pan_rate * 1.95, delta=0.01)
+        self.assertAlmostEqual(real["tilt"], tilt_rate * 1.95, delta=0.01)
+        self.assertEqual(self.log()[2:], [(PAN_SPEED, 0), (PAN, pan * DEG), (TILT_SPEED, 0), (TILT, tilt * DEG)])
         self.time.now += 1.0
-        self.assertEqual(self.real(), {"pan": 23.0, "tilt": 9.0})
+        self.assertEqual(self.real(), {"pan": float(pan), "tilt": float(tilt)})
         # Ein Schritt geht von der geschätzten Lage aus, save-current speichert sie.
-        self.assertEqual(self.mover.step(TINY2_ID, {"pan": 1})["position"]["pan"], 25.0)
+        self.assertEqual(self.mover.step(TINY2_ID, {"pan": 1})["position"]["pan"], pan + 2.0)
         presets = CameraPresets(PresetStore(self.root / "daten"), self.mover, self.manager)
         preset_id = presets.create({"name": "Oben", "camera": TINY2_ID})["preset"]["id"]
         self.hold({"tilt": -1, "speed": 20}, 1.0)
         self.mover.stop(TINY2_ID)
         saved = presets.save_current(preset_id, {})["preset"]
-        self.assertEqual((saved["pan"], saved["tilt"]), (25.0, round(9.0 - 19.3 * 0.95)))
+        tilt_20 = obsbot.speed_deg_per_s(obsbot.TILT_SPEED_CURVE, 20)
+        self.assertEqual((saved["pan"], saved["tilt"]), (pan + 2.0, round(tilt - tilt_20 * 0.95)))
         # Tempo über 100 gibt es nicht; die Richtung skaliert es (1 °/s mindestens).
         self.hold({"pan": -0.01, "speed": 40}, 0.2)
         self.assertEqual(self.writes(PAN_SPEED)[-1], -1)

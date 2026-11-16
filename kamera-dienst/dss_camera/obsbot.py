@@ -65,8 +65,12 @@ AI_OFF_COMMAND = (0x16, 0x02, 0x00, 0x00)
 # Dauerbewegung über V4L2_CID_PAN_SPEED/TILT_SPEED (Prüfung am Gerät 2026-11-16, über das
 # OBS-Bild): Wert → Grad je Sekunde, gleiches Vorzeichen wie die absoluten Werte; Wert 0 hält
 # jede Fahrt sofort an. Absolute Ziele fährt die Kamera mit fest ≈ 62 °/s.
-PAN_SPEED_CURVE = ((0, 0.0), (5, 5.1), (10, 12.0), (20, 22.1), (40, 42.6), (80, 84.8))
-TILT_SPEED_CURVE = ((0, 0.0), (10, 9.5), (20, 19.3))
+# Nachmessung 2026-11-16: Fahrt 1 s und 4 s, Tempo = (Lage 4 s − Lage 1 s) / 3 s, damit fällt
+# der Anfahrversatz heraus (streut ±0,1 s, Vorzeichen nicht stabil, darum nicht eingebaut).
+# Pan 40 und 80 stammen aus der ersten Messung (Nachmessung am Anschlag nicht möglich), Tilt 20
+# nur aus der 1-s-Fahrt (4 s geht über den Kippbereich).
+PAN_SPEED_CURVE = ((0, 0.0), (5, 5.32), (10, 10.87), (20, 22.78), (40, 42.6), (80, 84.8))
+TILT_SPEED_CURVE = ((0, 0.0), (5, 4.58), (10, 9.96), (20, 20.5))
 ABSOLUTE_DEG_PER_S = 62.0
 
 

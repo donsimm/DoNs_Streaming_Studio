@@ -65,3 +65,29 @@ Im Kernel-Protokoll des Streaming-PCs seit dem Start (07:15) 1828 korrigierbare 
 - **Interna:** Lage nach der Messkurve statt «Wert = °/s» (Pan 10 → 12,0 °/s, sonst Korrektursprung ≈ 20 %); Tempo nur bei Änderung senden, aber jeden Schritt Kamera und Zustand prüfen (Abbruch nach Regel 6 wie bisher); nach Abbruch sofort Halt mit Korrektur, misslingt er, beim Ende nochmals nur Tempo 0; Halt auch bei `step`, `home`, Presets und beim Beenden des Dienstes; Tempo-Werte aus `controls` ausgeblendet (sonst über `PUT controls` setzbar).
 - `[OFFEN]` Startet eine Dauerbewegung, während ein absolutes Ziel (`step`, Preset) noch fährt, beginnt die Schätzung beim Ziel statt bei der echten Lage.
 - **Quellen:** Messwerte am Gerät (Lotse, 2026-11-16, über das OBS-Bild); https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html (`V4L2_CID_PAN_SPEED`, `V4L2_CID_TILT_SPEED`, nicht abgerufen).
+
+## b5: Tempokurven nachgemessen (2026-11-16)
+
+Nach b4 springt das Bild der Tiny 2 beim Loslassen um 3–6° (wächst mit der Fahrzeit): Die alte Kurve setzte das Tempo zu hoch an (Pan 10 → 12,0 statt 10,87 °/s), die geschätzte Lage lief der echten voraus, die Korrektur nach dem Halt fuhr sichtbar nach.
+
+Messung durch Lotse am 2026-11-16 über das OBS-Bild: Fahrt mit `…_speed v` für 1 s und für 4 s, dann `…_speed 0`; Tempo = (Lage 4 s − Lage 1 s) / 3 s, Versatz = Rest bei 1 s.
+
+| Achse | Wert | °/s | Bemerkung |
+|---|---|---|---|
+| Pan | 5 | 5,32 | Versatz 0,04–0,2 s, streut |
+| Pan | 10 | 10,87 | |
+| Pan | 20 | 22,78 | |
+| Pan | 30 | – | ungültig (Anschlag ≈ 130°) |
+| Pan | 40 | 42,6 | aus der ersten Messung, nicht wiederholt |
+| Pan | 80 | 84,8 | aus der ersten Messung, nicht wiederholt |
+| Tilt | 5 | 4,58 | Versatz +0,05 s |
+| Tilt | 10 | 9,96 | Versatz +0,02 s |
+| Tilt | 20 | ≈ 20,5 | nur die 1-s-Fahrt gültig (4 s über den Kippbereich) |
+| Tilt | 40 | – | ungültig (Bild-Tracking verloren) |
+
+- **Geändert:** `kamera-dienst/dss_camera/obsbot.py` (`PAN_SPEED_CURVE`, `TILT_SPEED_CURVE`, Kommentar), `kamera-dienst/tests/test_bewegen.py` (erwartete Lagen aus den Konstanten statt fester Zahlen, neuer Test `test_speed_curve`). `fake.py` und `motion.py` nutzen die Konstanten schon, unverändert.
+- **Geprüft (2026-11-16):** `scripts/bauen.sh` und `scripts/testen.sh -R '^kd_'`, Ergebnis in der Rückmeldung an Lotse. Am Gerät nicht geprüft.
+- **Korrektur nach dem Halt (Befund, nicht geändert):** Im Code gibt es keine Schwelle von 2° (die «≈ 2°» aus b4 sind nur das Prüfkriterium im Handtest). Beim normalen Halt sendet `Motion._advance_speed` Tempo 0 und danach immer den Treiberwert absolut auf die geschätzte Lage, gerundet aufs Raster und auf die Grenzen begrenzt (`Axis.raw`), egal wie gross die Abweichung zur echten Lage ist. Wird die Grenze im nächsten Schritt überschritten, geht der Wert absolut auf die Grenze. Nur nach einem Abbruch beim zweiten Versuch (Ende der Bewegung) gibt es keine Korrektur, nur Tempo 0.
+- **Interna:** Kein Anfahrversatz in der Schätzung (streut ±0,1 s, Vorzeichen nicht stabil). Über dem letzten Messpunkt gilt weiter die Steigung des letzten Abschnitts (Tilt über 20).
+- `[OFFEN]` **Sprung nach dem Loslassen 3–6°:** Kurve korrigiert, Prüfung am Gerät offen.
+- **Quellen:** Messwerte am Gerät (Lotse, 2026-11-16, über das OBS-Bild).
