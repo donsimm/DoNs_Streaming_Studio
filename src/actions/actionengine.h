@@ -129,6 +129,13 @@ public:
                     const QString &message);
     // Wartende Läufe werden verworfen, laufende beendet. false, wenn der Lauf nicht (mehr) läuft.
     bool cancel(const QUuid &runId, const QString &message = QString());
+    // Bricht alle laufenden und wartenden Läufe einer Aktion wie cancel() ab (auch Probeläufe),
+    // Ergebnis: Anzahl (Entscheid Nutzer 2026-11-16: Aktion abgeschaltet oder gelöscht)
+    int cancelAction(const QUuid &actionId, const QString &message);
+    // Dasselbe für mehrere Aktionen in einem Durchgang (Meldung je Aktion)
+    int cancelActions(const QHash<QUuid, QString> &messages);
+    // Dasselbe für alle Läufe (Hauptschalter «Chat-Bot aktiv» aus)
+    int cancelAll(const QString &message);
 
     // Warteschlangen (Plan 2.8); null = «Standard»
     void pauseQueue(const QUuid &queue);
@@ -155,6 +162,8 @@ private:
     bool queueBlocking(const QUuid &queue) const;
     bool queueBusy(const QUuid &queue) const;
     void pump();
+    // messageFor: Meldung des Abbruchs, leer = Lauf nicht abbrechen
+    int cancelMatching(const std::function<QString(const RunRecord &)> &messageFor);
     void startRun(ActionRun *run);
     void finishRun(ActionRun *run);
     void storeRecord(const RunRecord &record);

@@ -605,6 +605,8 @@ Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_fai
 
 **Läufe:** Ereignisse `twitch.*` vom Fluss, Befehle und Zeitnachrichten starten Läufe (Plan 3.1 bis 3.3). Ins Protokoll kommen nur Name der Aktion, Ergebnis, Grund und die Nummer und der Typ fehlerhafter Schritte, keine Chat-Texte und keine Zuschauernamen (Plan 3.5).
 
+**Abbruch beim Abschalten (P14 e2-1, Entscheid Nutzer 2026-11-16, gleiche Version):** Schaltet `action_put` eine Aktion ab (`enabled` von an auf aus) oder löscht `action_remove` sie (das Fenster löscht eine Gruppe mit einzelnen `action_remove`), bricht der Kern nach dem Speichern ihre laufenden Läufe sofort ab und verwirft ihre wartenden, auch Probeläufe, wie `action_run_cancel` (Töne des Laufs verstummen). `actions_set_enabled` mit `false` tut dasselbe für alle Läufe. `actions.run_finished` meldet `state` `cancelled` mit `message` «abgebrochen: Aktion abgeschaltet», «abgebrochen: Aktion gelöscht» bzw. «abgebrochen: Chat-Bot aus».
+
 **Stumm (Plan 3.4):** Der Kern der Version in Arbeit prüft beim Start und alle 2 s, ob unter der Verbindung der Version im Einsatz (`$XDG_RUNTIME_DIR/dons-streaming-studio/kern.sock`, für Tests `--einsatz-verbindung PFAD`) ein Kern mit `hello` antwortet. Dann startet er keine Läufe aus Ereignissen, Befehlen und Zeitnachrichten (Eintrag `muted`), `actions_status` ist `muted`, und `action_test` geht nur als Probelauf. Die Version im Einsatz prüft nicht.
 
 ```json

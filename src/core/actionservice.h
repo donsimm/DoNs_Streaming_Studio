@@ -104,6 +104,7 @@ private:
 
     using Reply = std::function<void(const QJsonObject &)>;
     void handleEdit(const dss::ActionsRequest &request, const Reply &reply);
+    void cancelRunsAfterEdit(const dss::actions::ActionsConfig &previous);
     void handleVariableEdit(const dss::ActionsRequest &request, const Reply &reply);
     void handleQuoteEdit(const dss::ActionsRequest &request, const Reply &reply);
     void handleQueueControl(const dss::ActionsRequest &request, const Reply &reply);

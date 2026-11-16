@@ -697,6 +697,76 @@ private slots:
         QCOMPARE(env.services.stoppedRuns, QList<QUuid>{r});
     }
 
+    // e2-1 (Entscheid Nutzer 2026-11-16): Aktion abgeschaltet oder gelöscht bricht ihre laufenden
+    // Läufe ab und verwirft die wartenden, auch Probeläufe, wie «Lauf abbrechen»; andere Aktionen
+    // bleiben. Hauptschalter aus bricht alle ab.
+    void cancelAction()
+    {
+        Env env;
+        env.services.sync = false;
+        const QUuid queue = env.addQueue(QStringLiteral("Alerts"), true);
+        Action alert = act(QStringLiteral("Alert"), {mk(kStepPlaySound, {{"file", "media/ton.mp3"}, {"wait", true}}),
+                                                     chat(QStringLiteral("danach"))});
+        alert.queue = queue;
+        const QUuid a = env.add(alert);
+        const QUuid b = env.add(act(QStringLiteral("Andere"), {chat(QStringLiteral("andere"))}));
+        const QUuid running = env.run(a);
+        const QUuid waiting = env.run(a);
+        const QUuid probe = env.run(a, {}, true);
+        const QUuid other = env.run(b);
+        QCOMPARE(env.state(running), RunState::Running);
+        QCOMPARE(env.state(waiting), RunState::Waiting);
+        QCOMPARE(env.state(probe), RunState::Waiting);
+        QCOMPARE(env.services.pending.size(), 2); // Ton von «Alert», Chat von «Andere»
+
+        const QString message = QStringLiteral("abgebrochen: Aktion abgeschaltet");
+        QCOMPARE(env.engine.cancelAction(a, message), 3);
+        for (const QUuid &r : {running, waiting, probe}) {
+            QCOMPARE(env.state(r), RunState::Cancelled);
+            QCOMPARE(env.rec(r).message, message);
+        }
+        // wartende nie gestartet, Ton nur des laufenden gestoppt
+        QVERIFY(!env.rec(waiting).startedAt.isValid());
+        QVERIFY(!env.rec(probe).startedAt.isValid());
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{running});
+        QCOMPARE(env.state(other), RunState::Running);
+        QCOMPARE(env.engine.cancelAction(a, message), 0);
+
+        // spätes Ende des Tons: kein Lauf mehr; «Andere» läuft weiter
+        env.services.sync = true;
+        env.services.pending.takeFirst()({});
+        env.services.pending.takeFirst()({});
+        QCOMPARE(env.state(other), RunState::Ok);
+        QCOMPARE(env.services.chatTexts().count(QStringLiteral("danach")), 0);
+
+        // Mehrere Aktionen in einem Durchgang, je eigene Meldung
+        env.services.sync = false;
+        const QUuid r1 = env.run(a);
+        const QUuid r2 = env.run(b);
+        QCOMPARE(env.engine.cancelActions({{a, QStringLiteral("eins")}, {b, QStringLiteral("zwei")}}), 2);
+        QCOMPARE(env.rec(r1).message, QStringLiteral("eins"));
+        QCOMPARE(env.rec(r2).message, QStringLiteral("zwei"));
+        env.services.pending.clear();
+
+        // Hauptschalter aus: alle Läufe, laufend und wartend
+        const QUuid h1 = env.run(a);
+        const QUuid h2 = env.run(a);
+        const QUuid h3 = env.run(a, {}, true);
+        const QUuid h4 = env.run(b);
+        QCOMPARE(env.state(h2), RunState::Waiting);
+        QCOMPARE(env.state(h4), RunState::Running);
+        env.services.stoppedRuns.clear();
+        QCOMPARE(env.engine.cancelAll(QStringLiteral("abgebrochen: Chat-Bot aus")), 4);
+        for (const QUuid &r : {h1, h2, h3, h4}) {
+            QCOMPARE(env.state(r), RunState::Cancelled);
+            QCOMPARE(env.rec(r).message, QStringLiteral("abgebrochen: Chat-Bot aus"));
+        }
+        QVERIFY(!env.rec(h2).startedAt.isValid());
+        QCOMPARE(env.services.stoppedRuns, QList<QUuid>{h1});
+        QCOMPARE(env.engine.runningCount(), 0);
+        QCOMPARE(env.clock.pendingTimers(), 0);
+    }
+
     // Probelauf: nichts nach Twitch oder OBS; Benutzerinfo, Overlay, Ton echt; Variablen getrennt
     // (Plan 3.6)
     void dryRun()

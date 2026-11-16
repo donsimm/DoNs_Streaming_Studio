@@ -584,12 +584,38 @@ void ActionService::handleEdit(const dss::ActionsRequest &request, const Reply &
                      QStringLiteral("Nicht gespeichert: ") + error));
         return;
     }
+    const dss::actions::ActionsConfig previous = m_config;
     m_config = next;
+    // Vor applyConfig: dessen pump() soll keinen wartenden Lauf einer abgeschalteten Aktion starten
+    cancelRunsAfterEdit(previous);
     applyConfig();
     qInfo("Aktionen gespeichert: %s «%s»", qPrintable(request.type), qPrintable(r.name));
     emit broadcastRequested(configMessage());
     reply(result(request.requestId, true, {}, {}, r.created));
     broadcastStatusIfChanged();
+}
+
+// Läufe abgeschalteter oder gelöschter Aktionen enden sofort, wartende werden verworfen; der
+// Hauptschalter aus beendet alle Läufe (Entscheid Nutzer 2026-11-16, P14 e2-1)
+void ActionService::cancelRunsAfterEdit(const dss::actions::ActionsConfig &previous)
+{
+    int count = 0;
+    if (previous.enabled && !m_config.enabled) {
+        count = m_engine->cancelAll(QStringLiteral("abgebrochen: Chat-Bot aus"));
+    } else {
+        QHash<QUuid, QString> messages;
+        for (const dss::actions::Action &old : previous.actions) {
+            const dss::actions::Action *now = m_config.action(old.id);
+            if (!now)
+                messages.insert(old.id, QStringLiteral("abgebrochen: Aktion gelöscht"));
+            else if (old.enabled && !now->enabled)
+                messages.insert(old.id, QStringLiteral("abgebrochen: Aktion abgeschaltet"));
+        }
+        if (!messages.isEmpty())
+            count = m_engine->cancelActions(messages);
+    }
+    if (count > 0)
+        qInfo("Aktionen: %d Läufe abgebrochen", count);
 }
 
 void ActionService::handleVariableEdit(const dss::ActionsRequest &request, const Reply &reply)

@@ -156,6 +156,46 @@ bool ActionEngine::cancel(const QUuid &runId, const QString &message)
     return true;
 }
 
+int ActionEngine::cancelAction(const QUuid &actionId, const QString &message)
+{
+    return cancelActions({{actionId, message}});
+}
+
+int ActionEngine::cancelActions(const QHash<QUuid, QString> &messages)
+{
+    return cancelMatching([&messages](const RunRecord &record) { return messages.value(record.actionId); });
+}
+
+int ActionEngine::cancelAll(const QString &message)
+{
+    return cancelMatching([&message](const RunRecord &) { return message; });
+}
+
+int ActionEngine::cancelMatching(const std::function<QString(const RunRecord &)> &messageFor)
+{
+    // Zuerst die wartenden, dann die laufenden: finishRun ruft pump() auf, ein Lauf, der
+    // noch wartet, würde sonst gestartet und gleich wieder abgebrochen (Ton, Schritte)
+    QList<QPair<QUuid, QString>> targets;
+    for (const QUuid &id : std::as_const(m_waiting)) {
+        const QString message = messageFor(m_runs.value(id)->record());
+        if (!message.isEmpty())
+            targets.append({id, message});
+    }
+    for (auto it = m_runs.cbegin(); it != m_runs.cend(); ++it) {
+        if (m_waiting.contains(it.key()))
+            continue;
+        const QString message = messageFor(it.value()->record());
+        if (!message.isEmpty())
+            targets.append({it.key(), message});
+    }
+    int count = 0;
+    for (const auto &[id, message] : std::as_const(targets)) {
+        if (cancel(id, message))
+            ++count;
+    }
+    return count;
+}
+
 void ActionEngine::pauseQueue(const QUuid &queue)
 {
     m_pausedQueues.insert(queue);

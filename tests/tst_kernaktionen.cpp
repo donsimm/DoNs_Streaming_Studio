@@ -30,6 +30,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 
@@ -726,6 +727,101 @@ private slots:
         for (const QString &name : {QStringLiteral("normal"), QStringLiteral("b")})
             QVERIFY2(core.log.contains(QStringLiteral("Ton Chat-Bot: Ende %1: gespielt").arg(file(name))), qPrintable(core.log));
 #endif
+    }
+
+    // e2-1 (Entscheid Nutzer 2026-11-16): Aktion abschalten oder löschen bricht ihre Läufe ab (auch
+    // Probeläufe), andere laufen weiter; Hauptschalter aus bricht alle ab. actions.run_finished
+    // meldet cancelled mit dem Grund.
+    void editCancelsRuns()
+    {
+        QTemporaryDir data;
+        Core core = start(data.path(), QStringLiteral("abbruch"));
+        CoreLink c(core.socket);
+        QVERIFY(c.isConnected());
+        QVERIFY(ok(c.request(QString::fromLatin1(msg::kActionsSetEnabled), {{QStringLiteral("enabled"), true}})));
+        c.send(subscribeEventsMessage({{QStringLiteral("actions.")}, true}));
+        QVERIFY(!c.waitFor(QString::fromLatin1(msg::kEventHistory)).isEmpty());
+
+        // je Aktion ein neuer Schritt: Schrittkennungen sind in aktionen.json eindeutig
+        const auto longAction = [](const QString &name) {
+            Step s = newStep(QString::fromLatin1(kStepDelay));
+            s.fields.insert(QStringLiteral("value_ms"), 30000);
+            return newAction(name, {s});
+        };
+        const auto put = [&](const Action &action) {
+            return ok(c.request(QString::fromLatin1(msg::kActionPut), {{QStringLiteral("action"), actionToJson(action)}}));
+        };
+        const auto launch = [&](const Action &action, bool dryRun) {
+            const QJsonObject started = c.request(QString::fromLatin1(msg::kActionTest),
+                                                  {{QStringLiteral("action_id"), idText(action.id)},
+                                                   {QStringLiteral("dry_run"), dryRun},
+                                                   {QStringLiteral("arguments"), QJsonObject()}});
+            return ok(started) ? started.value(QStringLiteral("id")).toString() : QString();
+        };
+        // Wartet auf actions.run_finished der genannten Läufe; Ergebnis: Kennung → Daten
+        const auto finished = [&](const QStringList &ids) {
+            QHash<QString, QJsonObject> result;
+            for (int i = 0; i < 50 && result.size() < ids.size(); ++i) {
+                const QJsonObject message = c.waitFor(QString::fromLatin1(msg::kEvent), 2000);
+                events::Event event;
+                QString error;
+                if (message.isEmpty() || !parseEventMessage(message, &event, &error))
+                    break;
+                const QString run = event.data.value(QStringLiteral("run_id")).toString();
+                if (event.type == QLatin1String("actions.run_finished") && ids.contains(run))
+                    result.insert(run, event.data);
+            }
+            return result;
+        };
+        const auto checkCancelled = [](const QJsonObject &data, const QString &message) {
+            return data.value(QStringLiteral("state")).toString() == QLatin1String("cancelled")
+                && data.value(QStringLiteral("message")).toString() == message;
+        };
+
+        Action a = longAction(QStringLiteral("DSS-Test Abbruch a"));
+        const Action b = longAction(QStringLiteral("DSS-Test Abbruch b"));
+        QVERIFY(put(a));
+        QVERIFY(put(b));
+
+        // Abschalten: echter Lauf und Probelauf von a enden, b läuft weiter
+        const QString a1 = launch(a, false);
+        const QString a2 = launch(a, true);
+        const QString b1 = launch(b, false);
+        QVERIFY(!a1.isEmpty() && !a2.isEmpty() && !b1.isEmpty());
+        a.enabled = false;
+        QVERIFY(put(a));
+        QHash<QString, QJsonObject> done = finished({a1, a2});
+        QCOMPARE(done.size(), 2);
+        for (const QJsonObject &d : std::as_const(done))
+            QVERIFY2(checkCancelled(d, QStringLiteral("abgebrochen: Aktion abgeschaltet")),
+                     qPrintable(QJsonDocument(d).toJson()));
+        const QList<RunRecord> afterDisable = runs(c);
+        QCOMPARE(afterDisable.size(), 3);
+        QCOMPARE(std::count_if(afterDisable.cbegin(), afterDisable.cend(),
+                               [](const RunRecord &r) { return r.state == RunState::Running; }),
+                 1);
+
+        // Löschen
+        a.enabled = true;
+        QVERIFY(put(a));
+        const QString a3 = launch(a, false);
+        QVERIFY(!a3.isEmpty());
+        QVERIFY(ok(c.request(QString::fromLatin1(msg::kActionRemove), {{QStringLiteral("action_id"), idText(a.id)}})));
+        done = finished({a3});
+        QCOMPARE(done.size(), 1);
+        QVERIFY(checkCancelled(done.value(a3), QStringLiteral("abgebrochen: Aktion gelöscht")));
+
+        // Hauptschalter aus: auch b und ein Probelauf von b
+        const QString b2 = launch(b, true);
+        QVERIFY(!b2.isEmpty());
+        QVERIFY(ok(c.request(QString::fromLatin1(msg::kActionsSetEnabled), {{QStringLiteral("enabled"), false}})));
+        done = finished({b1, b2});
+        QCOMPARE(done.size(), 2);
+        for (const QJsonObject &d : std::as_const(done))
+            QVERIFY(checkCancelled(d, QStringLiteral("abgebrochen: Chat-Bot aus")));
+        stop(core);
+        QVERIFY2(core.log.contains(QStringLiteral("Lauf «DSS-Test Abbruch b»: cancelled, abgebrochen: Chat-Bot aus")),
+                 qPrintable(core.log));
     }
 
     // c2 (Plan 4.4): Overlay-Element zeigen/verstecken über den Laufzustand des Kerns
