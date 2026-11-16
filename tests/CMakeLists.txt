@@ -132,7 +132,8 @@ if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
   target_compile_definitions(tst_kernaktionen PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
     DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_CORE_AUDIO=$<BOOL:${DSS_CORE_AUDIO}>
     DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton"
-    DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif" DSS_TEST_FONT="${DSS_TEST_FONT}")
+    DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif" DSS_TEST_FONT="${DSS_TEST_FONT}"
+    DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
   add_dependencies(tst_kernaktionen dss-core dss-cli)
   set_tests_properties(tst_kernaktionen PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
