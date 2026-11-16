@@ -281,6 +281,19 @@ private slots:
         r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Test"));
         QCOMPARE(r.problem, QStringLiteral("Die Gruppe «Test» gibt es schon."));
         QVERIFY(r.edits.isEmpty());
+        // ohne Rücksicht auf Gross- und Kleinschreibung (Entscheid 2026-11-16): andere Schreibweise einer
+        // anderen Gruppe abgewiesen, mit deren Schreibweise; eigene Schreibweise ändern erlaubt
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("TEST"));
+        QCOMPARE(r.problem, QStringLiteral("Die Gruppe «Test» gibt es schon."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("shoutout"));
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits.size(), 2);
+        QCOMPARE(putAction(r, 0).group, QStringLiteral("shoutout"));
+        QCOMPARE(putAction(r, 1).group, QStringLiteral("shoutout"));
+        r = renameActionGroup(config, QStringLiteral("SHOUTOUT"), QStringLiteral("Shoutouts"));
+        QCOMPARE(r.edits.size(), 2);
+        QCOMPARE(putAction(r, 1).group, QStringLiteral("Shoutouts"));
         r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Shoutout "));
         QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
         r = renameActionGroup(config, QStringLiteral("gibt es nicht"), QStringLiteral("Neu"));
@@ -295,6 +308,68 @@ private slots:
         QVERIFY(removeActionGroup(config, QStringLiteral("gibt es nicht")).edits.isEmpty());
         // Aktionen ohne Gruppe sind keine Gruppe
         QVERIFY(removeActionGroup(config, QString()).edits.isEmpty());
+    }
+
+    void groupsIgnoreCase()
+    {
+        const ActionsConfig original = loadConfig();
+        // «Shoutout ausführen» steht vor «Shoutout per Befehl»; dieser bekommt «shoutout»
+        ActionsConfig config = original;
+        for (Action &a : config.actions) {
+            if (a.id == kShoutoutCommand)
+                a.group = QStringLiteral("shoutout");
+        }
+
+        // Liste: eine Gruppe in der Schreibweise der ersten Aktion, auch an ihren Aktionen
+        const QList<ActionListRow> rows = actionListRows(config, QString(), {});
+        QCOMPARE(rowTexts(rows), rowTexts(actionListRows(original, QString(), {})));
+        int groupRows = 0;
+        for (const ActionListRow &row : rows) {
+            if (row.isGroup && row.group.compare(QStringLiteral("shoutout"), Qt::CaseInsensitive) == 0) {
+                ++groupRows;
+                QCOMPARE(row.text, QStringLiteral("Shoutout"));
+                QCOMPARE(row.detail, QStringLiteral("(2)"));
+            }
+            if (row.actionId == kShoutoutCommand)
+                QCOMPARE(row.group, QStringLiteral("Shoutout"));
+        }
+        QCOMPARE(groupRows, 1);
+        QCOMPARE(actionGroupChoices(config), actionGroupChoices(original));
+
+        // Löschen und Rückfrage über beide Schreibweisen
+        const QList<ActionsEdit> removeAll = removeActionGroup(original, QStringLiteral("Shoutout")).edits;
+        QCOMPARE(removeActionGroup(config, QStringLiteral("shoutout")).edits, removeAll);
+        QCOMPARE(removeActionGroup(config, QStringLiteral("Shoutout")).edits, removeAll);
+        const QString question =
+            QStringLiteral("Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt.");
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("shoutout")), question);
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("SHOUTOUT")), question);
+
+        // Umbenennen in die Schreibweise der ersten Aktion: nur die abweichende Aktion
+        EditResult r = renameActionGroup(config, QStringLiteral("shoutout"), QStringLiteral("Shoutout"));
+        QCOMPARE(r.edits.size(), 1);
+        QCOMPARE(putAction(r).id, kShoutoutCommand);
+        QCOMPARE(putAction(r).group, QStringLiteral("Shoutout"));
+
+        // Neu in der Gruppe und «Neue Gruppe» übernehmen bzw. meiden bestehende Schreibweisen
+        QCOMPARE(putAction(newAction(original, QStringLiteral(" shoutout "))).group, QStringLiteral("Shoutout"));
+        Action lower = putAction(newAction(original, QStringLiteral("neue gruppe")));
+        QCOMPARE(lower.group, QStringLiteral("neue gruppe"));
+        ActionsConfig withLower = original;
+        withLower.actions.append(lower);
+        QCOMPARE(putAction(newActionGroup(withLower)).group, QStringLiteral("Neue Gruppe 2"));
+
+        // Feld «Gruppe»: bestehende Schreibweise einer anderen Aktion wird übernommen
+        const Action begruessung = *original.action(kBegruessung);
+        Action after = begruessung;
+        after.group = QStringLiteral(" shoutout ");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("Shoutout"));
+        // allein in der Gruppe: die eigene Schreibweise darf sich ändern
+        after.group = QStringLiteral("begrüssung");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("begrüssung"));
+        // neue Gruppe: wie eingegeben, ohne Leerzeichen am Rand
+        after.group = QStringLiteral(" Neu ");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("Neu"));
     }
 
     void removeQuestions()

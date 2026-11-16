@@ -96,7 +96,9 @@ struct ActionListRow
     QString warning;     // Prüfmeldungen der Aktion und ihrer Teile
 };
 // search: ohne Gross- und Kleinschreibung in Name, Gruppe und Auslösern; eine Gruppe, deren Name
-// passt, zeigt alle ihre Aktionen.
+// passt, zeigt alle ihre Aktionen. Gruppen ohne Rücksicht auf Gross- und Kleinschreibung (Entscheid
+// des Nutzers, 2026-11-16): Gruppenzeile und ihre Aktionen tragen die Schreibweise der ersten Aktion
+// der Gruppe in der Datei.
 QList<ActionListRow> actionListRows(const actions::ActionsConfig &config, const QString &search,
                                     const QList<actions::ReferenceWarning> &warnings);
 // Auslöser einer Aktion in einer Zeile: aktive Auslöser, Befehle mit ihrem ersten Befehl,
@@ -104,7 +106,8 @@ QList<ActionListRow> actionListRows(const actions::ActionsConfig &config, const 
 QString actionTriggerSummary(const actions::Action &action, const actions::ActionsConfig &config);
 
 // Knopfleiste: «Neu» (in der Gruppe der Auswahl), «Neue Gruppe», «Kopieren», «Löschen»,
-// «Zurücksetzen» (nur mitgelieferte, Plan 7).
+// «Zurücksetzen» (nur mitgelieferte, Plan 7). Gruppennamen sind ohne Rücksicht auf Gross- und
+// Kleinschreibung eindeutig: newAction übernimmt die bestehende Schreibweise der Gruppe.
 EditResult newAction(const actions::ActionsConfig &config, const QString &group);
 EditResult newActionGroup(const actions::ActionsConfig &config);
 EditResult copyAction(const actions::ActionsConfig &config, const QUuid &actionId);
@@ -116,11 +119,13 @@ QString resetActionQuestion(const actions::Action &action);
 
 // Gruppe umbenennen: je Aktion der Gruppe ein action_put mit dem neuen Namen (ohne Leerzeichen am
 // Rand). Gruppen gibt es nur über ihre Aktionen (Plan 2.3); mitgelieferte Aktionen werden mit
-// umbenannt. Prüfmeldung bei leerem Namen und beim Namen einer anderen Gruppe (kein Zusammenführen).
-// Gleicher Name oder unbekannte Gruppe: nichts.
+// umbenannt. group und Vergleiche ohne Rücksicht auf Gross- und Kleinschreibung: Prüfmeldung bei
+// leerem Namen und beim Namen einer anderen Gruppe in jeder Schreibweise, mit deren Schreibweise
+// («Die Gruppe «Shoutout» gibt es schon.», kein Zusammenführen); eine andere Schreibweise derselben
+// Gruppe ist ein Umbenennen. Gleicher Name (alle Aktionen schon so) oder unbekannte Gruppe: nichts.
 EditResult renameActionGroup(const actions::ActionsConfig &config, const QString &group, const QString &name);
-// Gruppe löschen: je Aktion der Gruppe ein action_remove, in der Reihenfolge der Datei. Das Fenster
-// schickt sie nacheinander. Unbekannte Gruppe: nichts.
+// Gruppe löschen: je Aktion der Gruppe (jede Schreibweise) ein action_remove, in der Reihenfolge der
+// Datei. Das Fenster schickt sie nacheinander. Unbekannte Gruppe: nichts.
 EditResult removeActionGroup(const actions::ActionsConfig &config, const QString &group);
 
 // Rückfragen vor dem Löschen. Leerer Text: keine Rückfrage nötig (nichts darin, keine Verweise, oder
@@ -131,7 +136,8 @@ EditResult removeActionGroup(const actions::ActionsConfig &config, const QString
 // «Aktion «Shoutout ausführen» löschen? Sie wird von 1 Aktion benutzt.»
 QString removeActionQuestion(const actions::ActionsConfig &config, const QUuid &actionId);
 // Immer eine Rückfrage, wenn es die Gruppe gibt (sie löscht alle ihre Aktionen); Verweise nur von
-// ausserhalb der Gruppe. «Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt.»
+// ausserhalb der Gruppe. group in jeder Schreibweise, im Text die Schreibweise der ersten Aktion.
+// «Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt.»
 QString removeActionGroupQuestion(const actions::ActionsConfig &config, const QString &group);
 
 // --- «Aktionen», Mitte: Bereich «Aktion» ---
@@ -149,7 +155,8 @@ struct QueueChoice
 // «Warteschlange fehlt», zuletzt «Warteschlangen verwalten …».
 QList<QueueChoice> queueChoices(const actions::ActionsConfig &config, const QUuid &current);
 int queueChoiceIndex(const QList<QueueChoice> &choices, const QUuid &queue);
-// Gruppen aller Aktionen für die Auswahl «Gruppe», nach Name, ohne leere
+// Gruppen aller Aktionen für die Auswahl «Gruppe», nach Name, ohne leere; jede Gruppe einmal in der
+// Schreibweise der ersten Aktion in der Datei.
 QStringList actionGroupChoices(const actions::ActionsConfig &config);
 // Hinweis bei mitgelieferten Aktionen: «mitgeliefert» bzw. «mitgeliefert, geändert», wenn die
 // Fassung der Vorlage (templateAction, kommt mit f) bekannt ist und abweicht; leer bei eigenen.
@@ -158,6 +165,10 @@ QString templateHint(const actions::Action &action, const actions::Action *templ
 // Speichert die bearbeitete Aktion after (action_put). Name und Gruppe ohne Leerzeichen am Rand,
 // Name nicht leer, sonst wie der Kern beim Lesen (actionFromJson). Gleich wie before: nichts.
 EditResult putAction(const actions::Action &before, const actions::Action &after);
+// Für das Feld «Gruppe» im Fenster: wie oben, gibt es die Gruppe schon bei einer anderen Aktion in
+// anderer Schreibweise («shoutout» bei «Shoutout»), übernimmt after deren Schreibweise.
+EditResult putAction(const actions::ActionsConfig &config, const actions::Action &before,
+                     const actions::Action &after);
 
 // --- «Aktionen», Mitte: Bereich «Auslöser» ---
 
