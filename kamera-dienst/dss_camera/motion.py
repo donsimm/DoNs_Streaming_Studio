@@ -20,8 +20,9 @@ Plan 4: POST cameras/{cam}/move, stop, step, home).
   Geräts; bei der Tiny 2 Tilt unten Standard −66° (Schritt 0: Einschlafen bei −76°) und nie
   unter `TINY2_TILT_FLOOR_DEG`. Jeder Zielwert geht durch dieselbe Begrenzung (`goto` auch
   für Presets).
-- KI aus vor Bewegung (Regel 4): Einstellung `ai_off_before_move`; der Befehl selbst ist
-  gesperrt, bis er am Gerät bestätigt ist (`obsbot.AI_OFF_UNLOCKED`).
+- KI aus vor Bewegung (Regel 4): Einstellung `ai_off_before_move`; der Befehl geht einmal je
+  Bewegung ans Gerät (Start, Schritt, Ziel), nicht je Takt, ohne auf das Ende des Übergangs
+  zu warten (am Gerät bestätigt 2026-11-16, `obsbot.AI_OFF_UNLOCKED`).
 - Abbruch (Regel 6): Scheitert ein Schritt der Dauerbewegung (Kamera fehlt, Zeitüberschreitung,
   `EPROTO`, eingeschlafen), hält der Dienst an und sendet nichts nach ausser dem Halt der
   Tiny 2 (einmal sofort mit Korrektur der Lage; misslingt er, beim Ende der Bewegung nochmals

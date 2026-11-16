@@ -14,8 +14,8 @@
   (Abschnitt b), damit die Schutzregeln (Plan 2.3) immer gelten. Das Tempo von Pan und
   Tilt (Tiny 2) fehlt in der Liste. Erscheint eine wache Tiny 2 (auch beim Start), sendet
   der Dienst einmal Tempo 0, falls ein beendeter Dienst eine Fahrt hinterliess.
-- Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR schreibbar (nur wach),
-  Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
+- Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR und Bildwinkel
+  schreibbar (nur wach), Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
   Bewegungsbefehlen (`movable`) laufen unter derselben Sperre wie die Bildwerte.
 
 Quellen:
@@ -275,10 +275,11 @@ class ControlManager:
                                        f"«{label(control)}» wird über Bewegen gesteuert, nicht über die Bildwerte.")
                     plan.append((control, None if value is None else to_raw(control, value)))
                 if special and obsbot.run_state(self._block(device, camera)) != obsbot.RUN_AWAKE:
-                    raise ApiError(409, "camera_asleep", "HDR nur bei wacher Kamera (erst wecken).")
+                    names = " und ".join(obsbot.LABELS[key] for key, _, _ in special)
+                    raise ApiError(409, "camera_asleep", f"{names} nur bei wacher Kamera (erst wecken).")
                 try:
                     for key, raw, forget in special:
-                        value = self.obsbot.set_hdr(device, camera_id, raw)
+                        value = self.obsbot.set_value(device, camera_id, key, raw)
                         remember[key] = None if forget else value
                     for control, raw in sorted(plan, key=auto_first):
                         key = control_key(control.name)
@@ -417,9 +418,14 @@ class ControlManager:
                 controls = {control_key(c.name): c for c in device.controls() if supported(c)}
                 plan = []
                 for key, value in remembered.items():
-                    if key == obsbot.KEY_HDR and obsbot.is_tiny2(camera.model):
+                    if key in obsbot.WRITABLE and obsbot.is_tiny2(camera.model):
                         # Nur bei wacher Kamera (restore_pending prüft den Zustand).
-                        done.append(f"{key}={int(self.obsbot.set_hdr(device, camera.id, int(bool(value))))}")
+                        try:
+                            raw = obsbot.to_raw(key, value)
+                        except ApiError as error:
+                            log.warning("Gemerkter Wert für %s übersprungen: %s", camera.id, error.message)
+                            continue
+                        done.append(f"{key}={int(self.obsbot.set_value(device, camera.id, key, raw))}")
                         continue
                     control = controls.get(key)
                     if control is None or control.id in POSITION:

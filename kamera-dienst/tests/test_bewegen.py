@@ -67,7 +67,7 @@ class MoverTest(unittest.TestCase):
         self.mover = Mover(self.manager, self.store, self.time)
 
     def tearDown(self) -> None:
-        obsbot.AI_OFF_UNLOCKED = False
+        obsbot.AI_OFF_UNLOCKED = True
         self.tmp.cleanup()
 
     def tiny2(self) -> dict:
@@ -313,22 +313,33 @@ class MoverTest(unittest.TestCase):
         self.assertEqual(self.tiny2()["lost_moves"], 0)
         self.assertEqual(self.tiny2()["restarts"], 0)
 
-    def test_ai_off_not_sent_while_locked(self) -> None:
+    def test_ai_off_before_move(self) -> None:
+        # P15 b7: freigeschaltet; einmal je Bewegung (Dauerbewegung, Schritt, Grundstellung),
+        # nicht je Takt.
+        self.assertEqual(obsbot.command(*obsbot.AI_OFF_COMMAND)[:4], bytes.fromhex("16020000"))
         self.hold({"pan": 1}, 0.5)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, AI_OFF]])
+        self.assertEqual(self.tiny2()["ai"], 0)
+        self.mover.stop(TINY2_ID)
         self.mover.step(TINY2_ID, {"tilt": 1})
         self.mover.home(TINY2_ID, {})
-        self.assertNotIn([uvc_xu.SELECTOR_COMMAND, AI_OFF], self.tiny2()["xu_protokoll"])
-        self.assertEqual(self.tiny2()["xu_protokoll"], [])
-
-        # Gegenprobe: freigeschaltet geht der Befehl vor der Bewegung ans Gerät …
-        obsbot.AI_OFF_UNLOCKED = True
-        self.mover.stop(TINY2_ID)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, AI_OFF]] * 3)
+        # Der Dienst wartet nicht auf das Ende des Übergangs (≈ 5 s am Gerät).
+        before = self.time.slept
         self.mover.step(TINY2_ID, {"pan": 1})
-        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, AI_OFF]])
-        # … ausser die Einstellung ist aus.
+        self.assertEqual(self.time.slept, before)
+        self.assertEqual(len(self.tiny2()["xu_protokoll"]), 4)
+
+        # Einstellung aus: kein Befehl.
         self.store.update_motion(TINY2_ID, {"ai_off_before_move": False})
         self.mover.step(TINY2_ID, {"pan": 1})
-        self.assertEqual(len(self.tiny2()["xu_protokoll"]), 1)
+        self.assertEqual(len(self.tiny2()["xu_protokoll"]), 4)
+
+        # Gegenprobe: gesperrt geht nichts ans Gerät.
+        obsbot.AI_OFF_UNLOCKED = False
+        self.store.update_motion(TINY2_ID, {"ai_off_before_move": True})
+        self.mover.step(TINY2_ID, {"pan": 1})
+        self.assertEqual(len(self.tiny2()["xu_protokoll"]), 4)
 
     # --- Abbruch -----------------------------------------------------------------------
 

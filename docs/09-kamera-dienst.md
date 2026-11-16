@@ -66,6 +66,7 @@ curl "$D/status"
 ```
 
 - `state`: `awake`, `asleep`, `privacy` (nur Tiny 2), `absent` (ausgesteckt, `present: false`), `unknown`. Den Zustand der Tiny 2 liest der Dienst höchstens alle 5 s.
+- `cameras` enthält nur Geräte mit mindestens einem einstellbaren Wert (V4L2-Wert, der nicht nur lesbar ist, oder die Gruppe «OBSBOT»). Andere Bildgeräte, z. B. eine Aufnahmekarte, fehlen; der Dienst meldet sie einmal im Protokoll («… ohne einstellbare Werte, ausgeblendet»).
 - Die Listen der Presets enthalten nur `id` und `name`. Den ganzen Inhalt gibt es einzeln (`GET camera-presets/{id}`), für alle zusammen im Ereignis `presets` und in `GET export`. Eine Anfrage `GET camera-presets` für die ganze Liste gibt es nicht.
 
 ### Bildwerte
@@ -80,7 +81,7 @@ curl -X PUT "$D/cameras/$CAM/controls" -d '{"brightness": null}'
 - `PUT` setzt zuerst die Automatik-Schalter, dann die Werte, und antwortet mit den zurückgelesenen Werten. Verstellte Werte merkt sich der Dienst und setzt sie beim Erscheinen der Kamera und beim Start neu.
 - Ein falscher Wert ändert nichts (`400 invalid`). Ein Wert, der wegen eingeschalteter Automatik inaktiv ist, wird nicht gesetzt (`400 invalid`, die übrigen sind gesetzt).
 - Pan, Tilt und Zoom stehen in der Liste, gesetzt werden sie nur über Bewegen.
-- Tiny 2: Gruppe «OBSBOT» mit HDR (`obsbot_hdr`, nur bei wacher Kamera, sonst `409 camera_asleep`), Zustand und «Automatisch schlafen nach» (nur lesbar).
+- Tiny 2: Gruppe «OBSBOT» mit HDR (`obsbot_hdr`) und Bildwinkel (`obsbot_fov`, Typ `menu`: 0 «Weit», 1 «Mittel», 2 «Eng», Standard «Weit»), beide nur bei wacher Kamera (sonst `409 camera_asleep`) und gemerkt, dazu Zustand und «Automatisch schlafen nach» (nur lesbar). Die Zuordnung der Stufen zu weit, mittel, eng ist eine Annahme aus dem Zoom-Byte des Statusblocks.
 
 ### Bewegen
 
@@ -130,7 +131,7 @@ curl -X PUT "$D/cameras/$CAM/config" -d '{"tilt_min": null}'
 | `home_pan`, `home_tilt` | eigene Mitte für `home` in Grad | 0, 0 |
 | `speed` | Tempo von `move` ohne `speed` (Tiny 2 in Grad pro Sekunde) | Tiny 2: 10, sonst 50 |
 | `auto_wake` | Tiny 2 bei Bewegen ohne `wake` wecken | `false` |
-| `ai_off_before_move` | KI-Verfolgung vor Bewegung aus (Befehl noch gesperrt, siehe Einschränkungen) | `true` |
+| `ai_off_before_move` | KI-Verfolgung vor Bewegung aus (Tiny 2, einmal je Bewegung, siehe Einschränkungen) | `true` |
 
 - `PUT` mit beliebig vielen Feldern; `null` setzt den Standard (beim Namen das Modell). Ist ein Feld ungültig, ändert sich nichts (`400 invalid`, die Meldung nennt den Bereich).
 - `ranges`: erlaubte Bereiche aus dem Gerät, in Grad. Bei der Tiny 2 geht `tilt_min` nie unter −75° (sie schläft bei −76° ein). Die untere Grenze muss unter der oberen liegen, mit den Standards für `null`. Felder zu Achsen, die die Kamera nicht hat, fehlen in `ranges` und werden abgewiesen.
@@ -239,7 +240,7 @@ curl "$D/export" > kamera-dienst-sicherung.json
 | `403` | `forbidden` | Absender nicht in `erlaubte-adressen` |
 | `404` | `not_found` | unbekannte Anfrage, Kamera, Lampe oder Preset; in der Attrappe ohne Geräteordner auch Bildwerte, Bewegen, Presets und Lampen |
 | `409` | `camera_absent` | Kamera ausgesteckt oder nicht erreichbar; Dauerbewegung abgebrochen |
-| `409` | `camera_asleep` | Tiny 2 schläft (Bewegen ohne `wake`, HDR) |
+| `409` | `camera_asleep` | Tiny 2 schläft (Bewegen ohne `wake`, HDR, Bildwinkel) |
 | `409` | `file_error` | Datei im Datenordner ungültig (Änderungen gesperrt, Datei bleibt unverändert) oder nicht speicherbar |
 | `502` | `light_unreachable` | keine der angesprochenen Lampen antwortet |
 | `504` | `timeout` | Tiny 2 hat nicht rechtzeitig den Zustand gewechselt (Wecken, Schlafen) |
@@ -262,7 +263,7 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 
 ## Einschränkungen
 
-- **Tiny 2, Bildwinkel und KI-Modus:** In Schritt 0 nicht bestätigt, darum gesperrt und nicht angeboten. Der Befehl «KI-Verfolgung aus» vor einer Bewegung (`ai_off_before_move`) wird nicht gesendet, bis er am Gerät mit laufendem Videostrom geprüft ist (`obsbot.AI_OFF_UNLOCKED`); `ai_mode` gibt es in `controls` nicht. Auto-Schlaf wird nur gelesen.
+- **Tiny 2, KI-Modus:** Vor jeder Bewegung (Start, Schritt, Ziel, nicht je Takt) sendet der Dienst «KI-Verfolgung aus» (`16 02 00 00`, am Gerät bestätigt 2026-11-16, `ai_off_before_move`). Die Kamera braucht ≈ 5 s, bis die Verfolgung aus ist (Status 6, dann 0); der Dienst wartet nicht darauf. Ob sie Bewegungsbefehle während dieses Übergangs annimmt, ist nicht geprüft. Einschalten bietet der Dienst nicht an, `ai_mode` gibt es in `controls` nicht. Auto-Schlaf wird nur gelesen.
 - **Richtung und Tempo:** Die Standards von «Richtung umkehren» und bei der C922 das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
 - **Lage der Tiny 2:** geschätzt, nicht gemessen (die Kamera meldet sie nicht). Die Schätzung folgt der am Gerät gemessenen Kurve Tempo → Grad pro Sekunde (2026-11-16, über das OBS-Bild; Pan bis 80, Tilt bis 20 gemessen, darüber verlängert). Nach einem Abbruch (Kamera unerreichbar) ist die Lage unsicher, bis `home` oder ein Preset sie absolut setzt.
 

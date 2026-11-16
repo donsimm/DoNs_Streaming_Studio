@@ -130,6 +130,36 @@ class WatcherTest(unittest.TestCase):
         self.watcher.scan()
         self.assertEqual(self.by_id()["cccc:0003:SERIE0003"].node.name, "video5")
 
+    def add_capture_card(self) -> None:
+        """Aufnahmekarte wie die Blackmagic am Streaming-PC: ein Bildknoten, nur ein lesbarer Wert."""
+        video = v4l2.V4L2_CAP_VIDEO_CAPTURE
+        readonly = v4l2.Control(v4l2.V4L2_CID_BRIGHTNESS, v4l2.V4L2_CTRL_TYPE_INTEGER, "Brightness",
+                                0, 255, 1, 128, v4l2.V4L2_CTRL_FLAG_READ_ONLY, {})
+        self.folder.add_usb("3-1", "dddd", "0004", "Aufnahmekarte", serial="SERIE0004")
+        self.folder.add_node("video6", "3-1", "Aufnahmekarte", video, [readonly])
+        self.folder.plug("usb-Hersteller_Aufnahmekarte_SERIE0004-video-index0", "video6")
+
+    def test_device_without_values_hidden(self) -> None:
+        # P15 b7: Gerät ohne einstellbaren Wert fehlt in GET status, einmal im Protokoll.
+        self.add_capture_card()
+        with self.assertLogs("dss_camera.devices", "INFO") as logs:
+            self.watcher.scan()
+            self.watcher.scan()
+        hidden = [line for line in logs.output if "ausgeblendet" in line]
+        self.assertEqual(len(hidden), 1)
+        self.assertIn("dddd:0004:SERIE0004 (Aufnahmekarte) ohne einstellbare Werte, ausgeblendet.", hidden[0])
+        self.assertIn("dddd:0004:SERIE0004", self.by_id())
+        self.assertEqual({item["id"] for item in self.watcher.status()}, {TINY2_ID, C922_ID})
+        # Auch ausgesteckt nicht in der Liste, und beim Wiedereinstecken keine zweite Meldung.
+        self.folder.unplug("usb-Hersteller_Aufnahmekarte_SERIE0004-video-index0")
+        self.watcher.scan()
+        self.assertEqual({item["id"] for item in self.watcher.status()}, {TINY2_ID, C922_ID})
+        self.folder.plug("usb-Hersteller_Aufnahmekarte_SERIE0004-video-index0", "video6")
+        with self.assertLogs("dss_camera.devices", "INFO") as logs:
+            self.watcher.scan()
+        self.assertFalse([line for line in logs.output if "ausgeblendet" in line])
+        self.assertEqual({item["id"] for item in self.watcher.status()}, {TINY2_ID, C922_ID})
+
     def test_unplug_and_plug(self) -> None:
         self.watcher.scan()
         self.folder.unplug(C922_BY_ID)

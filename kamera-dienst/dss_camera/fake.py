@@ -135,13 +135,15 @@ def tiny2_axes() -> dict:
 def tiny2_state() -> dict:
     """Zustand der Attrappe unter `obsbot` in der Knotendatei.
 
-    `run`, `hdr`, `auto_sleep` wie im Statusblock; `wake_at`/`awake_since` Zeitpunkte der Uhr;
+    `run`, `hdr`, `fov`, `auto_sleep` wie im Statusblock; `ai` der zuletzt gesetzte KI-Modus
+    (`16 02 xx`; Start 2 = Verfolgung an, Annahme); `wake_at`/`awake_since` Zeitpunkte der Uhr;
     `stream_open` setzt der Test; `lage` die echte Lage (`tiny2_axes`, `FakeDevice.position`);
     Zähler: `lost_moves` (in der Grundstellungsfahrt verworfen), `moves_asleep` (im Schlaf,
     ohne Strom), `restarts` (im Schlaf mit offenem Strom; gilt am Gerät als Absturz mit
     Neustart der Kamera und darf nie vorkommen).
     """
-    return {"run": obsbot.RUN_AWAKE, "hdr": 0, "auto_sleep": 120, "wake_at": None,
+    return {"run": obsbot.RUN_AWAKE, "hdr": 0, "fov": obsbot.FOV_WIDE, "ai": 2, "auto_sleep": 120,
+            "wake_at": None,
             "awake_since": None, "stream_open": False, "lost_moves": 0, "moves_asleep": 0,
             "restarts": 0, "xu_protokoll": [], "lage": tiny2_axes()}
 
@@ -214,6 +216,7 @@ class FakeDevice:
         block = bytearray(uvc_xu.XU_LENGTH)
         block[obsbot.STATUS_HDR] = state["hdr"]
         block[obsbot.STATUS_RUN] = state["run"]
+        block[obsbot.STATUS_FOV] = state["fov"]
         struct.pack_into("<H", block, obsbot.STATUS_AUTO_SLEEP, state["auto_sleep"])
         self._save()
         return bytes(block)
@@ -228,6 +231,10 @@ class FakeDevice:
         elif selector == uvc_xu.SELECTOR_COMMAND:
             if data[0:2] == b"\x01\x01":
                 state["hdr"] = data[2]
+            elif data[0:2] == b"\x04\x01" and data[2] in obsbot.FOV_LABELS:
+                state["fov"] = data[2]
+            elif data[0:2] == b"\x16\x02":
+                state["ai"] = data[2]
         else:
             raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
         self._save()

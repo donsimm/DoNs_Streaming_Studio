@@ -138,8 +138,13 @@ class ManagerTest(unittest.TestCase):
     def test_status_block(self) -> None:
         controls = self.controls()
         obsbot_items = {key: item for key, item in controls.items() if item["group"] == "OBSBOT"}
-        self.assertEqual(set(obsbot_items), {"obsbot_hdr", "obsbot_state", "obsbot_auto_sleep"})
+        self.assertEqual(set(obsbot_items), {"obsbot_hdr", "obsbot_fov", "obsbot_state", "obsbot_auto_sleep"})
         self.assertEqual((controls["obsbot_hdr"]["value"], controls["obsbot_hdr"]["readonly"]), (False, False))
+        fov = controls["obsbot_fov"]
+        self.assertEqual((fov["label"], fov["type"], fov["value"], fov["default"], fov["readonly"]),
+                         ("Bildwinkel", "menu", 0, 0, False))
+        self.assertEqual([(entry["value"], entry["label"]) for entry in fov["menu"]],
+                         [(0, "Weit"), (1, "Mittel"), (2, "Eng")])
         self.assertEqual((controls["obsbot_state"]["value"], controls["obsbot_state"]["readonly"]), (1, True))
         self.assertEqual([entry["label"] for entry in controls["obsbot_state"]["menu"]],
                          ["Wach", "Schlaf", "Privatsphäre"])
@@ -294,15 +299,52 @@ class ManagerTest(unittest.TestCase):
         error = self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {"obsbot_hdr": 1})
         self.assertIn("true oder false", error.message)
 
+    def test_fov(self) -> None:
+        # P15 b7: Befehl 04 01 xx, Status 0x11 folgt; gemerkt wie HDR.
+        result = {item["key"]: item for item in self.manager.put(TINY2_ID, {"obsbot_fov": 2})}
+        self.assertEqual((result["obsbot_fov"]["value"], result["obsbot_fov"]["remembered"]), (2, True))
+        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, "040102"]])
+        self.assertEqual(self.store.remembered(TINY2_ID), {"obsbot_fov": 2})
+        self.assertEqual(self.controls()["obsbot_fov"]["value"], 2)
+
+        # Neu einstecken: gemerkter Bildwinkel wird nach der Wartezeit wieder gesetzt.
+        self.folder.update_tiny2(NODE, fov=0)
+        self.folder.unplug(TINY2_BY_ID)
+        self.watcher.scan()
+        self.folder.plug(TINY2_BY_ID, NODE)
+        self.watcher.scan()
+        self.assertEqual(self.tiny2()["fov"], 0)
+        self.time.now += 3.0
+        self.watcher.scan()
+        self.assertEqual(self.tiny2()["fov"], 2)
+
+        # Im Schlaf abgewiesen, ohne Befehl.
+        self.folder.update_tiny2(NODE, run=obsbot.RUN_ASLEEP, xu_protokoll=[])
+        error = self.assert_api_error(409, "camera_asleep", self.manager.put, TINY2_ID, {"obsbot_fov": 1})
+        self.assertIn("Bildwinkel", error.message)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [])
+
+        # Ungültig: nichts gesendet. null: weit und vergessen.
+        self.folder.update_tiny2(NODE, run=obsbot.RUN_AWAKE)
+        for value in (3, -1, True, "weit", 1.0):
+            with self.subTest(value=value):
+                error = self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {"obsbot_fov": value})
+                self.assertIn("erlaubt: 0, 1, 2", error.message)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [])
+        result = {item["key"]: item for item in self.manager.put(TINY2_ID, {"obsbot_fov": None})}
+        self.assertEqual((result["obsbot_fov"]["value"], result["obsbot_fov"]["remembered"]), (0, False))
+        self.assertEqual(self.store.remembered(TINY2_ID), {})
+
     def test_locked_functions(self) -> None:
         keys = set(self.controls())
-        self.assertFalse({key for key in keys if "fov" in key or "ai" in key or "view" in key
+        self.assertFalse({key for key in keys if "ai" in key or "view" in key
                           or "tracking" in key} - {"obsbot_state"})
         for key in ("obsbot_state", "obsbot_auto_sleep"):
             with self.subTest(key=key):
                 error = self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {key: 60})
                 self.assertIn("nur lesbar", error.message)
-        for key in ("obsbot_fov", "obsbot_ai_mode", "obsbot_tracking"):
+        # KI einschalten bietet der Dienst nicht an (P15 b7, nicht entschieden).
+        for key in ("obsbot_ai_mode", "obsbot_tracking"):
             with self.subTest(key=key):
                 self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {key: 0})
         self.assertEqual(self.tiny2()["xu_protokoll"], [])

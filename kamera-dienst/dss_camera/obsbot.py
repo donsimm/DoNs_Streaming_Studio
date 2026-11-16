@@ -1,4 +1,4 @@
-"""OBSBOT Tiny 2: Statusblock, Wecken, Schlafen, HDR (Plan 2.3 Regeln 1 und 2, «Ergebnis Schritt 0»).
+"""OBSBOT Tiny 2: Statusblock, Wecken, Schlafen, HDR, Bildwinkel, KI aus (Plan 2.3 Regeln 1 und 2, «Ergebnis Schritt 0»).
 
 - Statusblock: `GET_CUR` auf Selektor 0x06 (60 Byte). Byte 0x09 = Zustand (1 läuft,
   3 Schlaf, 4 Privatsphäre), Byte 0x06 = HDR, Bytes 0x0A–0x0B = Auto-Schlaf in Sekunden
@@ -9,8 +9,14 @@
   Grundstellung und verwirft Bewegungsbefehle still (Schritt 0, Zeile 7). Darum wartet der
   Dienst danach noch `AFTER_WAKE_S`, bevor ein Bewegungsbefehl ans Gerät geht.
 - HDR: Befehl `01 01 00` (aus) / `01 01 01` (an) auf Selektor 0x06, Status 0x06 folgt.
-- Gesperrt, weil in Schritt 0 nicht bestätigt (nicht angeboten): Bildwinkel (`04 01 xx`)
-  und KI-Modus «keine» (`16 02 00 00`). Auto-Schlaf wird nur gelesen, nie geschrieben.
+- Bildwinkel: Befehl `04 01 xx` auf Selektor 0x06, xx = 00, 01, 02; Status 0x11 folgt
+  (Prüfung mit Videostrom 2026-11-16). 00 = weit, 01 = mittel, 02 = eng ist eine Annahme:
+  Das Zoom-Byte zeigte bei 01 ≈ 5 % und bei 02 ≈ 15 %.
+- KI-Modus «keine» vor Bewegung: `16 02 00 00` auf Selektor 0x06 schaltet die Verfolgung
+  aus (Prüfung mit Videostrom 2026-11-16); der Status geht kurz auf 6/1 (wird ausgeschaltet)
+  und nach ≈ 5 s auf 0/0. Der Dienst wartet nicht darauf. Ob die Kamera Bewegungsbefehle
+  während des Übergangs annimmt, ist nicht geprüft. Einschalten bietet der Dienst nicht an.
+- Auto-Schlaf wird nur gelesen, nie geschrieben.
 
 Die Funktionen hier arbeiten auf einem geöffneten Gerät (`xu_get`, `xu_set`); Sperre und
 Suche der Kamera liegen bei `controls.ControlManager`.
@@ -40,6 +46,7 @@ PAYLOAD_SLEEP = 1
 STATUS_HDR = 0x06
 STATUS_RUN = 0x09
 STATUS_AUTO_SLEEP = 0x0A
+STATUS_FOV = 0x11
 
 RUN_AWAKE = 1
 RUN_ASLEEP = 3
@@ -53,13 +60,15 @@ AFTER_WAKE_S = 4.5
 # Schritt 0: Zustand 3 nach ~0,1 s, einmal 1,2 s.
 SLEEP_TIMEOUT_S = 10.0
 HDR_READBACK_S = 1.0
+FOV_READBACK_S = 1.0
 POLL_S = 0.1
 # Zustand für GET status höchstens alle 5 s lesen (Suche läuft jede Sekunde).
 STATE_INTERVAL_S = 5.0
 
-# KI-Modus «keine Verfolgung» vor Bewegung (Plan 2.3 Regel 4): in Schritt 0 nicht bestätigt,
-# darum gesperrt; erst nach Bestätigung am Gerät auf True setzen.
-AI_OFF_UNLOCKED = False
+# KI-Modus «keine Verfolgung» vor Bewegung (Plan 2.3 Regel 4): am Gerät bestätigt
+# (Prüfung mit Videostrom 2026-11-16, P15 b7 freigeschaltet). Tests schalten es zur
+# Gegenprobe ab.
+AI_OFF_UNLOCKED = True
 AI_OFF_COMMAND = (0x16, 0x02, 0x00, 0x00)
 
 # Dauerbewegung über V4L2_CID_PAN_SPEED/TILT_SPEED (Prüfung am Gerät 2026-11-16, über das
@@ -85,11 +94,18 @@ def speed_deg_per_s(curve: tuple, value: float) -> float:
 
 
 KEY_HDR = "obsbot_hdr"
+KEY_FOV = "obsbot_fov"
 KEY_STATE = "obsbot_state"
 KEY_AUTO_SLEEP = "obsbot_auto_sleep"
-KEYS = (KEY_HDR, KEY_STATE, KEY_AUTO_SLEEP)
+KEYS = (KEY_HDR, KEY_FOV, KEY_STATE, KEY_AUTO_SLEEP)
+# Schreibbar, nur im Zustand «wach»; gemerkt in kameras.json.
+WRITABLE = (KEY_HDR, KEY_FOV)
 GROUP = "OBSBOT"
 STATE_LABELS = {RUN_AWAKE: "Wach", RUN_ASLEEP: "Schlaf", RUN_PRIVACY: "Privatsphäre"}
+FOV_WIDE = 0
+# Annahme aus dem Zoom-Byte (siehe oben): 00 weit, 01 mittel, 02 eng.
+FOV_LABELS = {FOV_WIDE: "Weit", 1: "Mittel", 2: "Eng"}
+LABELS = {KEY_HDR: "HDR", KEY_FOV: "Bildwinkel"}
 
 
 def is_tiny2(model: str) -> bool:
@@ -138,12 +154,19 @@ def describe(block: bytes, remembered: dict) -> list[dict]:
     if run not in STATE_LABELS:
         menu.append({"value": run, "label": f"Unbekannt ({run})"})
     auto_sleep = struct.unpack_from("<H", block, STATUS_AUTO_SLEEP)[0]
+    fov = block[STATUS_FOV]
+    fov_menu = [{"value": value, "label": text} for value, text in FOV_LABELS.items()]
+    if fov not in FOV_LABELS:
+        fov_menu.append({"value": fov, "label": f"Unbekannt ({fov})"})
     common = {"group": GROUP, "step": 1, "inactive": False}
     # HDR-Standard des Geräts ist nicht bekannt; «aus» ist eine Annahme.
     return [
-        {**common, "key": KEY_HDR, "label": "HDR", "type": "bool", "min": 0, "max": 1,
+        {**common, "key": KEY_HDR, "label": LABELS[KEY_HDR], "type": "bool", "min": 0, "max": 1,
          "default": False, "value": bool(block[STATUS_HDR]), "menu": None,
          "remembered": KEY_HDR in remembered, "readonly": False},
+        {**common, "key": KEY_FOV, "label": LABELS[KEY_FOV], "type": "menu", "min": 0,
+         "max": max(FOV_LABELS), "default": FOV_WIDE, "value": fov, "menu": fov_menu,
+         "remembered": KEY_FOV in remembered, "readonly": False},
         {**common, "key": KEY_STATE, "label": "Zustand", "type": "menu", "min": 0, "max": 255,
          "default": RUN_AWAKE, "value": run, "menu": menu, "remembered": False, "readonly": True},
         {**common, "key": KEY_AUTO_SLEEP, "label": "Automatisch schlafen nach (s)", "type": "int",
@@ -153,14 +176,20 @@ def describe(block: bytes, remembered: dict) -> list[dict]:
 
 
 def to_raw(key: str, value) -> int:
-    """Prüft einen Wert aus PUT controls; nur HDR ist schreibbar."""
-    if key != KEY_HDR:
+    """Prüft einen Wert aus PUT controls; schreibbar sind HDR und Bildwinkel. `null` ergibt
+    den Standard (HDR aus, Bildwinkel weit)."""
+    if key not in WRITABLE:
         raise ApiError(400, "invalid", f"«{key}» ist nur lesbar.")
     if value is None:
-        return 0
-    if not isinstance(value, bool):
-        raise ApiError(400, "invalid", "«HDR» erwartet true oder false.")
-    return int(value)
+        return 0 if key == KEY_HDR else FOV_WIDE
+    if key == KEY_HDR:
+        if not isinstance(value, bool):
+            raise ApiError(400, "invalid", "«HDR» erwartet true oder false.")
+        return int(value)
+    if not isinstance(value, int) or isinstance(value, bool) or value not in FOV_LABELS:
+        choices = ", ".join(str(index) for index in FOV_LABELS)
+        raise ApiError(400, "invalid", f"«Bildwinkel»: {value} ist keine Auswahl (erlaubt: {choices}).")
+    return value
 
 
 class Obsbot:
@@ -250,21 +279,37 @@ class Obsbot:
         self.wait_ready(camera_id)
 
     def tracking_off(self, device, camera_id: str) -> bool:
-        """KI-Verfolgung aus vor einer Bewegung (Regel 4); False, solange der Befehl gesperrt ist."""
+        """KI-Verfolgung aus vor einer Bewegung (Regel 4), einmal je Bewegung; wartet nicht auf
+        den Status 0/0 (Übergang ≈ 5 s). False, wenn der Befehl gesperrt ist."""
         if not AI_OFF_UNLOCKED:
             if camera_id not in self._ai_noted:
                 self._ai_noted.add(camera_id)
-                log.info("%s: KI-Modus «keine» ist gesperrt (nicht bestätigt), nicht gesendet.", camera_id)
+                log.info("%s: KI-Modus «keine» ist gesperrt, nicht gesendet.", camera_id)
             return False
         device.xu_set(SELECTOR_COMMAND, command(*AI_OFF_COMMAND))
         return True
 
+    def _set_status(self, device, camera_id: str, data: tuple, index: int, raw: int,
+                    timeout_s: float) -> int:
+        """Kurzbefehl senden und das Status-Byte zurücklesen, bis es folgt oder die Zeit um ist."""
+        device.xu_set(SELECTOR_COMMAND, command(*data, raw))
+        deadline = self._clock() + timeout_s
+        while True:
+            value = self.read_block(device, camera_id)[index]
+            if value == raw or self._clock() >= deadline:
+                return value
+            self._sleep(POLL_S)
+
     def set_hdr(self, device, camera_id: str, raw: int) -> bool:
         """Setzt HDR und liest zurück (Status 0x06); nur im Zustand 1."""
-        device.xu_set(SELECTOR_COMMAND, command(0x01, 0x01, raw))
-        deadline = self._clock() + HDR_READBACK_S
-        while True:
-            value = self.read_block(device, camera_id)[STATUS_HDR]
-            if value == raw or self._clock() >= deadline:
-                return bool(value)
-            self._sleep(POLL_S)
+        return bool(self._set_status(device, camera_id, (0x01, 0x01), STATUS_HDR, raw, HDR_READBACK_S))
+
+    def set_fov(self, device, camera_id: str, raw: int) -> int:
+        """Setzt den Bildwinkel und liest zurück (Status 0x11); nur im Zustand 1."""
+        return self._set_status(device, camera_id, (0x04, 0x01), STATUS_FOV, raw, FOV_READBACK_S)
+
+    def set_value(self, device, camera_id: str, key: str, raw: int) -> bool | int:
+        """Schreibbaren Wert der Gruppe «OBSBOT» setzen (WRITABLE), Rückgabe wie GET controls."""
+        if key == KEY_HDR:
+            return self.set_hdr(device, camera_id, raw)
+        return self.set_fov(device, camera_id, raw)

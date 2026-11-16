@@ -3,7 +3,8 @@
 Der Dienst prüft `/dev/v4l/by-id` jede Sekunde (ohne Zusatzpaket wie `pyudev`).
 Knoten mit `V4L2_CAP_META_CAPTURE` werden übersprungen; je USB-Gerät zählt der
 erste Bildknoten. Werte und Bereiche liest der Dienst beim Erscheinen per
-`VIDIOC_QUERYCTRL`, nicht fest im Code.
+`VIDIOC_QUERYCTRL`, nicht fest im Code. Geräte ohne einen einstellbaren Wert (z. B. eine
+Aufnahmekarte) fehlen in GET status (`Camera.hidden`, P15 b7).
 
 Kennung einer Kamera: `<vid>:<pid>:<seriennummer>` aus sysfs (`idVendor`,
 `idProduct`, `serial` des USB-Geräts), ohne Seriennummer nur `<vid>:<pid>`. Die
@@ -27,7 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import v4l2
+from . import obsbot, v4l2
 
 log = logging.getLogger("dss_camera.devices")
 
@@ -38,6 +39,9 @@ POLL_INTERVAL_S = 1.0
 SETTLE_S = 3.0
 
 _BY_ID_PATTERN = re.compile(r"^usb-.+-video-index(\d+)$")
+# Typen, die GET controls anbietet (controls.TYPES).
+VALUE_TYPES = (v4l2.V4L2_CTRL_TYPE_INTEGER, v4l2.V4L2_CTRL_TYPE_BOOLEAN,
+               v4l2.V4L2_CTRL_TYPE_MENU, v4l2.V4L2_CTRL_TYPE_INTEGER_MENU)
 
 
 @dataclass
@@ -60,6 +64,13 @@ def probe_device(node: Path) -> DeviceInfo:
         os.close(fd)
 
 
+def adjustable(control: v4l2.Control) -> bool:
+    """Einstellbarer Wert im Sinn von controls.supported: bekannter Typ, weder abgeschaltet
+    noch nur lesbar."""
+    return (control.type in VALUE_TYPES
+            and not control.flags & (v4l2.V4L2_CTRL_FLAG_DISABLED | v4l2.V4L2_CTRL_FLAG_READ_ONLY))
+
+
 @dataclass
 class Camera:
     id: str
@@ -77,6 +88,14 @@ class Camera:
     def ptz(self) -> bool:
         ids = {control.id for control in self.controls}
         return v4l2.V4L2_CID_PAN_ABSOLUTE in ids or v4l2.V4L2_CID_TILT_ABSOLUTE in ids
+
+    @property
+    def hidden(self) -> bool:
+        """Abgefragt und ohne einen einstellbaren Wert (z. B. eine Aufnahmekarte): nicht in
+        GET status, auch ausgesteckt nicht. Nicht abfragbare Geräte bleiben sichtbar (Fehler).
+        Die Tiny 2 hat immer die Gruppe «OBSBOT» (obsbot.py)."""
+        return (self.error is None and not obsbot.is_tiny2(self.model)
+                and not any(map(adjustable, self.controls)))
 
     def status(self) -> dict:
         # Anzeigename: das Modell; einen eigenen setzt Backend.named (kameras.json).
@@ -114,6 +133,8 @@ class DeviceWatcher:
         # Sekunde neu geöffnet. Fehlgeschlagene Abfragen werden beim nächsten Mal wiederholt.
         self._probed: dict[Path, DeviceInfo] = {}
         self._failed: set[Path] = set()
+        # Ausgeblendete Geräte, schon im Protokoll gemeldet (einmal je Gerät).
+        self._hidden_noted: set[str] = set()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         # Nach jeder Suche aufgerufen (Neusetzen gemerkter Werte, controls.py).
@@ -212,6 +233,9 @@ class DeviceWatcher:
                 else:
                     camera.state = "unknown"
                     camera.error = info
+                if camera.hidden and camera_id not in self._hidden_noted:
+                    self._hidden_noted.add(camera_id)
+                    log.info("Gerät %s (%s) ohne einstellbare Werte, ausgeblendet.", camera_id, model)
             for camera_id, camera in self._cameras.items():
                 if camera_id not in found and camera.present:
                     camera.present = False
@@ -228,7 +252,7 @@ class DeviceWatcher:
 
     def status(self) -> list[dict]:
         with self._lock:
-            return [camera.status() for camera in self._cameras.values()]
+            return [camera.status() for camera in self._cameras.values() if not camera.hidden]
 
     def set_state(self, camera_id: str, state: str) -> None:
         """Zustand aus dem Gerät (awake, asleep, privacy, unknown); nur für steckende Kameras."""
