@@ -59,6 +59,10 @@ Theme darkTheme()
     t.graphCpu = QColor(0x47, 0x6b, 0xd7);
     t.graphRam = QColor(0x99, 0x7f, 0xdc);
     t.graphLan = QColor(0x59, 0xd9, 0x66);
+    t.badgeBot = QColor(0x99, 0x7f, 0xdc);
+    t.badgeChannel = QColor(0x28, 0x4c, 0xb8);
+    t.badgeMod = QColor(0x25, 0xa2, 0x31);
+    t.chatEventRow = QColor(0x32, 0x35, 0x40);
     return t;
 }
 
@@ -112,6 +116,9 @@ QWidget:disabled { color: @textDisabled@; }
 QDialog, QMainWindow, QMenuBar, QMenu { background-color: @window@; }
 QMainWindow::separator { background: transparent; width: 4px; height: 4px; margin: 0px; }
 QMainWindow::separator:hover { border: 1px solid @text@; margin: 1px; }
+/* P14 e2: Teiler zwischen Bereichen wie ein Dock, Werte von QMainWindow::separator. */
+QSplitter::handle { background: transparent; width: 4px; height: 4px; margin: 0px; }
+QSplitter::handle:hover { border: 1px solid @text@; margin: 1px; }
 
 QLabel, QCheckBox { background: transparent; }
 QComboBox, QCheckBox, QPushButton, QSpinBox, QDoubleSpinBox { margin-top: 2px; margin-bottom: 2px; }
@@ -348,6 +355,8 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #obsSourceState[state="problem"], #audioOutputState[state="problem"], #actionsAudioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
 /* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
 #settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
+/* P14 e2: Prüfmeldung am Feld, eine Zeile unter dem Abschnitt (Entscheid des Nutzers 2026-11-16). */
+#fieldProblem { color: @stateError@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},
@@ -378,6 +387,10 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
         {"coreDisconnected", t.coreDisconnected},
         {"preview", t.preview},
         {"graph", t.graph},
+        {"badgeBot", t.badgeBot},
+        {"badgeChannel", t.badgeChannel},
+        {"badgeMod", t.badgeMod},
+        {"chatEventRow", t.chatEventRow},
     };
     for (const auto &[name, color] : colors)
         css.replace(QLatin1Char('@') + QLatin1String(name) + QLatin1Char('@'), color.name());

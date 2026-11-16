@@ -1,6 +1,7 @@
 #include "chatbotpage.h"
 
 #include "headerbar.h"
+#include "panels.h"
 
 #include <QButtonGroup>
 #include <QFrame>
@@ -95,20 +96,7 @@ int ChatBotPage::addSubTab(const QString &title, QWidget *page)
 
 QWidget *ChatBotPage::addLivePanel(const QString &title, QWidget *content, int stretch, int position)
 {
-    auto *panel = new QWidget;
-    auto *column = new QVBoxLayout(panel);
-    column->setContentsMargins(0, 0, 0, 0);
-    column->setSpacing(0);
-    auto *titleLabel = new QLabel(title, panel);
-    titleLabel->setObjectName(QStringLiteral("chatBotPanelTitle"));
-    column->addWidget(titleLabel);
-    auto *body = new QFrame(panel);
-    body->setObjectName(QStringLiteral("chatBotPanelBody"));
-    auto *bodyColumn = new QVBoxLayout(body);
-    bodyColumn->setContentsMargins(2, 2, 2, 2);
-    content->setParent(body);
-    bodyColumn->addWidget(content);
-    column->addWidget(body, 1);
+    QWidget *panel = dockPanel(title, content, nullptr);
     m_liveRow->insertWidget(position, panel, stretch);
     return panel;
 }

@@ -72,6 +72,12 @@ struct Theme
     QColor graphCpu;        // --blue2
     QColor graphRam;        // --purple1
     QColor graphLan;        // --green1
+
+    // P14 e2: Chat im Unterreiter «Live» (Entscheid des Nutzers 2026-11-16, Werte aus Yami)
+    QColor badgeBot;        // Abzeichen «Bot» (--purple1)
+    QColor badgeChannel;    // Abzeichen «Kanal» (--blue3)
+    QColor badgeMod;        // Abzeichen «Mod» (--green3)
+    QColor chatEventRow;    // Hintergrund der grauen Ereigniszeilen (--grey5)
 };
 
 // Dunkles Design nach «Yami» (OBS Studio).
