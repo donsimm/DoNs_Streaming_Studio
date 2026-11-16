@@ -3,11 +3,20 @@
 // Probelauf schreibt nichts, Sicherung vor dem Schreiben, zweiter Import mit im Studio geänderten
 // Werten, Überschreiben, kein Name, keine ID und kein Wert im Bericht. Erfundene Exportdaten in
 // tests/daten/streamerbot-export/ (LIESMICH.md dort).
+// Seit P14 z1b auch über den Kern (viewer_import, dss-cli zuschauer-import und
+// scripts/zuschauer-import.sh, dss-core und dss-cli als eigene Prozesse): Stand aus dem Speicher
+// des Kerns, kein Name und kein Wert im Protokoll des Kerns.
 
 #include "actionjson.h"
+#include "actionprotocol.h"
 #include "viewerimport.h"
+#ifdef DSS_CLI_BIN
+#include "coresession.h"
+#include "prozesshilfe.h"
+#endif
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QJsonArray>
 #include <QTemporaryDir>
@@ -79,6 +88,103 @@ QMap<QString, QByteArray> snapshot(const QString &dir)
     return files;
 }
 
+#ifdef DSS_CLI_BIN
+// Kopiert den erfundenen Export (mit Unterordnern) nach target
+bool copyExport(const QString &target)
+{
+    const QDir source(QStringLiteral(DSS_TEST_EXPORT_DIR));
+    QDirIterator it(source.path(), QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString file = it.next();
+        const QString to = QDir(target).filePath(source.relativeFilePath(file));
+        if (!QDir().mkpath(QFileInfo(to).path()) || !QFile::copy(file, to))
+            return false;
+    }
+    return true;
+}
+
+// Stand im Datenordner vor dem ersten Import: aktionen.json und eine Variable nur im Studio
+void writeStartFiles(const QString &data)
+{
+    VariablesData vars;
+    vars.global.insert(QStringLiteral("nurImStudio"), {QJsonValue(1), VariableOrigin::Studio, kNow});
+    writeBytes(QDir(data).filePath(QString::fromLatin1(kVariablesFileName)), serializeVariables(vars));
+    writeBytes(QDir(data).filePath(QString::fromLatin1(kActionsFileName)), serializeActions(ActionsConfig{}));
+}
+
+// Die Dateien, die der Import schreiben kann
+QMap<QString, QByteArray> importFiles(const QString &data)
+{
+    QMap<QString, QByteArray> files;
+    for (const char *name : {kVariablesFileName, kViewersFileName, kQuotesFileName, kArchiveFileName, kActionsFileName})
+        files.insert(QString::fromLatin1(name), readBytes(QDir(data).filePath(QString::fromLatin1(name))));
+    return files;
+}
+
+VariablesData variablesFile(const QString &data)
+{
+    VariablesData vars;
+    QString error;
+    if (!parseVariables(readBytes(QDir(data).filePath(QString::fromLatin1(kVariablesFileName))), &vars, &error))
+        qWarning("variablen.json: %s", qPrintable(error));
+    return vars;
+}
+
+// Erfundene Namen, IDs und Texte des Exports, die nie im Protokoll des Kerns stehen dürfen (reine
+// Zahlenwerte fehlen hier: Ports und Zeiten im Protokoll könnten sie zufällig enthalten)
+const QStringList kSecrets = {QStringLiteral("zuschauer1"), QStringLiteral("zuschauer2"), QStringLiteral("zuschauer3"),
+                              QStringLiteral("zuschauer4"), QStringLiteral("zuschauer9"), QStringLiteral("10000000"),
+                              QStringLiteral("Hallo Testwert"), QStringLiteral("Testzitat"), QStringLiteral("Testgruppe"),
+                              QStringLiteral("testfarbe"), QStringLiteral("#123456"),
+                              QStringLiteral("Testeinstellungswert"), QStringLiteral("testpronomen")};
+
+struct TestCore
+{
+    std::unique_ptr<QTemporaryDir> run = testhelp::runtimeDir();
+    QString socket;
+    std::unique_ptr<QProcess> process;
+    QString log;
+
+    explicit TestCore(const QString &data)
+    {
+        socket = run->path() + QStringLiteral("/kern.sock");
+        // Eigene Verbindung der «Version im Einsatz» ohne Kern: nie den echten Socket fragen
+        process = testhelp::startCore(data, socket, testhelp::testConfigHome(),
+                                      {QStringLiteral("--einsatz-verbindung"), run->path() + QStringLiteral("/einsatz.sock")});
+        if (!testhelp::waitForLog(process.get(), QStringLiteral("Verbindung offen"), &log))
+            qWarning("Kern startet nicht: %s", qPrintable(log));
+    }
+
+    bool stop()
+    {
+        process->terminate();
+        const bool finished = process->waitForFinished(10000);
+        log += QString::fromUtf8(process->readAllStandardError());
+        return finished && process->exitStatus() == QProcess::NormalExit && process->exitCode() == 0;
+    }
+};
+
+testhelp::CliResult runImport(const TestCore &core, const QString &exportDir, const QStringList &options = {})
+{
+    return testhelp::runCliOnly(QStringList{QStringLiteral("--verbindung"), core.socket, QStringLiteral("zuschauer-import"),
+                                            exportDir}
+                                + options);
+}
+
+testhelp::CliResult runScript(const TestCore &core, const QString &data, const QByteArray &answer)
+{
+    QProcess p;
+    p.start(QStringLiteral("bash"),
+            {QStringLiteral(DSS_TEST_SCRIPT_DIR "/zuschauer-import.sh"), QStringLiteral("--cli"), QStringLiteral(DSS_CLI_BIN),
+             QStringLiteral("--datenordner"), data, QStringLiteral("--verbindung"), core.socket});
+    p.write(answer);
+    p.closeWriteChannel();
+    p.waitForFinished(20000);
+    return {p.exitStatus() == QProcess::NormalExit ? p.exitCode() : -1, QString::fromUtf8(p.readAllStandardOutput()),
+            QString::fromUtf8(p.readAllStandardError())};
+}
+#endif
+
 } // namespace
 
 class TestZuschauerImport : public QObject
@@ -94,6 +200,12 @@ private slots:
     void invalidFileStops();
     void writesWithBackup();
     void secondImportKeepsStudioChanges();
+    // P14 z1b: Weg über den Kern
+    void resultMessage();
+#ifdef DSS_CLI_BIN
+    void importThroughCore();
+    void importScript();
+#endif
 };
 
 void TestZuschauerImport::readsExport()
@@ -392,6 +504,177 @@ void TestZuschauerImport::secondImportKeepsStudioChanges()
     QCOMPARE(forced.report.userVariables, (ImportCount{0, 1, 3, 0, 1}));
     QCOMPARE(forced.report.overwrittenVariableNames, (QMap<QString, int>{{QStringLiteral("watchtime"), 1}}));
 }
+
+void TestZuschauerImport::resultMessage()
+{
+    dss::ActionsRequest request;
+    QString error;
+    const QJsonObject message = dss::actionsRequestMessage(
+        {4, QString::fromLatin1(dss::msg::kViewerImport),
+         {{QStringLiteral("path"), QStringLiteral("/tmp/export")}, {QStringLiteral("dry_run"), true},
+          {QStringLiteral("overwrite"), false}}});
+    QVERIFY2(dss::parseActionsRequest(message, &request, &error), qPrintable(error));
+    QVERIFY(!dss::parseActionsRequest(dss::actionsRequestMessage({4, QString::fromLatin1(dss::msg::kViewerImport),
+                                                                  {{QStringLiteral("path"), QStringLiteral("/tmp/export")}}}),
+                                      &request, &error));
+
+    const dss::ViewerImportResult result{false, QStringLiteral("Bericht\n"), {QStringLiteral("variablen.json")},
+                                         QStringLiteral("import/sicherung-20261115-120000")};
+    dss::ViewerImportResult back;
+    QVERIFY2(dss::parseViewerImportResult(dss::viewerImportResultMessage(4, result), &back, &error), qPrintable(error));
+    QCOMPARE(back, result);
+    const QJsonObject dry = dss::viewerImportResultMessage(5, {});
+    QVERIFY(dry.value(QStringLiteral("backup")).isNull());
+    QVERIFY(dss::parseViewerImportResult(dry, &back, &error));
+    QVERIFY(back.dryRun);
+    QVERIFY(back.backup.isEmpty());
+}
+
+#ifdef DSS_CLI_BIN
+void TestZuschauerImport::importThroughCore()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString data = dir.filePath(QStringLiteral("daten"));
+    QVERIFY(QDir().mkpath(data));
+    writeStartFiles(data);
+    const QString exportDir = QStringLiteral(DSS_TEST_EXPORT_DIR);
+    TestCore core(data);
+    const QMap<QString, QByteArray> start = importFiles(data);
+
+    // Probelauf (Standard): Bericht, nichts geschrieben
+    const testhelp::CliResult dry = runImport(core, exportDir);
+    QVERIFY2(dry.exitCode == 0, qPrintable(dry.out + dry.err));
+    QVERIFY(dry.out.contains(QStringLiteral("Probelauf")));
+    QVERIFY(dry.out.contains(QStringLiteral("watchtime (2 Zuschauer)")));
+    QCOMPARE(importFiles(data), start);
+    QVERIFY(!QFileInfo::exists(QDir(data).filePath(QStringLiteral("import"))));
+
+    // Endgültig: zuerst Sicherung der bisherigen Fassungen, dann schreiben
+    const testhelp::CliResult first = runImport(core, exportDir, {QStringLiteral("--endgueltig")});
+    QVERIFY2(first.exitCode == 0, qPrintable(first.out + first.err));
+    QVERIFY(first.out.contains(QStringLiteral("endgültig")));
+    QVERIFY(first.out.contains(QStringLiteral("Geschrieben: ")));
+    const QDir importDir(QDir(data).filePath(QStringLiteral("import")));
+    QStringList backups = importDir.entryList({QStringLiteral("sicherung-*")}, QDir::Dirs);
+    QCOMPARE(backups.size(), 1);
+    QVERIFY(first.out.contains(QStringLiteral("Sicherung: import/") + backups.first()));
+    const QString firstBackup = importDir.filePath(backups.first());
+    QCOMPARE(snapshot(firstBackup),
+             (QMap<QString, QByteArray>{{QString::fromLatin1(kActionsFileName), start.value(QString::fromLatin1(kActionsFileName))},
+                                        {QString::fromLatin1(kVariablesFileName), start.value(QString::fromLatin1(kVariablesFileName))}}));
+    VariablesData vars = variablesFile(data);
+    QCOMPARE(vars.users[kUser1].value(QStringLiteral("watchtime")), fromStreamerbot(1200, utc(1, 18)));
+    QCOMPARE(vars.global.value(QStringLiteral("nurImStudio")).value.toInt(), 1);
+
+    // Im Studio geändert, nur im Speicher des Kerns (die Datei schreibt er später)
+    {
+        dss::CoreSession session;
+        QString error;
+        bool notRunning = false;
+        QVERIFY2(session.open(core.socket, QStringLiteral("tst_zuschauerimport"), &error, &notRunning), qPrintable(error));
+        dss::ChangeResult r;
+        const std::optional<QJsonObject> set = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kVariableSet),
+            {{QStringLiteral("scope"), QStringLiteral("user")}, {QStringLiteral("user_id"), kUser1},
+             {QStringLiteral("name"), QStringLiteral("watchtime")}, {QStringLiteral("persisted"), true},
+             {QStringLiteral("value"), 1500}},
+            QString::fromLatin1(dss::msg::kChangeResult), &error);
+        QVERIFY2(set && dss::parseChangeResult(*set, &r, &error) && r.ok, qPrintable(error + r.message));
+    }
+
+    // Zweiter Import: der im Studio geänderte Wert bleibt (Hinweis auf --ueberschreiben)
+    const testhelp::CliResult second = runImport(core, exportDir, {QStringLiteral("--endgueltig")});
+    QVERIFY2(second.exitCode == 0, qPrintable(second.out + second.err));
+    QVERIFY(second.out.contains(QStringLiteral("--ueberschreiben")));
+    {
+        dss::CoreSession session;
+        QString error;
+        bool notRunning = false;
+        QVERIFY(session.open(core.socket, QStringLiteral("tst_zuschauerimport"), &error, &notRunning));
+        const std::optional<QJsonObject> reply = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kGetVariables), {}, QString::fromLatin1(dss::msg::kVariables), &error);
+        dss::VariablesInfo info;
+        QVERIFY2(reply && dss::parseVariablesMessage(*reply, &info, &error), qPrintable(error));
+        const VariableValue kept = info.persisted.users[kUser1].value(QStringLiteral("watchtime"));
+        QCOMPARE(kept.value.toInt(), 1500);
+        QCOMPARE(kept.origin, VariableOrigin::Studio);
+    }
+
+    // --ueberschreiben: Wert aus Streamer.bot; die Sicherung enthält den Stand aus dem Speicher
+    const testhelp::CliResult forced =
+        runImport(core, exportDir, {QStringLiteral("--endgueltig"), QStringLiteral("--ueberschreiben")});
+    QVERIFY2(forced.exitCode == 0, qPrintable(forced.out + forced.err));
+    QVERIFY(forced.out.contains(QString::fromLatin1(kVariablesFileName)));
+    backups = importDir.entryList({QStringLiteral("sicherung-*")}, QDir::Dirs, QDir::Time | QDir::Reversed);
+    QVERIFY(backups.size() >= 2);
+    QString lastBackup;
+    for (const QString &name : std::as_const(backups)) {
+        if (forced.out.contains(QStringLiteral("Sicherung: import/") + name + QLatin1Char('\n')))
+            lastBackup = importDir.filePath(name);
+    }
+    QVERIFY2(!lastBackup.isEmpty(), qPrintable(forced.out));
+    VariablesData saved;
+    QString error;
+    QVERIFY(parseVariables(readBytes(QDir(lastBackup).filePath(QString::fromLatin1(kVariablesFileName))), &saved, &error));
+    QCOMPARE(saved.users[kUser1].value(QStringLiteral("watchtime")).value.toInt(), 1500);
+
+    // Nicht lesbarer Export: abgewiesen, nichts geschrieben
+    const QMap<QString, QByteArray> before = importFiles(data);
+    const testhelp::CliResult missing =
+        runImport(core, dir.filePath(QStringLiteral("fehlt")), {QStringLiteral("--endgueltig")});
+    QCOMPARE(missing.exitCode, 1);
+    QVERIFY(missing.err.contains(QStringLiteral("Export nicht lesbar")));
+    QCOMPARE(importFiles(data), before);
+
+    // Nach dem Beenden: der Speicher hat die importierten Dateien nicht überschrieben
+    QVERIFY(core.stop());
+    vars = variablesFile(data);
+    QCOMPARE(vars.users[kUser1].value(QStringLiteral("watchtime")), fromStreamerbot(1200, utc(1, 18)));
+    QCOMPARE(vars.global.value(QStringLiteral("nurImStudio")).value.toInt(), 1);
+    QVERIFY2(core.log.contains(QStringLiteral("Zuschauer-Import: endgültig")), qPrintable(core.log));
+    for (const QString &secret : kSecrets)
+        QVERIFY2(!core.log.contains(secret, Qt::CaseInsensitive), qPrintable(secret));
+}
+
+void TestZuschauerImport::importScript()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString data = dir.filePath(QStringLiteral("daten"));
+    QVERIFY(QDir().mkpath(data));
+    writeStartFiles(data);
+    const QString exportDir = QDir(data).filePath(QStringLiteral("import/export"));
+    QVERIFY(copyExport(exportDir));
+    TestCore core(data);
+    const QMap<QString, QByteArray> start = importFiles(data);
+
+    // «n»: nur der Probelauf, nichts geschrieben
+    const testhelp::CliResult no = runScript(core, data, "n\n");
+    QVERIFY2(no.exitCode == 0, qPrintable(no.out + no.err));
+    QVERIFY(no.out.contains(QStringLiteral("Ordner des Exports: ") + exportDir));
+    QVERIFY(no.out.contains(QStringLiteral("Probelauf")));
+    QVERIFY(no.out.contains(QStringLiteral("Nichts übernommen.")));
+    QCOMPARE(importFiles(data), start);
+
+    // «j»: endgültig mit Sicherung; der Export bleibt
+    const testhelp::CliResult yes = runScript(core, data, "j\n");
+    QVERIFY2(yes.exitCode == 0, qPrintable(yes.out + yes.err));
+    QVERIFY(yes.out.contains(QStringLiteral("Übernommen.")));
+    QCOMPARE(QDir(QDir(data).filePath(QStringLiteral("import"))).entryList({QStringLiteral("sicherung-*")}, QDir::Dirs).size(), 1);
+    QVERIFY(QFileInfo::exists(exportDir));
+    QVERIFY(core.stop());
+    QCOMPARE(variablesFile(data).users[kUser1].value(QStringLiteral("watchtime")), fromStreamerbot(1200, utc(1, 18)));
+
+    // Ohne Export: Abbruch mit Meldung
+    QTemporaryDir empty;
+    TestCore other(empty.path());
+    const testhelp::CliResult none = runScript(other, empty.path(), "j\n");
+    QCOMPARE(none.exitCode, 1);
+    QVERIFY(none.err.contains(QStringLiteral("fehlt")));
+    QVERIFY(other.stop());
+}
+#endif
 
 QTEST_GUILESS_MAIN(TestZuschauerImport)
 #include "tst_zuschauerimport.moc"

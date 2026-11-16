@@ -18,8 +18,8 @@
 //
 // Liest den Export von scripts/streamerbot-export/ (z0), ordnet ihn nach Plan 9.3 zu und meldet in
 // einem Probelauf, was wohin käme. Endgültig: zuerst Sicherung der betroffenen Dateien, dann
-// schreiben. Die Kern-Anfrage viewer_import und dss-cli zuschauer-import kommen mit z1b; dort
-// schreibt nur der Kern (K-03).
+// schreiben. Seit z1b nutzt der Kern dies für viewer_import (ActionService, dss-cli
+// zuschauer-import); nur der Kern schreibt (K-03).
 //
 // Format des Exports (z0): je LiteDB-Datei ein Ordner ohne Endung, darin je Sammlung
 // <sammlung>.json (Array der Dokumente; Datum ISO 8601 in UTC, ObjectId und Guid als Text). Die

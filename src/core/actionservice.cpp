@@ -6,6 +6,7 @@
 #include "savescheduler.h"
 #include "triggerevent.h"
 #include "triggertypes.h"
+#include "viewerimport.h"
 
 #include <QDir>
 #include <QFile>
@@ -359,6 +360,8 @@ void ActionService::handleRequest(const QJsonObject &message, const Reply &reply
         reply(dss::viewersMessage(id, found));
     } else if (type == QLatin1String(dss::msg::kGetQuotes)) {
         reply(dss::quotesMessage(id, m_quotes));
+    } else if (type == QLatin1String(dss::msg::kViewerImport)) {
+        handleViewerImport(request, reply);
     } else if (type == QLatin1String(dss::msg::kTestEvent)) {
         handleTestEvent(request, reply);
     }
@@ -467,6 +470,95 @@ void ActionService::handleQuoteEdit(const dss::ActionsRequest &request, const Re
     }
     m_quotes = checked;
     reply(result(request.requestId, true));
+}
+
+// Zuschauer-Import aus Streamer.bot (P14 z1b, Plan 9.4): nimmt den Stand aus dem Speicher (sonst
+// überschriebe der SaveScheduler die importierten Dateien) und gibt den neuen dorthin zurück.
+// Protokoll und Antwort nennen nur Anzahlen und Namen von Variablen (Plan 2.10).
+void ActionService::handleViewerImport(const dss::ActionsRequest &request, const Reply &reply)
+{
+    const qint64 id = request.requestId;
+    const bool dryRun = request.fields.value(QStringLiteral("dry_run")).toBool();
+    const QString path = request.fields.value(QStringLiteral("path")).toString();
+    for (const QString &fileError : {m_configError, m_variablesError, m_viewersError, m_quotesError}) {
+        if (!fileError.isEmpty()) {
+            reply(result(id, false, QString::fromLatin1(dss::err::kActionsFileError),
+                         QStringLiteral("Kein Import, Datei ungültig: ") + fileError));
+            return;
+        }
+    }
+    if (!QDir::isAbsolutePath(path)) {
+        reply(rejected(id, QStringLiteral("Der Ordner des Exports muss ein absoluter Pfad sein")));
+        return;
+    }
+    QString error;
+    dss::actions::StreamerbotExport source;
+    if (!dss::actions::readStreamerbotExport(path, &source, &error)) {
+        reply(rejected(id, QStringLiteral("Export nicht lesbar: ") + error));
+        return;
+    }
+    // Ungespeicherte Variablen und Zuschauer zuerst schreiben: Datei = Speicher, die Sicherung
+    // enthält damit den Stand vor dem Import
+    if (!dryRun && !savePending(&error)) {
+        reply(result(id, false, QString::fromLatin1(dss::err::kSaveFailed), QStringLiteral("Nicht gespeichert: ") + error));
+        return;
+    }
+    // Archiv aus der Datei (nur der Import schreibt es), alles andere aus dem Speicher
+    dss::actions::ImportState before;
+    if (!dss::actions::loadImportState(m_options.dataDir, &before, &error)) {
+        reply(result(id, false, QString::fromLatin1(dss::err::kActionsFileError),
+                     QStringLiteral("Kein Import, Datei ungültig: ") + error));
+        return;
+    }
+    before.variables = m_variables.data();
+    before.viewers = m_viewers;
+    before.quotes = m_quotes;
+    if (before.actions)
+        before.actions = m_config;
+
+    const QDateTime now = m_clock.now().toUTC();
+    const dss::actions::ImportResult planned = dss::actions::planViewerImport(
+        source, before, {request.fields.value(QStringLiteral("overwrite")).toBool(), now});
+    dss::ViewerImportResult answer;
+    answer.dryRun = dryRun;
+    answer.report = dss::actions::importReportText(planned.report, !dryRun);
+    if (dryRun) {
+        qInfo("Zuschauer-Import: Probelauf, nichts geschrieben");
+        reply(dss::viewerImportResultMessage(id, answer));
+        return;
+    }
+
+    // Zwei Importe in derselben Sekunde: Nummer anhängen (writeViewerImport verlangt einen neuen Ordner)
+    const QDir data(m_options.dataDir);
+    const QString baseName = QStringLiteral("import/") + dss::actions::importBackupDirName(now);
+    QString backupName = baseName;
+    for (int n = 2; QFileInfo::exists(data.filePath(backupName)); ++n)
+        backupName = QStringLiteral("%1-%2").arg(baseName).arg(n);
+    if (!dss::actions::writeViewerImport(m_options.dataDir, data.filePath(backupName), before,
+                                         planned.state, &answer.written, &error)) {
+        qCritical("Zuschauer-Import: nicht geschrieben: %s", qPrintable(error));
+        reply(result(id, false, QString::fromLatin1(dss::err::kSaveFailed), QStringLiteral("Nicht geschrieben: ") + error));
+        return;
+    }
+    if (!answer.written.isEmpty())
+        answer.backup = backupName;
+    m_variables.setData(planned.state.variables);
+    m_variables.clearChanged();
+    m_viewers = planned.state.viewers;
+    m_viewersChanged = false;
+    m_quotes = planned.state.quotes;
+    const bool configChanged = planned.state.actions && *planned.state.actions != m_config;
+    if (configChanged) {
+        m_config = *planned.state.actions;
+        applyConfig();
+    }
+    qInfo("Zuschauer-Import: endgültig, %lld Dateien geschrieben (%s), Sicherung %s",
+          static_cast<long long>(answer.written.size()), qPrintable(answer.written.join(QStringLiteral(", "))),
+          answer.backup.isEmpty() ? "keine" : qPrintable(answer.backup));
+    if (configChanged)
+        emit broadcastRequested(configMessage());
+    reply(dss::viewerImportResultMessage(id, answer));
+    broadcastStatusIfChanged();
 }
 
 void ActionService::handleQueueControl(const dss::ActionsRequest &request, const Reply &reply)

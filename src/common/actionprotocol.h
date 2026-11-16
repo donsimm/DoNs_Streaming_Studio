@@ -35,6 +35,7 @@ inline constexpr char kViewers[] = "viewers";
 inline constexpr char kQuotes[] = "quotes";
 inline constexpr char kActionRuns[] = "action_runs";
 inline constexpr char kActionRun[] = "action_run";
+inline constexpr char kViewerImportResult[] = "viewer_import_result";
 // Fenster → Kern: Änderungen (Antwort change_result)
 inline constexpr char kActionsSetEnabled[] = "actions_set_enabled";
 inline constexpr char kActionPut[] = "action_put";
@@ -63,6 +64,8 @@ inline constexpr char kGetActionRuns[] = "get_action_runs";
 inline constexpr char kGetVariables[] = "get_variables";
 inline constexpr char kGetViewers[] = "get_viewers";
 inline constexpr char kGetQuotes[] = "get_quotes";
+// Fenster → Kern: Zuschauer-Import aus Streamer.bot (P14 z1b, Antwort viewer_import_result)
+inline constexpr char kViewerImport[] = "viewer_import";
 // Nur mit dss-core --testereignisse (Tests): Ereignis auf den Fluss legen
 inline constexpr char kTestEvent[] = "test_event";
 } // namespace msg
@@ -175,5 +178,18 @@ bool parseViewersMessage(const QJsonObject &message, actions::ViewersData *viewe
 // quotes
 QJsonObject quotesMessage(qint64 requestId, const actions::QuotesData &quotes);
 bool parseQuotesMessage(const QJsonObject &message, actions::QuotesData *quotes, QString *error);
+
+// viewer_import_result (P14 z1b, seit Version 17): Bericht ohne Namen und Werte von Zuschauern
+struct ViewerImportResult
+{
+    bool dryRun = true;
+    QString report;      // importReportText (viewerimport.h)
+    QStringList written; // geschriebene Dateien (Probelauf: leer)
+    QString backup;      // Ordner der Sicherung relativ zum Datenordner, leer = keine
+
+    bool operator==(const ViewerImportResult &) const = default;
+};
+QJsonObject viewerImportResultMessage(qint64 requestId, const ViewerImportResult &result);
+bool parseViewerImportResult(const QJsonObject &message, ViewerImportResult *result, QString *error);
 
 } // namespace dss

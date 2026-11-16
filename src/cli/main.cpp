@@ -22,6 +22,7 @@
 #include <QCoreApplication>
 #include <QDeadlineTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QRegularExpression>
 #include <QTextStream>
@@ -61,7 +62,7 @@ const QList<std::pair<QString, int>> kActionCommands = {
     {QStringLiteral("aktionen"), 0},       {QStringLiteral("aktion-setzen"), 1},
     {QStringLiteral("aktion-loeschen"), 1}, {QStringLiteral("aktion-test"), -1},
     {QStringLiteral("laeufe"), 0},         {QStringLiteral("warteschlange"), 2},
-    {QStringLiteral("variablen"), 0}};
+    {QStringLiteral("variablen"), 0},      {QStringLiteral("zuschauer-import"), 1}};
 
 bool isActionCommand(const QString &command)
 {
@@ -126,6 +127,7 @@ const char *const kUsageTemplate =
     "  laeufe [--folgen]\n"
     "  warteschlange NAME anhalten|fortsetzen|leeren\n"
     "  variablen [--zaehlen]\n"
+    "  zuschauer-import ORDNER [--endgueltig] [--ueberschreiben]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -171,6 +173,11 @@ const char *const kUsageTemplate =
     "laeufe: letzte 200 Läufe (nur im Speicher); --folgen: danach neue, bis der Kern trennt.\n"
     "warteschlange: NAME «Standard» oder Name aus aktionen.json. variablen: Variablen für alle und je\n"
     "Zuschauer (Twitch-ID); --zaehlen: nur Anzahl Werte je Name.\n"
+    "zuschauer-import: Zuschauer-Daten aus dem Export von Streamer.bot (ORDNER, meist\n"
+    "<Datenordner>/import/export) übernehmen. Ohne --endgueltig nur Probelauf (schreibt nichts);\n"
+    "--endgueltig sichert die betroffenen Dateien zuerst nach <Datenordner>/import/sicherung-<zeit>.\n"
+    "Im Studio geänderte Werte bleiben, ausser mit --ueberschreiben. Der Bericht nennt nur Anzahlen\n"
+    "und Namen von Variablen.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
     "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern, live,\n"
@@ -202,6 +209,8 @@ struct Arguments
     QStringList eventTypes;      // P13: ereignisse --typ (mehrmals möglich)
     bool real = false;           // P14 b3: aktion-test --echt
     bool count = false;          // P14 b3: variablen --zaehlen
+    bool importFinal = false;    // P14 z1b: zuschauer-import --endgueltig
+    bool importOverwrite = false; // P14 z1b: zuschauer-import --ueberschreiben
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -263,6 +272,10 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->real = true;
         } else if (a == QLatin1String("--zaehlen")) {
             result->count = true;
+        } else if (a == QLatin1String("--endgueltig")) {
+            result->importFinal = true;
+        } else if (a == QLatin1String("--ueberschreiben")) {
+            result->importOverwrite = true;
         } else if (a == QLatin1String("--typ")) {
             if (i + 1 >= args.size()) {
                 *error = QStringLiteral("--typ braucht einen Filter.");
@@ -1151,9 +1164,10 @@ int runActions(const Arguments &args)
         return kExitUsage;
     }
     if ((args.real && command != QLatin1String("aktion-test")) || (args.count && command != QLatin1String("variablen"))
-        || (args.follow && command != QLatin1String("laeufe"))) {
+        || (args.follow && command != QLatin1String("laeufe"))
+        || ((args.importFinal || args.importOverwrite) && command != QLatin1String("zuschauer-import"))) {
         err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen, --folgen für laeufe "
-                 "und ereignisse.\n\n" << usageText();
+                 "und ereignisse, --endgueltig und --ueberschreiben nur für zuschauer-import.\n\n" << usageText();
         return kExitUsage;
     }
     const auto fail = [](const QString &message) {
@@ -1161,7 +1175,8 @@ int runActions(const Arguments &args)
         return kExitError;
     };
     const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
-    dss::CoreSession session;
+    // Der Import liest und schreibt alle Zuschauer-Daten auf einmal: längere Zeitgrenze
+    dss::CoreSession session(command == QLatin1String("zuschauer-import") ? 30000 : 3000);
     QString error;
     bool notRunning = false;
     if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
@@ -1372,6 +1387,36 @@ int runActions(const Arguments &args)
         out() << "Warteschlange «" << a.at(0) << "»: " << a.at(1) << ".\n";
         return kExitOk;
     }
+    if (command == QLatin1String("zuschauer-import")) {
+        // Der Kern liest den Export und schreibt (K-03); der Pfad gilt für ihn, darum absolut
+        const QString exportDir = QFileInfo(a.at(0)).absoluteFilePath();
+        const std::optional<QJsonObject> reply = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kViewerImport),
+            {{QStringLiteral("path"), exportDir}, {QStringLiteral("dry_run"), !args.importFinal},
+             {QStringLiteral("overwrite"), args.importOverwrite}},
+            QString::fromLatin1(dss::msg::kViewerImportResult), &error);
+        if (!reply)
+            return fail(error);
+        dss::ChangeResult r;
+        if (dss::messageType(*reply) == QLatin1String(dss::msg::kChangeResult)) {
+            changeOk(reply, &r);
+            return fail(error);
+        }
+        dss::ViewerImportResult imported;
+        if (!dss::parseViewerImportResult(*reply, &imported, &error))
+            return fail(error);
+        out() << "Export: " << exportDir << '\n' << imported.report;
+        if (!imported.report.endsWith(QLatin1Char('\n')))
+            out() << '\n';
+        if (!imported.dryRun) {
+            if (imported.written.isEmpty())
+                out() << "Nichts geändert, nichts geschrieben.\n";
+            else
+                out() << "Geschrieben: " << imported.written.join(QStringLiteral(", ")) << "\nSicherung: "
+                      << imported.backup << '\n';
+        }
+        return kExitOk;
+    }
     // variablen
     const std::optional<QJsonObject> reply = session.actionsRequest(
         QString::fromLatin1(dss::msg::kGetVariables), {}, QString::fromLatin1(dss::msg::kVariables), &error);
@@ -1455,8 +1500,9 @@ int main(int argc, char *argv[])
         err().flush();
         return rc;
     }
-    if (args.real || args.count) {
-        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen.\n\n" << usageText();
+    if (args.real || args.count || args.importFinal || args.importOverwrite) {
+        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen, --endgueltig und "
+                 "--ueberschreiben nur für zuschauer-import.\n\n" << usageText();
         return kExitUsage;
     }
     const bool events = args.positional.first() == QLatin1String("ereignisse");

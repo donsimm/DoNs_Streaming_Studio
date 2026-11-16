@@ -103,6 +103,13 @@ dss_add_test(tst_zuschauerimport)
 target_link_libraries(tst_zuschauerimport PRIVATE dss_actions)
 target_compile_definitions(tst_zuschauerimport PRIVATE
   DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
+# P14 z1b: dazu der Weg über den Kern (viewer_import, dss-cli zuschauer-import,
+# scripts/zuschauer-import.sh) mit dss-core und dss-cli als eigenen Prozessen.
+if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
+  target_compile_definitions(tst_zuschauerimport PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_TEST_SCRIPT_DIR="${PROJECT_SOURCE_DIR}/scripts")
+  add_dependencies(tst_zuschauerimport dss-core dss-cli)
+endif()
 # P14 b1: Ablauf der Läufe (Zustandsmaschine, Warteschlangen, Grenzen) mit ersetzter Uhr und
 # ersetzten Diensten, ohne Qt Gui und ohne Netz.
 dss_add_test(tst_aktionsablauf)

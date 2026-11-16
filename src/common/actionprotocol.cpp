@@ -57,6 +57,7 @@ const QList<RequestRule> &requestRules()
         {msg::kGetVariables, {}},
         {msg::kGetViewers, {{"user_ids", Kind::Array}}},
         {msg::kGetQuotes, {}},
+        {msg::kViewerImport, {{"path", Kind::String}, {"dry_run", Kind::Bool}, {"overwrite", Kind::Bool}}},
         {msg::kTestEvent, {{"event", Kind::Object}}},
     };
     return rules;
@@ -563,6 +564,45 @@ bool parseQuotesMessage(const QJsonObject &message, actions::QuotesData *quotes,
     return actions::parseQuotes(objectBytes(QJsonObject{{QStringLiteral("format_version"), actions::kQuotesFormatVersion},
                                                         {QStringLiteral("quotes"), list}}),
                                 quotes, error);
+}
+
+QJsonObject viewerImportResultMessage(qint64 requestId, const ViewerImportResult &result)
+{
+    QJsonObject o = typed(msg::kViewerImportResult);
+    o.insert(QStringLiteral("request_id"), double(requestId));
+    o.insert(QStringLiteral("dry_run"), result.dryRun);
+    o.insert(QStringLiteral("report"), result.report);
+    o.insert(QStringLiteral("written"), QJsonArray::fromStringList(result.written));
+    o.insert(QStringLiteral("backup"), result.backup.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(result.backup));
+    return o;
+}
+
+bool parseViewerImportResult(const QJsonObject &message, ViewerImportResult *result, QString *error)
+{
+    QJsonArray written;
+    if (!checkType(message, msg::kViewerImportResult, error)
+        || !requireArray(message, QStringLiteral("written"), &written, error))
+        return false;
+    const QJsonValue dryRun = message.value(QStringLiteral("dry_run"));
+    const QJsonValue report = message.value(QStringLiteral("report"));
+    const QJsonValue backup = message.value(QStringLiteral("backup"));
+    if (!dryRun.isBool() || !report.isString() || !(backup.isString() || backup.isNull())) {
+        *error = QStringLiteral("Feld dry_run, report oder backup fehlt oder hat die falsche Art");
+        return false;
+    }
+    ViewerImportResult r;
+    r.dryRun = dryRun.toBool();
+    r.report = report.toString();
+    r.backup = backup.toString();
+    for (const QJsonValue &v : written) {
+        if (!v.isString()) {
+            *error = QStringLiteral("Feld written enthält einen Eintrag, der kein Text ist");
+            return false;
+        }
+        r.written.append(v.toString());
+    }
+    *result = r;
+    return true;
 }
 
 } // namespace dss

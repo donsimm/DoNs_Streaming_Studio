@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-15 (P14 b3, t und d zusammengeführt). Version der Schnittstelle: **16**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3), `tst_laufzustand` (Laufzustand, Platzhalter, Profilbilder gegen einen Testserver auf `127.0.0.1`, Kern und `dss-cli live…`, seit P14 d); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
+Stand: 2026-11-16 (P14 b3, t und d zusammengeführt, z1b). Version der Schnittstelle: **17**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3), `tst_zuschauerimport` (Zuschauer-Import ohne Kern, seit P14 z1b auch über Kern, `dss-cli` und `scripts/zuschauer-import.sh`), `tst_laufzustand` (Laufzustand, Platzhalter, Profilbilder gegen einen Testserver auf `127.0.0.1`, Kern und `dss-cli live…`, seit P14 d); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 17 (P14 z1b)
+
+Neu ist der Zuschauer-Import aus Streamer.bot (Abschnitt «Aktionen», Plan P14 9.4): die Anfrage `viewer_import` und die Antwort `viewer_import_result`. Ein Kern der Version 16 würde die Anfrage mit `unknown_type` beantworten. Darum stieg die Version.
 
 ### Version 16 (P14 t und d)
 
@@ -147,7 +151,7 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 16 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 16».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 17 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 17».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
 4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12), `actions_config` und `actions_status` (seit Version 15, P14 b3), `overlay_live` (seit Version 16, P14 d) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
@@ -179,11 +183,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `13` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `17` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":16,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":17,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -495,7 +499,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":16,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":17,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -569,6 +573,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 | `get_variables` | – | `variables` mit `persisted` (wie `variablen.json`, mit Herkunft), `volatile_global`, `volatile_users`, `file_error` |
 | `get_viewers` | `user_ids` (Liste von Twitch-IDs) | `viewers` mit `viewers` (nur bekannte: `login`, `display_name`, …) |
 | `get_quotes` | – | `quotes` mit `quotes` |
+| `viewer_import` | `path` (absoluter Pfad des Exports von Streamer.bot, meist `<Datenordner>/import/export`), `dry_run`, `overwrite` (seit Version 17) | `viewer_import_result` mit `dry_run`, `report` (Bericht auf Deutsch, nur Anzahlen und Namen von Variablen, keine Namen, IDs oder Werte von Zuschauern), `written` (geschriebene Dateien, Probelauf leer), `backup` (Ordner der Sicherung relativ zum Datenordner, zum Beispiel `import/sicherung-20261116-120000`, oder `null`). Abschnitt «Zuschauer-Import» |
 | `test_event` | `event` (wie in `event`) | nur mit `dss-core --testereignisse` (Tests): legt das Ereignis auf den Fluss; sonst `change_result` `unknown_type` |
 
 Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_failed`, `unknown_action`, `unknown_run`, `actions_unavailable`, `invalid_message` (Feld fehlt oder falsche Art).
@@ -584,7 +589,9 @@ Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_fai
 {"code":null,"id":"<run-uuid>","message":null,"ok":true,"request_id":12,"type":"change_result","warning":null}
 ```
 
-**Werkzeug:** `dss-cli aktionen`, `aktion-setzen DATEI.json`, `aktion-loeschen AKTION`, `aktion-test AKTION [--echt] [ARG=WERT …]`, `laeufe [--folgen]`, `warteschlange NAME anhalten|fortsetzen|leeren`, `variablen [--zaehlen]` (über den laufenden Kern, `--verbindung` wählt ihn).
+**Werkzeug:** `dss-cli aktionen`, `aktion-setzen DATEI.json`, `aktion-loeschen AKTION`, `aktion-test AKTION [--echt] [ARG=WERT …]`, `laeufe [--folgen]`, `warteschlange NAME anhalten|fortsetzen|leeren`, `variablen [--zaehlen]`, `zuschauer-import ORDNER [--endgueltig] [--ueberschreiben]` (über den laufenden Kern, `--verbindung` wählt ihn).
+
+**Zuschauer-Import (P14 z1b, seit Version 17, Plan P14 9.4):** `viewer_import` liest den Export (`src/actions/viewerimport.h`) und ordnet ihn dem Stand im Speicher des Kerns zu (Variablen, Zuschauer, Zitate, Benutzergruppen aus `aktionen.json`; das Archiv `streamerbot-archiv.json` aus der Datei). `dry_run` (Standard in `dss-cli`) schreibt nichts. Endgültig schreibt der Kern zuerst ungespeicherte Variablen und Zuschauer, sichert dann die betroffenen Dateien nach `<Datenordner>/import/sicherung-<zeit>/` und schreibt erst danach; der neue Stand gilt sofort im Speicher (bei geänderten Gruppen `actions_config` an alle). Werte aus Streamer.bot ersetzen gleichnamige, im Studio geänderte (`origin` `studio`) bleiben ausser mit `overwrite`, nur im Studio vorhandene bleiben immer. Ist eine der Dateien ungültig, gibt es keinen Import (`actions_file_error`); ein nicht lesbarer Export gibt `rejected`. Das Protokoll des Kerns nennt nur Probelauf oder endgültig, die geschriebenen Dateien und die Sicherung. Für den Nutzer: `scripts/zuschauer-import.sh` (Probelauf, dann Rückfrage).
 
 ## Änderungen (P08)
 

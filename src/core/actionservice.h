@@ -84,6 +84,7 @@ private:
     void handleQueueControl(const dss::ActionsRequest &request, const Reply &reply);
     void handleTest(const dss::ActionsRequest &request, const Reply &reply);
     void handleTestEvent(const dss::ActionsRequest &request, const Reply &reply);
+    void handleViewerImport(const dss::ActionsRequest &request, const Reply &reply);
 
     void onEvent(const dss::events::Event &event);
     void onRunStarted(const dss::actions::RunRecord &record);

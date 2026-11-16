@@ -53,8 +53,9 @@ namespace dss {
 //   Nachrichten in actionprotocol.h), Ereignisse actions.run_*
 // 16 seit P14 t: media_list mit kind "audio" und duration_ms; seit P14 d overlay_live,
 //   overlay_live_set, overlay_live_reset (overlaylive.h)
+// 17 seit P14 z1b: Zuschauer-Import viewer_import und viewer_import_result (actionprotocol.h)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 16;
+inline constexpr int kProtocolVersion = 17;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
