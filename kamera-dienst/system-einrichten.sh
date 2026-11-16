@@ -14,14 +14,17 @@
 #
 # Optionen:
 #   --port N       Port des Dienstes (Standard 8093; wie «port» in dienst.ini)
-#   --zone NAME    Zone von firewalld (Standard: die einzige aktive Zone)
+#   --zone NAME    Zone von firewalld (Standard: die Zone der Schnittstelle, über die der
+#                  Studio-PC erreicht wird, nach `ip route get`; hat diese keine Zone, die
+#                  einzige aktive Zone; sonst Abbruch)
 #   --entfernen    Regel entfernen statt anlegen
 #   --trocken      nur die geplanten firewall-cmd-Befehle ausgeben, nichts ausführen, ohne sudo
 #
 # Quellen (nicht abgerufen):
 #   https://firewalld.org/documentation/man-pages/firewall-cmd.html
 #     (--permanent, --zone, --add-rich-rule, --remove-rich-rule, --query-rich-rule, --reload,
-#      --get-active-zones)
+#      --get-active-zones, --get-zone-of-interface)
+#   https://man7.org/linux/man-pages/man8/ip-route.8.html (ip route get: «dev» der Route)
 #   https://firewalld.org/documentation/man-pages/firewalld.richlanguage.html
 #     (rule family="ipv4" source address="…" port port="…" protocol="tcp" accept)
 #
@@ -35,7 +38,7 @@ DRY=0
 STUDIO=""
 
 usage() {
-    sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//' >&2
+    sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' >&2
     exit 2
 }
 
@@ -81,20 +84,43 @@ fail() {
     exit 1
 }
 
+# Zone der Schnittstelle, über die der Studio-PC erreicht wird: `ip route get` nennt das Gerät
+# nach «dev», firewall-cmd dessen Zone. Setzt DEVICE und ZONE; ZONE bleibt leer, wenn keine
+# Route oder die Schnittstelle in keiner Zone ist (firewall-cmd meldet dann «no zone»).
+DEVICE=""
+route_zone() {
+    local zone
+    DEVICE=$(ip route get "$STUDIO" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1)
+    [[ -n "$DEVICE" ]] || return 0
+    zone=$(firewall-cmd --get-zone-of-interface="$DEVICE" 2>/dev/null | head -n 1)
+    if [[ "$zone" =~ ^[A-Za-z0-9_-]+$ ]]; then ZONE="$zone"; fi
+}
+
 if [[ $DRY -eq 0 ]]; then
     [[ $EUID -eq 0 ]] || fail "braucht sudo: sudo $0 $*"
     command -v firewall-cmd >/dev/null || fail "firewall-cmd fehlt (firewalld nicht installiert)"
     firewall-cmd --state >/dev/null 2>&1 || fail "firewalld läuft nicht"
     if [[ -z "$ZONE" ]]; then
+        route_zone
+    fi
+    if [[ -z "$ZONE" ]]; then
         # --get-active-zones: Name der Zone auf einer Zeile ohne Einrückung, darunter eingerückt
         # ihre Schnittstellen und Quellen.
         mapfile -t zones < <(firewall-cmd --get-active-zones | grep -v '^[[:space:]]' | grep -v '^$')
-        [[ ${#zones[@]} -eq 1 ]] || fail "mehrere oder keine aktive Zone (${zones[*]}), bitte --zone NAME"
+        [[ ${#zones[@]} -eq 1 ]] \
+            || fail "keine Zone für die Schnittstelle zu $STUDIO (${DEVICE:-keine Route})" \
+                    "und mehrere oder keine aktive Zone (${zones[*]}), bitte --zone NAME"
         ZONE="${zones[0]%% *}"
     fi
 elif [[ -z "$ZONE" ]]; then
-    ZONE="<aktive-zone>"
+    # Trockenlauf ohne sudo: Zone über die Route, soweit firewall-cmd sie ohne sudo nennt.
+    if command -v firewall-cmd >/dev/null; then
+        route_zone
+    fi
+    [[ -n "$ZONE" ]] || ZONE="<aktive-zone>"
 fi
+[[ -z "$DEVICE" || "$ZONE" == "<aktive-zone>" ]] \
+    || echo "Zone $ZONE: Schnittstelle $DEVICE, über die $STUDIO erreicht wird."
 
 RULE="rule family=\"ipv4\" source address=\"$STUDIO\" port port=\"$PORT\" protocol=\"tcp\" accept"
 

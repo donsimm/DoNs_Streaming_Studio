@@ -81,7 +81,7 @@ Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR (setzbar, nu
    sudo ~/.local/opt/dss-kamera/system-einrichten.sh <studio-pc>
    ```
 
-   Zeigt zuerst den Befehl und öffnet dann den Port 8093/tcp dauerhaft nur für `<studio-pc>` (reiche Regel in firewalld wie für obs-websocket). Anderer Port: `--port N`, andere Zone: `--zone NAME`, nur anzeigen: `--trocken`. Eine udev-Regel braucht es nicht.
+   Zeigt zuerst den Befehl und öffnet dann den Port 8093/tcp dauerhaft nur für `<studio-pc>` (reiche Regel in firewalld wie für obs-websocket). Die Zone von firewalld wählt das Skript selbst: die Zone der Schnittstelle, über die `<studio-pc>` erreicht wird (`ip route get`); hat diese keine Zone, die einzige aktive Zone, sonst bricht es mit Meldung ab. Anderer Port: `--port N`, andere Zone: `--zone NAME` (hat Vorrang), nur anzeigen: `--trocken`. Eine udev-Regel braucht es nicht.
 4. **cameractrls:** Läuft der Wiederherstellungsdienst `cameractrlsd`, abschalten; er und der Kamera-Dienst würden sonst gegeneinander Werte setzen. cameractrls selbst nie gleichzeitig mit dem Dienst nutzen.
 
 **Entfernen** (auf dem Streaming-PC):

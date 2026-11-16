@@ -191,6 +191,38 @@ class SystemSetupTest(unittest.TestCase):
         self.assertIn("--zone=<aktive-zone> --remove-rich-rule='"
                       + rule.replace("8093", "8100") + "'", result.stdout)
 
+    def test_dry_run_zone_from_route(self) -> None:
+        # Wie am Streaming-PC (P15 b6): zwei aktive Zonen, die Kabelkarte in der einen, das
+        # VPN-Gerät in «trusted». Ersatz für ip und firewall-cmd; gewählt wird die Zone der
+        # Schnittstelle aus `ip route get`, --zone hat Vorrang, ohne Zone bleibt der Platzhalter.
+        bin_dir = FOLDER / "zonen-bin"
+        bin_dir.mkdir(exist_ok=True)
+        stubs = {
+            "ip": 'echo "$3 via 192.0.2.1 dev kabel0 src 192.0.2.5 uid 1000"\necho "    cache"\n',
+            "firewall-cmd": ('case "$1" in\n'
+                             '  --get-zone-of-interface=kabel0) echo "${KABEL_ZONE:-heimzone}" ;;\n'
+                             '  --get-active-zones) printf "heimzone\\n  interfaces: kabel0\\n'
+                             'trusted\\n  interfaces: vpn0\\n" ;;\n'
+                             '  *) echo "no zone"; exit 2 ;;\nesac\n'),
+        }
+        for name, body in stubs.items():
+            (bin_dir / name).write_text("#!/usr/bin/env bash\n" + body, encoding="utf-8")
+            (bin_dir / name).chmod(0o755)
+        path = {"PATH": f"{bin_dir}:{os.environ.get('PATH', '')}"}
+
+        result = run(str(SYSTEM), "--trocken", "127.0.0.1", extra_env=path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--zone=heimzone --add-rich-rule=", result.stdout)
+        self.assertIn("Schnittstelle kabel0", result.stdout)
+
+        result = run(str(SYSTEM), "--trocken", "--zone", "andere", "127.0.0.1", extra_env=path)
+        self.assertIn("--zone=andere --add-rich-rule=", result.stdout)
+
+        result = run(str(SYSTEM), "--trocken", "127.0.0.1",
+                     extra_env={**path, "KABEL_ZONE": "no zone"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--zone=<aktive-zone> --add-rich-rule=", result.stdout)
+
     def test_wrong_calls(self) -> None:
         cases = [
             ["--trocken"],                                   # ohne <studio-pc>

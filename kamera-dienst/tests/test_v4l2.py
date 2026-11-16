@@ -71,6 +71,17 @@ class IoctlValuesTest(unittest.TestCase):
                     self.assertEqual(getattr(structure, field_name).offset,
                                      self.values[f"offsetof.{name}.{field_name}"], field_name)
 
+    def test_signed_values(self) -> None:
+        # Wert und Grenzen sind im Header `__s32`: Was der Treiber als −11 einträgt, kommt
+        # als −11 zurück und nicht als 245 oder 4294967285 (P15 b6).
+        raw = (-11).to_bytes(4, "little", signed=True)
+        control = v4l2.v4l2_control.from_buffer_copy((0x9A090F).to_bytes(4, "little") + raw)
+        self.assertEqual(control.value, -11)
+        query = v4l2.v4l2_queryctrl()
+        ctypes.memmove(ctypes.addressof(query) + v4l2.v4l2_queryctrl.minimum.offset,
+                       (-100).to_bytes(4, "little", signed=True), 4)
+        self.assertEqual(query.minimum, -100)
+
 
 class WatcherTest(unittest.TestCase):
     def setUp(self) -> None:
