@@ -1,0 +1,88 @@
+{
+ "room": {
+  "_id": 900000,
+  "twitch_id": 100000001,
+  "id": "testkanal",
+  "is_group": false,
+  "display_name": "testkanal",
+  "set": 900001,
+  "moderator_badge": null,
+  "vip_badge": null,
+  "mod_urls": null,
+  "user_badges": {},
+  "user_badge_ids": {},
+  "css": null
+ },
+ "sets": {
+  "900001": {
+   "id": 900001,
+   "_type": 1,
+   "icon": null,
+   "title": "Channel: testkanal",
+   "css": null,
+   "emoticons": [
+    {
+     "id": 900101,
+     "name": "testStatisch",
+     "height": 32,
+     "width": 28,
+     "public": false,
+     "hidden": false,
+     "modifier": false,
+     "modifier_flags": 0,
+     "owner": {"_id": 900000, "name": "testkanal", "display_name": "testkanal"},
+     "urls": {
+      "1": "https://cdn.frankerfacez.com/emote/900101/1",
+      "2": "https://cdn.frankerfacez.com/emote/900101/2",
+      "4": "https://cdn.frankerfacez.com/emote/900101/4"
+     }
+    },
+    {
+     "id": 900102,
+     "name": "testAnimiert",
+     "height": 32,
+     "width": 32,
+     "public": false,
+     "hidden": false,
+     "modifier": false,
+     "modifier_flags": 0,
+     "owner": {"_id": 900000, "name": "testkanal", "display_name": "testkanal"},
+     "urls": {
+      "1": "https://cdn.frankerfacez.com/emote/900102/1",
+      "2": "https://cdn.frankerfacez.com/emote/900102/2",
+      "4": "https://cdn.frankerfacez.com/emote/900102/4"
+     },
+     "animated": {
+      "1": "https://cdn.frankerfacez.com/emote/900102/animated/1",
+      "2": "https://cdn.frankerfacez.com/emote/900102/animated/2",
+      "4": "https://cdn.frankerfacez.com/emote/900102/animated/4"
+     }
+    },
+    {
+     "id": 900103,
+     "name": "testVersteckt",
+     "height": 32,
+     "width": 32,
+     "public": false,
+     "hidden": true,
+     "modifier": false,
+     "modifier_flags": 1,
+     "owner": {"_id": 900000, "name": "testkanal", "display_name": "testkanal"},
+     "urls": {"1": "https://cdn.frankerfacez.com/emote/900103/1"}
+    },
+    {
+     "id": 900104,
+     "name": "testModifier",
+     "height": 32,
+     "width": 32,
+     "public": false,
+     "hidden": false,
+     "modifier": true,
+     "modifier_flags": 2,
+     "owner": {"_id": 900000, "name": "testkanal", "display_name": "testkanal"},
+     "urls": {"1": "https://cdn.frankerfacez.com/emote/900104/1"}
+    }
+   ]
+  }
+ }
+}

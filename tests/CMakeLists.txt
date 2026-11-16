@@ -50,6 +50,9 @@ set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED "dss_media;dss
 dss_add_test(tst_protocol)
 dss_add_test(tst_windowdata)
 dss_add_test(tst_chatbotlive) # P14 e2-5: «Chat-Bot» › «Live», ohne Fenster
+# P14 Emotes em-2: Listen von BTTV, 7TV, FFZ (Antworten vom 2026-11-16) und Bild-Adressen
+dss_add_test(tst_emotes)
+target_compile_definitions(tst_emotes PRIVATE DSS_TEST_EMOTES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/emotes")
 dss_add_test(tst_systemstats)
 target_compile_definitions(tst_systemstats PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
 # P10-vor: Einstellungen des Kerns (kern.ini), ohne Qt Gui.

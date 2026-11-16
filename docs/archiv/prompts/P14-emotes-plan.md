@@ -93,7 +93,7 @@ Summe Agenten etwa 12 h (etwa 3 Sitzungen).
 
 ### Logik
 
-- [ ] **em-2 Listen und Bild-Adressen** (neu `src/common/emotes.{h,cpp}`, `src/common/CMakeLists.txt`, neu `tests/tst_emotes.cpp`, `tests/CMakeLists.txt`, `tests/daten/emotes/*.json`).
+- [x] **em-2 Listen und Bild-Adressen** (neu `src/common/emotes.{h,cpp}`, `src/common/CMakeLists.txt`, neu `tests/tst_emotes.cpp`, `tests/CMakeLists.txt`, `tests/daten/emotes/*.json`).
   - `enum class EmoteProvider { Twitch, Bttv, SevenTv, Ffz }`; `struct Emote { EmoteProvider provider; QString id; QString name; bool animated; bool zeroWidth; int width; int height; }` (Grösse in der kleinsten Stufe, falls bekannt).
   - Lesen je Antwort, robust gegen fehlende Felder und falsche Typen, Fehlertext auf Deutsch ohne Inhalt der Antwort:
     - BTTV global (Array; `modifier: true` auslassen; Zero-Width nur über die feste Liste `SoSnowy`, `IceCold`, `SantaHat`, `TopHat`, `ReinDeer`, `CandyCane`, `cvMask`, `cvHazmat`, Recherche 2) und Kanal (`channelEmotes` und `sharedEmotes`, nie Zero-Width).
