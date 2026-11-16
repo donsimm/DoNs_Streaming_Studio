@@ -73,7 +73,8 @@ Summe Agenten etwa 28 h (≈ 6 Sitzungen à 4–5 h; Plan 10.1 schätzte für e2
 
 ## Aufgaben
 
-- [ ] **e2-0 Prüfung kalibrieren (Lotse, kein Commit).** Kopie von `src/app/chatbotpage.cpp` in einem Worktree ausserhalb des Arbeitsordners, darin eine Rolle absichtlich anders (zum Beispiel Bereichstitel mit fester Farbe statt `#chatBotPanelTitle`). Ein getrennter Agent mit `ui-consistency:verifying` und der Checkliste («Live», Abschnitt 3) bekommt nur «weicht irgendwo ab». Wird die Abweichung nicht gemeldet: anhalten, Prüfung ist dafür blind. Ergebnis hier vermerken (was geprüft, was nicht). Wer pflanzt, prüft nicht; der kalibrierte Agent prüft danach keine Seite.
+- [x] **e2-0 Prüfung kalibrieren (Lotse, kein Commit).** Kopie von `src/app/chatbotpage.cpp` in einem Worktree ausserhalb des Arbeitsordners, darin eine Rolle absichtlich anders (zum Beispiel Bereichstitel mit fester Farbe statt `#chatBotPanelTitle`). Ein getrennter Agent mit `ui-consistency:verifying` und der Checkliste («Live», Abschnitt 3) bekommt nur «weicht irgendwo ab». Wird die Abweichung nicht gemeldet: anhalten, Prüfung ist dafür blind. Ergebnis hier vermerken (was geprüft, was nicht). Wer pflanzt, prüft nicht; der kalibrierte Agent prüft danach keine Seite.
+  - Ergebnis 2026-11-16: gepflanzt in einer Kopie ohne Git `ChatBotPage::addLivePanel` mit Titel von Hand (`setStyleSheet` mit festen Farben) statt `dockPanel()`. Prüfer (sonnet medium, `verifying`, nur «weicht irgendwo ab») meldete genau das als einzige sichere Abweichung (A1, mit Zeile, verletzter Checklistenzeile und Ersatz `dockPanel`). Geprüft: Bereichstitel, Tabelle «Ereignisse», Mitlaufen, Kopfzeile, Regeln 9 und 13. Nicht geprüft: Gerendertes (Grössen, Kontrast, Tastatur), Zahlen der Checkliste nicht neu gezählt, noch nicht gebaute Bereiche. Kosten 0,23 USD. Prüfung damit für Rollen über Objektnamen/Theme nicht blind.
 
 ### Logik
 
