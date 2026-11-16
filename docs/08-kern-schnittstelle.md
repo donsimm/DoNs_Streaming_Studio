@@ -8,6 +8,8 @@ Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Ände
 
 Neu ist die Anfrage `chat_send`: Das Fenster sendet als Bot oder als Kanal in den Chat (Abschnitt «Aktionen», «Chat senden aus dem Fenster»). Ein Kern der Version 17 kennt sie nicht und würde sie abweisen. Darum stieg die Version.
 
+Ebenfalls in Version 18 (P14 e2-4b): `actions_status` hat das Feld `enabled` (Hauptschalter aus `aktionen.json`) in jedem Zustand, damit das Fenster bei `muted` den echten Stand zeigt.
+
 ### Version 17 (P14 z1b)
 
 Neu ist der Zuschauer-Import aus Streamer.bot (Abschnitt «Aktionen», Plan P14 9.4): die Anfrage `viewer_import` und die Antwort `viewer_import_result`. Ein Kern der Version 16 würde die Anfrage mit `unknown_type` beantworten. Darum stieg die Version.
@@ -577,7 +579,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 | Nachricht | Felder |
 |---|---|
 | `actions_config` | `config` (ganzer Inhalt von `aktionen.json`, Format `docs/06`; `null` bei ungültiger Datei), `file_error` (Text oder `null`) |
-| `actions_status` | `state` (`unavailable`, `file_error`, `muted`, `off`, `on`), `message` (zum Beispiel «stumm: Version im Einsatz läuft»), `running`, `queues` (je `id` oder `null` für «Standard», `name`, `blocking`, `paused`, `waiting`, `running`), `accounts` (je `account` `bot` oder `broadcaster`, `can_send`, `message` mit dem Grund, zum Beispiel «Twitch nicht verbunden», «Kanal nicht angemeldet», «Bot nicht angemeldet»; neu gesendet bei jeder Änderung der Anmeldung) |
+| `actions_status` | `state` (`unavailable`, `file_error`, `muted`, `off`, `on`), `message` (zum Beispiel «stumm: Version im Einsatz läuft»), `enabled` (Hauptschalter aus `aktionen.json`, in jedem Zustand, auch bei `muted`; bei `file_error` und `unavailable` `false`, ab Version 18), `running`, `queues` (je `id` oder `null` für «Standard», `name`, `blocking`, `paused`, `waiting`, `running`), `accounts` (je `account` `bot` oder `broadcaster`, `can_send`, `message` mit dem Grund, zum Beispiel «Twitch nicht verbunden», «Kanal nicht angemeldet», «Bot nicht angemeldet»; neu gesendet bei jeder Änderung der Anmeldung) |
 
 **Fenster → Kern**, jede mit `request_id`. Antwort `change_result` (`ok`, `code`, `message`, `id`) nur an die fragende Verbindung; Abfragen bekommen eine eigene Nachricht mit derselben `request_id`, bei einem Fehler `change_result`.
 

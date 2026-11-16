@@ -370,10 +370,11 @@ ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::opt
         v.state = QStringLiteral("error");
         return v;
     }
-    // Stumm: actions_status sagt nicht, ob der Hauptschalter an ist; ausgegraut, weil die Version
-    // ohnehin nicht sendet ([OFFEN] im Bericht e2-4)
-    v.switchEnabled = state != QLatin1String("muted");
-    v.switchChecked = state == QLatin1String("on");
+    // Stumm: echter Stand des Hauptschalters, ausgegraut, weil die Version ohnehin nicht sendet
+    // (Entscheid des Nutzers, 2026-11-16)
+    const bool muted = state == QLatin1String("muted");
+    v.switchEnabled = !muted;
+    v.switchChecked = muted ? actions->enabled : state == QLatin1String("on");
     if (channelState == ConnectionState::Error)
         return v;
     if (state == QLatin1String("off")) {

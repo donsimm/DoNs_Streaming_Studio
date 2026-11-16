@@ -360,10 +360,11 @@ private slots:
         s.bot.login = QStringLiteral("testbot");
         const QString tip = twitchStatusText(s);
         const auto header = [&](const QString &state, const QString &message = QString(),
-                                ConnectionState channel = ConnectionState::Connected) {
+                                ConnectionState channel = ConnectionState::Connected, bool enabled = false) {
             ActionsStatus a;
             a.state = state;
             a.message = message;
+            a.enabled = enabled;
             return chatBotHeaderView(channel, s, a);
         };
         const auto check = [&](const ChatBotHeaderView &h, const QString &text, const QString &state, bool checked,
@@ -388,8 +389,14 @@ private slots:
         check(header(QStringLiteral("on")), QStringLiteral("läuft · liest als testkanal · sendet als testbot"),
               QStringLiteral("ok"), true, true);
         check(header(QStringLiteral("off")), QStringLiteral("aus"), QStringLiteral("off"), false, true);
+        // e2-4b: stumm zeigt den echten Stand des Hauptschalters, ausgegraut
         check(header(QStringLiteral("muted")), QStringLiteral("stumm: Version im Einsatz läuft"),
               QStringLiteral("warning"), false, false);
+        check(header(QStringLiteral("muted"), QString(), ConnectionState::Connected, true),
+              QStringLiteral("stumm: Version im Einsatz läuft"), QStringLiteral("warning"), true, false);
+        check(header(QStringLiteral("muted"), QString(), ConnectionState::Error, true),
+              chatBotHeaderView(ConnectionState::Error, s).text,
+              QStringLiteral("error"), true, false);
 
         // Twitch-Kanal mit Fehler: Text wie ohne Aktionen, der Schalter bleibt bedienbar
         const ChatBotHeaderView twitchError = chatBotHeaderView(ConnectionState::Error, s);

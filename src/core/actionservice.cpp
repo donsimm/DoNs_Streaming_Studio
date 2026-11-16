@@ -462,6 +462,8 @@ dss::ActionsStatus ActionService::status() const
         s.state = QStringLiteral("on");
         s.message = QStringLiteral("Chat-Bot aktiv");
     }
+    // Hauptschalter auch bei «stumm» melden, die Kopfzeile zeigt dort den echten Stand
+    s.enabled = m_configError.isEmpty() && m_config.enabled;
     const QList<dss::actions::RunRecord> runs = m_engine->history();
     const auto queueStatus = [&](const QUuid &id, const QString &name, bool blocking) {
         dss::ActionsQueueStatus q{id, name, blocking, m_engine->isQueuePaused(id), 0, 0};

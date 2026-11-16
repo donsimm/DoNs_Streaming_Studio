@@ -439,6 +439,7 @@ private slots:
             ActionsStatus status;
             QVERIFY(parseActionsStatus(c.waitFor(QString::fromLatin1(msg::kActionsStatus)), &status, &error));
             QCOMPARE(status.state, QStringLiteral("file_error"));
+            QVERIFY(!status.enabled);
             const TestSetup s = testSetup();
             const QJsonObject reply = c.request(QString::fromLatin1(msg::kActionPut), {{QStringLiteral("action"), actionToJson(s.action)}});
             QVERIFY(!reply.value(QStringLiteral("ok")).toBool());
@@ -550,6 +551,7 @@ private slots:
             QString error;
             QVERIFY(parseActionsStatus(c.waitFor(QString::fromLatin1(msg::kActionsStatus)), &status, &error));
             QCOMPARE(status.state, QStringLiteral("off")); // Chat-Bot aus, Senden trotzdem geprüft
+            QVERIFY(!status.enabled);
             QCOMPARE(status.accounts.size(), 2);
             const auto send = [&](const QJsonValue &text, const QJsonValue &account, const QJsonValue &replyTo = QJsonValue::Null) {
                 QJsonObject fields{{QStringLiteral("account"), account}, {QStringLiteral("reply_to"), replyTo}};
@@ -608,6 +610,23 @@ private slots:
             }
             QCOMPARE(status.state, QStringLiteral("muted"));
             QCOMPARE(status.message, QStringLiteral("stumm: Version im Einsatz läuft"));
+            // e2-4b: Hauptschalter auch bei «stumm» gemeldet, an und aus
+            const auto waitEnabled = [&](bool enabled) {
+                for (int i = 0; i < 20 && status.enabled != enabled; ++i) {
+                    const QJsonObject message = c.waitFor(QString::fromLatin1(msg::kActionsStatus), 500);
+                    if (!message.isEmpty() && !parseActionsStatus(message, &status, &error))
+                        return false;
+                }
+                return status.enabled == enabled;
+            };
+            QVERIFY(waitEnabled(true));
+            QCOMPARE(status.state, QStringLiteral("muted"));
+            QVERIFY(ok(c.request(QString::fromLatin1(msg::kActionsSetEnabled), {{QStringLiteral("enabled"), false}})));
+            QVERIFY(waitEnabled(false));
+            QCOMPARE(status.state, QStringLiteral("muted"));
+            QVERIFY(ok(c.request(QString::fromLatin1(msg::kActionsSetEnabled), {{QStringLiteral("enabled"), true}})));
+            QVERIFY(waitEnabled(true));
+            QCOMPARE(status.state, QStringLiteral("muted"));
             // Befehl aus dem Chat: kein Lauf, nur «stumm»
             QVERIFY(ok(c.request(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), chatEvent(kChatText)}})));
             QTRY_COMPARE_WITH_TIMEOUT(runs(c).size(), 1, 5000);
@@ -633,6 +652,7 @@ private slots:
                     QVERIFY(parseActionsStatus(message, &status, &error));
             }
             QCOMPARE(status.state, QStringLiteral("on"));
+            QVERIFY(status.enabled);
         }
         stop(core);
         QVERIFY2(core.log.contains(QStringLiteral("stumm, die Version im Einsatz läuft")), qPrintable(core.log));

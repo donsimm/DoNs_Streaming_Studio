@@ -1,6 +1,7 @@
 // Prüft Lesen und Schreiben aller Nachrichten der Schnittstelle Kern–Fenster ohne Qt Gui
 // (P07, Teil D; docs/08-kern-schnittstelle.md).
 
+#include "actionprotocol.h"
 #include "browsersource.h"
 #include "overlayjson.h"
 #include "protocol.h"
@@ -1059,6 +1060,23 @@ private slots:
         list[0] = entry;
         over.insert(QStringLiteral("imports"), list);
         QVERIFY(!parseImportProgress(over, &backImports, &error));
+    }
+
+    // e2-4b: actions_status meldet den Hauptschalter (enabled) in jedem Zustand, auch bei «stumm»
+    void actionsStatusEnabled()
+    {
+        for (const bool enabled : {true, false}) {
+            ActionsStatus status;
+            status.state = QStringLiteral("muted");
+            status.message = QStringLiteral("stumm: Version im Einsatz läuft");
+            status.enabled = enabled;
+            const QJsonObject message = roundTrip(actionsStatusMessage(status));
+            QCOMPARE(message.value(QStringLiteral("enabled")), QJsonValue(enabled));
+            ActionsStatus back;
+            QString error;
+            QVERIFY2(parseActionsStatus(message, &back, &error), qPrintable(error));
+            QCOMPARE(back, status);
+        }
     }
 };
 

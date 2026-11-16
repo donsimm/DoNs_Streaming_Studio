@@ -282,6 +282,7 @@ QJsonObject actionsStatusMessage(const ActionsStatus &status)
     o.insert(QStringLiteral("state"), status.state);
     o.insert(QStringLiteral("message"), status.message);
     o.insert(QStringLiteral("running"), status.running);
+    o.insert(QStringLiteral("enabled"), status.enabled);
     QJsonArray queues;
     for (const ActionsQueueStatus &q : status.queues) {
         queues.append(QJsonObject{{QStringLiteral("id"), uuidValue(q.id)},
@@ -314,6 +315,7 @@ bool parseActionsStatus(const QJsonObject &message, ActionsStatus *status, QStri
     }
     s.message = message.value(QStringLiteral("message")).toString();
     s.running = message.value(QStringLiteral("running")).toInt();
+    s.enabled = message.value(QStringLiteral("enabled")).toBool();
     QJsonArray queues;
     QJsonArray accounts;
     if (!requireArray(message, QStringLiteral("queues"), &queues, error)

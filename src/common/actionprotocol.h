@@ -143,6 +143,8 @@ struct ActionsStatus
     int running = 0;
     QList<ActionsQueueStatus> queues;
     QList<ActionsAccountStatus> accounts;
+    // Hauptschalter aus aktionen.json, in jedem Zustand (bei file_error und unavailable false)
+    bool enabled = false;
 
     bool operator==(const ActionsStatus &) const = default;
 };
