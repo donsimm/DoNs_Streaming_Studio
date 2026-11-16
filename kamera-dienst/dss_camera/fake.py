@@ -13,17 +13,22 @@ aber in einem Ordner statt `/dev` und `/sys` (Plan 2.2, «Attrappe mit Ordner st
     PFAD/sys/devices/usb1/<anschluss>/        idVendor, idProduct, serial, product
 
 Ein- und Ausstecken: Verweis in `by-id` anlegen bzw. löschen.
+
+Die Tiny 2 im Ordner hat zusätzlich die Erweiterungseinheit (Statusblock, Wecken,
+Schlafen, HDR) und ihr Verhalten aus Schritt 0 (`FakeDevice`, `tiny2_state`).
 """
 
 import errno
 import json
 import os
-from collections.abc import Iterator
+import struct
+import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from . import v4l2
+from . import obsbot, uvc_xu, v4l2
 from .backend import Backend
 from .devices import DeviceInfo, DeviceWatcher
 
@@ -94,18 +99,107 @@ _INACTIVE_WHEN = {
 }
 
 
+# Tiny 2 (Schritt 0, 2026-11-15): Zustand 1 ~1,5 s nach dem Wecken; danach fährt sie in die
+# Grundstellung und verwirft Bewegungsbefehle (mit 2,5 s Pause verloren, mit 4 s ausgeführt);
+# Neigen auf −76° oder tiefer legt sie schlafen.
+TINY2_WAKE_S = 1.5
+TINY2_HOMING_S = 4.0
+TINY2_SLEEP_TILT = -76 * 3600
+TINY2_POSITION = (v4l2.V4L2_CID_PAN_ABSOLUTE, v4l2.V4L2_CID_TILT_ABSOLUTE, v4l2.V4L2_CID_ZOOM_ABSOLUTE)
+
+
+def tiny2_state() -> dict:
+    """Zustand der Attrappe unter `obsbot` in der Knotendatei.
+
+    `run`, `hdr`, `auto_sleep` wie im Statusblock; `wake_at`/`awake_since` Zeitpunkte der Uhr;
+    `stream_open` setzt der Test; Zähler: `lost_moves` (in der Grundstellungsfahrt verworfen),
+    `moves_asleep` (im Schlaf, ohne Strom), `restarts` (im Schlaf mit offenem Strom; gilt am
+    Gerät als Absturz mit Neustart der Kamera und darf nie vorkommen).
+    """
+    return {"run": obsbot.RUN_AWAKE, "hdr": 0, "auto_sleep": 120, "wake_at": None,
+            "awake_since": None, "stream_open": False, "lost_moves": 0, "moves_asleep": 0,
+            "restarts": 0, "xu_protokoll": []}
+
+
 class FakeDevice:
-    """Werte eines Attrappen-Knotens wie `controls.V4l2Device` (G_CTRL/S_CTRL).
+    """Werte eines Attrappen-Knotens wie `controls.V4l2Device` (G_CTRL/S_CTRL, XU).
 
     Die Werte stehen unter `values` in der Knotendatei, jedes Schreiben zusätzlich
     unter `protokoll` (für die Prüfung der Reihenfolge). Schreiben auf einen inaktiven
-    Wert scheitert mit `EACCES`; das Gerät rundet auf den Schritt.
+    Wert scheitert mit `EACCES`; das Gerät rundet auf den Schritt. Knoten mit `obsbot`
+    verhalten sich wie eine Tiny 2 (`tiny2_state`); die Uhr ist ersetzbar.
     """
 
-    def __init__(self, node: Path) -> None:
+    def __init__(self, node: Path, clock: Callable[[], float] = time.monotonic) -> None:
         self._node = node
+        self._clock = clock
         self._data = _read_node(node)
         self._controls = {control.id: control for control in _controls(self._data)}
+
+    def _save(self) -> None:
+        self._node.write_text(json.dumps(self._data), encoding="utf-8")
+
+    def _tiny2(self) -> dict | None:
+        """Zustand der Tiny 2 zur aktuellen Zeit (Wecken nach TINY2_WAKE_S fertig)."""
+        state = self._data.get("obsbot")
+        if state is not None and state["wake_at"] is not None:
+            done = state["wake_at"] + TINY2_WAKE_S
+            if self._clock() >= done:
+                state.update(run=obsbot.RUN_AWAKE, awake_since=done, wake_at=None)
+        return state
+
+    def xu_get(self, selector: int, size: int) -> bytes:
+        state = self._tiny2()
+        if state is None or selector != uvc_xu.SELECTOR_COMMAND or size != uvc_xu.XU_LENGTH:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        block = bytearray(uvc_xu.XU_LENGTH)
+        block[obsbot.STATUS_HDR] = state["hdr"]
+        block[obsbot.STATUS_RUN] = state["run"]
+        struct.pack_into("<H", block, obsbot.STATUS_AUTO_SLEEP, state["auto_sleep"])
+        self._save()
+        return bytes(block)
+
+    def xu_set(self, selector: int, data: bytes) -> None:
+        state = self._tiny2()
+        if state is None or len(data) != uvc_xu.XU_LENGTH:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        state["xu_protokoll"].append([selector, data.rstrip(b"\0").hex()])
+        if selector == uvc_xu.SELECTOR_FRAME:
+            self._frame(state, data)
+        elif selector == uvc_xu.SELECTOR_COMMAND:
+            if data[0:2] == b"\x01\x01":
+                state["hdr"] = data[2]
+        else:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        self._save()
+
+    def _frame(self, state: dict, data: bytes) -> None:
+        # Die CRC-Felder sind beim Berechnen noch null (obsbot.build_frame).
+        cmd, length = struct.unpack_from("<HH", data, 10)
+        if (data[0:2] != b"\xaa\x25" or length > 44
+                or struct.unpack_from("<H", data, 6)[0] != obsbot.crc16_usb(data[0:6] + bytes(2) + data[8:12])
+                or struct.unpack_from("<H", data, 14)[0]
+                != obsbot.crc16_usb(data[12:14] + bytes(2) + data[16:16 + length])):
+            raise OSError(errno.EPROTO, os.strerror(errno.EPROTO))
+        if cmd != obsbot.CMD_SLEEP_WAKE or length != 4:
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        (payload,) = struct.unpack_from("<I", data, 16)
+        if payload == obsbot.PAYLOAD_WAKE and state["run"] != obsbot.RUN_AWAKE and state["wake_at"] is None:
+            state["wake_at"] = self._clock()
+        elif payload == obsbot.PAYLOAD_SLEEP:
+            state.update(run=obsbot.RUN_ASLEEP, wake_at=None, awake_since=None)
+
+    def _move(self, state: dict, control_id: int, value: int) -> bool:
+        """Bewegungsbefehl an die Tiny 2; False, wenn das Gerät ihn nicht ausführt."""
+        if state["run"] != obsbot.RUN_AWAKE:
+            state["restarts" if state["stream_open"] else "moves_asleep"] += 1
+            return False
+        if state["awake_since"] is not None and self._clock() < state["awake_since"] + TINY2_HOMING_S:
+            state["lost_moves"] += 1
+            return False
+        if control_id == v4l2.V4L2_CID_TILT_ABSOLUTE and value <= TINY2_SLEEP_TILT:
+            state.update(run=obsbot.RUN_ASLEEP, awake_since=None)
+        return True
 
     def _value(self, control_id: int) -> int:
         return self._data.get("values", {}).get(str(control_id), self._controls[control_id].default)
@@ -140,14 +234,18 @@ class FakeDevice:
         if control.step > 1:
             value = control.minimum + round((value - control.minimum) / control.step) * control.step
         value = max(control.minimum, min(control.maximum, value))
+        state = self._tiny2()
+        # Wie am Gerät meldet G_CTRL auch einen verworfenen Befehl (Schritt 0, Zeile 7).
+        moved = state is None or control_id not in TINY2_POSITION or self._move(state, control_id, value)
         self._data.setdefault("values", {})[str(control_id)] = value
-        self._data.setdefault("protokoll", []).append([control_id, value])
-        self._node.write_text(json.dumps(self._data), encoding="utf-8")
+        self._data.setdefault("protokoll", []).append([control_id, value] if moved else
+                                                      [control_id, value, "verworfen"])
+        self._save()
 
 
 @contextmanager
-def open_fake_device(node: Path) -> Iterator[FakeDevice]:
-    yield FakeDevice(node)
+def open_fake_device(node: Path, clock: Callable[[], float] = time.monotonic) -> Iterator[FakeDevice]:
+    yield FakeDevice(node, clock)
 
 
 def fake_watcher(root: Path, **kwargs) -> DeviceWatcher:
@@ -206,11 +304,14 @@ class FakeDeviceFolder:
             folder.mkdir(parents=True, exist_ok=True)
 
     def add_node(self, node: str, port: str, card: str, device_caps: int,
-                 controls: list[v4l2.Control] | None = None, failure: str | None = None) -> None:
+                 controls: list[v4l2.Control] | None = None, failure: str | None = None,
+                 tiny2: bool = False) -> None:
         data: dict = {"card": card, "device_caps": device_caps,
                       "controls": [asdict(item) for item in controls or []]}
         if failure:
             data["fehler"] = failure
+        if tiny2:
+            data["obsbot"] = tiny2_state()
         (self.dev / node).write_text(json.dumps(data), encoding="utf-8")
         interface = self.usb / port / f"{port}:1.0"
         interface.mkdir(parents=True, exist_ok=True)
@@ -248,6 +349,17 @@ class FakeDeviceFolder:
         data = json.loads((self.dev / node).read_text(encoding="utf-8"))
         return [tuple(item) for item in data.get("protokoll", [])]
 
+    def tiny2(self, node: str) -> dict:
+        """Zustand der Tiny-2-Attrappe (Zähler, Protokoll der XU-Befehle)."""
+        return json.loads((self.dev / node).read_text(encoding="utf-8"))["obsbot"]
+
+    def update_tiny2(self, node: str, **fields) -> None:
+        """Zustand ändern, z. B. `run=3` (Schlaf) oder `stream_open=True` (Videostrom offen)."""
+        path = self.dev / node
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["obsbot"].update(fields)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
     def unplug(self, by_id_name: str) -> None:
         (self.by_id / by_id_name).unlink(missing_ok=True)
 
@@ -256,7 +368,7 @@ class FakeDeviceFolder:
         video = v4l2.V4L2_CAP_VIDEO_CAPTURE
         meta = v4l2.V4L2_CAP_META_CAPTURE
         self.add_usb("1-2", "aaaa", "0001", "OBSBOT Tiny 2")
-        self.add_node("video0", "1-2", "OBSBOT Tiny 2: OBSBOT Tiny 2", video, TINY2_CONTROLS)
+        self.add_node("video0", "1-2", "OBSBOT Tiny 2: OBSBOT Tiny 2", video, TINY2_CONTROLS, tiny2=True)
         self.add_node("video1", "1-2", "OBSBOT Tiny 2: OBSBOT Tiny 2", meta)
         self.add_usb("1-3", "bbbb", "0002", "C922 Pro Stream Webcam", serial="SERIE0001")
         self.add_node("video2", "1-3", "C922 Pro Stream Webcam", video, C922_CONTROLS)

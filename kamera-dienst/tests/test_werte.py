@@ -83,7 +83,9 @@ class ManagerTest(unittest.TestCase):
             "zoom_absolute"})
         for item in controls.values():
             self.assertEqual(set(item), {"key", "label", "group", "type", "min", "max", "step",
-                                         "default", "value", "menu", "inactive", "remembered"})
+                                         "default", "value", "menu", "inactive", "remembered",
+                                         "readonly"})
+            self.assertIs(item["readonly"], False)
             self.assertIs(item["remembered"], False)
         plf = controls["power_line_frequency"]
         self.assertEqual((plf["type"], plf["value"], plf["default"], plf["label"], plf["group"]),

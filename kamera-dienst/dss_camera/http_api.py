@@ -85,6 +85,8 @@ class Api:
         self.router.add("GET", "status", self.get_status)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
         self.router.add("PUT", "cameras/{cam}/controls", self.put_controls)
+        self.router.add("POST", "cameras/{cam}/wake", self.post_wake)
+        self.router.add("POST", "cameras/{cam}/sleep", self.post_sleep)
 
     def get_status(self, request: Request) -> dict:
         return {
@@ -109,6 +111,12 @@ class Api:
     def put_controls(self, request: Request, cam: str) -> dict:
         manager = self._control_manager()
         return {"controls": manager.put(cam, request.json())}
+
+    def post_wake(self, request: Request, cam: str) -> dict:
+        return {"state": self._control_manager().wake(cam)}
+
+    def post_sleep(self, request: Request, cam: str) -> dict:
+        return {"state": self._control_manager().send_to_sleep(cam)}
 
 
 def make_handler(api: Api, allowed_addresses: frozenset[str]):

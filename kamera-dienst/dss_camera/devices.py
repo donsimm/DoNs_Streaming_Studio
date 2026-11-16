@@ -67,7 +67,7 @@ class Camera:
     node: Path | None = None
     usb_dir: Path | None = None
     present: bool = False
-    # awake, absent, unknown (Schlaf und Privatsphäre folgen in Abschnitt b).
+    # awake, asleep, privacy, absent, unknown; Schlaf und Privatsphäre nur Tiny 2 (obsbot.py).
     state: str = "unknown"
     controls: list[v4l2.Control] = field(default_factory=list)
     appeared_at: float | None = None
@@ -195,7 +195,8 @@ class DeviceWatcher:
                 camera = self._cameras.get(camera_id)
                 if camera is None:
                     camera = self._cameras[camera_id] = Camera(camera_id, model)
-                if not camera.present or camera.node != node:
+                appeared = not camera.present or camera.node != node
+                if appeared:
                     camera.appeared_at = now
                     log.info("Kamera erschienen: %s (%s, %s).", camera_id, model, node)
                 camera.present = True
@@ -203,7 +204,9 @@ class DeviceWatcher:
                 camera.usb_dir = usb_dir
                 camera.model = model
                 if isinstance(info, DeviceInfo):
-                    camera.state = "awake"
+                    # Schlaf und Privatsphäre setzt set_state (Statusblock der Tiny 2).
+                    if appeared or camera.state not in ("asleep", "privacy"):
+                        camera.state = "awake"
                     camera.controls = info.controls
                     camera.error = None
                 else:
@@ -226,6 +229,14 @@ class DeviceWatcher:
     def status(self) -> list[dict]:
         with self._lock:
             return [camera.status() for camera in self._cameras.values()]
+
+    def set_state(self, camera_id: str, state: str) -> None:
+        """Zustand aus dem Gerät (awake, asleep, privacy, unknown); nur für steckende Kameras."""
+        with self._lock:
+            camera = self._cameras.get(camera_id)
+            if camera is not None and camera.present and camera.state != state:
+                log.info("Kamera %s: Zustand %s.", camera_id, state)
+                camera.state = state
 
     def settle_remaining(self, camera_id: str) -> float | None:
         """Sekunden bis zum ersten Schreiben (Regel 7); None, wenn die Kamera fehlt."""

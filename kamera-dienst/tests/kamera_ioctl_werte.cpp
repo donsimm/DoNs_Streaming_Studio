@@ -4,6 +4,7 @@
 // Ausgabe je Zeile: «NAME WERT» (dezimal).
 // Quelle der Header: https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/videodev.html
 
+#include <linux/usb/video.h>
 #include <linux/uvcvideo.h>
 #include <linux/videodev2.h>
 
@@ -21,6 +22,7 @@ void print(const char *name, unsigned long long value)
 
 #define DSS_VALUE(name) print(#name, static_cast<unsigned long long>(name))
 #define DSS_SIZE(type) print("sizeof." #type, sizeof(struct type))
+#define DSS_UVC(name) print("uvc_xu." #name, static_cast<unsigned long long>(name))
 #define DSS_OFFSET(type, field) print("offsetof." #type "." #field, offsetof(struct type, field))
 
 int main()
@@ -100,5 +102,12 @@ int main()
     DSS_OFFSET(uvc_xu_control_query, query);
     DSS_OFFSET(uvc_xu_control_query, size);
     DSS_OFFSET(uvc_xu_control_query, data);
+
+    // Anfragen an die Erweiterungseinheit; kd_obsbot vergleicht sie mit uvc_xu.py
+    // (Präfix «uvc_xu.», kd_v4l2 überspringt Namen mit Punkt).
+    DSS_UVC(UVC_SET_CUR);
+    DSS_UVC(UVC_GET_CUR);
+    DSS_UVC(UVC_GET_LEN);
+    DSS_UVC(UVC_GET_INFO);
     return 0;
 }

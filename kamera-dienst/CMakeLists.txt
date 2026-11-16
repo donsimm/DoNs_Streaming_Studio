@@ -19,3 +19,9 @@ set_tests_properties(kd_v4l2 PROPERTIES TIMEOUT 120)
 add_test(NAME kd_werte
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_werte.py)
 set_tests_properties(kd_werte PROPERTIES TIMEOUT 120)
+
+# OBSBOT Tiny 2: UVC-Anfragen, Frame mit CRC, Statusblock, Wecken mit Wartezeit, Schlafen,
+# Schlaf durch Neigen, kein «Neustart», HDR, gesperrte Funktionen (Attrappe).
+add_test(NAME kd_obsbot
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obsbot.py $<TARGET_FILE:kamera_ioctl_werte>)
+set_tests_properties(kd_obsbot PROPERTIES TIMEOUT 120)

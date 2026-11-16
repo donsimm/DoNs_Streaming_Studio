@@ -12,6 +12,9 @@
   nach der Wartezeit aus Plan 2.3 Regel 7. Nie verstellte Werte fasst er nicht an.
 - Pan, Tilt und Zoom erscheinen in der Liste, gesetzt werden sie nur über Bewegen
   (Abschnitt b), damit die Schutzregeln (Plan 2.3) immer gelten.
+- Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR schreibbar (nur wach),
+  Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
+  Bewegungsbefehlen (`movable`) laufen unter derselben Sperre wie die Bildwerte.
 
 Quellen:
 https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/vidioc-queryctrl.html
@@ -29,7 +32,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import v4l2
+from . import obsbot, uvc_xu, v4l2
 from .devices import Camera, DeviceWatcher
 from .http_api import ApiError
 from .store import CameraStore
@@ -119,7 +122,7 @@ def describe(control: v4l2.Control, raw: int, remembered: bool) -> dict:
             "min": control.minimum, "max": control.maximum, "step": control.step,
             "default": to_api(control, control.default), "value": to_api(control, raw),
             "menu": menu, "inactive": bool(control.flags & v4l2.V4L2_CTRL_FLAG_INACTIVE),
-            "remembered": remembered}
+            "remembered": remembered, "readonly": False}
 
 
 def auto_first(item) -> bool:
@@ -144,6 +147,12 @@ class V4l2Device:
     def set(self, control_id: int, value: int) -> None:
         v4l2.set_ctrl(self._fd, control_id, value)
 
+    def xu_get(self, selector: int, size: int) -> bytes:
+        return uvc_xu.get_cur(self._fd, selector, size)
+
+    def xu_set(self, selector: int, data: bytes) -> None:
+        uvc_xu.set_cur(self._fd, selector, data)
+
 
 @contextmanager
 def open_v4l2(node: Path) -> Iterator[V4l2Device]:
@@ -157,15 +166,18 @@ def open_v4l2(node: Path) -> Iterator[V4l2Device]:
 class ControlManager:
     def __init__(self, watcher: DeviceWatcher, store: CameraStore,
                  open_device: Callable = open_v4l2,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self._watcher = watcher
         self._store = store
         self._open = open_device
         self._sleep = sleep
-        # Ein Gerätezugriff zur Zeit (Anfragen und Neusetzen beim Erscheinen).
+        self._clock = clock
+        # Ein Gerätezugriff zur Zeit (Anfragen, Wecken, Bewegen, Neusetzen beim Erscheinen).
         self._lock = threading.Lock()
         # Kamera → Zeitpunkt des Erscheinens, für den die gemerkten Werte gesetzt sind.
         self._restored: dict[str, float] = {}
+        self.obsbot = obsbot.Obsbot(clock, sleep)
 
     def _camera(self, camera_id: str) -> Camera:
         for camera in self._watcher.cameras():
@@ -175,23 +187,41 @@ class ControlManager:
                 return camera
         raise ApiError(404, "not_found", f"Unbekannte Kamera «{camera_id}».")
 
-    def _read(self, device, camera_id: str) -> list[dict]:
-        remembered = self._store.remembered(camera_id)
+    def _tiny2(self, camera_id: str) -> Camera:
+        camera = self._camera(camera_id)
+        if not obsbot.is_tiny2(camera.model):
+            raise ApiError(400, "invalid", f"«{camera.model}» kann nicht schlafen (nur {obsbot.MODEL}).")
+        return camera
+
+    def _block(self, device, camera: Camera) -> bytes:
+        """Statusblock der Tiny 2 lesen und den Zustand für GET status nachführen."""
+        block = self.obsbot.read_block(device, camera.id)
+        self._watcher.set_state(camera.id, obsbot.state_name(obsbot.run_state(block)))
+        return block
+
+    def _read(self, device, camera: Camera) -> list[dict]:
+        remembered = self._store.remembered(camera.id)
         result = []
         for control in device.controls():
             if supported(control):
                 key = control_key(control.name)
                 result.append(describe(control, device.get(control.id), key in remembered))
+        if obsbot.is_tiny2(camera.model):
+            result += obsbot.describe(self._block(device, camera), remembered)
         return result
+
+    @staticmethod
+    def _unreachable(camera: Camera, error: OSError) -> ApiError:
+        return ApiError(409, "camera_absent",
+                        f"Kamera «{camera.model}» nicht erreichbar: {error.strerror or error}.")
 
     def get(self, camera_id: str) -> list[dict]:
         camera = self._camera(camera_id)
         try:
             with self._lock, self._open(camera.node) as device:
-                return self._read(device, camera_id)
+                return self._read(device, camera)
         except OSError as error:
-            raise ApiError(409, "camera_absent",
-                           f"Kamera «{camera.model}» nicht erreichbar: {error.strerror or error}.") from None
+            raise self._unreachable(camera, error) from None
 
     def put(self, camera_id: str, changes: dict) -> list[dict]:
         if self._store.error is not None:
@@ -211,7 +241,12 @@ class ControlManager:
                 controls = {control_key(c.name): c for c in device.controls() if supported(c)}
                 # Erst alles prüfen, dann schreiben: Ein falscher Wert ändert nichts.
                 plan = []
+                special = []
+                tiny2 = obsbot.is_tiny2(camera.model)
                 for key, value in changes.items():
+                    if tiny2 and key in obsbot.KEYS:
+                        special.append((key, obsbot.to_raw(key, value), value is None))
+                        continue
                     control = controls.get(key)
                     if control is None:
                         raise ApiError(400, "invalid", f"Unbekannter Wert «{key}».")
@@ -219,7 +254,12 @@ class ControlManager:
                         raise ApiError(400, "invalid",
                                        f"«{label(control)}» wird über Bewegen gesteuert, nicht über die Bildwerte.")
                     plan.append((control, None if value is None else to_raw(control, value)))
+                if special and obsbot.run_state(self._block(device, camera)) != obsbot.RUN_AWAKE:
+                    raise ApiError(409, "camera_asleep", "HDR nur bei wacher Kamera (erst wecken).")
                 try:
+                    for key, raw, forget in special:
+                        value = self.obsbot.set_hdr(device, camera_id, raw)
+                        remember[key] = None if forget else value
                     for control, raw in sorted(plan, key=auto_first):
                         key = control_key(control.name)
                         inactive = (control.id not in AUTO_SWITCHES
@@ -236,10 +276,9 @@ class ControlManager:
                 finally:
                     # Auch bei einem Abbruch: Was geschrieben ist, bleibt gemerkt.
                     self._save(camera_id, remember)
-                result = self._read(device, camera_id) if not rejected else []
+                result = self._read(device, camera) if not rejected else []
         except OSError as error:
-            raise ApiError(409, "camera_absent",
-                           f"Kamera «{camera.model}» nicht erreichbar: {error.strerror or error}.") from None
+            raise self._unreachable(camera, error) from None
         if rejected:
             names = ", ".join(f"«{name}»" for name in rejected)
             raise ApiError(400, "invalid", f"Inaktiv (Automatik ist an), nicht gesetzt: {names}. "
@@ -256,8 +295,73 @@ class ControlManager:
             raise ApiError(409, "file_error",
                            f"Werte gesetzt, aber nicht gespeichert: {error.strerror or error}.") from None
 
+    def wake(self, camera_id: str) -> str:
+        """POST cameras/{cam}/wake: weckt die Tiny 2 und wartet auf Zustand 1 (Plan 2.3 Regel 2)."""
+        camera = self._tiny2(camera_id)
+        try:
+            with self._lock, self._open(camera.node) as device:
+                try:
+                    self.obsbot.wake(device, camera_id)
+                finally:
+                    self._block(device, camera)
+        except OSError as error:
+            raise self._unreachable(camera, error) from None
+        return "awake"
+
+    def send_to_sleep(self, camera_id: str) -> str:
+        """POST cameras/{cam}/sleep."""
+        camera = self._tiny2(camera_id)
+        try:
+            with self._lock, self._open(camera.node) as device:
+                try:
+                    self.obsbot.send_to_sleep(device, camera_id)
+                finally:
+                    self._block(device, camera)
+        except OSError as error:
+            raise self._unreachable(camera, error) from None
+        return "asleep"
+
+    @contextmanager
+    def movable(self, camera_id: str, wake: bool) -> Iterator:
+        """Geöffnetes Gerät für Bewegungsbefehle unter der Sperre (Plan 2.3 Regeln 1 und 2).
+
+        Bei der Tiny 2 nur, wenn sie wach ist und die Wartezeit nach dem Wecken vorbei ist;
+        sonst `409 camera_asleep` (ohne `wake`) oder Wecken und Warten (mit `wake`).
+        """
+        camera = self._camera(camera_id)
+        try:
+            with self._lock, self._open(camera.node) as device:
+                if obsbot.is_tiny2(camera.model):
+                    try:
+                        self.obsbot.ensure_ready(device, camera_id, wake)
+                    finally:
+                        self._block(device, camera)
+                yield device
+        except OSError as error:
+            raise self._unreachable(camera, error) from None
+
+    def _refresh_states(self) -> None:
+        """Zustand der Tiny 2 für GET status lesen (höchstens alle STATE_INTERVAL_S)."""
+        for camera in self._watcher.cameras():
+            if not obsbot.is_tiny2(camera.model):
+                continue
+            if not camera.present or camera.node is None or camera.error is not None:
+                self.obsbot.forget(camera.id)
+                continue
+            # Eine laufende Anfrage (z. B. Wecken) hat Vorrang; die Suche wartet nicht.
+            if not self.obsbot.due(camera.id) or not self._lock.acquire(blocking=False):
+                continue
+            try:
+                with self._open(camera.node) as device:
+                    self._block(device, camera)
+            except OSError as error:
+                log.warning("Zustand von %s nicht lesbar: %s.", camera.id, error.strerror or error)
+            finally:
+                self._lock.release()
+
     def restore_pending(self) -> None:
         """Gemerkte Werte neu setzen: je Erscheinen einmal, nach der Wartezeit (Plan 2.5)."""
+        self._refresh_states()
         for camera in self._watcher.cameras():
             if (not camera.present or camera.state != "awake" or camera.appeared_at is None
                     or self._restored.get(camera.id) == camera.appeared_at
@@ -275,6 +379,10 @@ class ControlManager:
                 controls = {control_key(c.name): c for c in device.controls() if supported(c)}
                 plan = []
                 for key, value in remembered.items():
+                    if key == obsbot.KEY_HDR and obsbot.is_tiny2(camera.model):
+                        # Nur bei wacher Kamera (restore_pending prüft den Zustand).
+                        done.append(f"{key}={int(self.obsbot.set_hdr(device, camera.id, int(bool(value))))}")
+                        continue
                     control = controls.get(key)
                     if control is None or control.id in POSITION:
                         log.warning("Gemerkter Wert «%s» passt nicht zu %s, übersprungen.", key, camera.id)

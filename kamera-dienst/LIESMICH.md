@@ -41,6 +41,10 @@ Der Dienst sucht die Kameras jede Sekunde in `/dev/v4l/by-id` (Meta-Knoten zähl
 
 `GET /api/v1/cameras/{cam}/controls` listet alle Werte der Kamera, `PUT` mit `{"<key>": Wert}` setzt sie (zuerst die Automatik-Schalter, dann die Werte) und meldet die zurückgelesenen Werte; `null` setzt den Standard des Geräts. Pan, Tilt und Zoom stehen in der Liste, gesetzt werden sie über Bewegen. Verstellte Werte merkt sich der Dienst in `~/.local/share/dss-kamera/kameras.json` und setzt sie beim Erscheinen der Kamera und beim Start neu. Eine ungültige `kameras.json` wird gemeldet und nicht überschrieben; Änderungen werden dann abgewiesen. In der Attrappe gibt es Bildwerte nur mit `--geraeteordner`.
 
+## OBSBOT Tiny 2
+
+Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR (setzbar, nur wenn die Kamera wach ist, wird gemerkt), Zustand und «Automatisch schlafen nach» (nur lesbar, `readonly: true`). Bildwinkel und KI-Modus bietet der Dienst nicht an (nicht bestätigt). `POST /api/v1/cameras/{cam}/wake` weckt die Kamera und wartet, bis sie wach ist (höchstens 10 s), `…/sleep` legt sie schlafen. Bewegungsbefehle gehen nur an die wache Kamera und frühestens 4,5 s nach dem Wecken. Der Zustand in `status` (`awake`, `asleep`, `privacy`) wird höchstens alle 5 s gelesen.
+
 ## Installation
 
 Folgt mit Abschnitt c (`installieren.sh`, `system-einrichten.sh`).
