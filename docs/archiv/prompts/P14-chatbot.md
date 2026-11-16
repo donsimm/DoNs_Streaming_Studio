@@ -476,6 +476,7 @@ Das Aussehen hängt an keiner Stelle am mitgelieferten Overlay; der Agent prüft
 - Wiederholbar: Probelauf (zeigt, was geschähe, schreibt nichts), dann endgültig; ein zweiter endgültiger Lauf ist möglich (9.4).
 - Bericht nur mit Anzahlen und Namen von Variablen (keine Namen von Zuschauern, keine Werte).
 - Nie gelesen: `auth.db`, `auth-backup.db`. Der Export und der Import öffnen nur eine Kopie, nie das Original.
+- Variablen, deren Name `secret`, `token`, `key`, `password`, `passwort`, `auth` oder `credential` enthält (Gross- und Kleinschreibung egal), werden weder übernommen noch archiviert; der Bericht nennt sie mit Namen und Anzahl unter «Variablen nicht übernommen (Zugangsdaten?)». Gleichnamige Variablen im Studio bleiben (Entscheid Nutzer 2026-11-16, z1c).
 
 ### 9.2 Lesen der LiteDB-Dateien (Frage 4)
 

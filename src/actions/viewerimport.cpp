@@ -39,6 +39,22 @@ bool isAuthName(const QString &name)
     return name.startsWith(QLatin1String("auth"), Qt::CaseInsensitive);
 }
 
+// Variablen, deren Name eines dieser Wörter enthält (ohne Rücksicht auf Gross- und Kleinschreibung),
+// deuten auf Zugangsdaten hin: nicht übernehmen, nur mit Namen melden (Entscheid Nutzer 2026-11-16).
+// Absichtlich grob; Fehltreffer wie «monkeyCount» sind in Ordnung, der Bericht nennt sie.
+const QStringList kCredentialWords = {QStringLiteral("secret"), QStringLiteral("token"), QStringLiteral("key"),
+                                      QStringLiteral("password"), QStringLiteral("passwort"),
+                                      QStringLiteral("auth"), QStringLiteral("credential")};
+
+bool isCredentialName(const QString &name)
+{
+    for (const QString &word : kCredentialWords) {
+        if (name.contains(word, Qt::CaseInsensitive))
+            return true;
+    }
+    return false;
+}
+
 // Meldungen nennen nur den Namen der Datei, nie den Inhalt
 bool readJsonFile(const QString &path, const QString &label, QJsonDocument *doc, QString *error)
 {
@@ -327,6 +343,10 @@ private:
         for (const QJsonValue &value : c.documents) {
             const QJsonObject doc = value.toObject();
             const QString name = doc.value(QStringLiteral("_id")).toString();
+            if (isCredentialName(name)) {
+                ++m_report.credentialVariableNames[name]; // weder übernommen noch ins Archiv
+                continue;
+            }
             const std::optional<QJsonValue> simple = simpleValue(doc.value(QStringLiteral("value")));
             if (name.trimmed().isEmpty() || !simple) {
                 toArchive(c.file, c.collection, value);
@@ -343,6 +363,11 @@ private:
         QHash<QString, QJsonObject> docs; // ID + Name → Dokument, für doppelte
         for (const QJsonValue &value : c.documents) {
             const QJsonObject doc = value.toObject();
+            const QString name = doc.value(QStringLiteral("name")).toString();
+            if (isCredentialName(name)) {
+                ++m_report.credentialVariableNames[name]; // weder übernommen noch ins Archiv
+                continue;
+            }
             if (!isTwitch(doc)) {
                 toArchive(c.file, c.collection, value);
                 continue;
@@ -353,7 +378,6 @@ private:
                 toArchive(c.file, c.collection, value);
                 continue;
             }
-            const QString name = doc.value(QStringLiteral("name")).toString();
             const std::optional<QJsonValue> simple = simpleValue(doc.value(QStringLiteral("value")));
             if (name.trimmed().isEmpty() || !simple) {
                 toArchive(c.file, c.collection, value);
@@ -427,20 +451,27 @@ private:
                                           QStringLiteral("userName")};
         const QString prefix = c.file.chopped(3) + QLatin1Char('.'); // ohne «.db»
         for (const QJsonValue &value : c.documents) {
-            const QJsonObject doc = value.toObject();
+            // Felder mit Zugangsdaten im Namen fallen weg, auch aus dem Archiv
+            QJsonObject doc = value.toObject();
+            for (const QString &key : doc.keys()) {
+                if (!kSkip.contains(key) && isCredentialName(prefix + key)) {
+                    ++m_report.credentialVariableNames[prefix + key];
+                    doc.remove(key);
+                }
+            }
             if (!namesUser(doc) || !isTwitch(doc)) {
-                toArchive(c.file, c.collection, value);
+                toArchive(c.file, c.collection, doc);
                 continue;
             }
             const QString userId = resolveUser(doc);
             if (userId.isEmpty()) {
                 ++m_report.withoutId;
-                toArchive(c.file, c.collection, value);
+                toArchive(c.file, c.collection, doc);
                 continue;
             }
             bool allSimple = true;
             VariableMap &vars = m_users[userId];
-            for (auto it = doc.begin(); it != doc.end(); ++it) {
+            for (auto it = doc.constBegin(); it != doc.constEnd(); ++it) {
                 if (kSkip.contains(it.key()))
                     continue;
                 const std::optional<QJsonValue> simple = simpleValue(it.value());
@@ -454,7 +485,7 @@ private:
                 vars.insert(name, VariableValue{*simple, VariableOrigin::Streamerbot, m_options.now});
             }
             if (!allSimple)
-                toArchive(c.file, c.collection, value);
+                toArchive(c.file, c.collection, doc);
         }
     }
 
@@ -744,6 +775,9 @@ QString importReportText(const ImportReport &r, bool final)
     lines.append(countLine(QStringLiteral("Variablen je Zuschauer"), r.userVariables));
     if (!r.userVariableNames.isEmpty())
         lines.append(QStringLiteral("  Namen: ") + nameCounts(r.userVariableNames, QStringLiteral("Zuschauer")));
+    if (!r.credentialVariableNames.isEmpty())
+        lines.append(QStringLiteral("Variablen nicht übernommen (Zugangsdaten?): ")
+                     + nameCounts(r.credentialVariableNames, QStringLiteral("Werte")));
     lines.append(countLine(QStringLiteral("Zähler der Befehle"), r.commandCounters));
     lines.append(countLine(QStringLiteral("Zuschauer"), r.viewers));
     lines.append(countLine(QStringLiteral("Zitate"), r.quotes));

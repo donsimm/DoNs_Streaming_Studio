@@ -6,6 +6,7 @@
 // Seit P14 z1b auch über den Kern (viewer_import, dss-cli zuschauer-import und
 // scripts/zuschauer-import.sh, dss-core und dss-cli als eigene Prozesse): Stand aus dem Speicher
 // des Kerns, kein Name und kein Wert im Protokoll des Kerns.
+// Seit P14 z1c: Variablen mit Zugangsdaten im Namen werden nicht übernommen, nur gemeldet.
 
 #include "actionjson.h"
 #include "actionprotocol.h"
@@ -200,6 +201,7 @@ private slots:
     void invalidFileStops();
     void writesWithBackup();
     void secondImportKeepsStudioChanges();
+    void skipsCredentialVariables();
     // P14 z1b: Weg über den Kern
     void resultMessage();
 #ifdef DSS_CLI_BIN
@@ -503,6 +505,125 @@ void TestZuschauerImport::secondImportKeepsStudioChanges()
     QCOMPARE(forced.state.variables.global.value(QStringLiteral("nurImStudio")).value.toInt(), 1);
     QCOMPARE(forced.report.userVariables, (ImportCount{0, 1, 3, 0, 1}));
     QCOMPARE(forced.report.overwrittenVariableNames, (QMap<QString, int>{{QStringLiteral("watchtime"), 1}}));
+}
+
+// P14 z1c: Variablen mit secret, token, key, password oder passwort im Namen (Gross- und
+// Kleinschreibung egal) werden weder übernommen noch archiviert; der Bericht nennt Namen und Anzahl.
+// Schon im Studio vorhandene gleichnamige Variablen bleiben.
+void TestZuschauerImport::skipsCredentialVariables()
+{
+    auto doc = [](std::initializer_list<std::pair<QString, QJsonValue>> fields) {
+        QJsonObject o;
+        for (const auto &[key, value] : fields)
+            o.insert(key, value);
+        return QJsonValue(o);
+    };
+    const QString id = QStringLiteral("_id");
+    const QString name = QStringLiteral("name");
+    const QString value = QStringLiteral("value");
+    const QString userId = QStringLiteral("userId");
+    const QString platform = QStringLiteral("platform");
+    const QString twitch = QStringLiteral("twitch");
+
+    StreamerbotExport source;
+    source.collections.append({QStringLiteral("globals.db"), QStringLiteral("globals"),
+                               QJsonArray{doc({{id, QStringLiteral("apiSecret")}, {value, QStringLiteral("nicht-echt-101")}}),
+                                          doc({{id, QStringLiteral("TwitchTOKEN")}, {value, QStringLiteral("nicht-echt-102")}}),
+                                          doc({{id, QStringLiteral("botPassWort")}, {value, QJsonObject{{QStringLiteral("a"), QStringLiteral("nicht-echt-103")}}}}),
+                                          doc({{id, QStringLiteral("monkeyCount")}, {value, 4}}),
+                                          doc({{id, QStringLiteral("oauthCode")}, {value, QStringLiteral("nicht-echt-104")}}),
+                                          doc({{id, QStringLiteral("dbCredential")}, {value, QStringLiteral("nicht-echt-105")}}),
+                                          doc({{id, QStringLiteral("normalZaehler")}, {value, 3}})}});
+    source.collections.append({QStringLiteral("globals.db"), QStringLiteral("user_globals"),
+                               QJsonArray{doc({{name, QStringLiteral("streamKey")}, {platform, twitch}, {userId, kUser1},
+                                               {value, QStringLiteral("nicht-echt-201")}}),
+                                          doc({{name, QStringLiteral("streamKey")}, {platform, twitch}, {userId, kUser2},
+                                               {value, QStringLiteral("nicht-echt-202")}}),
+                                          doc({{name, QStringLiteral("PASSWORD")}, {platform, QStringLiteral("youtube")},
+                                               {userId, QStringLiteral("yt-1")}, {value, QStringLiteral("nicht-echt-203")}}),
+                                          doc({{name, QStringLiteral("punkte")}, {platform, twitch}, {userId, kUser1}, {value, 5}})}});
+    source.collections.append({QStringLiteral("firstwords.db"), QStringLiteral("firstwords"),
+                               QJsonArray{doc({{userId, kUser2}, {QStringLiteral("count"), 2},
+                                               {QStringLiteral("tokenFeld"), QStringLiteral("nicht-echt-301")},
+                                               {QStringLiteral("liste"), QJsonArray{1}}})}});
+
+    // Im Studio schon vorhanden, mit Namen wie Zugangsdaten: bleibt unverändert
+    ImportState current;
+    current.actions = ActionsConfig{};
+    const VariableValue studioSecret{QJsonValue(QStringLiteral("studio-wert")), VariableOrigin::Studio, kNow};
+    current.variables.global.insert(QStringLiteral("apiSecret"), studioSecret);
+    current.variables.users[kUser1].insert(QStringLiteral("streamKey"), studioSecret);
+
+    for (const bool overwrite : {false, true}) {
+        const ImportResult result = planViewerImport(source, current, {overwrite, kNow});
+        const VariablesData &vars = result.state.variables;
+        QCOMPARE(vars.global.keys(), QStringList({QStringLiteral("apiSecret"), QStringLiteral("normalZaehler")}));
+        QCOMPARE(vars.global.value(QStringLiteral("apiSecret")), studioSecret);
+        QCOMPARE(vars.users.keys(), QStringList({kUser1, kUser2}));
+        QCOMPARE(vars.users[kUser1].keys(), QStringList({QStringLiteral("punkte"), QStringLiteral("streamKey")}));
+        QCOMPARE(vars.users[kUser1].value(QStringLiteral("streamKey")), studioSecret);
+        QCOMPARE(vars.users[kUser2].keys(), QStringList({QStringLiteral("firstwords.count")}));
+
+        const ImportReport &r = result.report;
+        QCOMPARE(r.credentialVariableNames, (QMap<QString, int>{{QStringLiteral("PASSWORD"), 1},
+                                                                 {QStringLiteral("TwitchTOKEN"), 1},
+                                                                 {QStringLiteral("apiSecret"), 1},
+                                                                 {QStringLiteral("botPassWort"), 1},
+                                                                 {QStringLiteral("dbCredential"), 1},
+                                                                 {QStringLiteral("firstwords.tokenFeld"), 1},
+                                                                 {QStringLiteral("monkeyCount"), 1},
+                                                                 {QStringLiteral("oauthCode"), 1},
+                                                                 {QStringLiteral("streamKey"), 2}}));
+        QCOMPARE(r.globalVariables, (ImportCount{1, 0, 0, 0, 0}));
+        QCOMPARE(r.globalVariableNames, QStringList({QStringLiteral("normalZaehler")}));
+        QCOMPARE(r.userVariableNames, (QMap<QString, int>{{QStringLiteral("firstwords.count"), 1},
+                                                           {QStringLiteral("punkte"), 1}}));
+        QVERIFY(r.keptVariableNames.isEmpty());
+        QVERIFY(r.overwrittenVariableNames.isEmpty());
+
+        // Kein Wert im Archiv; das Dokument von firstwords (Liste) ohne das Feld mit Zugangsdaten
+        const QByteArray archive = serializeArchive(result.state.archive);
+        QVERIFY(!archive.contains("nicht-echt"));
+        QVERIFY(archive.contains("liste"));
+
+        for (const bool final : {false, true}) {
+            const QString text = importReportText(r, final);
+            QVERIFY2(text.contains(QStringLiteral(
+                         "Variablen nicht übernommen (Zugangsdaten?): PASSWORD (1 Werte), TwitchTOKEN (1 Werte), "
+                         "apiSecret (1 Werte), botPassWort (1 Werte), dbCredential (1 Werte), firstwords.tokenFeld (1 Werte), "
+                         "monkeyCount (1 Werte), oauthCode (1 Werte), streamKey (2 Werte)")),
+                     qPrintable(text));
+            QVERIFY(!text.contains(QStringLiteral("nicht-echt")));
+            QVERIFY(!text.contains(QStringLiteral("studio-wert")));
+            QVERIFY(!text.contains(kUser1));
+        }
+    }
+
+    // Endgültig: variablen.json und Archiv enthalten keinen Wert, die Studio-Variablen bleiben
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString data = dir.filePath(QStringLiteral("daten"));
+    QVERIFY(QDir().mkpath(data));
+    writeBytes(QDir(data).filePath(QString::fromLatin1(kVariablesFileName)), serializeVariables(current.variables));
+    writeBytes(QDir(data).filePath(QString::fromLatin1(kActionsFileName)), serializeActions(ActionsConfig{}));
+    ImportState before;
+    QString error;
+    QVERIFY2(loadImportState(data, &before, &error), qPrintable(error));
+    const ImportResult result = planViewerImport(source, before, {false, kNow});
+    QStringList written;
+    QVERIFY2(writeViewerImport(data, dir.filePath(QStringLiteral("sicherung")), before, result.state, &written, &error),
+             qPrintable(error));
+    QVERIFY(written.contains(QString::fromLatin1(kVariablesFileName)));
+    for (const char *file : {kVariablesFileName, kArchiveFileName}) {
+        const QByteArray bytes = readBytes(QDir(data).filePath(QString::fromLatin1(file)));
+        QVERIFY2(!bytes.contains("nicht-echt"), file);
+        QVERIFY2(!bytes.contains("TwitchTOKEN") && !bytes.contains("PASSWORD") && !bytes.contains("tokenFeld"), file);
+    }
+    ImportState after;
+    QVERIFY2(loadImportState(data, &after, &error), qPrintable(error));
+    QCOMPARE(after.variables.global.value(QStringLiteral("apiSecret")), studioSecret);
+    QCOMPARE(after.variables.users[kUser1].value(QStringLiteral("streamKey")), studioSecret);
+    QVERIFY(!after.variables.users[kUser2].contains(QStringLiteral("streamKey")));
 }
 
 void TestZuschauerImport::resultMessage()

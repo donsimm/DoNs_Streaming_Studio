@@ -27,7 +27,8 @@
 //
 // Datenschutz (Plan 2.10, 9.1): Der Bericht nennt nur Anzahlen und Namen von Variablen, keine Namen
 // oder IDs von Zuschauern und keine Werte. Ordner und Dateien, deren Name mit «auth» beginnt, werden
-// nie gelesen.
+// nie gelesen. Variablen mit Zugangsdaten im Namen (secret, token, key, password, passwort) werden
+// weder übernommen noch archiviert, nur mit Namen gemeldet (z1c).
 
 namespace dss::actions {
 
@@ -103,6 +104,7 @@ struct ImportReport
     QStringList globalVariableNames;
     QMap<QString, int> keptVariableNames;   // im Studio geändert, bleibt: Name → Anzahl
     QMap<QString, int> overwrittenVariableNames;
+    QMap<QString, int> credentialVariableNames; // Zugangsdaten im Namen, nicht übernommen: Name → Anzahl
 
     int withoutId = 0;   // Dokumente mit Zuschauer, aber ohne Twitch-ID (ins Archiv)
     int duplicates = 0;  // doppelte Einträge desselben Zuschauers (der neuere gilt)
