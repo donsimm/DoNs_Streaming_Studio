@@ -527,30 +527,37 @@ QString emoteStatusText(const EmoteLoadState &state)
         const QString last = list.isEmpty() ? QString() : list.takeLast();
         return list.isEmpty() ? last : list.join(QStringLiteral(", ")) + QStringLiteral(" und ") + last;
     };
+    // Teile ohne «Emotes»; das Wort steht nur einmal vorne (Befund der Prüfung em-7):
+    // «Emotes geladen: …» oder «Emotes: <erster Teil>», danach die weiteren Teile.
     QStringList parts;
+    bool loaded = false;
     switch (state.network) {
     case EmoteLoadState::Network::OfflineCached:
-        parts.append(QStringLiteral("Emotes: Ohne Netz, Listen vom letzten Mal"));
+        parts.append(QStringLiteral("Ohne Netz, Listen vom letzten Mal"));
         break;
     case EmoteLoadState::Network::OfflineEmpty:
-        parts.append(QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen"));
+        parts.append(QStringLiteral("Ohne Netz und ohne gespeicherte Listen"));
         break;
     case EmoteLoadState::Network::Online: {
         QStringList counts;
         for (const auto &[provider, count] : state.counts)
             counts.append(QStringLiteral("%1 %2").arg(emoteProviderName(provider)).arg(count));
-        if (!counts.isEmpty())
-            parts.append(QStringLiteral("Emotes geladen: ") + counts.join(QStringLiteral(", ")));
+        if (!counts.isEmpty()) {
+            parts.append(QStringLiteral("geladen: ") + counts.join(QStringLiteral(", ")));
+            loaded = true;
+        }
         if (!state.unreachable.isEmpty())
-            parts.append(QStringLiteral("Emotes: %1 nicht erreichbar, die Wörter bleiben Text").arg(names(state.unreachable)));
+            parts.append(QStringLiteral("%1 nicht erreichbar, die Wörter bleiben Text").arg(names(state.unreachable)));
         break;
     }
     }
     if (!state.webp)
-        parts.append(QStringLiteral("Emotes: WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text"));
+        parts.append(QStringLiteral("WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text"));
     if (!state.channel)
-        parts.append(QStringLiteral("Emotes: kein Kanal angemeldet"));
-    return parts.join(QStringLiteral(" · "));
+        parts.append(QStringLiteral("kein Kanal angemeldet"));
+    if (parts.isEmpty())
+        return {};
+    return (loaded ? QStringLiteral("Emotes ") : QStringLiteral("Emotes: ")) + parts.join(QStringLiteral(" · "));
 }
 
 QString emoteToolTip(const Emote &emote)

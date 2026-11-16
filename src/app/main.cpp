@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFont>
+#include <QHostAddress>
 #include <QIcon>
 #include <QPixmap>
 #include <QTextStream>
@@ -84,8 +85,18 @@ int main(int argc, char *argv[])
         QStringLiteral("messdauer"),
         QStringLiteral("Nur mit --leinwand-messung: Dauer in Sekunden ab dem Start, Standard 75."),
         QStringLiteral("SEKUNDEN"));
+    const QCommandLineOption emoteServerOption(
+        QStringLiteral("emote-server"),
+        QStringLiteral("Nur für Prüfungen (P14 Emotes): Listen und Bilder der Emotes von einem "
+                       "lokalen Testserver laden (ADRESSE/<Server>/<Pfad> statt https://<Server>/"
+                       "<Pfad>). Nur eine Adresse auf diesem Rechner (Loopback), zum Beispiel "
+                       "http://127.0.0.1:8080. Ohne die Option lädt das Programm die Emotes von "
+                       "den echten Servern; nur mit --bildschirmfoto oder --leinwand-messung lädt "
+                       "es ohne die Option keine Emotes."),
+        QStringLiteral("ADRESSE"));
     parser.addOption(helpOption);
     parser.addOption(connectionOption);
+    parser.addOption(emoteServerOption);
     parser.addOption(unitOption);
     parser.addOption(versionOption);
     parser.addOption(screenshotOption);
@@ -133,6 +144,15 @@ int main(int argc, char *argv[])
         }
     } else if (parser.isSet(measureSecondsOption)) {
         QTextStream(stderr) << "Fehler: --messdauer gilt nur mit --leinwand-messung.\n";
+        return 2;
+    }
+
+    // Testserver der Emotes nur auf diesem Rechner, damit die Option nie fremde Server erreicht
+    const QUrl emoteServer(parser.value(emoteServerOption));
+    if (parser.isSet(emoteServerOption)
+        && (!emoteServer.isValid() || emoteServer.scheme() != QLatin1String("http")
+            || !QHostAddress(emoteServer.host()).isLoopback())) {
+        QTextStream(stderr) << "Fehler: --emote-server erwartet eine Adresse http://127.0.0.1:PORT.\n";
         return 2;
     }
 
@@ -184,6 +204,18 @@ int main(int argc, char *argv[])
     }
 
     MainWindow window(theme, screenshotFile.isEmpty(), client.get());
+    // P14 Emotes em-7: Prüfungen (Bildschirmfoto, Messung) gehen nur mit --emote-server ins Netz
+    if (parser.isSet(emoteServerOption)) {
+        dss::EmoteEndpoints endpoints;
+        QString root = emoteServer.toString();
+        if (root.endsWith(QLatin1Char('/')))
+            root.chop(1);
+        for (const dss::EmoteEndpoint &endpoint : dss::EmoteEndpoints::standard().list)
+            endpoints.list.append({endpoint.host, QUrl(root + QLatin1Char('/') + endpoint.host)});
+        window.enableEmotes(endpoints, dss::emoteCacheDir());
+    } else if (screenshotFile.isEmpty() && measureFile.isEmpty()) {
+        window.enableEmotes(dss::EmoteEndpoints::standard(), dss::emoteCacheDir());
+    }
     if (parser.isSet(statesOption)) {
         for (dss::Connection c : {dss::Connection::Twitch, dss::Connection::YouTube,
                                   dss::Connection::Obs, dss::Connection::Ndi})

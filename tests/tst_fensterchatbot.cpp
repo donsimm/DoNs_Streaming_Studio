@@ -9,7 +9,7 @@
 // P14 e3-5: «Befehle» (Zeilen, Filter, Kästchen, Formular, Prüfmeldung, Löschen, «Öffnen», Testen).
 // P14 e3-7: «Variablen» (Zeilen aus dem Import, Suche, Filter, Wert ändern, Prüfmeldung, Löschen).
 // P14 Emotes em-6: Delegat mit Emotes und Plattform-Symbol (eigene Seite ohne Kern, Testbilder
-// aus emotetestbilder.h).
+// aus emotetestbilder.h). P14 Emotes em-7: Laden im MainWindow gegen den HTTP-Stub (emotestub.h).
 
 #include "actionfields.h"
 #include "actionfieldspanel.h"
@@ -21,6 +21,7 @@
 #include "coreclient.h"
 #include "coresession.h"
 #include "emoteimages.h"
+#include "emotestub.h"
 #include "emotetestbilder.h"
 #include "listdetailpage.h"
 #include "mainwindow.h"
@@ -55,6 +56,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalSpy>
 #include <QSpinBox>
 #include <QStandardItemModel>
@@ -2685,6 +2687,369 @@ private slots:
         QCOMPARE(pixels(grabCell(5), Qt::green).size(), 40 * 28);
         QVERIFY(!pixels(grabCell(5), QColor(0xff, 0x40, 0x40), 12).isEmpty());
         page.setEmoteImages(nullptr);
+    }
+
+    // P14 Emotes em-7 Nacharbeit: resetChat (auch bei neuen Emote-Listen) rollt nur nach unten,
+    // wenn die Liste unten stand (leer gilt als unten); weiter oben bleibt die Leseposition.
+    void chatResetKeepsPosition()
+    {
+        const Theme theme = darkTheme();
+        ChatBotPage page(theme);
+        page.resize(1200, 500);
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page));
+        auto *chat = page.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+        QVERIFY(chat);
+        QScrollBar *bar = chat->verticalScrollBar();
+        const auto rows = [](int count) {
+            QList<ChatRow> list;
+            for (int i = 0; i < count; ++i) {
+                ChatRow row;
+                row.time = QStringLiteral("12:00:00");
+                row.name = QStringLiteral("Zuschauer");
+                row.text = QStringLiteral("Zeile %1").arg(i);
+                row.segments = {ChatSegment{row.text, std::nullopt}};
+                list.append(row);
+            }
+            return list;
+        };
+
+        // Leere Liste gilt als unten
+        page.resetChat(rows(100));
+        QApplication::processEvents();
+        QVERIFY(bar->maximum() > 20);
+        QCOMPARE(bar->value(), bar->maximum());
+
+        // Weiter oben: dieselben Zeilen neu aufgebaut, die Position bleibt
+        bar->setValue(10);
+        page.resetChat(rows(100));
+        QApplication::processEvents();
+        QCOMPARE(bar->value(), 10);
+        QCOMPARE(chat->topLevelItemCount(), 100);
+
+        // Unten: mit mehr Zeilen wieder unten
+        bar->setValue(bar->maximum());
+        const int before = bar->maximum();
+        page.resetChat(rows(120));
+        QApplication::processEvents();
+        QVERIFY(bar->maximum() > before);
+        QCOMPARE(bar->value(), bar->maximum());
+    }
+
+    // P14 Emotes em-7: Verdrahtung im MainWindow mit eigenem Kern, Twitch-Testserver und dem
+    // HTTP-Stub (emotestub.h, Listen aus tests/daten/emotes/, nie echtes Netz). Laden beim ersten
+    // twitch_status (ohne Kanal nur global) und bei jeder anderen Kanal-ID, Statuszeile aus
+    // emoteStatusText, Bild eines Emote-Worts, jedes Bild nur einmal bestellt, Echo der eigenen
+    // Nachricht ersetzt die Zeile, Stub aus → «ohne Netz».
+    void chatEmotesLoading()
+    {
+        using emotestub::readFile;
+        using emotestub::stubPath;
+        emotestub::HttpStub stub;
+        const QString channelId = QStringLiteral("100000001"); // neutrale Kanal-ID der Testdaten
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Bttv, std::nullopt)), {200, readFile("bttv-global.json"), {}});
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Bttv, channelId)), {200, readFile("bttv-kanal.json"), {}});
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::SevenTv, std::nullopt)), {200, readFile("7tv-global.json"), {}});
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::SevenTv, channelId)), {404, readFile("7tv-kanal.json"), {}});
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Ffz, std::nullopt)), {200, readFile("ffz-global.json"), {}});
+        stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Ffz, channelId)), {404, readFile("ffz-kanal.json"), {}});
+        const auto parsed = [](EmoteProvider provider, bool channel, const char *file) {
+            return parseEmoteList(provider, channel, 200, readFile(file)).emotes;
+        };
+        const QList<Emote> bttvGlobal = parsed(EmoteProvider::Bttv, false, "bttv-global.json");
+        const QList<Emote> bttvChannel = parsed(EmoteProvider::Bttv, true, "bttv-kanal.json");
+        const QList<Emote> sevenTv = parsed(EmoteProvider::SevenTv, false, "7tv-global.json");
+        const QList<Emote> ffz = parsed(EmoteProvider::Ffz, false, "ffz-global.json");
+        QVERIFY(!bttvGlobal.isEmpty() && !bttvChannel.isEmpty() && !sevenTv.isEmpty() && !ffz.isEmpty());
+        // FFZ-Emote (PNG, auch ohne WebP), das nach dem Vorrang mit allen Listen FFZ bleibt
+        EmoteIndex index;
+        index.setList(EmoteProvider::Bttv, false, bttvGlobal);
+        index.setList(EmoteProvider::Bttv, true, bttvChannel);
+        index.setList(EmoteProvider::SevenTv, false, sevenTv);
+        index.setList(EmoteProvider::Ffz, false, ffz);
+        std::optional<Emote> ffzEmote;
+        for (const Emote &e : ffz)
+            if (!ffzEmote && !e.zeroWidth && index.find(e.name) && index.find(e.name)->provider == EmoteProvider::Ffz)
+                ffzEmote = e;
+        QVERIFY(ffzEmote);
+        const QByteArray ffzImage = stubPath(QUrl(chatEmoteImageKey(*ffzEmote)));
+        stub.routes.insert(ffzImage, {200, filled(40, 28, Qt::green), {}});
+        // Twitch-Emote nur als Fragment (Echo), Bild cyan
+        const Emote twitchEmote{EmoteProvider::Twitch, QStringLiteral("dsstest1"), QStringLiteral("DSSTestTwitch"), false, false, 0, 0};
+        stub.routes.insert(stubPath(QUrl(chatEmoteImageKey(twitchEmote))), {200, filled(40, 28, Qt::cyan), {}});
+        const bool webp = EmoteImages::webpAvailable();
+        const auto status = [](bool channel, const QList<QPair<EmoteProvider, int>> &counts) {
+            EmoteLoadState s;
+            s.webp = EmoteImages::webpAvailable();
+            s.channel = channel;
+            for (const auto &c : counts)
+                if (s.webp || c.first == EmoteProvider::Ffz)
+                    s.counts.append(c);
+            return emoteStatusText(s);
+        };
+
+        testhelp::TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        QTemporaryDir data;
+        QTemporaryDir cache;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && cache.isValid() && runtime->isValid());
+        const QString socket = runtime->filePath(QStringLiteral("kern.sock"));
+        const QString home = testhelp::testConfigHome();
+        QFile ini(home + QStringLiteral("/dons-streaming-studio-entwicklung/kern.ini"));
+        QVERIFY(ini.open(QIODevice::Append));
+        ini.write("[twitch]\naktiv=ja\nclient-id=testclient\n");
+        ini.close();
+        std::unique_ptr<QProcess> core = testhelp::startCore(
+            data.path(), socket, home,
+            {QStringLiteral("--twitch-testserver"), server.baseUrl().toString(), QStringLiteral("--einsatz-verbindung"),
+             runtime->filePath(QStringLiteral("einsatz.sock")), QStringLiteral("--testereignisse")});
+        QString log;
+        QVERIFY2(testhelp::waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        {
+            CoreClient::Options o;
+            o.socketPath = socket;
+            o.program = QStringLiteral("dss-app");
+            o.version = version();
+            CoreClient client(o);
+            const Theme theme = darkTheme();
+            MainWindow window(theme, false, &client);
+            window.enableEmotes(stub.endpoints(), cache.path());
+            window.resize(1280, 800);
+            window.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&window));
+            const auto message = [&] { return window.statusBar()->currentMessage(); };
+            const auto post = [&](const QString &type, const QJsonObject &fields) {
+                std::optional<ChangeResult> answer;
+                const qint64 id = client.sendActionsEdit({type, fields});
+                const QMetaObject::Connection c = connect(&client, &CoreClient::changeFinished, this,
+                                                          [&](const ChangeResult &r) { if (r.requestId == id) answer = r; });
+                const bool answered = QTest::qWaitFor([&] { return answer.has_value(); }, 3000);
+                disconnect(c);
+                return answered && answer->ok;
+            };
+            const auto login = [&](const QString &id, const QString &name) {
+                if (!client.sendTwitchAccountRequest(msg::kTwitchLoginStart, QStringLiteral("channel")))
+                    return false;
+                return QTest::qWaitFor([&] { return server.approveLatest({id, name}); }, 5000)
+                       && QTest::qWaitFor([&] {
+                              const std::optional<TwitchStatusInfo> s = client.twitchStatus();
+                              return s && s->channel.userId == id;
+                          }, 5000);
+            };
+            const auto logout = [&] {
+                client.sendTwitchAccountRequest(msg::kTwitchLogout, QStringLiteral("channel"));
+                return QTest::qWaitFor([&] {
+                    const std::optional<TwitchStatusInfo> s = client.twitchStatus();
+                    return s && s->channel.userId.isEmpty();
+                }, 5000);
+            };
+            client.start();
+            QTRY_VERIFY_WITH_TIMEOUT(client.isConnected() && client.actionsStatus().has_value(), 5000);
+            openChatBot(&window);
+            auto *chat = window.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+            QVERIFY(chat);
+
+            // Erster twitch_status ohne Kanal: nur die globalen Listen
+            const QString globalText = status(false, {{EmoteProvider::Bttv, int(bttvGlobal.size())},
+                                                      {EmoteProvider::SevenTv, int(sevenTv.size())},
+                                                      {EmoteProvider::Ffz, int(ffz.size())}});
+            QTRY_COMPARE_WITH_TIMEOUT(message(), globalText, 5000);
+            qInfo("Statuszeile ohne Kanal: %s", qPrintable(message()));
+            QCOMPARE(int(stub.requests.size()), webp ? 3 : 1);
+            for (const emotestub::HttpStub::Request &r : std::as_const(stub.requests))
+                QCOMPARE(r.method, QByteArray("GET"));
+
+            // Kanal angemeldet: neu geladen mit den Listen des Kanals, Anzahl in der Statuszeile
+            QVERIFY(login(channelId, QStringLiteral("testkanal")));
+            const QString channelText = status(true, {{EmoteProvider::Bttv, int(bttvGlobal.size() + bttvChannel.size())},
+                                                      {EmoteProvider::SevenTv, int(sevenTv.size())},
+                                                      {EmoteProvider::Ffz, int(ffz.size())}});
+            QTRY_COMPARE_WITH_TIMEOUT(message(), channelText, 5000);
+            qInfo("Statuszeile mit Kanal: %s", qPrintable(message()));
+            QCOMPARE(stub.count("/api.frankerfacez.com/v1/room/id/" + channelId.toLatin1()), 1);
+
+            // Emote-Wort in einer Chat-Zeile wird nach dem Laden ein Bild; das Bild nur einmal bestellt
+            // Kurze Nachricht: die Spalte «Chat» ist im Testfenster schmal, Längeres endet mit «…»
+            QJsonObject event = chatEvent(ffzEmote->name, false, QStringLiteral("#40C0FF"));
+            QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), event}}));
+            const QString line = QStringLiteral("DSS-Test Zuschauer: ") + ffzEmote->name;
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, line), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(cellShowsColor(chat, findRow(chat, 1, line), Qt::green, 1), 5000);
+            event = chatEvent(QStringLiteral("DSS-Test ") + ffzEmote->name, false, QStringLiteral("#40C0FF"));
+            QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), event}}));
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, QStringLiteral("DSS-Test Zuschauer: DSS-Test ") + ffzEmote->name), 3000);
+            QCOMPARE(stub.count(ffzImage), 1);
+
+            // Echo der eigenen Nachricht: die Zeile aus chat_sent bekommt Twitch-Emote und Chatfarbe
+            auto *account = window.findChild<QComboBox *>(QStringLiteral("chatBotChatAccount"));
+            auto *text = window.findChild<QLineEdit *>(QStringLiteral("chatBotChatText"));
+            QVERIFY(account && text);
+            auto *model = qobject_cast<QStandardItemModel *>(account->model());
+            QTRY_VERIFY_WITH_TIMEOUT(model->item(1)->isEnabled(), 5000);
+            account->setCurrentIndex(1);
+            QTest::keyClicks(text, twitchEmote.name);
+            QTest::keyClick(text, Qt::Key_Return);
+            QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 1, 5000);
+            const QString ownLine = QStringLiteral("testkanal: ") + twitchEmote.name;
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, ownLine), 5000);
+            QTreeWidgetItem *own = findRow(chat, 1, ownLine);
+            const int rows = chat->topLevelItemCount();
+            QVERIFY(!cellShowsColor(chat, own, Qt::cyan, 1));
+            QJsonObject echo = chatEvent(twitchEmote.name, false, QStringLiteral("#FF4040"));
+            QJsonObject echoData = echo.value(QStringLiteral("data")).toObject();
+            echoData.insert(QStringLiteral("message_id"), server.chatMessages[0].messageId);
+            echoData.insert(QStringLiteral("user_id"), channelId);
+            echoData.insert(QStringLiteral("user_login"), QStringLiteral("testkanal"));
+            echoData.insert(QStringLiteral("user_name"), QStringLiteral("testkanal"));
+            echoData.insert(QStringLiteral("fragments"),
+                            QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("emote")},
+                                                   {QStringLiteral("text"), twitchEmote.name},
+                                                   {QStringLiteral("emote_id"), twitchEmote.id}}});
+            echo.insert(QStringLiteral("data"), echoData);
+            QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), echo}}));
+            QTRY_COMPARE_WITH_TIMEOUT(own->data(1, Qt::UserRole + 3).toString(), QStringLiteral("#FF4040"), 3000);
+            // Keine zweite Nachricht; der Kern meldet zum Echo höchstens eine graue Ereigniszeile
+            // (zum Beispiel «Erste Nachricht»)
+            int ownRows = 0;
+            for (int i = 0; i < chat->topLevelItemCount(); ++i) {
+                QTreeWidgetItem *item = chat->topLevelItem(i);
+                const bool isEvent = item->data(1, Qt::UserRole).toBool();
+                ownRows += !isEvent && item->text(1).endsWith(twitchEmote.name) ? 1 : 0;
+                if (i >= rows)
+                    qInfo("Zeile nach dem Echo: %s (%s)", qPrintable(item->text(1)), isEvent ? "grau" : "Nachricht");
+            }
+            QCOMPARE(ownRows, 1);
+            QCOMPARE(findRow(chat, 1, ownLine), own);
+            QTRY_VERIFY_WITH_TIMEOUT(cellShowsColor(chat, own, Qt::cyan, 1), 5000);
+            QVERIFY(cellShowsColor(chat, own, QColor(0xff, 0x40, 0x40), 1));
+
+            // Andere Kanal-ID: neu geladen (Abmelden allein lädt nicht)
+            const int beforeLogout = int(stub.requests.size());
+            QVERIFY(logout());
+            QTest::qWait(300);
+            QCOMPARE(int(stub.requests.size()), beforeLogout);
+            const QString otherId = QStringLiteral("100000002");
+            QVERIFY(login(otherId, QStringLiteral("testkanal2")));
+            QTRY_COMPARE_WITH_TIMEOUT(stub.count("/api.frankerfacez.com/v1/room/id/" + otherId.toLatin1()), 1, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(message().startsWith(QStringLiteral("Emotes geladen: ")), 5000);
+            // Bilder bleiben, die Zeilen zeigen das Emote weiter
+            QVERIFY(cellShowsColor(chat, findRow(chat, 1, line), Qt::green, 1));
+
+            // Stub aus, wieder eine andere Kanal-ID: Listen vom letzten Mal
+            stub.close();
+            QVERIFY(logout());
+            QVERIFY(login(QStringLiteral("100000003"), QStringLiteral("testkanal3")));
+            QTRY_VERIFY_WITH_TIMEOUT(message().startsWith(QStringLiteral("Emotes: Ohne Netz, Listen vom letzten Mal")), 10000);
+            qInfo("Statuszeile ohne Netz: %s", qPrintable(message()));
+            QVERIFY(cellShowsColor(chat, findRow(chat, 1, line), Qt::green, 1));
+            window.close(); // bittet den Kern, sich zu beenden (einziges Fenster)
+        }
+        if (core->state() != QProcess::NotRunning && !core->waitForFinished(3000))
+            stopCore(core.get());
+    }
+
+    // P14 Emotes em-7 Nacharbeit (Entscheide des Nutzers 2026-11-16): ohne Netz und ohne
+    // gespeicherte Listen still neu laden, höchstens drei Versuche (Abstände im Test verkürzt);
+    // die Emote-Meldung wartet, bis eine andere Meldung weg ist, eine spätere ersetzt die wartende.
+    // Eigene Fenster am Kern des Tests (ohne Twitch: nur globale Listen), nie geschlossen, damit
+    // sie den Kern nicht beenden; Stub aus emotestub.h, nie echtes Netz.
+    void chatEmotesRetry()
+    {
+        using emotestub::readFile;
+        using emotestub::stubPath;
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->twitchStatus().has_value(), 3000);
+        QVERIFY(m_client->twitchStatus()->channel.userId.isEmpty());
+        const Theme theme = darkTheme();
+        const QString other = QStringLiteral("DSS-Test andere Meldung");
+        // Wortlaut einmal wörtlich («Emotes» nur vorne, Befund der Prüfung em-7)
+        const QString webpPart = EmoteImages::webpAvailable()
+                                     ? QString()
+                                     : QStringLiteral(" · WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text");
+        const QString offlineText = QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen") + webpPart
+                                    + QStringLiteral(" · kein Kanal angemeldet");
+        using Network = EmoteLoadState::Network;
+
+        // Stub bleibt aus: erstes Laden und drei Wiederholungen, danach keine mehr; eine Meldung
+        {
+            emotestub::HttpStub stub;
+            stub.close();
+            QTemporaryDir cache;
+            QVERIFY(cache.isValid());
+            MainWindow window(theme, false, m_client.get());
+            window.setEmoteRetryDelays({200, 200, 200});
+            QSignalSpy messages(window.statusBar(), &QStatusBar::messageChanged);
+            window.enableEmotes(stub.endpoints(), cache.path());
+            auto *loader = window.findChild<EmoteLoader *>();
+            QVERIFY(loader);
+            QList<Network> states;
+            connect(loader, &EmoteLoader::stateChanged, &window, [&](const EmoteLoadState &s) { states.append(s.network); });
+            QTRY_COMPARE_WITH_TIMEOUT(states.size(), 4, 5000);
+            QTest::qWait(1000);
+            QCOMPARE(states, QList<Network>(4, Network::OfflineEmpty));
+            QCOMPARE(window.statusBar()->currentMessage(), offlineText);
+            QCOMPARE(messages.count(), 1);
+        }
+
+        // Stub erst aus, dann an: die Wiederholung lädt; die Meldung wartet auf die andere
+        {
+            emotestub::HttpStub stub;
+            stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Bttv, std::nullopt)), {200, readFile("bttv-global.json"), {}});
+            stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::SevenTv, std::nullopt)), {200, readFile("7tv-global.json"), {}});
+            stub.routes.insert(stubPath(emoteListUrl(EmoteProvider::Ffz, std::nullopt)), {200, readFile("ffz-global.json"), {}});
+            stub.close();
+            QTemporaryDir cache;
+            QVERIFY(cache.isValid());
+            MainWindow window(theme, false, m_client.get());
+            window.setEmoteRetryDelays({300, 300, 300});
+            QSignalSpy messages(window.statusBar(), &QStatusBar::messageChanged);
+            window.enableEmotes(stub.endpoints(), cache.path());
+            auto *loader = window.findChild<EmoteLoader *>();
+            QVERIFY(loader);
+            QList<Network> states;
+            connect(loader, &EmoteLoader::stateChanged, &window, [&](const EmoteLoadState &s) { states.append(s.network); });
+            QTRY_COMPARE_WITH_TIMEOUT(states.size(), 1, 5000);
+            QCOMPARE(states.first(), Network::OfflineEmpty);
+            QCOMPARE(window.statusBar()->currentMessage(), offlineText);
+
+            // Andere Meldung ohne Ablauf (der Test nimmt sie weg, wie nach ihren 10 s), Stub an
+            window.statusBar()->showMessage(other);
+            QVERIFY(stub.listen());
+            QTRY_VERIFY_WITH_TIMEOUT(states.last() == Network::Online, 5000);
+            QVERIFY(stub.count("/") >= 1);
+            QCOMPARE(window.statusBar()->currentMessage(), other);
+            window.statusBar()->clearMessage();
+            const QString loaded = window.statusBar()->currentMessage();
+            QVERIFY2(loaded.startsWith(QStringLiteral("Emotes geladen: ")) && loaded.contains(QStringLiteral("FFZ "))
+                         && loaded.endsWith(QStringLiteral(" · kein Kanal angemeldet")) && loaded.count(QStringLiteral("Emotes")) == 1,
+                     qPrintable(loaded));
+            qInfo("Statuszeile nach der Wiederholung: %s", qPrintable(loaded));
+            // Reihe beendet: keine weiteren Versuche
+            const qsizetype loads = states.size();
+            QTest::qWait(1000);
+            QCOMPARE(states.size(), loads);
+
+            // Zwei Ergebnisse, während eine andere Meldung steht: nur das spätere erscheint danach.
+            // Der Test sendet das Signal des Loaders selbst (signals sind in Qt 6 öffentlich).
+            EmoteLoadState first;
+            first.channel = false;
+            first.counts = {{EmoteProvider::Ffz, 1}};
+            EmoteLoadState second = first;
+            second.counts = {{EmoteProvider::Ffz, 2}};
+            window.statusBar()->showMessage(other);
+            messages.clear();
+            emit loader->stateChanged(first);
+            emit loader->stateChanged(second);
+            QCOMPARE(window.statusBar()->currentMessage(), other);
+            window.statusBar()->clearMessage();
+            QCOMPARE(window.statusBar()->currentMessage(), QStringLiteral("Emotes geladen: FFZ 2 · kein Kanal angemeldet"));
+            for (const QList<QVariant> &m : std::as_const(messages))
+                QVERIFY(!m.at(0).toString().contains(QStringLiteral("FFZ 1")));
+            // Steht eine Emote-Meldung, ersetzt die nächste sie sofort
+            emit loader->stateChanged(first);
+            QCOMPARE(window.statusBar()->currentMessage(), QStringLiteral("Emotes geladen: FFZ 1 · kein Kanal angemeldet"));
+        }
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

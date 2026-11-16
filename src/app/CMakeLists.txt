@@ -25,6 +25,7 @@ add_library(dss_app_ui STATIC
   queuesdialog.h queuesdialog.cpp
   mainwindowedit.cpp
   mainwindowcommands.cpp
+  mainwindowemotes.cpp
   mainwindowtimers.cpp
   mainwindowvariables.cpp
   translation.h translation.cpp

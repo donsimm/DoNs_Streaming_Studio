@@ -589,22 +589,30 @@ private slots:
                                  << QStringLiteral("Emotes geladen: BTTV 74, 7TV 312, FFZ 15");
         QTest::newRow("7TV nicht erreichbar")
             << EmoteLoadState{Network::Online, {{EmoteProvider::Bttv, 74}, {EmoteProvider::Ffz, 15}}, {EmoteProvider::SevenTv}, true, true}
-            << QStringLiteral("Emotes geladen: BTTV 74, FFZ 15 · Emotes: 7TV nicht erreichbar, die Wörter bleiben Text");
+            << QStringLiteral("Emotes geladen: BTTV 74, FFZ 15 · 7TV nicht erreichbar, die Wörter bleiben Text");
         QTest::newRow("keiner erreichbar")
             << EmoteLoadState{Network::Online, {}, {EmoteProvider::Bttv, EmoteProvider::SevenTv, EmoteProvider::Ffz}, true, true}
             << QStringLiteral("Emotes: BTTV, 7TV und FFZ nicht erreichbar, die Wörter bleiben Text");
         QTest::newRow("zwei nicht erreichbar")
             << EmoteLoadState{Network::Online, {{EmoteProvider::Ffz, 0}}, {EmoteProvider::Bttv, EmoteProvider::SevenTv}, true, true}
-            << QStringLiteral("Emotes geladen: FFZ 0 · Emotes: BTTV und 7TV nicht erreichbar, die Wörter bleiben Text");
+            << QStringLiteral("Emotes geladen: FFZ 0 · BTTV und 7TV nicht erreichbar, die Wörter bleiben Text");
         QTest::newRow("ohne Netz, gespeichert") << EmoteLoadState{Network::OfflineCached, all, {}, true, true}
                                                 << QStringLiteral("Emotes: Ohne Netz, Listen vom letzten Mal");
         QTest::newRow("ohne Netz, nichts gespeichert") << EmoteLoadState{Network::OfflineEmpty, {}, {}, true, true}
                                                        << QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen");
         QTest::newRow("ohne WebP")
             << EmoteLoadState{Network::Online, {{EmoteProvider::Ffz, 15}}, {}, false, true}
-            << QStringLiteral("Emotes geladen: FFZ 15 · Emotes: WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text");
+            << QStringLiteral("Emotes geladen: FFZ 15 · WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text");
         QTest::newRow("kein Kanal") << EmoteLoadState{Network::Online, all, {}, true, false}
-                                    << QStringLiteral("Emotes geladen: BTTV 74, 7TV 312, FFZ 15 · Emotes: kein Kanal angemeldet");
+                                    << QStringLiteral("Emotes geladen: BTTV 74, 7TV 312, FFZ 15 · kein Kanal angemeldet");
+        // «Emotes» höchstens einmal, auch wenn der erste Teil nicht «geladen» ist
+        QTest::newRow("ohne Netz, kein Kanal") << EmoteLoadState{Network::OfflineEmpty, {}, {}, true, false}
+                                               << QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen · kein Kanal angemeldet");
+        QTest::newRow("FFZ nicht erreichbar, ohne WebP, kein Kanal")
+            << EmoteLoadState{Network::Online, {}, {EmoteProvider::Ffz}, false, false}
+            << QStringLiteral("Emotes: FFZ nicht erreichbar, die Wörter bleiben Text · WebP fehlt "
+                              "(Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text · kein Kanal angemeldet");
+        QTest::newRow("nichts") << EmoteLoadState{Network::Online, {}, {}, true, true} << QString();
     }
 
     void statusTexts()

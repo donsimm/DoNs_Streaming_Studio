@@ -515,15 +515,14 @@ void MainWindow::connectChatBot()
         m_chatBot->resetEvents(m_eventRows.visibleRows());
         m_chatRows.reset(events, m_client->twitchStatus());
         m_chatBot->resetChat(m_chatRows.rows());
+        requestEmoteImages(m_chatRows.rows());
     });
     connect(m_client, &dss::CoreClient::eventReceived, this, [this](const dss::events::Event &event) {
         // P14 e2-12: Meldungen der Läufe (actions.run_*) nur in «Läufe der Aktionen»; ein gestarteter
         // Lauf bekommt dazu eine graue Zeile im «Chat» (e2-13).
         if (event.type.startsWith(QLatin1String("actions."))) {
-            if (event.type == QLatin1String("actions.run_started")) {
-                const dss::RowsAppend chat = m_chatRows.add(event, m_client->twitchStatus());
-                m_chatBot->appendChat(chat, chat.appended ? m_chatRows.rows().last() : dss::ChatRow());
-            }
+            if (event.type == QLatin1String("actions.run_started"))
+                showChatChange(m_chatRows.add(event, m_client->twitchStatus()));
             dss::actions::RunRecord record;
             QString error;
             if (!dss::runFromJson(event.data, &record, &error)) {
@@ -535,8 +534,7 @@ void MainWindow::connectChatBot()
             return;
         }
         // P14 e2-13: jedes Ereignis in «Chat» und «Ereignisse», sofern der Typ dort eine Zeile hat
-        const dss::RowsAppend chat = m_chatRows.add(event, m_client->twitchStatus());
-        m_chatBot->appendChat(chat, chat.appended ? m_chatRows.rows().last() : dss::ChatRow());
+        showChatChange(m_chatRows.add(event, m_client->twitchStatus()));
         const dss::RowsAppend row = m_eventRows.add(event);
         m_chatBot->appendEvent(row, row.appended ? m_eventRows.rows().last() : dss::EventRow());
     });

@@ -133,7 +133,8 @@ struct EmoteLoadState
 
     bool operator==(const EmoteLoadState &) const = default;
 };
-// Statuszeile, Teile mit « · » getrennt, z. B. «Emotes geladen: BTTV 74, 7TV 312, FFZ 15»
+// Statuszeile, Teile mit « · » getrennt, «Emotes» nur einmal vorne, z. B.
+// «Emotes geladen: BTTV 74, 7TV 312, FFZ 15 · kein Kanal angemeldet»
 QString emoteStatusText(const EmoteLoadState &state);
 // «<Name> (BTTV)»
 QString emoteToolTip(const Emote &emote);

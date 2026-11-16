@@ -712,13 +712,24 @@ void ChatBotPage::appendEvent(const dss::RowsAppend &change, const dss::EventRow
 
 void ChatBotPage::resetChat(const QList<dss::ChatRow> &rows)
 {
+    // Läuft auch bei neuen Emote-Listen (em-7): wie appendItem nur nach unten rollen, wenn die
+    // Liste schon unten stand (leere Liste gilt als unten); sonst die Leseposition behalten.
+    QScrollBar *bar = m_chat->verticalScrollBar();
+    const bool follow = atBottom(m_chat);
+    const int position = bar->value();
     m_chat->clear();
     QList<QTreeWidgetItem *> items;
     items.reserve(rows.size());
     for (const dss::ChatRow &row : rows)
         items.append(chatItem(row));
     m_chat->addTopLevelItems(items);
-    m_chat->scrollToBottom();
+    if (follow) {
+        m_chat->scrollToBottom();
+    } else {
+        // Bereich erst nach dem Layout der neuen Zeilen bekannt
+        m_chat->doItemsLayout();
+        bar->setValue(position);
+    }
 }
 
 void ChatBotPage::appendChat(const dss::RowsAppend &change, const dss::ChatRow &row)

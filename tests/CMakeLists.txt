@@ -246,12 +246,14 @@ if(DSS_BUILD_APP)
   # P14 e2-11: Reiter «Chat-Bot» im echten Fenster (Schalter «Chat-Bot aktiv», Unterreiter
   # «Aktionen») mit eigenem dss-core; ohne X11 übersprungen (77).
   # P14 e2-13: Senden gegen tests/twitchtestserver.h (127.0.0.1, ohne Netz)
-  qt_add_executable(tst_fensterchatbot tst_fensterchatbot.cpp twitchtestserver.h)
+  # P14 Emotes em-7: Emotes gegen den HTTP-Stub (emotestub.h, 127.0.0.1, ohne Netz)
+  qt_add_executable(tst_fensterchatbot tst_fensterchatbot.cpp twitchtestserver.h emotestub.h)
   target_link_libraries(tst_fensterchatbot PRIVATE dss_app_ui dss_warnings Qt6::Test Qt6::Network Qt6::WebSockets)
   # P14 e3-7: Variablen und Zuschauer für «Variablen» aus dem erfundenen Export (Import im Testkern)
   target_compile_definitions(tst_fensterchatbot PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
     DSS_TEST_APP_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften"
-    DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
+    DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export"
+    DSS_TEST_EMOTES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/emotes")
   add_dependencies(tst_fensterchatbot dss-core)
   add_test(NAME tst_fensterchatbot COMMAND tst_fensterchatbot)
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fenster-config-chatbot)
