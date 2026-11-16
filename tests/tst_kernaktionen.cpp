@@ -633,6 +633,13 @@ private slots:
         run = runAction(c, newAction(QStringLiteral("DSS-Test Ton fehlt"), {soundStep(QStringLiteral("media/fehlt.wav"), true)}));
         QCOMPARE(run.state, RunState::Error);
         QVERIFY2(run.log.at(0).message.contains(QStringLiteral("fehlt im Datenordner")), qPrintable(run.log.at(0).message));
+
+        // Pfad ausserhalb der Mediathek: abgewiesen, bevor eine Datei geöffnet wird
+        for (const QString &file : {QStringLiteral("media/../kern.ini"), QStringLiteral("/etc/hostname")}) {
+            run = runAction(c, newAction(QStringLiteral("DSS-Test Ton Pfad"), {soundStep(file, true)}));
+            QCOMPARE(run.state, RunState::Error);
+            QVERIFY2(run.log.at(0).message.contains(QStringLiteral("ungültig")), qPrintable(run.log.at(0).message));
+        }
         stop(core);
         QVERIFY2(core.log.contains(QStringLiteral("Ton Chat-Bot: Start")), qPrintable(core.log));
 #else

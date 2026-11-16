@@ -151,6 +151,13 @@ public:
                                                 : dss::actions::StepResult::failure(message));
                              });
         }
+        // Nur Dateien unter media/ im Datenordner: kein absoluter Pfad, kein «..»
+        if (!request.file.startsWith(QLatin1String("media/")) || QDir::isAbsolutePath(request.file)
+            || request.file.split(QLatin1Char('/')).contains(QLatin1String(".."))) {
+            done(dss::actions::StepResult::failure(
+                QStringLiteral("Datei «%1» ungültig, erwartet eine Datei der Mediathek (media/…).").arg(request.file)));
+            return;
+        }
         QString error;
         const quint64 id = sound->play(request.file, request.volume, &error);
         if (id == 0) {
