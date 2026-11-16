@@ -85,7 +85,7 @@ void OverlayLiveState::set(const LiveSetRequest &request, const Done &done)
     QHash<QUuid, QString> urls;
     QStringList warnings;
     for (const LiveElementRequest &e : request.elements) {
-        const QString image = m_options.substitute(e.image, request.arguments).trimmed();
+        const QString image = (request.resolved ? e.image : m_options.substitute(e.image, request.arguments)).trimmed();
         if (image.isEmpty())
             continue;
         if (isLiveImageUrl(image)) {
@@ -170,7 +170,7 @@ void OverlayLiveState::apply(const LiveSetRequest &request, const QHash<QUuid, Q
         if (s.kind == SourceKind::Text) {
             // Platzhalter im eigenen Text des Elements (Plan 4.4) oder Text aus dem Aufruf
             const QString original = e.text ? *e.text : s.text.content;
-            QString text = m_options.substitute(original, request.arguments);
+            QString text = e.text && request.resolved ? original : m_options.substitute(original, request.arguments);
             if (text.size() > kLiveMaxTextChars) {
                 text.truncate(kLiveMaxTextChars);
                 warnings.append(QStringLiteral("Text für «%1» auf %2 Zeichen gekürzt.").arg(s.name).arg(kLiveMaxTextChars));

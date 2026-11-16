@@ -217,6 +217,8 @@ public:
         for (const dss::actions::OverlayRequest::Element &e : request.elements)
             r.elements.append({e.source, e.text, e.image.value_or(QString())});
         r.durationMs = int(request.durationMs);
+        // Text und Bild aus dem Schritt hat der Lauf schon eingesetzt (ActionRun::executeOverlay)
+        r.resolved = true;
         // Argumente des Laufs für die Platzhalter im eigenen Text der Elemente
         for (auto it = request.arguments.cbegin(); it != request.arguments.cend(); ++it)
             r.arguments.insert(it.key(), dss::actions::placeholderText(it.value()));

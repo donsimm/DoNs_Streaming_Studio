@@ -93,6 +93,10 @@ struct LiveSetRequest
     QList<LiveElementRequest> elements;
     int durationMs = 0; // 0 = ohne Ende
     QHash<QString, QString> arguments; // Argumente des Laufs für die Platzhalter
+    // Text und Bild der Elemente sind schon eingesetzt (Schritt einer Aktion, der Lauf ersetzt sie):
+    // nicht nochmals ersetzen, sonst würde ein Wert mit «%…%» erneut ersetzt (Plan 2.9). Der eigene
+    // Text der Elemente wird weiter ersetzt. Nur im Kern, nicht in der Nachricht.
+    bool resolved = false;
 
     bool operator==(const LiveSetRequest &) const = default;
 };

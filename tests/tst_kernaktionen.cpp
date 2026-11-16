@@ -709,6 +709,26 @@ private slots:
         // Nach der Dauer fällt der ganze Laufzustand der Elemente weg
         QTRY_VERIFY_WITH_TIMEOUT(liveElements(core.socket, overlayId).isEmpty(), 6000);
 
+        // Ein eingesetzter Wert wird nie nochmals ersetzt (Plan 2.9): «%…%» in einem Wert bleibt wörtlich,
+        // im Text aus dem Schritt, im eigenen Text des Elements und im Bild
+        const QJsonObject tricky{{QStringLiteral("user"), QStringLiteral("%geheim%")},
+                                 {QStringLiteral("geheim"), QStringLiteral("Wert-X")},
+                                 {QStringLiteral("bild"), QStringLiteral("%anderesBild%")},
+                                 {QStringLiteral("anderesBild"), otherImage}};
+        run = runAction(c, newAction(QStringLiteral("DSS-Test einmal ersetzen"),
+                                     {overlayStep(overlayId, QStringLiteral("show"),
+                                                  {{greeting, std::nullopt, std::nullopt},
+                                                   {thanks, QStringLiteral("Danke %user%"), std::nullopt},
+                                                   {picture, std::nullopt, QStringLiteral("%bild%")}},
+                                                  300, false)}),
+                        tricky, &tookMs);
+        QVERIFY2(run.state == RunState::Ok, qPrintable(run.log.isEmpty() ? run.message : run.log.at(0).message));
+        live = liveElements(core.socket, overlayId);
+        QCOMPARE(live.value(greeting).text, std::optional<QString>(QStringLiteral("Hallo %geheim%!")));
+        QCOMPARE(live.value(thanks).text, std::optional<QString>(QStringLiteral("Danke %geheim%")));
+        QCOMPARE(live.value(picture).image, QString()); // «%anderesBild%» ist kein Bild: eigenes Bild
+        QTRY_VERIFY_WITH_TIMEOUT(liveElements(core.socket, overlayId).isEmpty(), 6000);
+
         // wait: der Lauf wartet die Dauer ab; «weich» wirkt in P14-1 wie ohne Übergang
         Step soft = overlayStep(overlayId, QStringLiteral("show"), {{greeting, std::nullopt, std::nullopt}}, 600, true);
         soft.fields.insert(QStringLiteral("transition_in"), QStringLiteral("fade"));
