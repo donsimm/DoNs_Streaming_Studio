@@ -99,7 +99,7 @@ QList<StepTypeInfo> buildStepTypes()
     t.append({QString::fromLatin1(kStepTwitchShoutout), QStringLiteral("Shoutout"), 0, StepPart::P14_1,
               false, true, {textField(QStringLiteral("login"))}});
     // color: Farbe der Ansage bei Twitch als Text. Laut Schritt 0 (B 17) blue, green, orange, purple,
-    // primary; die Prüfung kommt mit dem Schritt in c1.
+    // primary; geprüft beim Senden im Kern (TwitchActions, c1b).
     t.append({QString::fromLatin1(kStepTwitchAnnounce), QStringLiteral("Ansage"), 23, StepPart::P14_1,
               false, true,
               {textField(QStringLiteral("text")), textField(QStringLiteral("color"), QStringLiteral("primary")),

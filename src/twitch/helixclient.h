@@ -42,6 +42,8 @@ public:
         QJsonObject body;   // Antwort als JSON (leer bei 204 oder ohne JSON)
         QString error;      // Netzfehler auf Deutsch; leer mit Antwort
         bool ok() const { return status >= 200 && status < 300; }
+        // Grund auf Deutsch, wenn nicht ok: Netzfehler oder Status mit message aus dem Körper
+        QString errorText() const;
     };
     using Done = std::function<void(const Reply &)>;
 

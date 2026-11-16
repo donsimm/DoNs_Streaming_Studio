@@ -360,6 +360,9 @@ int main(int argc, char *argv[])
     TwitchChatTransport chatTransport(&twitch);
     actionOptions.chatTransport = &chatTransport;
     actionOptions.broadcasterId = [&chatTransport] { return chatTransport.broadcasterId(); };
+    // c1b: Benutzerinfo, Shoutout, Ansage
+    TwitchActions twitchActions(&twitch);
+    actionOptions.twitchApi = &twitchActions;
 #endif
     ActionService actions(service.eventBus(), actionOptions);
     actions.load();

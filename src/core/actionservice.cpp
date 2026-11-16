@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QLocalSocket>
+#include <QPointer>
 #include <QSaveFile>
 #include <QTimer>
 
@@ -68,23 +69,50 @@ QString pathText(const QList<int> &path)
 
 } // namespace
 
-// Bis Abschnitt c1b: Benutzerinfo, Shoutout und Ansage melden «Twitch nicht verbunden» (Chat senden
-// geht seit c1a über ChatOutbox).
-class ActionService::NotConnectedTwitch : public dss::actions::TwitchApi
+// Benutzerinfo, Shoutout und Ansage (c1b): an Options::twitchApi weiter; ohne (Twitch nicht
+// eingebaut) «Twitch nicht verbunden». Eine gefundene Benutzerinfo führt zuschauer.json nach (Plan 4.8).
+class ActionService::TwitchForward : public dss::actions::TwitchApi
 {
 public:
-    void userInfo(const QString &, dss::actions::StepDone done) override
+    explicit TwitchForward(ActionService *service)
+        : m_service(service)
     {
-        done(dss::actions::StepResult::failure(kTwitchNotConnected));
     }
-    void shoutout(const QString &, dss::actions::StepDone done) override
+
+    void userInfo(const QString &login, dss::actions::StepDone done) override
     {
-        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+        if (!api()) {
+            done(dss::actions::StepResult::failure(kTwitchNotConnected));
+            return;
+        }
+        QPointer<ActionService> service(m_service);
+        api()->userInfo(login, [service, done](const dss::actions::StepResult &r) {
+            if (service && r.ok && r.arguments.value(QStringLiteral("targetUserFound")).toBool())
+                service->noteViewer(r.arguments.value(QStringLiteral("targetUserId")).toString(),
+                                    r.arguments.value(QStringLiteral("targetUserName")).toString(),
+                                    r.arguments.value(QStringLiteral("targetUser")).toString());
+            done(r);
+        });
     }
-    void announce(const dss::actions::AnnounceRequest &, dss::actions::StepDone done) override
+    void shoutout(const QString &login, dss::actions::StepDone done) override
     {
-        done(dss::actions::StepResult::failure(kTwitchNotConnected));
+        if (api())
+            api()->shoutout(login, std::move(done));
+        else
+            done(dss::actions::StepResult::failure(kTwitchNotConnected));
     }
+    void announce(const dss::actions::AnnounceRequest &request, dss::actions::StepDone done) override
+    {
+        if (api())
+            api()->announce(request, std::move(done));
+        else
+            done(dss::actions::StepResult::failure(kTwitchNotConnected));
+    }
+
+private:
+    dss::actions::TwitchApi *api() const { return m_service->m_options.twitchApi; }
+
+    ActionService *m_service;
 };
 
 ActionService::ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent)
@@ -94,7 +122,7 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     , m_engine(std::make_unique<dss::actions::ActionEngine>(&m_clock, &m_variables))
     , m_dispatcher(std::make_unique<dss::actions::TriggerDispatcher>(&m_clock, &m_variables))
     , m_chat(std::make_unique<dss::actions::ChatOutbox>(&m_clock, options.chatTransport))
-    , m_twitch(std::make_unique<NotConnectedTwitch>())
+    , m_twitch(std::make_unique<TwitchForward>(this))
     , m_saver(new dss::SaveScheduler(this))
 {
     dss::actions::ActionServices services;
@@ -541,12 +569,10 @@ void ActionService::handleTestEvent(const dss::ActionsRequest &request, const Re
 void ActionService::onEvent(const dss::events::Event &event)
 {
     // Zuschauer nachführen (Plan 2.10): nur Login und Anzeigename
-    if (event.type == QLatin1String(dss::actions::kTriggerChatMessage) && m_viewersError.isEmpty()) {
-        if (dss::actions::noteViewer(&m_viewers, event.data.value(QStringLiteral("user_id")).toString(),
-                                     event.data.value(QStringLiteral("user_login")).toString(),
-                                     event.data.value(QStringLiteral("user_name")).toString()))
-            m_viewersChanged = true;
-    }
+    if (event.type == QLatin1String(dss::actions::kTriggerChatMessage))
+        noteViewer(event.data.value(QStringLiteral("user_id")).toString(),
+                   event.data.value(QStringLiteral("user_login")).toString(),
+                   event.data.value(QStringLiteral("user_name")).toString(), false);
     m_dispatcher->setMuted(m_muted);
     const dss::actions::TriggerEvent trigger{event.type, event.time, event.originId, event.data};
     // Eigener Kanal und «vom Studio gesendet» (Plan 4.1, c1a)
@@ -559,6 +585,15 @@ void ActionService::onEvent(const dss::events::Event &event)
     const dss::actions::TriggerResult r = m_dispatcher->handleEvent(trigger, context);
     dss::actions::submit(*m_engine, r);
     noteVariablesChanged();
+}
+
+void ActionService::noteViewer(const QString &userId, const QString &login, const QString &displayName, bool save)
+{
+    if (!m_viewersError.isEmpty() || !dss::actions::noteViewer(&m_viewers, userId, login, displayName))
+        return;
+    m_viewersChanged = true;
+    if (save)
+        noteVariablesChanged();
 }
 
 void ActionService::publishRun(const char *type, const dss::actions::RunRecord &record)

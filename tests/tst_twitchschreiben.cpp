@@ -1,9 +1,11 @@
 // Schreibende Aufrufe an Twitch (P14 c1a, Plan 4.1 und 10.4) gegen tests/twitchtestserver.h, ohne
 // Netz: Send Chat Message mit User-Token (Kanal), mit App-Token (Bot mit Abzeichen), Antwort
 // (reply_parent_message_id), Nachricht von Twitch nicht gesendet (drop_reason), falscher Absender
-// (Fehler von Twitch). c1b ergänzt Benutzerinfo, Shoutout und Ansage.
+// (Fehler von Twitch). c1b: Benutzerinfo (gefunden, unbekannt, Fehler), Shoutout (angenommen,
+// abgelehnt), Ansage (mit und ohne Farbe, 403 ohne Moderator).
 
 #include "chatmessage.h"
+#include "helixactions.h"
 #include "helixclient.h"
 #include "twitchauth.h"
 #include "twitchtestserver.h"
@@ -114,6 +116,112 @@ private slots:
         QVERIFY2(r->error.startsWith(QStringLiteral("Twitch antwortet mit 401")), qPrintable(r->error));
         QVERIFY(m_server->chatMessages.isEmpty());
         QVERIFY(!r->error.contains(token));
+    }
+
+    // --- c1b (Plan 4.8 und 4.9) ---
+
+private:
+    template <typename Result, typename Call>
+    std::optional<Result> wait(Call call)
+    {
+        std::optional<Result> result;
+        call([&](const Result &r) { result = r; });
+        if (!QTest::qWaitFor([&] { return result.has_value(); }, kWait))
+            return std::nullopt;
+        return result;
+    }
+
+private slots:
+    void userInfo()
+    {
+        FixedToken token;
+        token.token = m_server->addToken(kChannelUser, channelScopes());
+        m_server->addUser(QStringLiteral("900000001"), QStringLiteral("zuschauer42"), QStringLiteral("Zuschauer42"),
+                          QStringLiteral("Just Chatting"));
+        const auto found = wait<UserInfoResult>([&](auto done) { getUser(m_helix.get(), &token, QStringLiteral("zuschauer42"), done); });
+        QVERIFY(found);
+        QVERIFY2(found->error.isEmpty(), qPrintable(found->error));
+        QVERIFY(found->found);
+        QCOMPARE(found->user.id, QStringLiteral("900000001"));
+        QCOMPARE(found->user.login, QStringLiteral("zuschauer42"));
+        QCOMPARE(found->user.displayName, QStringLiteral("Zuschauer42"));
+        QCOMPARE(found->user.description, QStringLiteral("Beschreibung von Zuschauer42"));
+        QCOMPARE(found->user.profileImageUrl, QStringLiteral("https://bild.test/900000001.png"));
+        QCOMPARE(found->game, QStringLiteral("Just Chatting"));
+        QVERIFY(found->gameError.isEmpty());
+        const auto channels = m_server->requestsTo(QStringLiteral("/helix/channels"));
+        QCOMPARE(channels.size(), 1);
+        QCOMPARE(channels[0].query.queryItemValue(QStringLiteral("broadcaster_id")), QStringLiteral("900000001"));
+
+        // Unbekannt: kein Fehler, nicht gefunden, keine zweite Anfrage
+        const auto unknown = wait<UserInfoResult>([&](auto done) { getUser(m_helix.get(), &token, QStringLiteral("niemand"), done); });
+        QVERIFY(unknown && unknown->error.isEmpty() && !unknown->found);
+        QCOMPARE(m_server->requestsTo(QStringLiteral("/helix/channels")).size(), 1);
+
+        // Ungültiges Token: Fehler
+        token.token = QStringLiteral("ungueltig");
+        const auto failed = wait<UserInfoResult>([&](auto done) { getUser(m_helix.get(), &token, QStringLiteral("zuschauer42"), done); });
+        QVERIFY(failed && failed->error.startsWith(QStringLiteral("Twitch antwortet mit 401")));
+    }
+
+    void shoutout()
+    {
+        FixedToken token;
+        token.token = m_server->addToken(kChannelUser, channelScopes());
+        const auto ok = wait<HelixCallResult>([&](auto done) {
+            sendShoutout(m_helix.get(), &token, kChannelUser.id, QStringLiteral("900000001"), kChannelUser.id, done);
+        });
+        QVERIFY(ok);
+        QVERIFY2(ok->ok, qPrintable(ok->error));
+        QCOMPARE(ok->status, 204);
+        QCOMPARE(m_server->shoutouts.size(), 1);
+        const QUrlQuery q = m_server->shoutouts[0].query;
+        QCOMPARE(q.queryItemValue(QStringLiteral("from_broadcaster_id")), kChannelUser.id);
+        QCOMPARE(q.queryItemValue(QStringLiteral("to_broadcaster_id")), QStringLiteral("900000001"));
+        QCOMPARE(q.queryItemValue(QStringLiteral("moderator_id")), kChannelUser.id);
+
+        // Abgelehnt (nicht live): Fehler mit der Meldung von Twitch
+        m_server->rejectNextShoutout = QStringLiteral("The broadcaster is not streaming live");
+        const auto rejected = wait<HelixCallResult>([&](auto done) {
+            sendShoutout(m_helix.get(), &token, kChannelUser.id, QStringLiteral("900000001"), kChannelUser.id, done);
+        });
+        QVERIFY(rejected && !rejected->ok);
+        QCOMPARE(rejected->status, 400);
+        QCOMPARE(rejected->error, QStringLiteral("Twitch antwortet mit 400: The broadcaster is not streaming live"));
+        QCOMPARE(m_server->shoutouts.size(), 1);
+    }
+
+    void announcement()
+    {
+        FixedToken bot;
+        bot.token = m_server->addToken(kBotUser, botScopes());
+        const auto ok = wait<HelixCallResult>([&](auto done) {
+            sendAnnouncement(m_helix.get(), &bot, kChannelUser.id, kBotUser.id, QString::fromUtf8("Grüezi 😀"),
+                             QStringLiteral("purple"), done);
+        });
+        QVERIFY(ok);
+        QVERIFY2(ok->ok, qPrintable(ok->error));
+        QCOMPARE(m_server->announcements.size(), 1);
+        const auto &a = m_server->announcements[0];
+        QCOMPARE(a.query.queryItemValue(QStringLiteral("broadcaster_id")), kChannelUser.id);
+        QCOMPARE(a.query.queryItemValue(QStringLiteral("moderator_id")), kBotUser.id);
+        QCOMPARE(a.body.value(QStringLiteral("message")).toString(), QString::fromUtf8("Grüezi 😀"));
+        QCOMPARE(a.body.value(QStringLiteral("color")).toString(), QStringLiteral("purple"));
+
+        // Ohne Farbe fehlt das Feld (Twitch: primary)
+        QVERIFY(wait<HelixCallResult>([&](auto done) {
+            sendAnnouncement(m_helix.get(), &bot, kChannelUser.id, kBotUser.id, QStringLiteral("ohne"), {}, done);
+        })->ok);
+        QVERIFY(!m_server->announcements[1].body.contains(QStringLiteral("color")));
+
+        // Bot moderiert nicht: 403
+        m_server->nonModerators.insert(kBotUser.id);
+        const auto forbidden = wait<HelixCallResult>([&](auto done) {
+            sendAnnouncement(m_helix.get(), &bot, kChannelUser.id, kBotUser.id, QStringLiteral("nein"), {}, done);
+        });
+        QVERIFY(forbidden && !forbidden->ok);
+        QCOMPARE(forbidden->status, 403);
+        QCOMPARE(m_server->announcements.size(), 2);
     }
 };
 

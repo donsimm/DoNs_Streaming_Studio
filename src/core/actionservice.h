@@ -41,7 +41,8 @@ class SaveScheduler;
 // - Chat senden (c1a): ChatOutbox über Options::chatTransport (Kern mit Twitch); Ergebnis als
 //   twitch.chat_sent und twitch.chat_dropped auf dem Fluss. Eigene Nachrichten gelten bei den
 //   Auslösern als «intern» (Plan 4.1), broadcasterId kommt vom eigenen Kanal.
-// - Benutzerinfo, Shoutout und Ansage melden bis Abschnitt c1b «Twitch nicht verbunden»; Ton,
+// - Benutzerinfo, Shoutout und Ansage (c1b) über Options::twitchApi, ohne «Twitch nicht verbunden».
+//   Eine gefundene Benutzerinfo führt zuschauer.json nach (Login, Anzeigename, Plan 4.8). Ton,
 //   Overlay und OBS sind «nicht verfügbar» (c2, P14-2).
 class ActionService : public QObject
 {
@@ -58,6 +59,8 @@ public:
         bool testEvents = false;
         // c1a: Senden in den Chat; nullptr = Twitch nicht eingebaut. Lebt länger als der Dienst.
         dss::actions::ChatTransport *chatTransport = nullptr;
+        // c1b: Benutzerinfo, Shoutout, Ansage; nullptr = Twitch nicht eingebaut. Lebt länger als der Dienst.
+        dss::actions::TwitchApi *twitchApi = nullptr;
         // Twitch-ID des eigenen Kanals (geteilter Chat, Kanal darf Befehle immer); leer = unbekannt
         std::function<QString()> broadcasterId;
     };
@@ -84,7 +87,7 @@ signals:
     void broadcastRequested(const QJsonObject &message);
 
 private:
-    class NotConnectedTwitch;
+    class TwitchForward;
 
     using Reply = std::function<void(const QJsonObject &)>;
     void handleEdit(const dss::ActionsRequest &request, const Reply &reply);
@@ -100,6 +103,8 @@ private:
     void onRunFinished(const dss::actions::RunRecord &record);
     void publishRun(const char *type, const dss::actions::RunRecord &record);
     void publishChat(const dss::actions::ChatOutcome &outcome);
+    // zuschauer.json nachführen (nicht bei ungültiger Datei); save: Speichern anstossen
+    void noteViewer(const QString &userId, const QString &login, const QString &displayName, bool save = true);
 
     // aktionen.json atomar schreiben
     bool writeConfig(const dss::actions::ActionsConfig &config, QString *error);
@@ -122,7 +127,7 @@ private:
     std::unique_ptr<dss::actions::ActionEngine> m_engine;
     std::unique_ptr<dss::actions::TriggerDispatcher> m_dispatcher;
     std::unique_ptr<dss::actions::ChatOutbox> m_chat;
-    std::unique_ptr<NotConnectedTwitch> m_twitch;
+    std::unique_ptr<TwitchForward> m_twitch;
     dss::events::Subscription m_subscription;
 
     dss::actions::ActionsConfig m_config;

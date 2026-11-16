@@ -14,6 +14,15 @@
 
 namespace dss::twitch {
 
+QString HelixClient::Reply::errorText() const
+{
+    // Fehler von Twitch: status und message im Körper (https://dev.twitch.tv/docs/api/reference/)
+    const QString text = body.value(QStringLiteral("message")).toString();
+    return !error.isEmpty() ? error
+           : text.isEmpty() ? QStringLiteral("Twitch antwortet mit %1").arg(status)
+                            : QStringLiteral("Twitch antwortet mit %1: %2").arg(QString::number(status), text);
+}
+
 HelixClient::HelixClient(QNetworkAccessManager *network, QObject *parent)
     : QObject(parent)
     , m_network(network)

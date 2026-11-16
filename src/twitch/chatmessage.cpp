@@ -18,11 +18,7 @@ void sendChatMessage(HelixClient *helix, TokenSource *token, const ChatMessage &
     helix->post(token, QStringLiteral("/helix/chat/messages"), body, [done](const HelixClient::Reply &reply) {
         ChatMessageResult result;
         if (!reply.ok()) {
-            // Fehler von Twitch: status und message im Körper (https://dev.twitch.tv/docs/api/reference/)
-            const QString text = reply.body.value(QStringLiteral("message")).toString();
-            result.error = !reply.error.isEmpty() ? reply.error
-                           : text.isEmpty()       ? QStringLiteral("Twitch antwortet mit %1").arg(reply.status)
-                                                  : QStringLiteral("Twitch antwortet mit %1: %2").arg(QString::number(reply.status), text);
+            result.error = reply.errorText();
             done(result);
             return;
         }

@@ -8,6 +8,7 @@
 // - P14 c1a: Chat senden aus einer Aktion (Ersatz Kanal, Bot, Antwort), Konten in actions_status,
 //   eigene Nachrichten lösen keinen Befehl aus, kein Testtoken und kein Chat-Text im Protokoll.
 //   Die Chat-Nachrichten kommen über test_event (dss-core --testereignisse).
+// - P14 c1b: Benutzerinfo, Shoutout und Ansage aus einer Aktion, zuschauer.json nachgeführt.
 // Eigener Datenordner, eigener Ordner der Einstellungen; die Geheimnisse legt systemd-creds --user ab
 // (wie tst_kernverbindung).
 
@@ -21,6 +22,7 @@
 #include "protocol.h"
 #include "twitchtestserver.h"
 #include "version.h"
+#include "viewerdata.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -114,6 +116,16 @@ public:
                 types << m.value(QStringLiteral("event")).toObject().value(QStringLiteral("type")).toString();
         }
         return types;
+    }
+    // data des neuesten Ereignisses dieses Typs; leer, wenn keines
+    QJsonObject latestEventData(const QString &type) const
+    {
+        for (qsizetype i = m_messages.size() - 1; i >= 0; --i) {
+            const QJsonObject event = m_messages[i].value(QStringLiteral("event")).toObject();
+            if (messageType(m_messages[i]) == QLatin1String(msg::kEvent) && event.value(QStringLiteral("type")).toString() == type)
+                return event.value(QStringLiteral("data")).toObject();
+        }
+        return {};
     }
     QByteArray traffic() const { return m_received + m_sent; }
     QByteArray received() const { return m_received; }
@@ -488,6 +500,164 @@ private slots:
         for (const QString &text : {QStringLiteral("Geheimtext"), viewer.login})
             QVERIFY2(!core.log().contains(text), qPrintable(text));
         QVERIFY2(core.log().contains(QStringLiteral("Lauf «DSS-Test Chat»: ok")), qPrintable(core.log()));
+#endif
+    }
+
+    // P14 c1b (Plan 4.8 und 4.9): Befehl «!dssso» mit Benutzerinfo (mit «@», gross geschrieben),
+    // Chat mit allen Platzhaltern, Shoutout abgelehnt (nicht live) und angenommen, Ansage als Bot und
+    // als Kanal (2 s Abstand), Ansage als Bot ohne Moderator (Kanal sendet), unbekannte Farbe,
+    // unbekannter Name. zuschauer.json nachgeführt; keine Namen, Texte und Tokens im Protokoll.
+    void userInfoShoutoutAnnounce()
+    {
+#if !DSS_CORE_ACTIONS
+        QSKIP("Aktionssystem nicht eingebaut (DSS_CORE_ACTIONS aus)");
+#else
+        using namespace dss::actions;
+        TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        const TwitchTestUser viewer{QStringLiteral("900000001"), QStringLiteral("zuschauer_geheim_4711")};
+        server.addUser(viewer.id, viewer.login, QStringLiteral("Zuschauer_Geheim_4711"), QStringLiteral("Just Chatting"));
+        QTemporaryDir data;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && runtime->isValid());
+        const QString socketPath = runtime->filePath(QStringLiteral("kern.sock"));
+        const QStringList args{QStringLiteral("--twitch-testserver"), server.baseUrl().toString(),
+                               QStringLiteral("--testereignisse"), QStringLiteral("--einsatz-verbindung"),
+                               runtime->filePath(QStringLiteral("einsatz.sock"))};
+        Core core(data.path(), socketPath, twitchConfigHome(), args);
+        QVERIFY2(core.waitForLog(QStringLiteral("Twitch: eingeschaltet")), qPrintable(core.log()));
+        Window window;
+        QVERIFY(QTest::qWaitFor([&] { return window.open(socketPath); }, kWait));
+        window.send(subscribeEventsMessage({{QStringLiteral("actions.")}, false}));
+        const auto login = [&](qint64 id, const QString &account, const TwitchTestUser &user) {
+            window.send(twitchAccountRequestMessage(msg::kTwitchLoginStart, {id, account}));
+            return QTest::qWaitFor([&] { return server.approveLatest(user); }, kWait);
+        };
+        const auto request = [&](qint64 id, const char *type, const QJsonObject &fields) {
+            window.send(actionsRequestMessage({id, QString::fromLatin1(type), fields}));
+            return QTest::qWaitFor([&] { return window.result(id).has_value(); }, kWait) && window.result(id)->ok;
+        };
+        QVERIFY(login(2, QStringLiteral("channel"), kChannelUser));
+        QVERIFY(login(3, QStringLiteral("bot"), kBotUser));
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("bot"), QStringLiteral("x")), QString(), kWait);
+
+        Command command;
+        command.id = QUuid::createUuid();
+        command.name = QStringLiteral("DSS-Test");
+        command.commands = {QStringLiteral("!dssso")};
+        Action action;
+        action.id = QUuid::createUuid();
+        action.name = QStringLiteral("DSS-Test Shoutout");
+        Trigger trigger = newTrigger(QString::fromLatin1(kTriggerCommand));
+        trigger.fields.insert(QStringLiteral("command_id"), command.id.toString(QUuid::WithoutBraces));
+        action.triggers.append(trigger);
+        const auto step = [&](const char *type, const QJsonObject &fields) {
+            Step s = newStep(QString::fromLatin1(type));
+            for (auto it = fields.begin(); it != fields.end(); ++it)
+                s.fields.insert(it.key(), it.value());
+            action.steps.append(s);
+        };
+        step(kStepUserInfo, {{QStringLiteral("login"), QStringLiteral("@Zuschauer_Geheim_4711")}});
+        step(kStepChatSend, {{QStringLiteral("text"), QStringLiteral("%targetUser%|%targetUserName%|%targetUserId%|"
+                                                                     "%targetUserProfileImageUrl%|%targetDescription%|%game%|%targetUserFound%")},
+                             {QStringLiteral("use_bot"), false}});
+        step(kStepTwitchShoutout, {{QStringLiteral("login"), QStringLiteral("%targetUserName%")}}); // abgelehnt
+        step(kStepTwitchShoutout, {{QStringLiteral("login"), QStringLiteral("@%targetUserName%")}});
+        step(kStepTwitchAnnounce, {{QStringLiteral("text"), QStringLiteral("Ansage-Geheimtext eins")}, {QStringLiteral("color"), QStringLiteral("Blue")}});
+        step(kStepTwitchAnnounce, {{QStringLiteral("text"), QStringLiteral("Ansage-Geheimtext zwei")}, {QStringLiteral("use_bot"), false},
+                                   {QStringLiteral("color"), QString()}});
+        step(kStepTwitchAnnounce, {{QStringLiteral("text"), QStringLiteral("Ansage-Geheimtext drei")}, {QStringLiteral("color"), QStringLiteral("rot")}});
+        step(kStepUserInfo, {{QStringLiteral("login"), QStringLiteral("niemand")}});
+        step(kStepChatSend, {{QStringLiteral("text"), QStringLiteral("gefunden %targetUserFound%")}, {QStringLiteral("use_bot"), false}});
+        QVERIFY(request(10, msg::kCommandPut, {{QStringLiteral("command"), commandToJson(command)}}));
+        QVERIFY(request(11, msg::kActionPut, {{QStringLiteral("action"), actionToJson(action)}}));
+        QVERIFY(request(12, msg::kActionsSetEnabled, {{QStringLiteral("enabled"), true}}));
+
+        server.rejectNextShoutout = QStringLiteral("The broadcaster is not streaming live");
+        QVERIFY(request(13, msg::kTestEvent, {{QStringLiteral("event"), chatEvent(QStringLiteral("eins"), viewer, QStringLiteral("!dssso"), false)}}));
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 2, kWait);
+        QTRY_COMPARE_WITH_TIMEOUT(window.eventTypes().count(QStringLiteral("actions.run_finished")), 1, kWait);
+
+        QCOMPARE(server.chatMessages[0].body.value(QStringLiteral("message")).toString(),
+                 QStringLiteral("Zuschauer_Geheim_4711|zuschauer_geheim_4711|900000001|https://bild.test/900000001.png|"
+                                "Beschreibung von Zuschauer_Geheim_4711|Just Chatting|True"));
+        QCOMPARE(server.chatMessages[1].body.value(QStringLiteral("message")).toString(), QStringLiteral("gefunden False"));
+        QCOMPARE(server.requestsTo(QStringLiteral("/helix/users")).last().query.queryItemValue(QStringLiteral("login")),
+                 QStringLiteral("niemand"));
+        // Shoutout: der zweite angenommen, vom Kanal an den Zuschauer
+        QCOMPARE(server.shoutouts.size(), 1);
+        QCOMPARE(server.shoutouts[0].query.queryItemValue(QStringLiteral("to_broadcaster_id")), viewer.id);
+        QCOMPARE(server.shoutouts[0].query.queryItemValue(QStringLiteral("from_broadcaster_id")), kChannelUser.id);
+        QCOMPARE(server.shoutouts[0].tokenUserId, kChannelUser.id);
+        // Ansagen: als Bot, dann als Kanal, mindestens 2 s dazwischen; unbekannte Farbe geht nicht hinaus
+        QCOMPARE(server.announcements.size(), 2);
+        QCOMPARE(server.announcements[0].tokenUserId, kBotUser.id);
+        QCOMPARE(server.announcements[0].body.value(QStringLiteral("color")).toString(), QStringLiteral("blue"));
+        QCOMPARE(server.announcements[1].tokenUserId, kChannelUser.id);
+        QVERIFY(!server.announcements[1].body.contains(QStringLiteral("color")));
+        const qint64 gap = server.announcements[0].at.msecsTo(server.announcements[1].at);
+        QVERIFY2(gap >= 1900, qPrintable(QString::number(gap)));
+
+        // Lauf: Fehler bei Shoutout und Farbe, alle Schritte ausgeführt
+        const QJsonObject finished = window.latestEventData(QStringLiteral("actions.run_finished"));
+        QCOMPARE(finished.value(QStringLiteral("state")).toString(), QStringLiteral("error"));
+        window.send(actionsRequestMessage({20, QString::fromLatin1(msg::kActionRunDetails),
+                                           {{QStringLiteral("run_id"), finished.value(QStringLiteral("run_id"))}}}));
+        QTRY_VERIFY_WITH_TIMEOUT(!window.latest(msg::kActionRun).isEmpty(), kWait);
+        RunRecord run;
+        QString error;
+        QVERIFY(parseActionRun(window.latest(msg::kActionRun), &run, &error));
+        QStringList messages;
+        for (const StepLogEntry &e : run.log)
+            messages << e.message;
+        QCOMPARE(run.log.size(), 9);
+        QCOMPARE(messages.at(0), QStringLiteral("Benutzer gefunden"));
+        QCOMPARE(run.log.at(2).result, StepLogEntry::Result::Error);
+        QCOMPARE(messages.at(2), QStringLiteral("Shoutout abgelehnt: Twitch antwortet mit 400: The broadcaster is not streaming live"));
+        QCOMPARE(messages.at(3), QStringLiteral("Shoutout gegeben"));
+        QCOMPARE(messages.at(4), QStringLiteral("Ansage gesendet als Bot"));
+        QCOMPARE(messages.at(5), QStringLiteral("Ansage gesendet als Kanal"));
+        QCOMPARE(run.log.at(6).result, StepLogEntry::Result::Error);
+        QVERIFY2(messages.at(6).startsWith(QStringLiteral("Farbe «rot» unbekannt")), qPrintable(messages.at(6)));
+        QCOMPARE(messages.at(7), QStringLiteral("Benutzer nicht gefunden"));
+
+        // Bot moderiert nicht (403): der Kanal sendet
+        server.nonModerators.insert(kBotUser.id);
+        Action announceOnly = action;
+        announceOnly.id = QUuid::createUuid();
+        announceOnly.name = QStringLiteral("DSS-Test Ansage");
+        announceOnly.triggers.clear();
+        announceOnly.steps.clear();
+        Step botAnnounce = newStep(QString::fromLatin1(kStepTwitchAnnounce));
+        botAnnounce.fields.insert(QStringLiteral("text"), QStringLiteral("Ansage-Geheimtext vier"));
+        announceOnly.steps.append(botAnnounce);
+        QVERIFY(request(21, msg::kActionPut, {{QStringLiteral("action"), actionToJson(announceOnly)}}));
+        QVERIFY(request(22, msg::kActionTest, {{QStringLiteral("action_id"), announceOnly.id.toString(QUuid::WithoutBraces)},
+                                               {QStringLiteral("arguments"), QJsonObject()},
+                                               {QStringLiteral("dry_run"), false}}));
+        QTRY_COMPARE_WITH_TIMEOUT(server.announcements.size(), 3, kWait);
+        QCOMPARE(server.announcements[2].tokenUserId, kChannelUser.id);
+
+        const QByteArray traffic = window.traffic();
+        window.close();
+        QVERIFY2(core.stop(), qPrintable(core.log()));
+
+        // zuschauer.json nachgeführt (Login und Anzeigename aus der Benutzerinfo)
+        QFile viewersFile(data.filePath(QString::fromLatin1(kViewersFileName)));
+        QVERIFY(viewersFile.open(QIODevice::ReadOnly));
+        ViewersData viewers;
+        QVERIFY2(parseViewers(viewersFile.readAll(), &viewers, &error), qPrintable(error));
+        QCOMPARE(viewers.viewers.value(viewer.id).login, viewer.login);
+        QCOMPARE(viewers.viewers.value(viewer.id).displayName, QStringLiteral("Zuschauer_Geheim_4711"));
+
+        for (const QString &s : server.secrets()) {
+            QVERIFY2(!core.log().contains(s), qPrintable(QStringLiteral("im Protokoll: %1").arg(s.left(8))));
+            if (!s.startsWith(QLatin1String("NUTZER")))
+                QVERIFY2(!traffic.contains(s.toUtf8()), qPrintable(QStringLiteral("im Socket: %1").arg(s.left(8))));
+        }
+        for (const QString &text : {QStringLiteral("Geheimtext"), QStringLiteral("eheim_4711")})
+            QVERIFY2(!core.log().contains(text), qPrintable(text));
 #endif
     }
 

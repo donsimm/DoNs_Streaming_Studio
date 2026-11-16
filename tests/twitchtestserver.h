@@ -3,7 +3,8 @@
 // Testserver für die Anbindung an Twitch (P13, Plan 4 «Testserver statt Twitch CLI»): ein kleiner
 // HTTP-Teil auf QTcpServer für /oauth2/* und /helix/* und EventSub über WebSocket unter /ws, alles
 // auf demselben Port von 127.0.0.1, ohne Netz, ohne Konto, ohne TLS. Vom Test gesteuert, Muster wie
-// tests/obstestserver.h. Schreibende Aufrufe: P14 c1a POST /helix/chat/messages (c1b folgt).
+// tests/obstestserver.h. Schreibende Aufrufe: P14 c1a POST /helix/chat/messages, c1b GET
+// /helix/users?login=, GET /helix/channels, POST /helix/chat/shoutouts und /helix/chat/announcements.
 //
 // Verhalten nach der Doku von Twitch (Quellen in src/twitch/twitchauth.h und helixclient.h):
 // - POST /oauth2/device: device_code, user_code, verification_uri, expires_in, interval
@@ -187,6 +188,35 @@ public:
     };
     QList<ChatRecord> chatMessages;
     QString dropNextChat; // gesetzt: nächste Nachricht mit is_sent false und diesem drop_reason.code
+
+    // P14 c1b: GET /helix/users?login= sucht hier (Login → Objekt wie Get Users: id, login,
+    // display_name, description, profile_image_url); ohne login das Konto des Tokens.
+    // GET /helix/channels?broadcaster_id= liefert game_name aus channelGames (fehlt: leer).
+    QHash<QString, QJsonObject> users;
+    QHash<QString, QString> channelGames; // Twitch-ID → game_name
+    struct WriteRecord
+    {
+        QUrlQuery query;
+        QJsonObject body;
+        QString tokenUserId; // Konto des Tokens
+        QDateTime at;
+    };
+    QList<WriteRecord> shoutouts;     // angenommene POST /helix/chat/shoutouts
+    QList<WriteRecord> announcements; // angenommene POST /helix/chat/announcements
+    // gesetzt: nächster Shoutout mit 400 und dieser message (zum Beispiel «not streaming live»)
+    QString rejectNextShoutout;
+    QSet<QString> nonModerators; // Konten, die im Kanal nicht moderieren: Ansage 403
+
+    void addUser(const QString &id, const QString &login, const QString &displayName, const QString &game = {})
+    {
+        users.insert(login, {{QStringLiteral("id"), id},
+                             {QStringLiteral("login"), login},
+                             {QStringLiteral("display_name"), displayName},
+                             {QStringLiteral("description"), QStringLiteral("Beschreibung von ") + displayName},
+                             {QStringLiteral("profile_image_url"), QStringLiteral("https://bild.test/%1.png").arg(id)}});
+        if (!game.isEmpty())
+            channelGames.insert(id, game);
+    }
 
     // Bestätigt den neuesten offenen Gerätecode mit diesem Konto (wie der Nutzer im Browser).
     bool approveLatest(const TwitchTestUser &user, const QStringList &grantedScopes = {})
@@ -674,10 +704,23 @@ private:
                   {"Ratelimit-Limit: 800", "Ratelimit-Remaining: 0", "Ratelimit-Reset: " + QByteArray::number(reset)});
             return;
         }
-        if (request.path == QLatin1String("/helix/users") && request.method == "GET") {
+        if (request.path == QLatin1String("/helix/users") && request.method == "GET"
+            && request.query.hasQueryItem(QStringLiteral("login"))) {
+            const auto it = users.constFind(request.query.queryItemValue(QStringLiteral("login")));
+            reply(socket, 200, {{QStringLiteral("data"), it == users.cend() ? QJsonArray() : QJsonArray{*it}}});
+        } else if (request.path == QLatin1String("/helix/users") && request.method == "GET") {
             reply(socket, 200, {{QStringLiteral("data"),
                                  QJsonArray{QJsonObject{{QStringLiteral("id"), token->user.id},
                                                         {QStringLiteral("login"), token->user.login}}}}});
+        } else if (request.path == QLatin1String("/helix/channels") && request.method == "GET") {
+            const QString id = request.query.queryItemValue(QStringLiteral("broadcaster_id"));
+            reply(socket, 200, {{QStringLiteral("data"),
+                                 QJsonArray{QJsonObject{{QStringLiteral("broadcaster_id"), id},
+                                                        {QStringLiteral("game_name"), channelGames.value(id)}}}}});
+        } else if (request.path == QLatin1String("/helix/chat/shoutouts") && request.method == "POST") {
+            handleShoutout(socket, request, *token);
+        } else if (request.path == QLatin1String("/helix/chat/announcements") && request.method == "POST") {
+            handleAnnouncement(socket, request, *token);
         } else if (request.path == QLatin1String("/helix/streams") && request.method == "GET") {
             reply(socket, 200, streams);
         } else if (request.path == QLatin1String("/helix/eventsub/subscriptions") && request.method == "POST") {
@@ -747,6 +790,58 @@ private:
             dropNextChat.clear();
         }
         reply(socket, 200, {{QStringLiteral("data"), QJsonArray{data}}});
+    }
+
+    // P14 c1b: Send a Shoutout (https://dev.twitch.tv/docs/api/reference/chat): drei IDs als Query,
+    // moderator_id = Konto des Tokens, kein Shoutout an sich selbst; 204 ohne Körper.
+    void handleShoutout(QTcpSocket *socket, const TwitchHttpRequest &request, const Token &token)
+    {
+        const QString from = request.query.queryItemValue(QStringLiteral("from_broadcaster_id"));
+        const QString to = request.query.queryItemValue(QStringLiteral("to_broadcaster_id"));
+        const QString moderator = request.query.queryItemValue(QStringLiteral("moderator_id"));
+        if (from.isEmpty() || to.isEmpty() || moderator.isEmpty()) {
+            error(socket, 400, QStringLiteral("Missing required parameter"));
+            return;
+        }
+        if (moderator != token.user.id) {
+            error(socket, 401, QStringLiteral("The moderator_id must match the user ID in the access token"));
+            return;
+        }
+        if (from == to) {
+            error(socket, 400, QStringLiteral("The broadcaster may not give themselves a Shoutout"));
+            return;
+        }
+        if (!rejectNextShoutout.isEmpty()) {
+            const QString message = rejectNextShoutout;
+            rejectNextShoutout.clear();
+            error(socket, 400, message);
+            return;
+        }
+        shoutouts.append({request.query, {}, token.user.id, QDateTime::currentDateTimeUtc()});
+        reply(socket, 204, {});
+    }
+
+    // P14 c1b: Send Chat Announcement (https://dev.twitch.tv/docs/api/reference/chat): broadcaster_id
+    // und moderator_id als Query, message und color im Körper; moderiert der Token nicht: 403.
+    void handleAnnouncement(QTcpSocket *socket, const TwitchHttpRequest &request, const Token &token)
+    {
+        const QJsonObject body = QJsonDocument::fromJson(request.body).object();
+        const QString moderator = request.query.queryItemValue(QStringLiteral("moderator_id"));
+        if (request.query.queryItemValue(QStringLiteral("broadcaster_id")).isEmpty() || moderator.isEmpty()
+            || body.value(QStringLiteral("message")).toString().isEmpty()) {
+            error(socket, 400, QStringLiteral("Missing required parameter"));
+            return;
+        }
+        if (moderator != token.user.id) {
+            error(socket, 401, QStringLiteral("The moderator_id must match the user ID in the access token"));
+            return;
+        }
+        if (nonModerators.contains(moderator)) {
+            error(socket, 403, QStringLiteral("The user in moderator_id is not one of the broadcaster's moderators"));
+            return;
+        }
+        announcements.append({request.query, body, token.user.id, QDateTime::currentDateTimeUtc()});
+        reply(socket, 204, {});
     }
 
     QTcpServer *m_server = nullptr;
