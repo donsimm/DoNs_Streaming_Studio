@@ -735,6 +735,8 @@ void printSettings(const dss::CoreSettings &s, const QString &file, const QStrin
                                              .arg(s.port).arg(dss::kPortMin).arg(dss::kPortMax)},
                 {QStringLiteral("Adresse im Heimnetz"),
                  s.homeAddress.isEmpty() ? QStringLiteral("leer") : s.homeAddress},
+                {QStringLiteral("Twitch-Client-ID"), // P13
+                 s.twitchClientId.isEmpty() ? QStringLiteral("leer") : s.twitchClientId},
                 {QStringLiteral("Datei"), file},
                 {QStringLiteral("Quelle"), origin}});
 }
@@ -830,6 +832,13 @@ int runSettings(const Arguments &args)
     if (!info) {
         err() << "Fehler: " << error << '\n';
         return kExitError;
+    }
+    if (update.twitchClientId) { // P13
+        out() << QStringLiteral("Twitch-Client-ID: %1\n")
+                     .arg(info->settings.twitchClientId.isEmpty() ? QStringLiteral("leer")
+                                                                  : info->settings.twitchClientId)
+              << "Gespeichert in " << info->file << ".\n";
+        return kExitOk;
     }
     if (update.port)
         out() << QStringLiteral("Port: %1\n").arg(info->settings.port);

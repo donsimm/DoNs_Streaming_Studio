@@ -22,6 +22,7 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ├── zuschauer.json            Login und Anzeigename je Twitch-ID (P14), siehe «Zuschauer, Zitate, Archiv»
 ├── zitate.json               Zitate aus Streamer.bot (P14)
 ├── streamerbot-archiv.json   übrige Daten aus Streamer.bot, unverändert aufbewahrt (P14)
+├── twitch-sitzung.json       Zuschauer, die im laufenden Stream schon geschrieben haben (P13), siehe unten
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
@@ -30,6 +31,8 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 - **live-bilder/** (seit P14 d): Profilbilder, die der Kern für den Laufzustand eines Overlays lädt (`docs/08-kern-schnittstelle.md`, «Laufzustand»). Nur der Kern schreibt hier, höchstens 200 Dateien, die ältesten ungenutzten werden gelöscht; beim Start leert er den Ordner. Keine Overlay-Datei verweist darauf.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
 - **obs-quellen.json** (seit P10c, E-29): Zuordnung Overlay zu Browserquelle in OBS, gespeichert atomar (`QSaveFile`), nur vom Kern. Inhalt: `{"format":1,"quellen":[{"overlay":"<Kennung>","input_uuid":"<Kennung in OBS>","input_name":"<Name in OBS>"}]}`. Die Zuordnung läuft über `input_uuid`, bleibt also beim Umbenennen in OBS gültig. Fehlt die Quelle in OBS, bleibt der Eintrag: Bei einer anderen Szenensammlung fehlt sie nur scheinbar. Ohne Token und ohne Adresse. Ungültige Datei: wird in `obs-quellen.json.ungueltig-<JJJJMMTT-hhmmss>` umbenannt, der Kern beginnt ohne Zuordnung (bestehende Quellen übernimmt der Abgleich, wenn die Adresse genau stimmt).
+- **twitch-sitzung.json** (seit P13): Damit «erste Nachricht im Stream» (`twitch.first_message`) nach einem Neustart des Kerns im selben Stream nicht doppelt kommt, schreibt der Kern die Twitch-Benutzer-IDs der Zuschauer, die seit dem Start des Streams geschrieben haben, verzögert und atomar (`QSaveFile`) hierher, nur vom Kern (`src/twitch/chatsession.h`). Inhalt: `{"started_at":"<Start des Streams laut Twitch>","user_ids":["<ID>", …]}`, ohne Namen und ohne Nachrichten. Beim Start übernimmt der Kern die Liste nur, wenn Twitch denselben `started_at` meldet, sonst verwirft er sie. Ohne laufenden Stream schreibt er nichts; beim Ende des Streams löscht er die Datei.
+- **Anmeldungen bei Twitch** liegen nicht im Datenordner, sondern verschlüsselt neben `kern.ini` (wie `obs-passwort.cred`, F1, Regel 12): `twitch-token.cred` (Kanal), `twitch-bot-token.cred` (Bot) und `twitch-client-secret.cred` (Client Secret der App), je mit `systemd-creds --user` (Namen `dss-twitch-token`, `dss-twitch-bot-token`, `dss-twitch-client-secret`). Eine Token-Datei enthält verschlüsselt Access- und Refresh-Token, Ablaufzeit, Benutzer-ID, Anmeldename und Rechte; «Abmelden» löscht sie. Das App-Token für das Abzeichen «Chat Bot» bleibt nur im Speicher. Einzelheiten: `docs/08-kern-schnittstelle.md`, «Anbindung an Twitch».
 
 ## Liste (`liste.json`)
 

@@ -425,7 +425,18 @@ if(DSS_CORE_TWITCH)
   # P14 c1a: Chat senden aus einer Aktion über den Testserver (nur mit dem Aktionssystem)
   target_link_libraries(tst_kerntwitch PRIVATE dss_actions)
   target_compile_definitions(tst_kerntwitch PRIVATE DSS_CORE_ACTIONS=$<BOOL:${DSS_CORE_ACTIONS}>)
+  # Lastprobe der Prüfstufe «Baustein» (60 s, 50 Chat-Nachrichten pro Sekunde): nur mit
+  # ctest -C Lastprobe, nicht im normalen ctest.
+  add_test(NAME tst_kerntwitch_last CONFIGURATIONS Lastprobe COMMAND tst_kerntwitch chatLoad)
+  set_tests_properties(tst_kerntwitch_last PROPERTIES ENVIRONMENT DSS_LASTPROBE=1 TIMEOUT 300)
 endif()
+
+# P13, Commit 9: scripts/twitch-einrichten.sh gegen einen Testkern (eigener Datenordner, eigene
+# Verbindung, eigenes XDG_CONFIG_HOME), ohne Browser und ohne Twitch.
+find_program(DSS_PYTHON3_SKRIPT python3 REQUIRED)
+add_test(NAME tst_twitcheinrichten
+  COMMAND ${DSS_PYTHON3_SKRIPT} ${CMAKE_CURRENT_SOURCE_DIR}/twitch_einrichten_pruefen.py
+          ${PROJECT_SOURCE_DIR}/scripts/twitch-einrichten.sh $<TARGET_FILE:dss-core> $<TARGET_FILE:dss-cli>)
 
 # P11: Vergleichslogik der zwei Zeichner (Masszahlen, Kantenmaske), Qt Gui nur für QImage, ohne
 # Fenster. Genutzt von tst_browserquelle und tst_bildvergleich.
