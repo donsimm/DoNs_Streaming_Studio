@@ -113,7 +113,7 @@ private slots:
         QCOMPARE(runRow(r).result, QStringLiteral("fertig"));
         r.startedAt = r.queuedAt;
         r.finishedAt = r.queuedAt.addMSecs(1500);
-        QCOMPARE(runRow(r).result, QStringLiteral("fertig (1.5 s)"));
+        QCOMPARE(runRow(r).result, QStringLiteral("fertig (1,5 s)"));
         QCOMPARE(runRow(r).state, QStringLiteral("ok"));
         r.finishedAt = r.queuedAt.addMSecs(250);
         QCOMPARE(runRow(r).result, QStringLiteral("fertig (250 ms)"));
