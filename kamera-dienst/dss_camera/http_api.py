@@ -81,12 +81,14 @@ class Router:
 
 
 class Api:
-    def __init__(self, backend: Backend, fake: bool, controls=None, mover=None) -> None:
+    def __init__(self, backend: Backend, fake: bool, controls=None, mover=None, presets=None) -> None:
         self.backend = backend
         self.fake = fake
-        # controls.ControlManager und motion.Mover; fehlen ohne Geräte (Attrappe ohne --geraeteordner).
+        # controls.ControlManager, motion.Mover und presets.CameraPresets; fehlen ohne Geräte
+        # (Attrappe ohne --geraeteordner).
         self.controls = controls
         self.mover = mover
+        self.presets = presets
         self.router = Router()
         self.router.add("GET", "status", self.get_status)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
@@ -97,6 +99,12 @@ class Api:
         self.router.add("POST", "cameras/{cam}/stop", self.post_stop)
         self.router.add("POST", "cameras/{cam}/step", self.post_step)
         self.router.add("POST", "cameras/{cam}/home", self.post_home)
+        self.router.add("POST", "camera-presets", self.post_camera_preset)
+        self.router.add("GET", "camera-presets/{preset}", self.get_camera_preset)
+        self.router.add("PUT", "camera-presets/{preset}", self.put_camera_preset)
+        self.router.add("DELETE", "camera-presets/{preset}", self.delete_camera_preset)
+        self.router.add("POST", "camera-presets/{preset}/save-current", self.post_save_current)
+        self.router.add("POST", "camera-presets/{preset}/recall", self.post_recall)
 
     def get_status(self, request: Request) -> dict:
         return {
@@ -147,6 +155,30 @@ class Api:
 
     def post_home(self, request: Request, cam: str) -> dict:
         return self._mover().home(cam, request.json(optional=True))
+
+    def _presets(self):
+        if self.presets is None:
+            raise ApiError(404, "not_found",
+                           "Kamera-Presets gibt es nur mit Geräten (Attrappe: mit --geraeteordner).")
+        return self.presets
+
+    def post_camera_preset(self, request: Request) -> dict:
+        return self._presets().create(request.json())
+
+    def get_camera_preset(self, request: Request, preset: str) -> dict:
+        return self._presets().get(preset)
+
+    def put_camera_preset(self, request: Request, preset: str) -> dict:
+        return self._presets().put(preset, request.json())
+
+    def delete_camera_preset(self, request: Request, preset: str) -> dict:
+        return self._presets().delete(preset)
+
+    def post_save_current(self, request: Request, preset: str) -> dict:
+        return self._presets().save_current(preset, request.json(optional=True))
+
+    def post_recall(self, request: Request, preset: str) -> dict:
+        return self._presets().recall(preset, request.json(optional=True))
 
 
 def make_handler(api: Api, allowed_addresses: frozenset[str]):

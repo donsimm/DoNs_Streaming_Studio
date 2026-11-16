@@ -19,6 +19,7 @@ from .devices import DeviceWatcher
 from .fake import FakeBackend, fake_watcher, open_fake_device
 from .http_api import Api, Servers
 from .motion import Mover
+from .presets import CameraPresets, PresetStore
 from .store import CameraStore, default_data_dir
 
 EXIT_CONFIG = 1
@@ -70,13 +71,16 @@ def main(argv: list[str] | None = None) -> int:
         backend = DeviceBackend(devices)
     manager = None
     mover = None
+    presets = None
     if devices is not None:
         # Gemerkte Werte in $XDG_DATA_HOME/dss-kamera/kameras.json (Plan 3).
         store = CameraStore(default_data_dir())
         manager = ControlManager(devices, store, open_device)
         devices.add_listener(manager.restore_pending)
         mover = Mover(manager, store)
-    api = Api(backend, fake=args.attrappe, controls=manager, mover=mover)
+        backend.preset_store = PresetStore(default_data_dir())
+        presets = CameraPresets(backend.preset_store, mover, manager)
+    api = Api(backend, fake=args.attrappe, controls=manager, mover=mover, presets=presets)
     try:
         servers = Servers(api, settings.listen_addresses, settings.port, settings.allowed_addresses)
     except OSError as error:

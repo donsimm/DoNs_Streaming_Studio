@@ -60,6 +60,9 @@ class FakeBackend(Backend):
         return [dict(light) for light in self._lights]
 
     def camera_presets(self) -> list[dict]:
+        # Mit Attrappen-Ordner die echten Presets aus kamera-presets.json.
+        if self.preset_store is not None:
+            return self.preset_store.summary()
         return [dict(preset) for preset in self._camera_presets]
 
     def light_presets(self) -> list[dict]:

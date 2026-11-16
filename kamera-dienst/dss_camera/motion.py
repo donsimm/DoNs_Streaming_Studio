@@ -356,6 +356,14 @@ class Mover:
                           lambda found, current: {name: value for name, value in wanted.items()
                                                   if value is not None and name in found})
 
+    def current(self, camera_id: str) -> dict:
+        """Aktuelle Position (wie `position`) für Presets; ohne Wecken und ohne KI-Befehl."""
+        settings = self.settings(camera_id)
+        camera = self._ptz_camera(camera_id)
+        with self._manager.movable(camera_id, False) as device:
+            found = axes(camera.model, camera.controls, settings)
+            return position(found, {name: device.get(axis.control_id) for name, axis in found.items()})
+
     def _goto(self, camera_id: str, settings: dict, wake: bool, target) -> dict:
         camera = self._ptz_camera(camera_id)
         self._cancel(camera_id)
