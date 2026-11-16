@@ -591,7 +591,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 | `action_put`, `command_put`, `timer_put`, `queue_put`, `group_put` | `action`, `command`, `timer`, `queue` bzw. `group` (ganzes Objekt wie in `aktionen.json`) | `change_result`; `id` = Kennung, wenn neu angelegt |
 | `action_remove`, `command_remove`, `timer_remove`, `queue_remove`, `group_remove` | `action_id`, `command_id`, `timer_id`, `queue_id` bzw. `group_id` | `change_result` |
 | `action_copy` | `action_id` | `change_result` mit `id` der Kopie («<Name> (Kopie)», gleich nach dem Original) |
-| `action_reset` | `action_id` | bis Abschnitt f immer abgewiesen (Vorlagen fehlen) |
+| `action_reset` | genau eines von `action_id` (mitgelieferte Aktion nach der Vorlage zurücksetzen, Kennung und Platz bleiben) und `template_id` (gelöschte mitgelieferte Aktion am Ende wieder anlegen) (P14 f1, gleiche Version) | `change_result`; bei `template_id` `id` der neuen Aktion (die Kennung der Vorlage, wenn frei). Fehlende Befehle, Zeitnachrichten und Warteschlangen der Vorlage kommen mit; eine Warteschlange gleichen Namens wird benutzt. Auslöser und Schritte bekommen neue Kennungen. Abgewiesen (`rejected`): eigene Aktion, schon vorhanden, unbekannte Vorlage |
 | `queue_control` | `queue_id` (`null` = «Standard»), `control` (`pause`, `resume`, `clear`) | `change_result`; gilt bis zum Neustart |
 | `variable_set` | `scope` (`global`, `user`), `user_id` (nur bei `user`), `name`, `persisted`, `value` (Text oder Zahl) | `change_result` |
 | `variable_remove` | wie `variable_set` ohne `value` | `change_result` |
@@ -610,7 +610,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 
 Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_failed`, `unknown_action`, `unknown_run`, `actions_unavailable`, `invalid_message` (Feld fehlt oder falsche Art).
 
-**Speichern:** Jede Änderung prüft den ganzen Stand wie beim Lesen (Kennungen über die Datei eindeutig) und schreibt `aktionen.json` sofort und atomar. Eine ungültige Datei wird nie überschrieben: Der Bot bleibt aus, `actions_config` trägt `file_error`, Änderungen werden mit `actions_file_error` abgewiesen. Fehlt die Datei, gilt ein leerer Stand mit Hauptschalter aus (die mitgelieferten Aktionen kommen mit Abschnitt f). Variablen (`variablen.json`) und Zuschauer (`zuschauer.json`, nachgeführt aus `twitch.chat_message`) schreibt der Kern zusammengefasst und beim Beenden. `SIGHUP` liest alle Dateien neu.
+**Speichern:** Jede Änderung prüft den ganzen Stand wie beim Lesen (Kennungen über die Datei eindeutig) und schreibt `aktionen.json` sofort und atomar. Eine ungültige Datei wird nie überschrieben: Der Bot bleibt aus, `actions_config` trägt `file_error`, Änderungen werden mit `actions_file_error` abgewiesen. Fehlt die Datei, legt der Kern die mitgelieferten Aktionen aus der eingebauten Vorlage `src/actions/vorlage/aktionen.json` an und schreibt sie, Hauptschalter aus (P14 f1, Plan 7); eine vorhandene Datei bleibt immer unberührt. Variablen (`variablen.json`) und Zuschauer (`zuschauer.json`, nachgeführt aus `twitch.chat_message`) schreibt der Kern zusammengefasst und beim Beenden. `SIGHUP` liest alle Dateien neu.
 
 **Läufe:** Ereignisse `twitch.*` vom Fluss, Befehle und Zeitnachrichten starten Läufe (Plan 3.1 bis 3.3). Ins Protokoll kommen nur Name der Aktion, Ergebnis, Grund und die Nummer und der Typ fehlerhafter Schritte, keine Chat-Texte und keine Zuschauernamen (Plan 3.5).
 

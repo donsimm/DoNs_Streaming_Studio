@@ -170,6 +170,7 @@ class Core
 public:
     Core(const QString &dataDir, const QString &socketPath, const QString &configHome, const QStringList &args)
     {
+        testhelp::writeEmptyActions(dataDir); // ohne mitgelieferte Aktionen (P14 f1)
         m_process = testhelp::startCore(dataDir, socketPath, configHome, args);
         QObject::connect(m_process.get(), &QProcess::readyReadStandardError,
                          [this] { m_log += QString::fromUtf8(m_process->readAllStandardError()); });

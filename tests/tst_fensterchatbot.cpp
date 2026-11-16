@@ -343,6 +343,7 @@ private slots:
         m_run = testhelp::runtimeDir();
         const QString socket = m_run->filePath(QStringLiteral("kern.sock"));
         m_inUseSocket = m_run->filePath(QStringLiteral("einsatz.sock"));
+        QVERIFY(testhelp::writeEmptyActions(m_data.path())); // ohne mitgelieferte Aktionen (P14 f1)
         m_core = testhelp::startCore(m_data.path(), socket, testhelp::testConfigHome(),
                                      {QStringLiteral("--einsatz-verbindung"), m_inUseSocket,
                                       QStringLiteral("--testereignisse")});

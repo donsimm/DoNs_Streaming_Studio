@@ -2,6 +2,7 @@
 
 #include "actionedit.h"
 #include "actionjson.h"
+#include "actiontemplate.h"
 #include "overlaylivestate.h"
 #include "placeholders.h"
 #include "protocol.h"
@@ -358,7 +359,8 @@ void ActionService::load()
     QByteArray bytes;
     bool exists = false;
 
-    // aktionen.json; fehlt sie, gilt der leere Stand (die mitgelieferten Aktionen kommen mit f)
+    // aktionen.json; fehlt sie, legt der Kern die mitgelieferten Aktionen an (Plan 2.11 und 7,
+    // Hauptschalter aus), nie über eine vorhandene Datei
     dss::actions::ActionsConfig config;
     m_configError.clear();
     if (!readFile(filePath(dss::actions::kActionsFileName), &bytes, &exists, &error)
@@ -366,6 +368,15 @@ void ActionService::load()
         m_configError = QStringLiteral("%1: %2").arg(QLatin1String(dss::actions::kActionsFileName), error);
         config = {};
         qCritical("Aktionen: %s; die Datei bleibt unverändert, Chat-Bot aus", qPrintable(m_configError));
+    } else if (!exists) {
+        QString templateError;
+        config = dss::actions::actionTemplate(&templateError);
+        if (!templateError.isEmpty())
+            qCritical("Aktionen: %s", qPrintable(templateError));
+        else if (!writeConfig(config, &error))
+            qCritical("Aktionen: mitgelieferte Aktionen nicht gespeichert: %s", qPrintable(error));
+        else
+            qInfo("Aktionen: aktionen.json fehlte, mitgelieferte Aktionen angelegt");
     }
     m_config = config;
 

@@ -102,6 +102,11 @@ target_compile_definitions(tst_aktionsformat PRIVATE
   DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen"
   DSS_CORE_BIN="$<TARGET_FILE:dss-core>") # --format-pruefen
 add_dependencies(tst_aktionsformat dss-core)
+# P14 f1: mitgelieferte Aktionen (Vorlage, Anlegen durch den Kern, Zurücksetzen, Wiederherstellen)
+dss_add_test(tst_mitgeliefert)
+target_link_libraries(tst_mitgeliefert PRIVATE dss_actions)
+target_compile_definitions(tst_mitgeliefert PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+add_dependencies(tst_mitgeliefert dss-core)
 # P14 a: Platzhalter wie Streamer.bot, Variablen und Zähler (variablen.json), ohne Qt Gui.
 dss_add_test(tst_platzhalter)
 target_link_libraries(tst_platzhalter PRIVATE dss_actions)

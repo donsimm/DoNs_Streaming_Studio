@@ -73,6 +73,8 @@ public:
     // Freigabe der Knöpfe, vom MainWindow aus der Auswahl und actionResettable() berechnet.
     // add gilt auch für Menü und Doppelklick der Gruppen (ohne Kern keines von beiden).
     void setListButtons(bool add, bool copyRemove, bool reset);
+    // P14 f1: Menüeintrag «Mitgelieferte Aktionen wiederherstellen …» frei (es fehlt mindestens eine)
+    void setRestoreAvailable(bool available) { m_restoreAvailable = available; }
 
     // P14 e2-15, Mitte. Felder zeigen den Wert des Kerns; ein Textfeld, an dem der Nutzer gerade
     // schreibt, bleibt, solange sich der Wert im Kern nicht ändert. resetFields: immer den Wert des
@@ -109,6 +111,7 @@ signals:
     void copyClicked();
     void removeClicked();
     void resetClicked();
+    void restoreTemplatesRequested(); // P14 f1, Menü der Liste
     void renameGroupRequested(const QString &group);
     void removeGroupRequested(const QString &group);
     // P14 e2-15, Mitte: Textfelder beim Verlassen oder mit Enter, Kästchen und Auswahl sofort
@@ -154,6 +157,7 @@ private:
     QUuid m_wantedAction;      // selectAction() vor dem Eintreffen der Zeile
     bool m_filling = false;
     bool m_groupEditing = false; // aus setListButtons(add): Kern verbunden, Liste geladen
+    bool m_restoreAvailable = false;
 
     // Mitte
     Theme m_theme;

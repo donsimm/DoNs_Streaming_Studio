@@ -257,6 +257,7 @@ private:
     {
         Core c;
         c.socket = m_run->path() + QLatin1Char('/') + name + QStringLiteral(".sock");
+        writeEmptyActions(dataDir); // ohne mitgelieferte Aktionen (P14 f1, tst_mitgeliefert)
         c.process = startCore(dataDir, c.socket, testConfigHome(),
                               QStringList{QStringLiteral("--einsatz-verbindung"), m_inUseSocket,
                                           QStringLiteral("--testereignisse")}

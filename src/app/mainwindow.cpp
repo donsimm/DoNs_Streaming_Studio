@@ -670,6 +670,20 @@ void MainWindow::connectActions()
             return;
         runActionEdits(dss::resetAction(*info->config, id), action->name);
     });
+    // P14 f1: gelöschte mitgelieferte Aktionen wieder anlegen (Plan 7), nach Rückfrage
+    connect(page, &ActionsPage::restoreTemplatesRequested, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (!info || !info->config)
+            return;
+        const QString question = dss::restoreTemplatesQuestion(*info->config);
+        if (question.isEmpty()
+            || !confirm(this, QStringLiteral("Mitgelieferte Aktionen wiederherstellen?"), question,
+                        QStringLiteral("Wiederherstellen"), QStringLiteral("Abbrechen")))
+            return;
+        const QStringList names = dss::missingTemplateNames(*info->config);
+        runActionEdits(dss::restoreTemplateActions(*info->config), names.size() == 1 ? names.first()
+                                                                                       : QStringLiteral("%1 Aktionen").arg(names.size()));
+    });
     connect(page, &ActionsPage::renameGroupRequested, this, &MainWindow::askRenameActionGroup);
     connect(page, &ActionsPage::removeGroupRequested, this, &MainWindow::askRemoveActionGroup);
     // Antworten: beim ersten Fehler aufhören (die Meldung zeigt onChangeFinished, aus der Mitte
@@ -996,6 +1010,7 @@ void MainWindow::refreshActionButtons()
         editable ? info->config->action(m_chatBot->actionsPage()->selectedAction()) : nullptr;
     m_chatBot->actionsPage()->setListButtons(editable, action != nullptr,
                                              action && dss::actionResettable(*action));
+    m_chatBot->actionsPage()->setRestoreAvailable(editable && !dss::missingTemplateNames(*info->config).isEmpty());
     refreshActionDetail();
 }
 

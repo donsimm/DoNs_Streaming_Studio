@@ -37,7 +37,7 @@ struct TwitchStatusInfo;
 // variable_remove); fields die Felder der Nachricht. Festgelegt seit b3 in actionprotocol.h und
 // docs/08, «Aktionen» (actionsEditMessage setzt type und request_id dazu):
 // action_put {action}, command_put {command}, timer_put {timer} (Inhalt wie in aktionen.json),
-// *_remove, action_copy, action_reset {action_id | command_id | timer_id},
+// *_remove, action_copy, action_reset {action_id | template_id},
 // variable_set {scope, user_id, name, persisted, value}, variable_remove {scope, user_id, name, persisted}.
 struct ActionsEdit
 {
@@ -125,6 +125,13 @@ bool actionResettable(const actions::Action &action);
 EditResult resetAction(const actions::ActionsConfig &config, const QUuid &actionId);
 // Rückfrage vor «Zurücksetzen» (Plan 7)
 QString resetActionQuestion(const actions::Action &action);
+// P14 f1: gelöschte mitgelieferte Aktionen (Plan 7, Menü der Liste «Mitgelieferte Aktionen
+// wiederherstellen …»). Namen in der Reihenfolge der Vorlage; leer = keine fehlt.
+QStringList missingTemplateNames(const actions::ActionsConfig &config);
+// je fehlende Aktion ein action_reset {template_id}; leer, wenn keine fehlt
+EditResult restoreTemplateActions(const actions::ActionsConfig &config);
+// Rückfrage mit den Namen; leer, wenn keine fehlt
+QString restoreTemplatesQuestion(const actions::ActionsConfig &config);
 
 // Gruppe umbenennen: je Aktion der Gruppe ein action_put mit dem neuen Namen (ohne Leerzeichen am
 // Rand). Gruppen gibt es nur über ihre Aktionen (Plan 2.3); mitgelieferte Aktionen werden mit

@@ -32,7 +32,8 @@ const QList<RequestRule> &requestRules()
         {msg::kActionPut, {{"action", Kind::Object}}},
         {msg::kActionRemove, {{"action_id", Kind::Uuid}}},
         {msg::kActionCopy, {{"action_id", Kind::Uuid}}},
-        {msg::kActionReset, {{"action_id", Kind::Uuid}}},
+        // f1: action_id (zurücksetzen) oder template_id (gelöschte wieder anlegen), genau eines
+        {msg::kActionReset, {{"action_id", Kind::Uuid, true}, {"template_id", Kind::Uuid, true}}},
         {msg::kCommandPut, {{"command", Kind::Object}}},
         {msg::kCommandRemove, {{"command_id", Kind::Uuid}}},
         {msg::kTimerPut, {{"timer", Kind::Object}}},

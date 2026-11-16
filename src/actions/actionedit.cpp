@@ -1,6 +1,7 @@
 #include "actionedit.h"
 
 #include "actionjson.h"
+#include "actiontemplate.h"
 
 #include <QSet>
 
@@ -136,14 +137,22 @@ ConfigEditResult applyConfigEdit(ActionsConfig *config, const QString &type, con
         next.actions.insert(at + 1, copy); // gleich nach dem Original (Reihenfolge der Läufe, Plan 3.2)
         result = {true, {}, copy.id, copy.name};
     } else if (type == QLatin1String("action_reset")) {
-        const QUuid id = idField(fields, QStringLiteral("action_id"));
-        const Action *action = next.action(id);
-        if (!action)
-            return failure(QStringLiteral("Eine Aktion mit der Kennung %1 gibt es nicht").arg(id.toString(QUuid::WithoutBraces)));
-        if (action->templateId.isNull())
-            return failure(QStringLiteral("«%1» ist keine mitgelieferte Aktion").arg(action->name));
-        // Die Vorlagen kommen mit Abschnitt f (Plan 7)
-        return failure(QStringLiteral("Zurücksetzen geht noch nicht: Vorlagen fehlen"));
+        // Plan 7: mit action_id zurücksetzen, mit template_id eine gelöschte wieder anlegen
+        const bool byAction = fields.contains(QStringLiteral("action_id"));
+        if (byAction == fields.contains(QStringLiteral("template_id")))
+            return failure(QStringLiteral("Genau eines von action_id und template_id angeben"));
+        QString error;
+        if (byAction) {
+            const QUuid id = idField(fields, QStringLiteral("action_id"));
+            if (!resetActionToTemplate(&next, id, &error))
+                return failure(error);
+            result = {true, {}, {}, next.action(id)->name};
+        } else {
+            QUuid created;
+            if (!restoreTemplateAction(&next, idField(fields, QStringLiteral("template_id")), &created, &error))
+                return failure(error);
+            result = {true, {}, created, next.action(created)->name};
+        }
     } else if (type == QLatin1String("command_put")) {
         result = put(&next, &ActionsConfig::commands, fields, "command", &commandFromJson);
     } else if (type == QLatin1String("command_remove")) {

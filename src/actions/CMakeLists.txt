@@ -24,6 +24,11 @@ add_library(dss_actions STATIC
   triggerdispatcher.h triggerdispatcher.cpp
   actionedit.h actionedit.cpp # b3: Änderungen an aktionen.json (Kern)
   chatoutbox.h chatoutbox.cpp # c1a: Chat senden (Grenzen, Kürzen, Schleifen), ohne Netz
+  actiontemplate.h actiontemplate.cpp # f1: mitgelieferte Aktionen (Plan 7)
 )
 target_include_directories(dss_actions PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dss_actions PUBLIC Qt6::Core dss_events PRIVATE dss_warnings)
+# f1: Vorlage der mitgelieferten Aktionen als Qt-Ressource (:/dss/vorlage/aktionen.json). Bei einer
+# statischen Bibliothek bindet Qt die Ressource über ein Objekt mit ein, ohne Q_INIT_RESOURCE.
+# https://doc.qt.io/qt-6.8/qt-add-resources.html
+qt_add_resources(dss_actions dss_actions_vorlage PREFIX "/dss/vorlage" BASE vorlage FILES vorlage/aktionen.json)

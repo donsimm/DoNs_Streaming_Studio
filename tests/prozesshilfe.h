@@ -98,6 +98,19 @@ inline std::unique_ptr<QProcess> startCore(const QString &dataDir, const QString
     return p;
 }
 
+// P14 f1: Fehlt aktionen.json, legt der Kern die mitgelieferten Aktionen an (Plan 7). Tests, die
+// mit einem leeren Aktionssystem rechnen, legen vorher diese leere Datei an (vorhandene bleibt).
+inline bool writeEmptyActions(const QString &dataDir)
+{
+    QFile f(dataDir + QStringLiteral("/aktionen.json"));
+    if (f.exists())
+        return true;
+    return f.open(QIODevice::WriteOnly)
+           && f.write("{\"format_version\": 1, \"enabled\": false, \"queues\": [], \"groups\": [], "
+                      "\"actions\": [], \"commands\": [], \"timers\": []}\n")
+                  > 0;
+}
+
 // Wartet, bis das gesammelte Protokoll text enthält. log sammelt alles Gelesene.
 inline bool waitForLog(QProcess *p, const QString &text, QString *log, int timeoutMs = 5000)
 {

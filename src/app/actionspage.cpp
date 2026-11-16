@@ -729,15 +729,20 @@ void ActionsPage::setListButtons(bool add, bool copyRemove, bool reset)
 
 void ActionsPage::showGroupMenu(const QPoint &position)
 {
-    // Wie das Dock «Overlays»: ohne Kern kein Menü, sonst nur an einer Gruppenzeile
+    // Wie das Dock «Overlays»: ohne Kern kein Menü; an einer Gruppenzeile Umbenennen und Löschen.
+    // Danach wie das Dock «Medien» der allgemeine Eintrag, ausgegraut, wenn nichts fehlt (P14 f1).
     if (!m_groupEditing)
         return;
     const QTreeWidgetItem *item = m_tree->itemAt(position);
-    if (!item || !item->data(0, kIsGroupRole).toBool())
-        return;
-    const QString group = item->data(0, kGroupRole).toString();
     QMenu menu(this);
-    menu.addAction(QStringLiteral("Umbenennen …"), this, [this, group] { emit renameGroupRequested(group); });
-    menu.addAction(QStringLiteral("Löschen …"), this, [this, group] { emit removeGroupRequested(group); });
+    if (item && item->data(0, kIsGroupRole).toBool()) {
+        const QString group = item->data(0, kGroupRole).toString();
+        menu.addAction(QStringLiteral("Umbenennen …"), this, [this, group] { emit renameGroupRequested(group); });
+        menu.addAction(QStringLiteral("Löschen …"), this, [this, group] { emit removeGroupRequested(group); });
+        menu.addSeparator();
+    }
+    menu.addAction(QStringLiteral("Mitgelieferte Aktionen wiederherstellen …"), this,
+                   &ActionsPage::restoreTemplatesRequested)
+        ->setEnabled(m_restoreAvailable);
     menu.exec(m_tree->viewport()->mapToGlobal(position));
 }

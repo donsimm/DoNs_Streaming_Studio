@@ -2,6 +2,7 @@
 
 #include "actionjson.h"
 #include "actionprotocol.h"
+#include "actiontemplate.h"
 #include "eventtypes.h"
 #include "fieldspec.h"
 #include "protocol.h"
@@ -698,6 +699,31 @@ QString resetActionQuestion(const Action &action)
     return QStringLiteral("Aktion «%1» auf die mitgelieferte Fassung zurücksetzen? Eigene Änderungen "
                           "an Auslösern und Schritten gehen verloren.")
         .arg(action.name);
+}
+
+QStringList missingTemplateNames(const ActionsConfig &config)
+{
+    QStringList names;
+    for (const QUuid &id : actions::missingTemplates(config))
+        names.append(actions::templateAction(id)->name);
+    return names;
+}
+
+EditResult restoreTemplateActions(const ActionsConfig &config)
+{
+    EditResult r;
+    for (const QUuid &id : actions::missingTemplates(config))
+        r.edits.append(edit("action_reset", {{QStringLiteral("template_id"), uuidText(id)}}));
+    return r;
+}
+
+QString restoreTemplatesQuestion(const ActionsConfig &config)
+{
+    const QStringList names = missingTemplateNames(config);
+    if (names.isEmpty())
+        return {};
+    return QStringLiteral("Diese mitgelieferten Aktionen wieder anlegen? Sie kommen ans Ende der Liste.\n\n%1")
+        .arg(names.join(QLatin1Char('\n')));
 }
 
 EditResult renameActionGroup(const ActionsConfig &config, const QString &group, const QString &name)
