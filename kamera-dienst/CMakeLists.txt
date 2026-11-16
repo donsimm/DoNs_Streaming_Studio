@@ -49,3 +49,11 @@ set_tests_properties(kd_licht PROPERTIES TIMEOUT 120)
 add_test(NAME kd_ereignisse
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ereignisse.py)
 set_tests_properties(kd_ereignisse PROPERTIES TIMEOUT 120)
+
+# Installation: installieren.sh mit --ziel in einen Ordner unter build/ (ohne Einheit, ohne ssh),
+# zweiter Lauf mit Sicherung, Dienst startet aus dem Zielordner; system-einrichten.sh nur
+# mit bash -n und --trocken.
+add_test(NAME kd_installieren
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_installieren.py
+          ${CMAKE_CURRENT_BINARY_DIR}/kd_installieren)
+set_tests_properties(kd_installieren PROPERTIES TIMEOUT 180)

@@ -18,7 +18,7 @@ Keine Anmeldung, dafür drei Schichten (Plan 5):
 
 1. **Bindung:** Der Dienst lauscht nur auf IPv4, auf den Adressen aus `lauschadressen` (Adresse des Streaming-PCs im Heimnetz und `127.0.0.1`).
 2. **Absender:** Nur Adressen aus `erlaubte-adressen` (Standard: `<studio-pc>` und `127.0.0.1`) bekommen eine Antwort; andere bekommen `403 forbidden` und einen Eintrag im Protokoll. Die Liste lässt sich nur in `dienst.ini` ändern, nicht über die Schnittstelle.
-3. **Firewall:** `system-einrichten.sh` öffnet den Port nur für `<studio-pc>` (folgt mit Abschnitt c3).
+3. **Firewall:** `sudo ~/.local/opt/dss-kamera/system-einrichten.sh <studio-pc>` legt in firewalld dauerhaft die reiche Regel `rule family="ipv4" source address="<studio-pc>" port port="8093" protocol="tcp" accept` an (wie die Regel für obs-websocket auf 4455) und lädt neu. Andere Absender trifft das Ziel der Zone; sie öffnet den Bereich 1025–65535 nicht mehr (Schritt 0). `--entfernen` nimmt die Regel wieder heraus, `--trocken` zeigt nur die Befehle. Installation, Entfernen und Rückweg: `kamera-dienst/LIESMICH.md`.
 
 Es gibt keine Zugangsdaten. Im Protokoll stehen Adressen anderer Absender nur bei `403`.
 
@@ -241,3 +241,5 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 - Python `http.server`: https://docs.python.org/3/library/http.server.html (nicht abgerufen)
 - Elgato Key Light: https://apihandyman.io/hacking-elgato-key-light-with-postman/
 - OBSBOT Tiny 2, Frames: https://github.com/cgevans/tiny2
+- firewalld, reiche Regeln: https://firewalld.org/documentation/man-pages/firewalld.richlanguage.html und https://firewalld.org/documentation/man-pages/firewall-cmd.html (nicht abgerufen)
+- systemd-Benutzereinheit: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html (nicht abgerufen)

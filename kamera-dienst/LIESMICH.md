@@ -56,4 +56,53 @@ Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR (setzbar, nu
 
 ## Installation
 
-Folgt mit Abschnitt c (`installieren.sh`, `system-einrichten.sh`).
+| | Ort auf dem Streaming-PC |
+|---|---|
+| Programm | `~/.local/opt/dss-kamera/` |
+| Daten | `~/.local/share/dss-kamera/` |
+| Einstellungen | `~/.config/dss-kamera/dienst.ini` |
+| Einheit | `~/.config/systemd/user/dss-kamera.service` (startet mit der Anmeldung, Neustart bei Fehler) |
+| Sicherungen | `~/.local/share/dss-kamera-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/` (`programm/`, `daten/`) |
+| Protokoll | `journalctl --user -u dss-kamera` |
+
+1. **Installieren oder aktualisieren** (auf dem Studio-PC, eine Zeile):
+
+   ```
+   ~/DoNs_Streaming_Studio/kamera-dienst/installieren.sh <streaming-pc>
+   ```
+
+   Kopiert den Dienst über `ssh` auf den Streaming-PC, sichert vorher Programm und Daten (nur wenn schon eine Version installiert ist), schreibt die Einheit, startet den Dienst neu und prüft `GET /api/v1/status`. Daten und `dienst.ini` bleiben unverändert.
+2. **Einstellungen** (einmal, auf dem Streaming-PC): `~/.config/dss-kamera/dienst.ini` wie oben unter «Start» anlegen, danach `systemctl --user restart dss-kamera`. Ohne die Datei ist der Dienst nur auf dem Streaming-PC selbst erreichbar.
+3. **Firewall** (einmal, auf dem Streaming-PC, `sudo` gibt der Nutzer ein):
+
+   ```
+   sudo ~/.local/opt/dss-kamera/system-einrichten.sh <studio-pc>
+   ```
+
+   Zeigt zuerst den Befehl und öffnet dann den Port 8093/tcp dauerhaft nur für `<studio-pc>` (reiche Regel in firewalld wie für obs-websocket). Anderer Port: `--port N`, andere Zone: `--zone NAME`, nur anzeigen: `--trocken`. Eine udev-Regel braucht es nicht.
+4. **cameractrls:** Läuft der Wiederherstellungsdienst `cameractrlsd`, abschalten; er und der Kamera-Dienst würden sonst gegeneinander Werte setzen. cameractrls selbst nie gleichzeitig mit dem Dienst nutzen.
+
+**Entfernen** (auf dem Streaming-PC):
+
+```
+sudo ~/.local/opt/dss-kamera/system-einrichten.sh --entfernen <studio-pc>
+systemctl --user disable --now dss-kamera
+rm ~/.config/systemd/user/dss-kamera.service
+systemctl --user daemon-reload
+rm -r ~/.local/opt/dss-kamera
+```
+
+Daten, `dienst.ini` und Sicherungen bleiben liegen; wer sie nicht mehr braucht, löscht `~/.local/share/dss-kamera`, `~/.config/dss-kamera` und `~/.local/share/dss-kamera-sicherungen` von Hand.
+
+**Rückweg** zur vorigen Version (auf dem Streaming-PC, `<zeit>` = Ordner der Sicherung):
+
+```
+systemctl --user stop dss-kamera
+rm -r ~/.local/opt/dss-kamera
+cp -a ~/.local/share/dss-kamera-sicherungen/<zeit>/programm ~/.local/opt/dss-kamera
+systemctl --user start dss-kamera
+```
+
+Die Daten nur zurückholen, wenn die neue Version sie verdorben hat: vorher `~/.local/share/dss-kamera` umbenennen, dann `…/<zeit>/daten` dorthin kopieren. Welche Version installiert ist, steht in `~/.local/opt/dss-kamera/version.txt`.
+
+**Nur zum Prüfen** (Claude Code und Lotse, nie gegen die echte Installation): `installieren.sh --lokal --ziel ORDNER --datenordner ORDNER --ohne-einheit` auf diesem PC ohne `ssh`, oder mit `<streaming-pc>` statt `--lokal` in einen Testordner auf dem Streaming-PC. Die drei Optionen gehen nur zusammen.

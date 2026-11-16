@@ -94,7 +94,7 @@ Für das Studio wichtig, von Lotse per SSH lesend geprüft am 2026-11-08 (Berich
 | Grafik | RTX 4090, Treiber 595.112.07 |
 | OBS | 32.2.2 (rpm) |
 | obs-websocket | 5.7.4 auf Port 4455 (IPv4 und IPv6), mit Anmeldung, vom Studio-PC aus erreichbar |
-| Firewall | Zone `FedoraWorkstation` auf `eno2`, Ports 1025–65535 TCP/UDP offen |
+| Firewall | Zone `FedoraWorkstation` auf `eno2`, offen nur `41641/udp`, die Dienste dhcpv6-client, mdns und samba-client sowie reiche Regeln (4455 nur vom Studio-PC, ssh aus dem Heimnetz); der Bereich 1025–65535 ist nicht mehr offen (Schritt 0 P15, 2026-11-15) |
 | NDI-Plugin | fehlt (Angabe von Lotse in der Übergabe vom 2026-11-08, `docs/archiv/uebergabe-2026-11-08.md`) |
 
 Zugang und Rechte: `CLAUDE.md`, «Umgebung».
