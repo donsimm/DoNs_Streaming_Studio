@@ -1,5 +1,6 @@
 #include "actionspage.h"
 
+#include "actionfieldspanel.h"
 #include "panels.h"
 
 #include <QCheckBox>
@@ -169,6 +170,10 @@ ActionsPage::ActionsPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     column->addWidget(buttonBar({m_add, m_newGroup, m_copy, m_remove}, {m_reset}, m_areas[List]));
 
     createActionArea();
+
+    // P14 e2-16, rechts: Felder des gewählten Schritts oder Auslösers
+    m_fields = new ActionFieldsPanel(m_areas[Detail]);
+    m_areas[Detail]->layout()->addWidget(m_fields);
 }
 
 void ActionsPage::createActionArea()
@@ -219,20 +224,6 @@ void ActionsPage::createActionArea()
                                 {testLabel, m_testUser, m_test, m_realTest}, area));
 }
 
-QLabel *ActionsPage::createProblemLine(QWidget *parent)
-{
-    // Prüfmeldung am Feld (Entscheid des Nutzers, 2026-11-16): eine Zeile, immer da, damit eine
-    // Meldung die Anordnung nicht verschiebt; der ganze Text steht im Hinweis beim Darüberfahren.
-    auto *label = new QLabel(QStringLiteral("—"), parent);
-    label->setObjectName(QStringLiteral("fieldProblem"));
-    label->setTextFormat(Qt::PlainText);
-    label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-    label->ensurePolished();
-    label->setMinimumHeight(label->sizeHint().height());
-    label->clear();
-    return label;
-}
-
 QWidget *ActionsPage::createActionSection()
 {
     QGridLayout *grid = nullptr;
@@ -269,7 +260,7 @@ QWidget *ActionsPage::createActionSection()
     grid->addWidget(m_queue, 1, 1);
     grid->addWidget(m_enabled, 1, 2, 1, 2);
     grid->addWidget(m_hint, 2, 1, 1, 3);
-    m_problems[ActionSection] = createProblemLine(w);
+    m_problems[ActionSection] = problemLine(w);
     grid->addWidget(m_problems[ActionSection], 3, 0, 1, 4);
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(3, 1);
@@ -296,7 +287,7 @@ QWidget *ActionsPage::createTriggerSection()
     m_triggerAdd->setObjectName(QStringLiteral("actionTriggerAdd"));
     fillTypeMenu(m_triggerAdd, dss::triggerChoices(), [this](const QString &type) { emit triggerAddChosen(type); });
     m_triggerRemove = symbolButton(QStringLiteral("entfernen.svg"), QStringLiteral("–"),
-                                   QStringLiteral("Auslöser entfernen"), nullptr);
+                                   QStringLiteral("Auslöser löschen"), nullptr);
     m_triggerRemove->setObjectName(QStringLiteral("actionTriggerRemove"));
     connect(m_triggerRemove, &QToolButton::clicked, this, &ActionsPage::triggerRemoveClicked);
 
@@ -307,7 +298,7 @@ QWidget *ActionsPage::createTriggerSection()
     m_triggers->setRootIsDecorated(false);
     m_triggers->setEnabled(false);
     grid->addWidget(m_triggers, 0, 0);
-    m_problems[TriggerSection] = createProblemLine(w);
+    m_problems[TriggerSection] = problemLine(w);
     grid->addWidget(m_problems[TriggerSection], 1, 0);
     grid->setRowStretch(0, 1);
 
@@ -336,7 +327,7 @@ QWidget *ActionsPage::createStepSection()
     m_steps->setItemDelegate(new ForegroundDelegate(m_steps));
     m_steps->setEnabled(false);
     grid->addWidget(m_steps, 0, 0);
-    m_problems[StepSection] = createProblemLine(w);
+    m_problems[StepSection] = problemLine(w);
     grid->addWidget(m_problems[StepSection], 1, 0);
     grid->setRowStretch(0, 1);
 
@@ -498,12 +489,18 @@ void ActionsPage::setSectionProblem(Section section, const QString &text)
 {
     if (section == NoSection)
         return;
+    if (section == DetailSection) {
+        m_fields->setProblem(text);
+        return;
+    }
     m_problems[section]->setText(text);
     m_problems[section]->setToolTip(text);
 }
 
 QString ActionsPage::sectionProblem(Section section) const
 {
+    if (section == DetailSection)
+        return m_fields->problem();
     return section == NoSection ? QString() : m_problems[section]->text();
 }
 

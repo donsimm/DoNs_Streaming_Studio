@@ -130,6 +130,20 @@ QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWi
     return box;
 }
 
+QLabel *problemLine(QWidget *parent)
+{
+    // Prüfmeldung am Feld (Entscheid des Nutzers, 2026-11-16): eine Zeile, immer da, damit eine
+    // Meldung die Anordnung nicht verschiebt; der ganze Text steht im Hinweis beim Darüberfahren.
+    auto *label = new QLabel(QStringLiteral("—"), parent);
+    label->setObjectName(QStringLiteral("fieldProblem"));
+    label->setTextFormat(Qt::PlainText);
+    label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    label->ensurePolished();
+    label->setMinimumHeight(label->sizeHint().height());
+    label->clear();
+    return label;
+}
+
 QWidget *dockPanel(const QString &title, QWidget *content, QWidget *parent)
 {
     auto *panel = new QWidget(parent);

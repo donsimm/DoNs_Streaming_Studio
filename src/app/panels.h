@@ -6,6 +6,7 @@
 
 class QAbstractSpinBox;
 class QGridLayout;
+class QLabel;
 class QToolButton;
 class QWidget;
 
@@ -35,6 +36,10 @@ QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, 
 
 // Liste mit einer Knopfleiste (buttonBar) darunter.
 QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent);
+
+// Prüfmeldung unter einem Abschnitt (#fieldProblem, stateError): Zeile mit reservierter Höhe, auch
+// ohne Meldung. P14 e2-15 für die Mitte, seit e2-16 auch für die rechte Spalte.
+QLabel *problemLine(QWidget *parent);
 
 // Bereich wie ein Dock: Titel (#chatBotPanelTitle) wie QDockWidget::title, darunter der Inhalt
 // (#chatBotPanelBody), fest ohne Lösen und Schliessen.

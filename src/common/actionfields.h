@@ -56,6 +56,21 @@ struct FieldSection
     QString hint = {};               // Hinweis unter dem Abschnitt (grau), meist leer
 };
 
+struct ActionViewNames;
+
+// Eintrag einer Auswahl aus den Daten (FieldRow::choices), P14 e2-16
+struct FieldChoice
+{
+    QString value; // Kennung in Kleinbuchstaben ohne Klammern; leer = null («Keine»)
+    QString label;
+    bool operator==(const FieldChoice &) const = default;
+};
+// Auswahl zu FieldRow::choices mit Kennungen (overlay, source, action, command, timer, queue):
+// «Keine», dann die Einträge nach Name. Fehlt current in den Daten, steht er als «<Kennung> (fehlt)»
+// am Ende, damit das Feld den Wert des Kerns zeigen kann. Andere Arten (media, leer): leer.
+QList<FieldChoice> fieldChoices(const QString &choices, const actions::ActionsConfig &config,
+                                const ActionViewNames &names, const QString &current);
+
 // Gespeicherter Wert (aus aktionen.json) in den angezeigten Wert umrechnen, z. B. 8500 ms → 8,5 s.
 double toDisplay(const FieldRow &row, double stored);
 // Angezeigten Wert zurück in den gespeicherten; bei Art Int auf ganze Zahlen gerundet.
@@ -72,6 +87,8 @@ QString stepTitle(const actions::Step &step);
 QList<FieldSection> triggerForm(const QString &type);
 // «Auslöser «<Art>»»; Art = TriggerTypeInfo::label, bei unbekanntem Typ der Typ selbst.
 QString triggerTitle(const actions::Trigger &trigger);
+// Grauer Hinweis rechts für Arten, deren Form leer ist (Entscheid des Nutzers, 2026-11-16).
+QString emptyFormHint();
 // Titel des Abschnitts mit dem Feld (Schritt oder Auslöser), für die Prüfmeldung darunter; leer, wenn
 // das Feld fehlt.
 QString fieldSection(const QList<FieldSection> &form, const QString &fieldName);

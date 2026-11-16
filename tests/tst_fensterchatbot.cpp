@@ -7,6 +7,8 @@
 // und «Chat-Nachrichten ausblenden».
 // P14 e2-14: «Aktionen» links (Suche, Baum, Leiste, Gruppen umbenennen und löschen).
 
+#include "actionfields.h"
+#include "actionfieldspanel.h"
 #include "actionjson.h"
 #include "actionmodel.h"
 #include "actionspage.h"
@@ -17,12 +19,14 @@
 #include "steptypes.h"
 #include "symbols.h"
 #include "theme.h"
+#include "triggertypes.h"
 #include "twitchtestserver.h"
 #include "version.h"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFrame>
 #include <QHeaderView>
 #include <QImage>
@@ -34,6 +38,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QStandardItemModel>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -1013,14 +1018,15 @@ private slots:
         auto *hint = actionSection ? actionSection->findChild<QLabel *>(QStringLiteral("hintLabel")) : nullptr;
         QVERIFY(tree && name && group && queue && enabled && triggers && steps && triggerAdd && triggerRemove
                 && stepAdd && stepRemove && stepUp && stepDown && testUser && test && realTest && hint);
-        const QList<QLabel *> problems = page->findChildren<QLabel *>(QStringLiteral("fieldProblem"));
+        const QList<QLabel *> problems =
+            page->area(ActionsPage::Action)->findChildren<QLabel *>(QStringLiteral("fieldProblem"));
         QCOMPARE(problems.size(), 3);
         for (QLabel *problem : problems)
             QVERIFY(problem->height() > 0); // Höhe reserviert, auch ohne Meldung
 
         // Abschnitte über section(), Tooltips und Leiste wie unter den Docks
         const QList<std::pair<QToolButton *, QString>> tips{
-            {triggerAdd, QStringLiteral("Auslöser hinzufügen")}, {triggerRemove, QStringLiteral("Auslöser entfernen")},
+            {triggerAdd, QStringLiteral("Auslöser hinzufügen")}, {triggerRemove, QStringLiteral("Auslöser löschen")},
             {stepAdd, QStringLiteral("Schritt hinzufügen")}, {stepRemove, QStringLiteral("Schritt löschen")},
             {stepUp, QStringLiteral("Schritt nach oben")}, {stepDown, QStringLiteral("Schritt nach unten")}};
         for (const auto &[button, tip] : tips) {
@@ -1164,6 +1170,146 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!coreAction(id), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
                                   QStringLiteral("Gelöscht: DSS-Test Mitte Neu"), 3000);
+    }
+
+    // P14 e2-16, rechts: eine Seite je Art, Wechsel ohne Neuaufbau, Zeiten in Sekunden mit Komma,
+    // «weich» ausgegraut mit Grund, Prüfmeldung unter dem Abschnitt, Hinweis bei Cheer.
+    void actionFields()
+    {
+        QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
+        auto *page = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+        ActionFieldsPanel *panel = page->fieldsPanel();
+        QVERIFY(panel && panel->parentWidget() == page->area(ActionsPage::Detail));
+        auto *scroll = child<QScrollArea>("actionFieldsScroll");
+        QVERIFY(scroll);
+        QCOMPARE(scroll->frameShape(), QFrame::NoFrame);
+        QCOMPARE(scroll->horizontalScrollBarPolicy(), Qt::ScrollBarAlwaysOff);
+
+        // Jede Art hat ihre Seite
+        for (const actions::StepTypeInfo &t : actions::stepTypes())
+            QVERIFY2(panel->page(ActionFieldsPanel::Target::Step, t.key), qPrintable(t.key));
+        for (const actions::TriggerTypeInfo &t : actions::triggerTypes())
+            QVERIFY2(panel->page(ActionFieldsPanel::Target::Trigger, t.key), qPrintable(t.key));
+        const int widgetCount = int(panel->findChildren<QWidget *>().size());
+
+        // Aktion mit Pause, Overlay-Schritt (ein Element mit einer Quelle, die es nicht gibt) und Cheer
+        actions::Step delay = actions::newStep(QString::fromLatin1(actions::kStepDelay));
+        actions::Step overlay = actions::newStep(QString::fromLatin1(actions::kStepOverlaySource));
+        const QString missingSource = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        overlay.fields.insert(QStringLiteral("elements"),
+                              QJsonArray{QJsonObject{{QStringLiteral("source"), missingSource},
+                                                     {QStringLiteral("text"), QJsonValue::Null},
+                                                     {QStringLiteral("image"), QJsonValue::Null}}});
+        const actions::Trigger cheer = actions::newTrigger(QString::fromLatin1(actions::kTriggerCheer));
+        actions::Action a;
+        a.id = QUuid::createUuid();
+        a.name = QStringLiteral("DSS-Test Felder");
+        a.steps = {delay, overlay};
+        a.triggers = {cheer};
+        const std::optional<ChangeResult> put = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(a)}}});
+        QVERIFY(put && put->ok);
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectAction(a.id), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(page->detailAction(), a.id, 3000);
+
+        // Ohne Auswahl: Hinweis
+        child<QTreeWidget>("actionSteps")->setCurrentItem(nullptr);
+        child<QTreeWidget>("actionTriggers")->setCurrentItem(nullptr);
+        QCOMPARE(panel->currentPage()->objectName(), QStringLiteral("fieldsPage:none"));
+        QCOMPARE(panel->currentPage()->findChild<QLabel *>(QStringLiteral("hintLabel"))->text(),
+                 QStringLiteral("Kein Schritt oder Auslöser gewählt"));
+        QCOMPARE(page->areaTitle(ActionsPage::Detail), QStringLiteral("Schritt"));
+        // Art ohne Einstellungen: grauer Hinweis aus der Logik
+        QWidget *followPage = panel->page(ActionFieldsPanel::Target::Trigger,
+                                          QString::fromLatin1(actions::kTriggerFollow));
+        QVERIFY(followPage);
+        QCOMPARE(followPage->findChild<QLabel *>(QStringLiteral("hintLabel"))->text(), emptyFormHint());
+
+        // Pause: Dauer in Sekunden, 8,5 s gespeichert als 8500 ms
+        QWidget *delayPage = panel->page(ActionFieldsPanel::Target::Step, delay.type);
+        auto *duration = delayPage->findChild<QDoubleSpinBox *>(QStringLiteral("field:value_ms"));
+        QVERIFY(duration && !duration->keyboardTracking());
+        page->selectStep(delay.id);
+        QCOMPARE(panel->currentPage(), delayPage);
+        QCOMPARE(page->areaTitle(ActionsPage::Detail), stepTitle(delay));
+        QCOMPARE(duration->text(), QStringLiteral("1 s"));
+        duration->setFocus();
+        duration->selectAll();
+        QTest::keyClicks(duration, QStringLiteral("8,5"));
+        QTest::keyClick(duration, Qt::Key_Return);
+        const auto stepField = [&](const QUuid &step, const QString &field) {
+            QJsonValue value;
+            if (const std::optional<actions::Action> now = coreAction(a.id))
+                actions::forEachStep(now->steps, [&](const actions::Step &s, const QList<int> &) {
+                    if (s.id == step)
+                        value = s.fields.value(field);
+                });
+            return value;
+        };
+        QTRY_COMPARE_WITH_TIMEOUT(stepField(delay.id, QStringLiteral("value_ms")).toInteger(), qint64(8500), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->statusBar()->currentMessage(),
+                                  QStringLiteral("Gespeichert: DSS-Test Felder"), 3000);
+        QCOMPARE(duration->text(), QStringLiteral("8,5 s"));
+
+        // Overlay-Schritt: Seite umschalten, «weich» ausgegraut mit Grund
+        QWidget *overlayPage = panel->page(ActionFieldsPanel::Target::Step, overlay.type);
+        page->selectStep(overlay.id);
+        QCOMPARE(panel->currentPage(), overlayPage);
+        QCOMPARE(overlayPage->findChild<QDoubleSpinBox *>(QStringLiteral("field:duration_ms"))->text(),
+                 QStringLiteral("5 s"));
+        for (const char *name : {"field:transition_in", "field:transition_out", "field:transition_ms"}) {
+            auto *field = overlayPage->findChild<QWidget *>(QString::fromLatin1(name));
+            QVERIFY2(field && !field->isEnabled(), name);
+            QVERIFY2(field->toolTip().startsWith(QStringLiteral("Wirkt noch nicht")), name);
+        }
+        auto *elements = overlayPage->findChild<QTreeWidget *>(QStringLiteral("field:elements"));
+        QVERIFY(elements);
+        QTRY_COMPARE_WITH_TIMEOUT(elements->topLevelItemCount(), 1, 3000);
+        QCOMPARE(elements->topLevelItem(0)->text(0), missingSource + QStringLiteral(" (fehlt)"));
+        QCOMPARE(overlayPage->findChild<QToolButton *>(QStringLiteral("field:elements:add"))->toolTip(),
+                 QStringLiteral("Element hinzufügen"));
+        QCOMPARE(overlayPage->findChild<QToolButton *>(QStringLiteral("field:elements:remove"))->toolTip(),
+                 QStringLiteral("Element löschen"));
+
+        // Inhalt des Elements: «Keine» ist keine Quelle → Prüfmeldung unter «Inhalt der Quellen»,
+        // das Feld zeigt wieder den Wert des Kerns, die Anordnung bleibt
+        elements->setCurrentItem(elements->topLevelItem(0));
+        auto *source = overlayPage->findChild<QComboBox *>(QStringLiteral("element:source"));
+        QVERIFY(source && source->isEnabled());
+        QCOMPARE(source->currentData().toString(), missingSource);
+        QLabel *problem = nullptr;
+        for (QLabel *line : overlayPage->findChildren<QLabel *>(QStringLiteral("fieldProblem")))
+            if (line->parentWidget()->findChild<QComboBox *>(QStringLiteral("element:source")))
+                problem = line;
+        QVERIFY(problem && problem->text().isEmpty() && problem->height() > 0);
+        const int problemHeight = problem->height();
+        source->setFocus();
+        QTest::keyClick(source, Qt::Key_Home);
+        QTRY_VERIFY_WITH_TIMEOUT(!problem->text().isEmpty(), 3000);
+        QCOMPARE(page->sectionProblem(ActionsPage::DetailSection), problem->text());
+        QCOMPARE(source->currentData().toString(), missingSource);
+        QCOMPARE(problem->height(), problemHeight);
+
+        // Cheer: Seite des Auslösers mit dem Hinweis unter «Bits»
+        QWidget *cheerPage = panel->page(ActionFieldsPanel::Target::Trigger, cheer.type);
+        page->selectTrigger(cheer.id);
+        QCOMPARE(panel->currentPage(), cheerPage);
+        QCOMPARE(page->areaTitle(ActionsPage::Detail), triggerTitle(cheer));
+        QVERIFY(page->sectionProblem(ActionsPage::DetailSection).isEmpty()); // andere Auswahl
+        bool hint = false;
+        for (QLabel *label : cheerPage->findChildren<QLabel *>(QStringLiteral("hintLabel")))
+            hint = hint || (label->text() == QStringLiteral("Nur «bis»: genau dieser Wert") && label->isVisible());
+        QVERIFY(hint);
+
+        // Zurück zur Pause: dieselben Widgets, nichts neu aufgebaut
+        page->selectStep(delay.id);
+        QCOMPARE(panel->currentPage(), delayPage);
+        QCOMPARE(delayPage->findChild<QDoubleSpinBox *>(QStringLiteral("field:value_ms")), duration);
+        QCOMPARE(int(panel->findChildren<QWidget *>().size()), widgetCount);
+
+        QTest::mouseClick(child<QToolButton>("actionRemove"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreAction(a.id), 3000);
     }
 
     // Ohne Kern: Schalter aus und ausgegraut, Text von Twitch.

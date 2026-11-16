@@ -119,6 +119,9 @@ private:
     void refreshActionDetail(bool resetFields = false);
     void refreshStepButtons();
     void refreshActionTest();
+    // P14 e2-16, rechts: Seite und Werte zur Auswahl der Mitte
+    void refreshActionFields(bool resetFields = false);
+    dss::ActionViewNames actionViewNames() const;
     void connectActionDetail();
     // Bearbeitung der gezeigten Aktion: fn bekommt die Aktion des Kerns und liefert die Bearbeitung
     void editDetailAction(ActionsPage::Section section,

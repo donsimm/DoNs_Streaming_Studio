@@ -5,6 +5,7 @@
 // Ohne Qt Gui (CLAUDE.md Regel 9).
 
 #include "actionfields.h"
+#include "actionview.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
@@ -60,6 +61,7 @@ private slots:
     void secondsForMilliseconds();
     void inactiveRows();
     void listenButton();
+    void choicesFromData();
 };
 
 void TestActionFields::everyFieldOnce_data()
@@ -508,6 +510,42 @@ void TestActionFields::listenButton()
         for (const FieldSection &s : triggerForm(t.key))
             QVERIFY(s.buttons.isEmpty());
     }
+}
+
+void TestActionFields::choicesFromData()
+{
+    ActionsConfig config;
+    const QUuid b = QUuid::fromString(QStringLiteral("00000000-0000-0000-0000-00000000000b"));
+    const QUuid a = QUuid::fromString(QStringLiteral("00000000-0000-0000-0000-00000000000a"));
+    Action first;
+    first.id = b;
+    first.name = QStringLiteral("Zeta");
+    Action second;
+    second.id = a;
+    second.name = QStringLiteral("Alpha");
+    config.actions = {first, second};
+    ActionViewNames names;
+    names.overlays.insert(a, QStringLiteral("Szene"));
+
+    // «Keine» vorne, dann nach Name
+    const QList<FieldChoice> actionsList = fieldChoices(QStringLiteral("action"), config, names, QString());
+    QCOMPARE(actionsList.size(), 3);
+    QCOMPARE(actionsList[0], (FieldChoice{QString(), QStringLiteral("Keine")}));
+    QCOMPARE(actionsList[1], (FieldChoice{a.toString(QUuid::WithoutBraces), QStringLiteral("Alpha")}));
+    QCOMPARE(actionsList[2].label, QStringLiteral("Zeta"));
+
+    // Fehlender Wert steht am Ende, damit das Feld den Wert des Kerns zeigt
+    const QString missing = QStringLiteral("00000000-0000-0000-0000-0000000000ff");
+    const QList<FieldChoice> overlays = fieldChoices(QStringLiteral("overlay"), config, names, missing.toUpper());
+    QCOMPARE(overlays.size(), 3);
+    QCOMPARE(overlays[1].label, QStringLiteral("Szene"));
+    QCOMPARE(overlays[2], (FieldChoice{missing, missing + QStringLiteral(" (fehlt)")}));
+    // Vorhandener Wert kommt nicht doppelt
+    QCOMPARE(fieldChoices(QStringLiteral("overlay"), config, names, a.toString(QUuid::WithoutBraces)).size(), 2);
+
+    // Ohne Kennungen keine Auswahl
+    QVERIFY(fieldChoices(QStringLiteral("media"), config, names, QString()).isEmpty());
+    QVERIFY(fieldChoices(QString(), config, names, QString()).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestActionFields)

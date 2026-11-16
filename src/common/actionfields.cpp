@@ -1,8 +1,10 @@
 #include "actionfields.h"
 
+#include "actionview.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace dss {
@@ -295,6 +297,11 @@ QString triggerTitle(const Trigger &trigger)
     return QStringLiteral("Auslöser «%1»").arg(info ? info->label : trigger.type);
 }
 
+QString emptyFormHint()
+{
+    return QStringLiteral("Keine Einstellungen");
+}
+
 FieldSection elementForm()
 {
     FieldSection s{QStringLiteral("Inhalt der Quellen"),
@@ -312,6 +319,47 @@ QString stepTitle(const Step &step)
 {
     const StepTypeInfo *info = stepType(step.type);
     return QStringLiteral("Schritt «%1»").arg(info ? info->label : step.type);
+}
+
+QList<FieldChoice> fieldChoices(const QString &choices, const ActionsConfig &config,
+                                const ActionViewNames &names, const QString &current)
+{
+    QList<FieldChoice> entries;
+    const auto add = [&entries](const QUuid &id, const QString &label) {
+        entries.append({id.toString(QUuid::WithoutBraces), label});
+    };
+    if (choices == QLatin1String("overlay")) {
+        for (auto it = names.overlays.cbegin(); it != names.overlays.cend(); ++it)
+            add(it.key(), it.value());
+    } else if (choices == QLatin1String("source")) {
+        for (auto it = names.sources.cbegin(); it != names.sources.cend(); ++it)
+            add(it.key(), it.value());
+    } else if (choices == QLatin1String("action")) {
+        for (const Action &a : config.actions)
+            add(a.id, a.name);
+    } else if (choices == QLatin1String("command")) {
+        for (const Command &c : config.commands)
+            add(c.id, c.name);
+    } else if (choices == QLatin1String("timer")) {
+        for (const Timer &t : config.timers)
+            add(t.id, t.name);
+    } else if (choices == QLatin1String("queue")) {
+        for (const Queue &q : config.queues)
+            add(q.id, q.name);
+    } else {
+        return {};
+    }
+    // Nach Name wie actionChoices; gleiche Namen nach Kennung, damit die Reihenfolge fest ist
+    std::sort(entries.begin(), entries.end(), [](const FieldChoice &a, const FieldChoice &b) {
+        const int c = a.label.localeAwareCompare(b.label);
+        return c != 0 ? c < 0 : a.value < b.value;
+    });
+    entries.prepend({QString(), QStringLiteral("Keine")});
+    const QString wanted = current.toLower();
+    if (!wanted.isEmpty()
+        && std::none_of(entries.cbegin(), entries.cend(), [&](const FieldChoice &e) { return e.value == wanted; }))
+        entries.append({wanted, QStringLiteral("%1 (fehlt)").arg(wanted)});
+    return entries;
 }
 
 QString fieldSection(const QList<FieldSection> &form, const QString &fieldName)

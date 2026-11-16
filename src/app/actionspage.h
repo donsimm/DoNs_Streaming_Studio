@@ -7,6 +7,7 @@
 #include <QUuid>
 #include <QWidget>
 
+class ActionFieldsPanel;
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -30,8 +31,9 @@ class ActionsPage : public QWidget
 
 public:
     enum Area { List = 0, Action, Detail };
-    // P14 e2-15: Abschnitte der Mitte, je mit einer Prüfmeldung am Feld (#fieldProblem)
-    enum Section { NoSection = -1, ActionSection = 0, TriggerSection, StepSection };
+    // P14 e2-15: Abschnitte der Mitte, je mit einer Prüfmeldung am Feld (#fieldProblem).
+    // DetailSection (e2-16): rechte Spalte, Meldung unter dem Abschnitt des Felds (ActionFieldsPanel).
+    enum Section { NoSection = -1, ActionSection = 0, TriggerSection, StepSection, DetailSection };
 
     // Stand der Mitte aus dem Stand des Kerns, vom MainWindow über dss::actionview berechnet.
     struct ActionDetail
@@ -81,7 +83,7 @@ public:
     void setSectionProblem(Section section, const QString &text);
     QString sectionProblem(Section section) const;
     // Freigaben aus dss::stepButtons; add gilt für «Schritt hinzufügen» und «Auslöser hinzufügen»,
-    // removeTrigger für «Auslöser entfernen».
+    // removeTrigger für «Auslöser löschen».
     void setStepButtons(bool add, const dss::StepButtons &buttons, bool removeTrigger);
     // «Testwerte: Benutzer» aus dss::testUserChoices, Freigabe aus testAllowed/realTestAllowed.
     // Die Wahl bleibt über die Bezeichnung erhalten.
@@ -95,6 +97,8 @@ public:
     QUuid selectedTrigger() const; // null: kein Auslöser gewählt
     // Aktion, die die Mitte zeigt (Ziel der Bearbeitungen der Mitte); null = keine.
     QUuid detailAction() const { return m_shownAction; }
+    // P14 e2-16, rechts: Felder des gewählten Schritts oder Auslösers in area(Detail)
+    ActionFieldsPanel *fieldsPanel() const { return m_fields; }
 
 signals:
     void searchChanged(const QString &text);
@@ -129,7 +133,6 @@ private:
     QWidget *createActionSection();
     QWidget *createTriggerSection();
     QWidget *createStepSection();
-    QLabel *createProblemLine(QWidget *parent);
     void setTriggerRows(const QList<dss::TriggerRow> &rows);
     void setStepRows(const QList<dss::StepRow> &rows);
     void finishNameEdit();
@@ -180,4 +183,6 @@ private:
     QUuid m_wantedStep;   // selectStep() vor dem Eintreffen der Zeile
     QUuid m_wantedTrigger;
     bool m_detailFilling = false;
+
+    ActionFieldsPanel *m_fields = nullptr; // rechts
 };

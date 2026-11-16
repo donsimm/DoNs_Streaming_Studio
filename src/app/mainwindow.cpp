@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 
+#include "actionfieldspanel.h"
+#include "actionfields.h"
 #include "actionspage.h"
 #include "canvasimage.h"
 #include "canvaswidget.h"
@@ -779,6 +781,19 @@ void MainWindow::connectActionDetail()
     });
     connect(page, &ActionsPage::stepSelected, this, &MainWindow::refreshStepButtons);
     connect(page, &ActionsPage::triggerSelected, this, &MainWindow::refreshStepButtons);
+    // P14 e2-16, rechts: Auswahl schaltet die Seite um; Felder speichern über setStepField bzw.
+    // setTriggerField, die Prüfmeldung steht unter dem Abschnitt des Felds.
+    connect(page, &ActionsPage::stepSelected, this, [this] { refreshActionFields(); });
+    connect(page, &ActionsPage::triggerSelected, this, [this] { refreshActionFields(); });
+    connect(page->fieldsPanel(), &ActionFieldsPanel::fieldEdited, this,
+            [this](ActionFieldsPanel::Target target, const QUuid &id, const QString &field, const QJsonValue &value) {
+                editDetailAction(ActionsPage::DetailSection,
+                                 [target, id, field, value](const ActionsConfig &, const Action &action) {
+                                     return target == ActionFieldsPanel::Target::Step
+                                         ? dss::setStepField(action, id, field, value)
+                                         : dss::setTriggerField(action, id, field, value);
+                                 });
+            });
     // «▶ Testen»: action_test an den Kern; «Probelauf gestartet: <Name>» nach der Antwort,
     // Ablehnungen zeigt onChangeFinished.
     connect(page, &ActionsPage::testClicked, this, &MainWindow::startActionTest);
@@ -820,16 +835,7 @@ void MainWindow::refreshActionDetail(bool resetFields)
     ActionsPage::ActionDetail detail;
     if (action) {
         const dss::actions::ActionsConfig &config = *info->config;
-        // Namen der Kurzinhalte: Overlays aus der Liste, Quellen der Overlays, die das Fenster
-        // schon geladen hat
-        dss::ActionViewNames names;
-        for (const dss::OverlaySummary &summary : m_client->overlays()) {
-            names.overlays.insert(summary.id, summary.name);
-            if (const std::optional<dss::Overlay> overlay = m_client->overlay(summary.id)) {
-                for (const dss::Source &source : overlay->sources)
-                    names.sources.insert(source.id, source.name);
-            }
-        }
+        const dss::ActionViewNames names = actionViewNames();
         detail.actionId = action->id;
         detail.name = action->name;
         detail.group = action->group;
@@ -851,6 +857,64 @@ void MainWindow::refreshActionDetail(bool resetFields)
     page->setActionDetail(detail, resetFields);
     refreshStepButtons();
     refreshActionTest();
+    refreshActionFields(resetFields);
+}
+
+dss::ActionViewNames MainWindow::actionViewNames() const
+{
+    // Namen der Kurzinhalte und der Auswahl rechts: Overlays aus der Liste, Quellen der Overlays,
+    // die das Fenster schon geladen hat
+    dss::ActionViewNames names;
+    for (const dss::OverlaySummary &summary : m_client->overlays()) {
+        names.overlays.insert(summary.id, summary.name);
+        if (const std::optional<dss::Overlay> overlay = m_client->overlay(summary.id)) {
+            for (const dss::Source &source : overlay->sources)
+                names.sources.insert(source.id, source.name);
+        }
+    }
+    return names;
+}
+
+void MainWindow::refreshActionFields(bool resetFields)
+{
+    // P14 e2-16, rechts: Felder des gewählten Schritts oder Auslösers der gezeigten Aktion
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    ActionFieldsPanel::State state;
+    QString title = QStringLiteral("Schritt");
+    if (action) {
+        const QUuid stepId = page->selectedStep();
+        const QUuid triggerId = page->selectedTrigger();
+        if (!stepId.isNull()) {
+            dss::actions::forEachStep(action->steps, [&](const dss::actions::Step &step, const QList<int> &) {
+                if (step.id != stepId)
+                    return;
+                state.target = ActionFieldsPanel::Target::Step;
+                state.type = step.type;
+                state.fields = step.fields;
+                title = dss::stepTitle(step);
+            });
+        } else if (!triggerId.isNull()) {
+            for (const dss::actions::Trigger &trigger : action->triggers) {
+                if (trigger.id != triggerId)
+                    continue;
+                state.target = ActionFieldsPanel::Target::Trigger;
+                state.type = trigger.type;
+                state.fields = trigger.fields;
+                title = dss::triggerTitle(trigger);
+            }
+        }
+        if (state.target != ActionFieldsPanel::Target::None) {
+            state.id = state.target == ActionFieldsPanel::Target::Step ? stepId : triggerId;
+            state.editable = true;
+            state.config = *info->config;
+            state.names = actionViewNames();
+        }
+    }
+    page->setAreaTitle(ActionsPage::Detail, title);
+    page->fieldsPanel()->setState(state, resetFields);
 }
 
 void MainWindow::refreshStepButtons()
