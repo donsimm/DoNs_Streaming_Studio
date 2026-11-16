@@ -109,6 +109,7 @@ private:
     void handleQuoteEdit(const dss::ActionsRequest &request, const Reply &reply);
     void handleQueueControl(const dss::ActionsRequest &request, const Reply &reply);
     void handleTest(const dss::ActionsRequest &request, const Reply &reply);
+    void handleChatSend(const dss::ActionsRequest &request, const Reply &reply);
     void handleTestEvent(const dss::ActionsRequest &request, const Reply &reply);
     void handleViewerImport(const dss::ActionsRequest &request, const Reply &reply);
 

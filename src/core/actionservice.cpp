@@ -28,6 +28,8 @@ namespace {
 
 const QString kTwitchNotConnected = QStringLiteral("Twitch nicht verbunden");
 constexpr int kProbeTimeoutMs = 1000;
+// chat_send: höchstens 500 UTF-16-Einheiten wie die Grenze beim Schritt (Plan 4.1, ChatOutbox::Limits)
+constexpr int kChatSendMaxLength = 500;
 
 QJsonObject result(qint64 requestId, bool ok, const QString &code = {}, const QString &message = {},
                    const QUuid &id = {})
@@ -534,6 +536,8 @@ void ActionService::handleRequest(const QJsonObject &message, const Reply &reply
             reply(result(id, false, QString::fromLatin1(dss::err::kUnknownRun), QStringLiteral("Der Lauf läuft nicht (mehr)")));
         else
             reply(result(id, true));
+    } else if (type == QLatin1String(dss::msg::kChatSend)) {
+        handleChatSend(request, reply);
     } else if (type == QLatin1String(dss::msg::kActionRunDetails)) {
         const QUuid run = *dss::uuidField(request.fields, QStringLiteral("run_id"), false, &error);
         const std::optional<dss::actions::RunRecord> record = m_engine->record(run);
@@ -834,6 +838,48 @@ void ActionService::handleTest(const dss::ActionsRequest &request, const Reply &
     const QUuid run = m_engine->enqueue(
         {actionId, QString::fromLatin1(dss::actions::kTriggerTest), QUuid(), arguments, dryRun});
     reply(result(request.requestId, true, {}, {}, run));
+}
+
+// Chat senden aus dem Fenster (Version 18, Plan 5, e2-2): Handarbeit des Nutzers, darum auch bei
+// «Chat-Bot aus»; stumm abgewiesen (Plan 3.4). Kein Ersatzkonto, keine Kürzung: zu lange Texte werden
+// abgewiesen. Die Antwort sagt nur «angenommen»; das Ergebnis kommt als twitch.chat_sent oder
+// twitch.chat_dropped über publishChat. Der Text kommt nicht ins Journal (Plan 3.5).
+void ActionService::handleChatSend(const dss::ActionsRequest &request, const Reply &reply)
+{
+    const QString text = request.fields.value(QStringLiteral("text")).toString();
+    const QString accountKey = request.fields.value(QStringLiteral("account")).toString();
+    const QString replyTo = request.fields.value(QStringLiteral("reply_to")).toString();
+    std::optional<dss::actions::ChatAccount> account;
+    for (const dss::actions::ChatAccount a : {dss::actions::ChatAccount::Bot, dss::actions::ChatAccount::Broadcaster}) {
+        if (accountKey == dss::actions::chatAccountKey(a))
+            account = a;
+    }
+    const QString trimmed = text.trimmed();
+    QString problem;
+    if (!account)
+        problem = QStringLiteral("account muss bot oder broadcaster sein");
+    else if (trimmed.isEmpty())
+        problem = QStringLiteral("Die Nachricht ist leer");
+    else if (text.size() > kChatSendMaxLength)
+        problem = QStringLiteral("Die Nachricht ist länger als %1 Zeichen").arg(kChatSendMaxLength);
+    else if (trimmed.startsWith(QLatin1Char('/')) || trimmed.startsWith(QLatin1Char('.')))
+        problem = QStringLiteral("Twitch-Befehle sind nicht möglich");
+    else if (m_muted)
+        problem = QStringLiteral("stumm: Version im Einsatz läuft");
+    else
+        problem = m_chat->unavailableReason(*account);
+    if (!problem.isEmpty()) {
+        reply(rejected(request.requestId, problem));
+        return;
+    }
+    dss::actions::ChatRequest chat;
+    chat.text = text;
+    chat.useBot = *account == dss::actions::ChatAccount::Bot;
+    chat.fallback = false;
+    chat.replyTo = replyTo;
+    // Erst antworten: das Ergebnis darf noch im Aufruf von sendChat kommen
+    reply(result(request.requestId, true));
+    m_chat->sendChat(chat, {});
 }
 
 void ActionService::handleTestEvent(const dss::ActionsRequest &request, const Reply &reply)

@@ -537,6 +537,55 @@ private slots:
             QVERIFY2(!core.log.contains(secret), qPrintable(secret));
     }
 
+    // e2-2 (Version 18): chat_send ohne Twitch. Abgewiesen mit Grund: leer, länger als 500 UTF-16-Einheiten,
+    // Twitch-Befehl, unbekanntes Konto, Konto kann nicht senden (Grund wie in actions_status.accounts),
+    // falsche Felder. Senden selbst prüft tst_kerntwitch (chatSendFromWindow).
+    void chatSendRejected()
+    {
+        QTemporaryDir data;
+        Core core = start(data.path(), QStringLiteral("a"));
+        {
+            CoreLink c(core.socket);
+            ActionsStatus status;
+            QString error;
+            QVERIFY(parseActionsStatus(c.waitFor(QString::fromLatin1(msg::kActionsStatus)), &status, &error));
+            QCOMPARE(status.state, QStringLiteral("off")); // Chat-Bot aus, Senden trotzdem geprüft
+            QCOMPARE(status.accounts.size(), 2);
+            const auto send = [&](const QJsonValue &text, const QJsonValue &account, const QJsonValue &replyTo = QJsonValue::Null) {
+                QJsonObject fields{{QStringLiteral("account"), account}, {QStringLiteral("reply_to"), replyTo}};
+                if (!text.isUndefined())
+                    fields.insert(QStringLiteral("text"), text);
+                const QJsonObject reply = c.request(QString::fromLatin1(msg::kChatSend), fields);
+                return ok(reply) ? QStringLiteral("ok") : reply.value(QStringLiteral("message")).toString();
+            };
+            const QString bot = QStringLiteral("bot");
+            QCOMPARE(send(QString(), bot), QStringLiteral("Die Nachricht ist leer"));
+            QCOMPARE(send(QStringLiteral("  \n "), bot), QStringLiteral("Die Nachricht ist leer"));
+            QCOMPARE(send(QString(501, QLatin1Char('a')), bot), QStringLiteral("Die Nachricht ist länger als 500 Zeichen"));
+            // 250 Emoji ausserhalb der BMP = 500 UTF-16-Einheiten: erlaubt, scheitert erst am Konto
+            QString emoji;
+            for (int i = 0; i < 251; ++i)
+                emoji += QString::fromUtf8("\xF0\x9F\x98\x80");
+            QCOMPARE(send(emoji, bot), QStringLiteral("Die Nachricht ist länger als 500 Zeichen"));
+            emoji.chop(2);
+            QCOMPARE(send(emoji, bot), status.accounts.at(0).message);
+            for (const QString &command : {QStringLiteral("/ban x"), QStringLiteral(".ban x"), QStringLiteral("  /me x")})
+                QCOMPARE(send(command, bot), QStringLiteral("Twitch-Befehle sind nicht möglich"));
+            QCOMPARE(send(kReplyText, QStringLiteral("kanal")), QStringLiteral("account muss bot oder broadcaster sein"));
+            // Ohne Twitch kann kein Konto senden: Grund wie in actions_status
+            for (const ActionsAccountStatus &a : std::as_const(status.accounts)) {
+                QVERIFY(!a.canSend);
+                QVERIFY(!a.message.isEmpty());
+                QCOMPARE(send(kReplyText, a.account, QStringLiteral("msg-1")), a.message);
+            }
+            // Falsche Felder: Text fehlt, reply_to keine Zeichenkette
+            QVERIFY(send(QJsonValue::Undefined, bot).contains(QStringLiteral("text")));
+            QVERIFY(send(kReplyText, bot, 5).contains(QStringLiteral("reply_to")));
+        }
+        stop(core);
+        QVERIFY2(!core.log.contains(QStringLiteral("Geheimtext")), qPrintable(core.log));
+    }
+
     void mutedWithSecondCore()
     {
         // Zweiter Kern unter der Verbindung der «Version im Einsatz»
@@ -570,6 +619,12 @@ private slots:
             QVERIFY(!ok(c.request(QString::fromLatin1(msg::kActionTest), {{QStringLiteral("action_id"), idText(s.action.id)},
                                                                           {QStringLiteral("arguments"), QJsonObject()},
                                                                           {QStringLiteral("dry_run"), false}})));
+            // e2-2: Chat senden aus dem Fenster abgewiesen
+            const QJsonObject chat = c.request(QString::fromLatin1(msg::kChatSend), {{QStringLiteral("text"), kReplyText},
+                                                                                     {QStringLiteral("account"), QStringLiteral("broadcaster")},
+                                                                                     {QStringLiteral("reply_to"), QJsonValue::Null}});
+            QVERIFY(!ok(chat));
+            QCOMPARE(chat.value(QStringLiteral("message")).toString(), QStringLiteral("stumm: Version im Einsatz läuft"));
             // Version im Einsatz beendet: nicht mehr stumm
             stop(inUse);
             for (int i = 0; i < 20 && status.state == QLatin1String("muted"); ++i) {
@@ -979,6 +1034,24 @@ private slots:
                                                             {QStringLiteral("value"), 3}}}),
                                     &r, &error));
         QVERIFY(!r.fields.contains(QStringLiteral("user_id")));
+        // chat_send (Version 18): reply_to Text oder null, Pflicht
+        QVERIFY(actionsRequestTypes().contains(QStringLiteral("chat_send")));
+        const auto chatSend = [&](const QJsonValue &replyTo) {
+            QJsonObject fields{{QStringLiteral("text"), QStringLiteral("x")}, {QStringLiteral("account"), QStringLiteral("bot")}};
+            if (!replyTo.isUndefined())
+                fields.insert(QStringLiteral("reply_to"), replyTo);
+            return parseActionsRequest(actionsRequestMessage({2, QString::fromLatin1(msg::kChatSend), fields}), &r, &error);
+        };
+        QVERIFY(chatSend(QJsonValue::Null));
+        QVERIFY(r.fields.value(QStringLiteral("reply_to")).isNull());
+        QVERIFY(chatSend(QStringLiteral("m-1")));
+        QCOMPARE(r.fields.value(QStringLiteral("reply_to")).toString(), QStringLiteral("m-1"));
+        QVERIFY(!chatSend(QJsonValue::Undefined));
+        QVERIFY(!chatSend(1));
+        QVERIFY(!parseActionsRequest(actionsRequestMessage({2, QString::fromLatin1(msg::kChatSend),
+                                                            {{QStringLiteral("text"), 1}, {QStringLiteral("account"), QStringLiteral("bot")},
+                                                             {QStringLiteral("reply_to"), QJsonValue::Null}}}),
+                                     &r, &error));
         // Lauf hin und zurück
         RunRecord run;
         run.runId = QUuid::createUuid();

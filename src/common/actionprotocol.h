@@ -58,6 +58,9 @@ inline constexpr char kQuoteRemove[] = "quote_remove";
 // Fenster → Kern: Läufe (Antwort change_result, bei action_test mit der Kennung des Laufs)
 inline constexpr char kActionTest[] = "action_test";
 inline constexpr char kActionRunCancel[] = "action_run_cancel";
+// Fenster → Kern: Chat senden als bot oder broadcaster (seit Version 18, Antwort change_result;
+// Ergebnis twitch.chat_sent oder twitch.chat_dropped auf dem Fluss)
+inline constexpr char kChatSend[] = "chat_send";
 // Fenster → Kern: Abfragen (Antwort mit eigener Nachricht)
 inline constexpr char kActionRunDetails[] = "action_run_details";
 inline constexpr char kGetActionRuns[] = "get_action_runs";

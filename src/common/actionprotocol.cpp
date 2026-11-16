@@ -10,7 +10,7 @@ namespace dss {
 
 namespace {
 
-enum class Kind { Bool, Object, Uuid, NullableUuid, String, Int, Value, Array };
+enum class Kind { Bool, Object, Uuid, NullableUuid, String, NullableString, Int, Value, Array };
 
 struct FieldRule
 {
@@ -52,6 +52,7 @@ const QList<RequestRule> &requestRules()
         {msg::kQuoteRemove, {{"index", Kind::Int}}},
         {msg::kActionTest, {{"action_id", Kind::Uuid}, {"arguments", Kind::Object}, {"dry_run", Kind::Bool}}},
         {msg::kActionRunCancel, {{"run_id", Kind::Uuid}}},
+        {msg::kChatSend, {{"text", Kind::String}, {"account", Kind::String}, {"reply_to", Kind::NullableString}}},
         {msg::kActionRunDetails, {{"run_id", Kind::Uuid}}},
         {msg::kGetActionRuns, {}},
         {msg::kGetVariables, {}},
@@ -208,6 +209,7 @@ bool parseActionsRequest(const QJsonObject &message, ActionsRequest *request, QS
         case Kind::Object: ok = v.isObject(); break;
         case Kind::Array: ok = v.isArray(); break;
         case Kind::String: ok = v.isString(); break;
+        case Kind::NullableString: ok = v.isString() || v.isNull(); break;
         case Kind::Value: ok = v.isString() || v.isDouble(); break;
         case Kind::Int: ok = v.isDouble() && v.toDouble() == double(qint64(v.toDouble())); break;
         case Kind::Uuid:

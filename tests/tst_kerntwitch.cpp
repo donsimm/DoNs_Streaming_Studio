@@ -534,6 +534,80 @@ private slots:
 #endif
     }
 
+    // P14 e2-2 (Version 18): chat_send aus dem Fenster bei «Chat-Bot aus» (Entscheid des Nutzers,
+    // 2026-11-16): als Kanal, Bot ohne Anmeldung abgewiesen (Grund wie in accounts), als Bot mit
+    // Antwort. Kein Ersatzkonto; Ergebnis als twitch.chat_sent; kein Text im Protokoll (Plan 3.5).
+    void chatSendFromWindow()
+    {
+#if !DSS_CORE_ACTIONS
+        QSKIP("Aktionssystem nicht eingebaut (DSS_CORE_ACTIONS aus)");
+#else
+        TwitchTestServer server;
+        server.deviceInterval = 1;
+        QVERIFY(server.start());
+        QTemporaryDir data;
+        const auto runtime = testhelp::runtimeDir();
+        QVERIFY(data.isValid() && runtime->isValid());
+        const QString socketPath = runtime->filePath(QStringLiteral("kern.sock"));
+        const QStringList args{QStringLiteral("--twitch-testserver"), server.baseUrl().toString(),
+                               QStringLiteral("--einsatz-verbindung"), runtime->filePath(QStringLiteral("einsatz.sock"))};
+        const QString text = QStringLiteral("DSS-Test Fenster-Geheimtext-6612");
+        Core core(data.path(), socketPath, twitchConfigHome(), args);
+        QVERIFY2(core.waitForLog(QStringLiteral("Twitch: eingeschaltet")), qPrintable(core.log()));
+        Window window;
+        QVERIFY(QTest::qWaitFor([&] { return window.open(socketPath); }, kWait));
+        window.send(subscribeEventsMessage({{QStringLiteral("twitch.")}, false}));
+        const auto login = [&](qint64 id, const QString &account, const TwitchTestUser &user) {
+            window.send(twitchAccountRequestMessage(msg::kTwitchLoginStart, {id, account}));
+            return QTest::qWaitFor([&] { return server.approveLatest(user); }, kWait);
+        };
+        const auto send = [&](qint64 id, const QString &account, const QJsonValue &replyTo) {
+            window.send(actionsRequestMessage({id, QString::fromLatin1(msg::kChatSend),
+                                               {{QStringLiteral("text"), text},
+                                                {QStringLiteral("account"), account},
+                                                {QStringLiteral("reply_to"), replyTo}}}));
+            if (!QTest::qWaitFor([&] { return window.result(id).has_value(); }, kWait))
+                return ChangeResult{id, false, {}, {}, QStringLiteral("keine Antwort")};
+            return *window.result(id);
+        };
+        QVERIFY(login(2, QStringLiteral("channel"), kChannelUser));
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("broadcaster"), QStringLiteral("x")), QString(), kWait);
+        // Chat-Bot aus (neue Daten), trotzdem erlaubt
+        QCOMPARE(window.latest(msg::kActionsStatus).value(QStringLiteral("state")).toString(), QStringLiteral("off"));
+
+        // 1. Bot nicht angemeldet: abgewiesen, kein Ersatz durch den Kanal
+        const ChangeResult botOff = send(10, QStringLiteral("bot"), QJsonValue::Null);
+        QVERIFY(!botOff.ok);
+        QCOMPARE(botOff.message, QStringLiteral("Bot nicht angemeldet"));
+        // 2. Als Kanal, ohne Antwort
+        QVERIFY(send(11, QStringLiteral("broadcaster"), QJsonValue::Null).ok);
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 1, kWait);
+        QCOMPARE(server.chatMessages[0].body.value(QStringLiteral("sender_id")).toString(), kChannelUser.id);
+        QCOMPARE(server.chatMessages[0].body.value(QStringLiteral("message")).toString(), text);
+        QVERIFY(!server.chatMessages[0].body.contains(QStringLiteral("reply_parent_message_id")));
+        QTRY_COMPARE_WITH_TIMEOUT(window.eventTypes().count(QStringLiteral("twitch.chat_sent")), 1, kWait);
+        QCOMPARE(window.latestEventData(QStringLiteral("twitch.chat_sent")).value(QStringLiteral("account")).toString(),
+                 QStringLiteral("broadcaster"));
+        // 3. Als Bot mit Antwort
+        QVERIFY(login(3, QStringLiteral("bot"), kBotUser));
+        QTRY_COMPARE_WITH_TIMEOUT(accounts(window).value(QStringLiteral("bot"), QStringLiteral("x")), QString(), kWait);
+        QVERIFY(send(12, QStringLiteral("bot"), QStringLiteral("nachricht-1")).ok);
+        QTRY_COMPARE_WITH_TIMEOUT(server.chatMessages.size(), 2, kWait);
+        QCOMPARE(server.chatMessages[1].body.value(QStringLiteral("sender_id")).toString(), kBotUser.id);
+        QCOMPARE(server.chatMessages[1].body.value(QStringLiteral("reply_parent_message_id")).toString(),
+                 QStringLiteral("nachricht-1"));
+        QTRY_COMPARE_WITH_TIMEOUT(window.eventTypes().count(QStringLiteral("twitch.chat_sent")), 2, kWait);
+        const QJsonObject sent = window.latestEventData(QStringLiteral("twitch.chat_sent"));
+        QCOMPARE(sent.value(QStringLiteral("account")).toString(), QStringLiteral("bot"));
+        QCOMPARE(sent.value(QStringLiteral("text")).toString(), text);
+        QCOMPARE(sent.value(QStringLiteral("reply_to")).toString(), QStringLiteral("nachricht-1"));
+
+        window.close();
+        QVERIFY2(core.stop(), qPrintable(core.log()));
+        QVERIFY2(!core.log().contains(QStringLiteral("Geheimtext")), qPrintable(core.log()));
+#endif
+    }
+
     // P14 c1b (Plan 4.8 und 4.9): Befehl «!dssso» mit Benutzerinfo (mit «@», gross geschrieben),
     // Chat mit allen Platzhaltern, Shoutout abgelehnt (nicht live) und angenommen, Ansage als Bot und
     // als Kanal (2 s Abstand), Ansage als Bot ohne Moderator (Kanal sendet), unbekannte Farbe,

@@ -54,8 +54,9 @@ namespace dss {
 // 16 seit P14 t: media_list mit kind "audio" und duration_ms; seit P14 d overlay_live,
 //   overlay_live_set, overlay_live_reset (overlaylive.h)
 // 17 seit P14 z1b: Zuschauer-Import viewer_import und viewer_import_result (actionprotocol.h)
+// 18 seit P14 e2-2: Chat senden aus dem Fenster (chat_send, actionprotocol.h)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 17;
+inline constexpr int kProtocolVersion = 18;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 

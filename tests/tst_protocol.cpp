@@ -137,7 +137,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 17); // seit P14 z1b (Zuschauer-Import)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 18); // seit P14 e2-2 (chat_send)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
