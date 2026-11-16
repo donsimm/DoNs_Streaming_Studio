@@ -257,6 +257,97 @@ private slots:
         QVERIFY(resetActionQuestion(*config.action(kBegruessung)).contains(QStringLiteral("«Begrüssung»")));
     }
 
+    void renameAndRemoveGroup()
+    {
+        const ActionsConfig config = loadConfig();
+        // Umbenennen: je Aktion der Gruppe ein action_put, sonst unverändert
+        EditResult r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral(" Shoutouts "));
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits.size(), 2);
+        Action a = putAction(r, 0);
+        QCOMPARE(a.id, kShoutoutRun);
+        QCOMPARE(a.group, QStringLiteral("Shoutouts"));
+        a.group = QStringLiteral("Shoutout");
+        QCOMPARE(a, *config.action(kShoutoutRun));
+        QCOMPARE(putAction(r, 1).id, kShoutoutCommand);
+        QCOMPARE(putAction(r, 1).group, QStringLiteral("Shoutouts"));
+        // mitgelieferte Aktionen auch (Plan 2.3: Gruppe nur zum Ordnen)
+        QCOMPARE(putAction(renameActionGroup(config, QStringLiteral("Begrüssung"), QStringLiteral("Hallo"))).templateId,
+                 config.action(kBegruessung)->templateId);
+        // leer, bestehende Gruppe (kein Zusammenführen), gleich oder unbekannt
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("  "));
+        QCOMPARE(r.problem, QStringLiteral("Der Name darf nicht leer sein."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Test"));
+        QCOMPARE(r.problem, QStringLiteral("Die Gruppe «Test» gibt es schon."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Shoutout "));
+        QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
+        r = renameActionGroup(config, QStringLiteral("gibt es nicht"), QStringLiteral("Neu"));
+        QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
+        QVERIFY(renameActionGroup(config, QString(), QStringLiteral("Neu")).edits.isEmpty());
+
+        // Löschen: alle Aktionen der Gruppe, in der Reihenfolge der Datei
+        QCOMPARE(removeActionGroup(config, QStringLiteral("Shoutout")).edits,
+                 (QList<ActionsEdit>{{QStringLiteral("action_remove"), {{QStringLiteral("action_id"), uuidText(kShoutoutRun)}}},
+                                     {QStringLiteral("action_remove"),
+                                      {{QStringLiteral("action_id"), uuidText(kShoutoutCommand)}}}}));
+        QVERIFY(removeActionGroup(config, QStringLiteral("gibt es nicht")).edits.isEmpty());
+        // Aktionen ohne Gruppe sind keine Gruppe
+        QVERIFY(removeActionGroup(config, QString()).edits.isEmpty());
+    }
+
+    void removeQuestions()
+    {
+        ActionsConfig config = loadConfig();
+        // Aktion: von «Aktion ausführen» einer anderen, von einer Zeitnachricht, ohne Verweise
+        QCOMPARE(removeActionQuestion(config, kShoutoutRun),
+                 QStringLiteral("Aktion «Shoutout ausführen» löschen? Sie wird von 1 Aktion benutzt."));
+        QCOMPARE(removeActionQuestion(config, kShoutoutCommand),
+                 QStringLiteral("Aktion «Shoutout per Befehl» löschen? Sie wird von 1 Befehl benutzt."));
+        QCOMPARE(removeActionQuestion(config, kAllTriggers),
+                 QStringLiteral("Aktion «Alle Auslöser» löschen? Sie wird von 1 Zeitnachricht benutzt."));
+        QCOMPARE(removeActionQuestion(config, kFirstChatters), QString());
+        QCOMPARE(removeActionQuestion(config, QUuid::createUuid()), QString());
+        // Gruppe: immer, Verweise nur von ausserhalb («Aktion ausführen» innerhalb zählt nicht)
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("Shoutout")),
+                 QStringLiteral("Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt."));
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("Begrüssung")),
+                 QStringLiteral("Gruppe «Begrüssung» mit 1 Aktion löschen?"));
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("Test")),
+                 QStringLiteral("Gruppe «Test» mit 1 Aktion löschen? Sie wird von 1 Zeitnachricht benutzt."));
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("gibt es nicht")), QString());
+        QCOMPARE(removeActionGroupQuestion(config, QString()), QString());
+
+        // mehrere Verweise: Befehl und Zeitnachricht dazu, Aktion ausführen aus zwei anderen Aktionen
+        Action *run = &config.actions[1]; // Shoutout ausführen
+        Trigger command;
+        command.id = QUuid::createUuid();
+        command.type = QString::fromLatin1(kTriggerCommand);
+        command.fields.insert(QStringLiteral("command_id"), uuidText(kCommandDiscord));
+        run->triggers.append(command);
+        Trigger missing = command; // Befehl, den es nicht gibt, zählt nicht
+        missing.fields.insert(QStringLiteral("command_id"), uuidText(QUuid::createUuid()));
+        run->triggers.append(missing);
+        Trigger timer;
+        timer.type = QString::fromLatin1(kTriggerTimer);
+        timer.fields.insert(QStringLiteral("timer_id"), uuidText(kTimerRandom));
+        run->triggers.append(timer);
+        Step call;
+        call.id = QUuid::createUuid();
+        call.type = QString::fromLatin1(kStepRunAction);
+        call.fields.insert(QStringLiteral("action_id"), uuidText(kShoutoutRun));
+        config.actions[3].steps.append(call); // First Chatters
+        QCOMPARE(removeActionQuestion(config, kShoutoutRun),
+                 QStringLiteral("Aktion «Shoutout ausführen» löschen? Sie wird von 1 Befehl, 1 Zeitnachricht "
+                                "und 2 Aktionen benutzt."));
+        QCOMPARE(removeCommandQuestion(config, kCommandDiscord),
+                 QStringLiteral("Befehl «!discord» löschen? Er wird von 1 Aktion benutzt."));
+        config.actions[0].triggers.append(command);
+        QCOMPARE(removeCommandQuestion(config, kCommandDiscord),
+                 QStringLiteral("Befehl «!discord» löschen? Er wird von 2 Aktionen benutzt."));
+    }
+
     // --- «Aktionen», Bereich «Aktion» ---
 
     void actionHeader()
@@ -513,6 +604,15 @@ private slots:
         QVERIFY(a.steps.at(0).steps.at(0).steps.isEmpty());
         // «Dann» und «Sonst» bleiben
         QVERIFY(removeStep(before, kIdIfTrue).edits.isEmpty());
+        // Rückfrage nur bei Inhalt, gezählt ohne «Dann» und «Sonst»
+        QCOMPARE(removeStepQuestion(before, kIdIf), QStringLiteral("Schritt «Wenn» samt 1 Schritt darin löschen?"));
+        QCOMPARE(removeStepQuestion(*config.action(kFirstChatters), kIdGroup),
+                 QStringLiteral("Schritt «Gruppe» samt 3 Schritten darin löschen?"));
+        QCOMPARE(removeStepQuestion(before, kIdChat), QString());
+        QCOMPARE(removeStepQuestion(before, kIdIfTrue), QString());
+        QCOMPARE(removeStepQuestion(before, QUuid::createUuid()), QString());
+        Action emptyIf = putAction(removeStep(before, kIdBreak));
+        QCOMPARE(removeStepQuestion(emptyIf, kIdIf), QString());
         QVERIFY(moveStep(before, kIdIfFalse, -1).edits.isEmpty());
         QVERIFY(setStepEnabled(before, kIdIfTrue, false).edits.isEmpty());
 
@@ -709,9 +809,15 @@ private slots:
         QCOMPARE(saved.name, QStringLiteral("Shoutout (Kopie)"));
         QVERIFY(saved.id != kCommandShoutout);
         QCOMPARE(saved.permissions, config.command(kCommandShoutout)->permissions);
-        QCOMPARE(removeCommand(kCommandShoutout).edits.first(),
-                 (ActionsEdit{QStringLiteral("command_remove"),
-                              {{QStringLiteral("command_id"), uuidText(kCommandShoutout)}}}));
+        QCOMPARE(removeCommand(config, kCommandShoutout).edits,
+                 (QList<ActionsEdit>{{QStringLiteral("command_remove"),
+                                      {{QStringLiteral("command_id"), uuidText(kCommandShoutout)}}}}));
+        QVERIFY(removeCommand(config, QUuid::createUuid()).edits.isEmpty());
+        // Rückfrage nur mit Verweisen
+        QCOMPARE(removeCommandQuestion(config, kCommandShoutout),
+                 QStringLiteral("Befehl «!so» löschen? Er wird von 1 Aktion benutzt."));
+        QCOMPARE(removeCommandQuestion(config, kCommandDiscord), QString());
+        QCOMPARE(removeCommandQuestion(config, QUuid::createUuid()), QString());
     }
 
     // --- Unterreiter «Zeitnachrichten» ---
@@ -767,7 +873,12 @@ private slots:
         QVERIFY(timerFromJson(r.edits.first().fields.value(QStringLiteral("timer")).toObject(), &saved, &error));
         QCOMPARE(saved.name, QStringLiteral("Zufällig (Kopie)"));
         QCOMPARE(saved.extra, config.timer(kTimerRandom)->extra);
-        QCOMPARE(removeTimer(kTimerInfo).edits.first().type, QStringLiteral("timer_remove"));
+        QCOMPARE(removeTimer(config, kTimerInfo).edits.first().type, QStringLiteral("timer_remove"));
+        QVERIFY(removeTimer(config, QUuid::createUuid()).edits.isEmpty());
+        QCOMPARE(removeTimerQuestion(config, kTimerInfo),
+                 QStringLiteral("Zeitnachricht «Info alle 20 min» löschen? Sie wird von 1 Aktion benutzt."));
+        QCOMPARE(removeTimerQuestion(config, kTimerRandom), QString());
+        QCOMPARE(removeTimerQuestion(config, QUuid::createUuid()), QString());
     }
 
     // --- Unterreiter «Variablen» ---
@@ -842,11 +953,25 @@ private slots:
         r = setVariableValue(motto, QStringLiteral("42"));
         QCOMPARE(r.edits.first().fields.value(QStringLiteral("value")), QJsonValue(QStringLiteral("42")));
         QVERIFY(!r.edits.first().fields.contains(QStringLiteral("user_id")));
-        QCOMPARE(removeVariable(motto).edits,
+        QCOMPARE(removeVariable(variables(), {}, {}, motto).edits,
                  (QList<ActionsEdit>{{QStringLiteral("variable_remove"),
                                       {{QStringLiteral("scope"), QStringLiteral("global")},
                                        {QStringLiteral("name"), QStringLiteral("motto")},
                                        {QStringLiteral("persisted"), true}}}}));
+        QCOMPARE(removeVariable(variables(), {}, {}, firsts).edits.first().type, QStringLiteral("variable_remove"));
+        // Löschen nur, was es noch gibt (dauerhaft bzw. flüchtig)
+        VariableRow gone = motto;
+        gone.name = QStringLiteral("gibt es nicht");
+        QVERIFY(removeVariable(variables(), {}, {}, gone).edits.isEmpty());
+        VariableRow volatileRow = firsts;
+        volatileRow.persisted = false;
+        QVERIFY(removeVariable(variables(), {}, {}, volatileRow).edits.isEmpty());
+        const VolatileUserValues volatileUsers{{QStringLiteral("100000001"), {{QStringLiteral("firsts"), 1}}}};
+        QCOMPARE(removeVariable(variables(), {}, volatileUsers, volatileRow).edits.size(), 1);
+        VariableRow volatileGlobal = motto;
+        volatileGlobal.persisted = false;
+        QVERIFY(removeVariable(variables(), {}, {}, volatileGlobal).edits.isEmpty());
+        QCOMPARE(removeVariable(variables(), {{QStringLiteral("motto"), 1}}, {}, volatileGlobal).edits.size(), 1);
         QCOMPARE(variableValueText(QJsonValue(0.1)), QStringLiteral("0.1"));
         QCOMPARE(variableValueText(QJsonValue(-5.0)), QStringLiteral("-5"));
     }

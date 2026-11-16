@@ -393,6 +393,79 @@ QJsonObject variableFields(const VariableRow &row)
     return f;
 }
 
+// --- Rückfragen vor dem Löschen ---
+
+// «1 Befehl», «2 Befehlen» (nach «von» bzw. «samt»)
+QString countText(qsizetype n, const QString &one, const QString &many)
+{
+    return QStringLiteral("%1 %2").arg(QString::number(n), n == 1 ? one : many);
+}
+
+// «1 Befehl und 2 Zeitnachrichten», «1 Befehl, 1 Zeitnachricht und 1 Aktion»; leer ohne
+QString joinedCounts(const QStringList &parts)
+{
+    if (parts.size() < 2)
+        return parts.join(QString());
+    return QStringLiteral("%1 und %2").arg(parts.mid(0, parts.size() - 1).join(QStringLiteral(", ")), parts.last());
+}
+
+bool runsAction(const QList<Step> &steps, const QSet<QUuid> &targets)
+{
+    for (const Step &s : steps) {
+        if (s.type == QLatin1String(kStepRunAction) && targets.contains(idField(s.fields, "action_id")))
+            return true;
+        if (runsAction(s.steps, targets))
+            return true;
+    }
+    return false;
+}
+
+// Verweise auf die Aktionen targets von ausserhalb: Befehle und Zeitnachrichten aus ihren Auslösern,
+// andere Aktionen mit «Aktion ausführen» darauf. Leer ohne.
+QString actionUsesText(const ActionsConfig &config, const QSet<QUuid> &targets)
+{
+    QSet<QUuid> commands;
+    QSet<QUuid> timers;
+    qsizetype actions = 0;
+    for (const Action &a : config.actions) {
+        if (!targets.contains(a.id)) {
+            if (runsAction(a.steps, targets))
+                ++actions;
+            continue;
+        }
+        for (const Trigger &t : a.triggers) {
+            if (t.type == QLatin1String(kTriggerCommand) && config.command(idField(t.fields, "command_id")))
+                commands.insert(idField(t.fields, "command_id"));
+            else if (t.type == QLatin1String(kTriggerTimer) && config.timer(idField(t.fields, "timer_id")))
+                timers.insert(idField(t.fields, "timer_id"));
+        }
+    }
+    QStringList parts;
+    if (!commands.isEmpty())
+        parts.append(countText(commands.size(), QStringLiteral("Befehl"), QStringLiteral("Befehlen")));
+    if (!timers.isEmpty())
+        parts.append(countText(timers.size(), QStringLiteral("Zeitnachricht"), QStringLiteral("Zeitnachrichten")));
+    if (actions > 0)
+        parts.append(countText(actions, QStringLiteral("Aktion"), QStringLiteral("Aktionen")));
+    return joinedCounts(parts);
+}
+
+// Aktionen mit einem Auslöser triggerType auf id, als «1 Aktion»; leer ohne
+QString triggerUsesText(const ActionsConfig &config, const char *triggerTypeKey, const char *field, const QUuid &id)
+{
+    const qsizetype n = linkedActions(config, triggerTypeKey, field, id).size();
+    return n > 0 ? countText(n, QStringLiteral("Aktion"), QStringLiteral("Aktionen")) : QString();
+}
+
+// Schritte in steps samt allen darin, ohne die Zweige «Dann» und «Sonst» selbst
+qsizetype stepCount(const QList<Step> &steps)
+{
+    qsizetype n = 0;
+    for (const Step &s : steps)
+        n += (isBranch(s) ? 0 : 1) + stepCount(s.steps);
+    return n;
+}
+
 } // namespace
 
 // --- Allgemein ---
@@ -588,6 +661,70 @@ QString resetActionQuestion(const Action &action)
     return QStringLiteral("Aktion «%1» auf die mitgelieferte Fassung zurücksetzen? Eigene Änderungen "
                           "an Auslösern und Schritten gehen verloren.")
         .arg(action.name);
+}
+
+EditResult renameActionGroup(const ActionsConfig &config, const QString &group, const QString &name)
+{
+    const QString newName = name.trimmed();
+    if (group.isEmpty() || newName == group || !actionGroupChoices(config).contains(group))
+        return {};
+    if (newName.isEmpty())
+        return problem(emptyNameProblem());
+    if (actionGroupChoices(config).contains(newName))
+        return problem(QStringLiteral("Die Gruppe «%1» gibt es schon.").arg(newName));
+    EditResult r;
+    for (const Action &a : config.actions) {
+        if (a.group != group)
+            continue;
+        Action after = a;
+        after.group = newName;
+        const EditResult put = putAction(a, after);
+        if (!put.problem.isEmpty())
+            return put;
+        r.edits += put.edits;
+    }
+    return r;
+}
+
+EditResult removeActionGroup(const ActionsConfig &config, const QString &group)
+{
+    EditResult r;
+    if (group.isEmpty())
+        return r;
+    for (const Action &a : config.actions) {
+        if (a.group == group)
+            r.edits.append(edit("action_remove", {{QStringLiteral("action_id"), uuidText(a.id)}}));
+    }
+    return r;
+}
+
+QString removeActionQuestion(const ActionsConfig &config, const QUuid &actionId)
+{
+    const Action *action = config.action(actionId);
+    if (!action)
+        return QString();
+    const QString uses = actionUsesText(config, {actionId});
+    if (uses.isEmpty())
+        return QString();
+    return QStringLiteral("Aktion «%1» löschen? Sie wird von %2 benutzt.").arg(action->name, uses);
+}
+
+QString removeActionGroupQuestion(const ActionsConfig &config, const QString &group)
+{
+    QSet<QUuid> members;
+    for (const Action &a : config.actions) {
+        if (!group.isEmpty() && a.group == group)
+            members.insert(a.id);
+    }
+    if (members.isEmpty())
+        return QString();
+    QString s = QStringLiteral("Gruppe «%1» mit %2 löschen?")
+                    .arg(group, countText(members.size(), QStringLiteral("Aktion"), QStringLiteral("Aktionen")));
+    const QString uses = actionUsesText(config, members);
+    if (!uses.isEmpty())
+        s += (members.size() == 1 ? QStringLiteral(" Sie wird von %1 benutzt.") : QStringLiteral(" Sie werden von %1 benutzt."))
+                 .arg(uses);
+    return s;
 }
 
 // --- «Aktionen», Bereich «Aktion» ---
@@ -912,6 +1049,21 @@ EditResult removeStep(const Action &action, const QUuid &stepId)
     return putAction(action, a);
 }
 
+QString removeStepQuestion(const Action &action, const QUuid &stepId)
+{
+    Action a = action;
+    const StepPlace place = findStep(&a.steps, stepId);
+    if (!place.list)
+        return QString();
+    const Step &step = place.list->at(place.index);
+    const qsizetype n = stepCount(step.steps);
+    if (isBranch(step) || n == 0)
+        return QString();
+    const StepTypeInfo *info = stepType(step.type);
+    return QStringLiteral("Schritt «%1» samt %2 darin löschen?")
+        .arg(info ? info->label : step.type, countText(n, QStringLiteral("Schritt"), QStringLiteral("Schritten")));
+}
+
 EditResult moveStep(const Action &action, const QUuid &stepId, int direction)
 {
     Action a = action;
@@ -1172,11 +1324,22 @@ EditResult copyCommand(const ActionsConfig &config, const QUuid &commandId)
     return r;
 }
 
-EditResult removeCommand(const QUuid &commandId)
+EditResult removeCommand(const ActionsConfig &config, const QUuid &commandId)
 {
+    if (!config.command(commandId))
+        return {};
     EditResult r;
     r.edits.append(edit("command_remove", {{QStringLiteral("command_id"), uuidText(commandId)}}));
     return r;
+}
+
+QString removeCommandQuestion(const ActionsConfig &config, const QUuid &commandId)
+{
+    const Command *command = config.command(commandId);
+    const QString uses = command ? triggerUsesText(config, kTriggerCommand, "command_id", commandId) : QString();
+    if (uses.isEmpty())
+        return QString();
+    return QStringLiteral("%1 löschen? Er wird von %2 benutzt.").arg(commandTitle(*command), uses);
 }
 
 EditResult putCommand(const Command &before, const Command &after)
@@ -1261,11 +1424,22 @@ EditResult copyTimer(const ActionsConfig &config, const QUuid &timerId)
     return r;
 }
 
-EditResult removeTimer(const QUuid &timerId)
+EditResult removeTimer(const ActionsConfig &config, const QUuid &timerId)
 {
+    if (!config.timer(timerId))
+        return {};
     EditResult r;
     r.edits.append(edit("timer_remove", {{QStringLiteral("timer_id"), uuidText(timerId)}}));
     return r;
+}
+
+QString removeTimerQuestion(const ActionsConfig &config, const QUuid &timerId)
+{
+    const Timer *timer = config.timer(timerId);
+    const QString uses = timer ? triggerUsesText(config, kTriggerTimer, "timer_id", timerId) : QString();
+    if (uses.isEmpty())
+        return QString();
+    return QStringLiteral("%1 löschen? Sie wird von %2 benutzt.").arg(timerTitle(*timer), uses);
 }
 
 EditResult putTimer(const Timer &before, const Timer &after)
@@ -1395,8 +1569,16 @@ EditResult setVariableValue(const VariableRow &row, const QString &text)
     return r;
 }
 
-EditResult removeVariable(const VariableRow &row)
+EditResult removeVariable(const VariablesData &data, const VolatileValues &volatileValues,
+                          const VolatileUserValues &volatileUserValues, const VariableRow &row)
 {
+    const bool user = row.scope == VariableScope::User;
+    const bool exists = row.persisted ? (user ? data.users.value(row.userId).contains(row.name)
+                                              : data.global.contains(row.name))
+                                      : (user ? volatileUserValues.value(row.userId).contains(row.name)
+                                              : volatileValues.contains(row.name));
+    if (!exists)
+        return {};
     EditResult r;
     r.edits.append(edit("variable_remove", variableFields(row)));
     return r;

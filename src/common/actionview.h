@@ -114,6 +114,26 @@ EditResult resetAction(const actions::ActionsConfig &config, const QUuid &action
 // Rückfrage vor «Zurücksetzen» (Plan 7)
 QString resetActionQuestion(const actions::Action &action);
 
+// Gruppe umbenennen: je Aktion der Gruppe ein action_put mit dem neuen Namen (ohne Leerzeichen am
+// Rand). Gruppen gibt es nur über ihre Aktionen (Plan 2.3); mitgelieferte Aktionen werden mit
+// umbenannt. Prüfmeldung bei leerem Namen und beim Namen einer anderen Gruppe (kein Zusammenführen).
+// Gleicher Name oder unbekannte Gruppe: nichts.
+EditResult renameActionGroup(const actions::ActionsConfig &config, const QString &group, const QString &name);
+// Gruppe löschen: je Aktion der Gruppe ein action_remove, in der Reihenfolge der Datei. Das Fenster
+// schickt sie nacheinander. Unbekannte Gruppe: nichts.
+EditResult removeActionGroup(const actions::ActionsConfig &config, const QString &group);
+
+// Rückfragen vor dem Löschen. Leerer Text: keine Rückfrage nötig (nichts darin, keine Verweise, oder
+// das Objekt gibt es nicht). Verweise zählen, auch abgeschaltete: Befehle und Zeitnachrichten, die
+// eine Aktion über ihre Auslöser startet, und Schritte «Aktion ausführen» anderer Aktionen; beim
+// Befehl und bei der Zeitnachricht die Aktionen mit einem Auslöser darauf. Der Kern entfernt die
+// Verweise nicht, sie erscheinen danach als Prüfmeldung «fehlt» bzw. ohne Aktion.
+// «Aktion «Shoutout ausführen» löschen? Sie wird von 1 Aktion benutzt.»
+QString removeActionQuestion(const actions::ActionsConfig &config, const QUuid &actionId);
+// Immer eine Rückfrage, wenn es die Gruppe gibt (sie löscht alle ihre Aktionen); Verweise nur von
+// ausserhalb der Gruppe. «Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt.»
+QString removeActionGroupQuestion(const actions::ActionsConfig &config, const QString &group);
+
 // --- «Aktionen», Mitte: Bereich «Aktion» ---
 
 QString actionTitle(const actions::Action &action); // «Aktion «Begrüssung»»
@@ -197,6 +217,9 @@ QList<TypeChoice> stepChoices();
 EditResult addStep(const actions::Action &action, const QUuid &selected, const QString &type);
 // Entfernt den Schritt mit allem darin; «Dann» und «Sonst» nicht.
 EditResult removeStep(const actions::Action &action, const QUuid &stepId);
+// Rückfrage vor removeStep, nur wenn der Schritt Schritte enthält (Gruppe, Wenn mit Dann/Sonst;
+// gezählt ohne die Zweige selbst), sonst leer. «Schritt «Gruppe» samt 3 Schritten darin löschen?»
+QString removeStepQuestion(const actions::Action &action, const QUuid &stepId);
 // direction -1 = hoch, +1 = runter, innerhalb derselben Liste
 EditResult moveStep(const actions::Action &action, const QUuid &stepId, int direction);
 EditResult setStepEnabled(const actions::Action &action, const QUuid &stepId, bool enabled);
@@ -288,7 +311,9 @@ QStringList commandsFromText(const QString &text);
 
 EditResult newCommand(const actions::ActionsConfig &config);
 EditResult copyCommand(const actions::ActionsConfig &config, const QUuid &commandId);
-EditResult removeCommand(const QUuid &commandId);
+EditResult removeCommand(const actions::ActionsConfig &config, const QUuid &commandId);
+// Rückfrage (siehe removeActionQuestion): «Befehl «!so» löschen? Er wird von 1 Aktion benutzt.»
+QString removeCommandQuestion(const actions::ActionsConfig &config, const QUuid &commandId);
 // command_put; Name nicht leer, Befehle ohne Leerzeichen am Rand und ohne leere, Abklingzeiten
 // ab 0, sonst wie der Kern beim Lesen (commandFromJson). Gleich wie before: nichts.
 EditResult putCommand(const actions::Command &before, const actions::Command &after);
@@ -311,7 +336,9 @@ QString timerTitle(const actions::Timer &timer); // «Zeitnachricht «Info»»
 
 EditResult newTimer(const actions::ActionsConfig &config);
 EditResult copyTimer(const actions::ActionsConfig &config, const QUuid &timerId);
-EditResult removeTimer(const QUuid &timerId);
+EditResult removeTimer(const actions::ActionsConfig &config, const QUuid &timerId);
+// Rückfrage (siehe removeActionQuestion): «Zeitnachricht «Info» löschen? Sie wird von 1 Aktion benutzt.»
+QString removeTimerQuestion(const actions::ActionsConfig &config, const QUuid &timerId);
 // timer_put; Name nicht leer, Abstand mindestens 60 s, bei Zufall Bereich ab 60 s und von ≤ bis,
 // sonst wie der Kern beim Lesen (timerFromJson). Gleich wie before: nichts.
 EditResult putTimer(const actions::Timer &before, const actions::Timer &after);
@@ -352,6 +379,8 @@ QString variableNameLabel(const QString &name); // leer → «Alle Variablen»
 
 // Wert in der Zelle geändert: Eine Zahl bleibt eine Zahl (sonst Prüfmeldung), Text bleibt Text.
 EditResult setVariableValue(const VariableRow &row, const QString &text);
-EditResult removeVariable(const VariableRow &row);
+// Löschen nur, wenn es die Variable in data (dauerhaft) bzw. in den flüchtigen Werten noch gibt.
+EditResult removeVariable(const actions::VariablesData &data, const VolatileValues &volatileValues,
+                          const VolatileUserValues &volatileUserValues, const VariableRow &row);
 
 } // namespace dss
