@@ -226,14 +226,23 @@ int RunRows::visibleIndex(int index) const
 
 namespace {
 
-// Ohne Index ein Abschnitt Text wie vor em-3
+// Ohne Index ein Abschnitt Text wie vor em-3; ein GIF mit Adresse steht dann auch nicht im Text,
+// sondern in der eigenen Zeile (em-9)
 QList<ChatSegment> rowSegments(const ChatRow &row, const EmoteIndex *emotes)
 {
     if (emotes)
         return chatSegments(row.fragments, *emotes);
-    if (row.text.isEmpty())
+    QString text = row.text;
+    if (!chatGifs(row.fragments).isEmpty()) {
+        text.clear();
+        for (const ChatFragment &fragment : row.fragments) {
+            if (!fragment.isGif())
+                text += fragment.text;
+        }
+    }
+    if (text.isEmpty())
         return {};
-    return {ChatSegment{row.text, std::nullopt}};
+    return {ChatSegment{text, std::nullopt}};
 }
 
 // Nachricht ohne Fragmente (twitch.chat_sent, ältere Verläufe): ein Fragment text

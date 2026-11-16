@@ -110,6 +110,25 @@ private slots:
         QVERIFY(!images.contains(QStringLiteral("einbild")));
     }
 
+    // P14 Emotes em-9: Grenzen der GIFs im Chat (kGifImageLimits): 112 px hoch, Breite nach
+    // Seitenverhältnis bis 4 × 112, Quellbild bis 1024 px, Bytes bis kGifMaxBytes
+    void gifLimits()
+    {
+        QCOMPARE(kGifImageLimits.height, 112);
+        EmoteImages images;
+        QVERIFY(images.add(QStringLiteral("gif"), twoFrameGif(), kGifImageLimits));
+        QCOMPARE(images.frameCount(QStringLiteral("gif")), 2);
+        QCOMPARE(images.frame(QStringLiteral("gif"), 0)->size(), QSize(224, 112));
+        // Grösser als ein Emote darf sein (Giphy liefert das Original, um 480 px breit)
+        QVERIFY(images.add(QStringLiteral("breit"), filled(1024, 256, Qt::red), kGifImageLimits));
+        QCOMPARE(images.frame(QStringLiteral("breit"), 0)->size(), QSize(448, 112));
+        expectReject("Bild zu gross");
+        QVERIFY(!images.add(QStringLiteral("zu breit"), filled(1025, 10, Qt::red), kGifImageLimits));
+        expectReject("zu viele Bytes");
+        QVERIFY(!images.add(QStringLiteral("bytes"), QByteArray(kGifMaxBytes + 1, '\0'), kGifImageLimits));
+        QVERIFY(!images.contains(QStringLiteral("zu breit")));
+    }
+
     void webpStatic()
     {
         EmoteImages images;

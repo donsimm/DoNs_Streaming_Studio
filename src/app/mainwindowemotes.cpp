@@ -21,7 +21,7 @@ void MainWindow::enableEmotes(const dss::EmoteEndpoints &endpoints, const QStrin
     if (m_emoteLoader || !m_client)
         return;
     m_emoteLoader = new dss::EmoteLoader(cacheDir, endpoints, this);
-    m_chatBot->setEmoteImages(&m_emoteImages);
+    m_chatBot->setEmoteImages(&m_emoteImages, &m_gifImages);
     // Neue Listen: Abschnitte aller Zeilen neu, Liste neu aufbauen, Bilder der Zeilen bestellen
     connect(m_emoteLoader, &dss::EmoteLoader::indexChanged, this, [this](const dss::EmoteIndex &index) {
         m_chatRows.setEmotes(index);
@@ -51,6 +51,11 @@ void MainWindow::enableEmotes(const dss::EmoteEndpoints &endpoints, const QStrin
     // bzw. EmoteImages). Sonst nur neu zeichnen, keine neuen Zeilen.
     connect(m_emoteLoader, &dss::EmoteLoader::imageLoaded, this, [this](const QString &key, const QByteArray &bytes) {
         if (!bytes.isEmpty() && m_emoteImages.add(key, bytes))
+            m_chatBot->emoteImagesChanged();
+    });
+    // GIFs (em-9) mit eigener Höhe und eigenen Grenzen; ohne Bild bleibt der Text des Fragments
+    connect(m_emoteLoader, &dss::EmoteLoader::gifLoaded, this, [this](const QString &key, const QByteArray &bytes) {
+        if (!bytes.isEmpty() && m_gifImages.add(key, bytes, dss::kGifImageLimits))
             m_chatBot->emoteImagesChanged();
     });
     connect(m_client, &dss::CoreClient::twitchStatusChanged, this, &MainWindow::loadEmotes);
@@ -138,6 +143,13 @@ void MainWindow::requestEmoteImages(const QList<dss::ChatRow> &rows)
                 continue;
             m_emoteRequested.insert(key);
             m_emoteLoader->image(*segment.emote, true);
+        }
+        // GIFs (em-9): Schlüssel ist die unveränderte Adresse wie im Delegaten
+        for (const dss::ChatGif &gif : dss::chatGifs(row.fragments)) {
+            if (m_emoteRequested.contains(gif.url) || m_gifImages.contains(gif.url))
+                continue;
+            m_emoteRequested.insert(gif.url);
+            m_emoteLoader->gif(gif.url);
         }
     }
 }

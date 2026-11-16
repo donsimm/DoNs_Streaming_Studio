@@ -539,6 +539,8 @@ private slots:
             {"emote", "Kappa", "25", {"static"}, {}, {}},
             {"emote", "testka1Tanz", "emotesv2_1", {"static", "animated"}, {}, {}},
             {"gif", "[GIF]", {}, {}, "g1", "https://media.example/g1.gif"},
+            // GIF ohne Adresse: Text
+            {"gif", "[ohne]", {}, {}, "g2", {}},
             // Fragment emote ohne Kennung: Text, ohne Suche im Index
             {"emote", "Kappa", {}, {}, {}, {}},
         };
@@ -548,7 +550,25 @@ private slots:
         // Twitch-Emote aus dem Fragment hat Vorrang vor dem gleichnamigen BTTV-Emote
         QCOMPARE(s.at(1), (ChatSegment{"Kappa", Emote{EmoteProvider::Twitch, "25", "Kappa"}}));
         QCOMPARE(s.at(2), (ChatSegment{"testka1Tanz", Emote{EmoteProvider::Twitch, "emotesv2_1", "testka1Tanz", true}}));
-        QCOMPARE(s.at(3), (ChatSegment{"[GIF]Kappa", std::nullopt}));
+        // em-9: GIF mit Adresse steht in der eigenen Zeile, nicht im Text
+        QCOMPARE(s.at(3), (ChatSegment{"[ohne]Kappa", std::nullopt}));
+        QCOMPARE(chatGifs(fragments), (QList<ChatGif>{{"https://media.example/g1.gif", "[GIF]"}}));
+    }
+
+    // P14 Emotes em-9: GIFs in der Reihenfolge der Fragmente, Adresse unverändert (auch Query)
+    void gifsFromFragments()
+    {
+        const QString url = QStringLiteral("https://media4.giphy.com/media/x/giphy.gif?cid=a%2Fb&rid=giphy.gif&ct=g");
+        const QList<ChatFragment> fragments = chatFragments(QJsonArray{
+            QJsonObject{{"type", "text"}, {"text", "vorher "}},
+            QJsonObject{{"type", "gif"}, {"text", "[eins]"}, {"gif_id", "g1"}, {"gif_url", url}},
+            QJsonObject{{"type", "gif"}, {"text", "[zwei]"}, {"gif_id", "g2"}, {"gif_url", "https://i.giphy.com/g2.gif"}},
+            QJsonObject{{"type", "gif"}, {"text", "[null]"}, {"gif_id", QJsonValue::Null}, {"gif_url", QJsonValue::Null}},
+        });
+        QCOMPARE(chatGifs(fragments), (QList<ChatGif>{{url, "[eins]"}, {"https://i.giphy.com/g2.gif", "[zwei]"}}));
+        QVERIFY(!fragments.at(3).isGif());
+        QCOMPARE(chatSegments(fragments, EmoteIndex()), (QList<ChatSegment>{{"vorher [null]", std::nullopt}}));
+        QVERIFY(chatGifs({}).isEmpty());
     }
 
     void segmentsZeroWidth()

@@ -26,10 +26,13 @@ namespace dss {
 inline constexpr qint64 kEmoteImageMaxBytes = 2 * 1024 * 1024;
 inline constexpr qint64 kEmoteCacheMaxBytes = 100 * 1024 * 1024;
 inline constexpr int kEmoteRequestTimeoutMs = 15000;
+// P14 Emotes em-9: GIFs im Chat (Giphy) höchstens so gross; eigener Wert, nicht gemessen
+inline constexpr qint64 kGifMaxBytes = 8 * 1024 * 1024;
 
 // Ein erlaubter Server: host ist der Host der echten Adresse (emoteListUrl, emoteImageUrl), base
 // der Ort, an den die Anfrage geht (Schema, Host, Port, Pfad davor). Normal https://<host>;
-// Tests geben einen lokalen Stub an.
+// Tests geben einen lokalen Stub an. host «*.<Domain>» gilt für jeden Host unter der Domain
+// (GIFs, em-9); base ohne Host heisst dann: die echte Adresse unverändert, nur mit diesem Schema.
 struct EmoteEndpoint
 {
     QString host;
@@ -37,13 +40,14 @@ struct EmoteEndpoint
 };
 
 // Die einzige Liste erlaubter Server. Anfragen und Weiterleitungen gehen nur an Adressen unter
-// einer base dieser Liste; em-9 ergänzt hier die Hosts der GIFs.
+// einer base dieser Liste.
 struct EmoteEndpoints
 {
     QList<EmoteEndpoint> list;
 
     // api.betterttv.net, cdn.betterttv.net, 7tv.io, cdn.7tv.app, api.frankerfacez.com,
-    // cdn.frankerfacez.com, static-cdn.jtvnw.net, je über https
+    // cdn.frankerfacez.com, static-cdn.jtvnw.net, je über https; *.giphy.com (GIFs, em-9) über
+    // https mit der unveränderten Adresse
     static EmoteEndpoints standard();
     // Echte Adresse → Adresse der Anfrage; leer, wenn ihr Host nicht in der Liste steht
     QUrl map(const QUrl &real) const;
@@ -73,11 +77,21 @@ public:
     // emoteImageUrl; WebP vom letzten load()). Dieselbe Adresse läuft nur einmal gleichzeitig.
     QString image(const Emote &emote, bool animate);
 
+    // P14 Emotes em-9: lädt ein GIF aus dem Chat, am Ende gifLoaded(url, …). Die Adresse geht
+    // unverändert hinaus (Twitch: «must not be modified»; Giphy: Query-Parameter nicht ändern),
+    // nur an erlaubte Server (*.giphy.com), nur in den Arbeitsspeicher: eigener Netzzugang ohne
+    // QNetworkDiskCache (Giphy: «Do not … cache or store copies»). Gibt url zurück, leer, wenn
+    // die Adresse nicht erlaubt ist (dann bleibt der Text). Dieselbe Adresse läuft nur einmal.
+    // Quellen: Recherche docs/archiv/recherchen/2026-11-16-twitch-gif.md, Abschnitte 1 und 5.
+    QString gif(const QString &url);
+
 signals:
     void indexChanged(const dss::EmoteIndex &index);
     void stateChanged(const dss::EmoteLoadState &state);
     // bytes leer: nicht geladen (Fehler ist im Protokoll), das Wort bleibt Text
     void imageLoaded(const QString &key, const QByteArray &bytes);
+    // wie imageLoaded, für gif(); key ist die Adresse
+    void gifLoaded(const QString &key, const QByteArray &bytes);
 
 private:
     struct ListJob
@@ -101,10 +115,14 @@ private:
     void startList(ListJob job);
     void listFinished(QNetworkReply *reply, const ListJob &job);
     void finishLoad();
-    QNetworkReply *get(const QUrl &real, int cacheControl, qint64 maxBytes);
+    QNetworkReply *get(QNetworkAccessManager *network, const QUrl &real, int cacheControl, qint64 maxBytes);
+    // Bild-Anfrage zu key starten; am Ende loaded(key, Bytes) über das Signal des Aufrufers
+    bool startImage(QNetworkAccessManager *network, const QUrl &real, const QString &key, int cacheControl,
+                    qint64 maxBytes, void (EmoteLoader::*loaded)(const QString &, const QByteArray &));
 
     EmoteEndpoints m_endpoints;
     QNetworkAccessManager *m_network = nullptr;
+    QNetworkAccessManager *m_gifNetwork = nullptr; // ohne Zwischenspeicher (em-9)
     std::optional<QString> m_channelId;
     bool m_webp = true;
     bool m_channelValid = false;

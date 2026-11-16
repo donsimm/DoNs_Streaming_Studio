@@ -99,10 +99,26 @@ struct ChatFragment
     QString gifId;
     QString gifUrl;
 
+    // GIF mit Adresse: steht in der eigenen Zeile unter dem Kopf (em-9), nicht im Text
+    bool isGif() const { return type == QLatin1String("gif") && !gifUrl.isEmpty(); }
+
     bool operator==(const ChatFragment &) const = default;
 };
 // data.fragments → Fragmente; Einträge ohne Objekt fallen weg, fehlende Felder bleiben leer.
 QList<ChatFragment> chatFragments(const QJsonValue &fragments);
+
+// P14 Emotes em-9: ein GIF im Chat. url unverändert aus gif_url (Twitch: «must not be
+// modified», Recherche 2026-11-16-twitch-gif, Abschnitt 1), text des Fragments als Ersatz ohne
+// Bild und als Tooltip.
+struct ChatGif
+{
+    QString url;
+    QString text;
+
+    bool operator==(const ChatGif &) const = default;
+};
+// Die GIFs der Nachricht in ihrer Reihenfolge (Fragmente mit isGif()).
+QList<ChatGif> chatGifs(const QList<ChatFragment> &fragments);
 
 // Ein Abschnitt der angezeigten Nachricht: Text oder ein Emote (text ist dann sein Name).
 struct ChatSegment
@@ -114,7 +130,8 @@ struct ChatSegment
 };
 // Fragmente emote werden Twitch-Emotes (Stelle aus EventSub, keine Textsuche; animiert, wenn
 // formats animated enthält). In Fragmenten text wird an ' ' getrennt und jedes Wort exakt im Index
-// gesucht; Leerzeichen bleiben Text. cheermote, mention und gif (Anzeige ab em-9) bleiben Text.
+// gesucht; Leerzeichen bleiben Text. cheermote, mention und gif ohne Adresse bleiben Text, gif
+// mit Adresse fällt weg (eigene Zeile, chatGifs).
 // Ein Zero-Width-Emote bleibt das nur direkt hinter einem Emote (Leerzeichen dazwischen zählen
 // nicht), sonst wird es ein normales Emote. Aufeinanderfolgende Texte werden ein Abschnitt.
 QList<ChatSegment> chatSegments(const QList<ChatFragment> &fragments, const EmoteIndex &index);

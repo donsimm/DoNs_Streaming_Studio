@@ -36,6 +36,21 @@ QString listLabel(EmoteProvider provider, bool channel)
     return emoteProviderName(provider) + (channel ? QStringLiteral(" Kanal") : QStringLiteral(" global"));
 }
 
+// host passt zu pattern: gleich oder, bei «*.<Domain>», ein Host unter der Domain (nicht die
+// Domain selbst)
+bool hostMatches(const QString &pattern, const QString &host)
+{
+    if (pattern.startsWith(QLatin1String("*.")))
+        return host.size() > pattern.size() - 1 && host.endsWith(pattern.mid(1), Qt::CaseInsensitive);
+    return host.compare(pattern, Qt::CaseInsensitive) == 0;
+}
+
+// Endpunkt, der die echte Adresse unverändert lässt (base ohne Host)
+bool passesThrough(const EmoteEndpoint &endpoint)
+{
+    return endpoint.base.host().isEmpty();
+}
+
 } // namespace
 
 EmoteEndpoints EmoteEndpoints::standard()
@@ -47,17 +62,24 @@ EmoteEndpoints EmoteEndpoints::standard()
         const QString name = QString::fromLatin1(host);
         endpoints.list.append({name, QUrl(QStringLiteral("https://") + name)});
     }
+    // GIFs im Chat (em-9): Giphy liefert von media0…media4.giphy.com, i.giphy.com; ein festes
+    // Muster nennt weder Twitch noch Giphy (Recherche 2026-11-16-twitch-gif, Abschnitt 2)
+    QUrl https;
+    https.setScheme(QStringLiteral("https"));
+    endpoints.list.append({QStringLiteral("*.giphy.com"), https});
     return endpoints;
 }
 
 QUrl EmoteEndpoints::map(const QUrl &real) const
 {
     for (const EmoteEndpoint &endpoint : list) {
-        if (real.host().compare(endpoint.host, Qt::CaseInsensitive) != 0)
+        if (!hostMatches(endpoint.host, real.host()))
             continue;
+        if (passesThrough(endpoint))
+            return allows(real) ? real : QUrl();
         QUrl url = endpoint.base;
         url.setPath(basePath(endpoint.base) + real.path());
-        url.setQuery(real.query());
+        url.setQuery(real.query(QUrl::FullyEncoded), QUrl::StrictMode);
         return url;
     }
     return {};
@@ -70,6 +92,12 @@ bool EmoteEndpoints::allows(const QUrl &url) const
     const QString path = url.adjusted(QUrl::NormalizePathSegments).path();
     for (const EmoteEndpoint &endpoint : list) {
         const QUrl &base = endpoint.base;
+        if (passesThrough(endpoint)) {
+            if (url.scheme().compare(base.scheme(), Qt::CaseInsensitive) == 0 && hostMatches(endpoint.host, url.host())
+                && url.port(defaultPort(url)) == defaultPort(base))
+                return true;
+            continue;
+        }
         if (url.scheme().compare(base.scheme(), Qt::CaseInsensitive) != 0
             || url.host().compare(base.host(), Qt::CaseInsensitive) != 0
             || url.port(defaultPort(url)) != base.port(defaultPort(base)))
@@ -82,7 +110,8 @@ bool EmoteEndpoints::allows(const QUrl &url) const
 }
 
 EmoteLoader::EmoteLoader(const QString &cacheDir, EmoteEndpoints endpoints, QObject *parent)
-    : QObject(parent), m_endpoints(std::move(endpoints)), m_network(new QNetworkAccessManager(this))
+    : QObject(parent), m_endpoints(std::move(endpoints)), m_network(new QNetworkAccessManager(this)),
+      m_gifNetwork(new QNetworkAccessManager(this))
 {
     // Nur der HTTP-Zwischenspeicher, keine eigene Bildsammlung (Plan «Wer lädt», Frage 4).
     // https://doc.qt.io/qt-6.8/qnetworkdiskcache.html
@@ -90,6 +119,8 @@ EmoteLoader::EmoteLoader(const QString &cacheDir, EmoteEndpoints endpoints, QObj
     cache->setCacheDirectory(cacheDir);
     cache->setMaximumCacheSize(kEmoteCacheMaxBytes);
     m_network->setCache(cache);
+    // m_gifNetwork bekommt nie einen Zwischenspeicher: «By default, QNetworkAccessManager does
+    // not have a set cache» (https://doc.qt.io/qt-6.8/qnetworkaccessmanager.html#setCache)
 }
 
 EmoteLoader::~EmoteLoader()
@@ -103,7 +134,7 @@ EmoteLoader::~EmoteLoader()
     }
 }
 
-QNetworkReply *EmoteLoader::get(const QUrl &real, int cacheControl, qint64 maxBytes)
+QNetworkReply *EmoteLoader::get(QNetworkAccessManager *network, const QUrl &real, int cacheControl, qint64 maxBytes)
 {
     const QUrl url = m_endpoints.map(real);
     if (url.isEmpty() || !m_endpoints.allows(url))
@@ -116,7 +147,7 @@ QNetworkReply *EmoteLoader::get(const QUrl &real, int cacheControl, qint64 maxBy
     request.setTransferTimeout(kEmoteRequestTimeoutMs);
     // Fest, ohne Rechnernamen und ohne Twitch-Token (Plan «Nur die vier Anbieter»)
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("DoNs-Streaming-Studio/") + version());
-    QNetworkReply *reply = m_network->get(request);
+    QNetworkReply *reply = network->get(request);
     connect(reply, &QNetworkReply::redirected, reply, [this, reply](const QUrl &target) {
         if (m_endpoints.allows(reply->url().resolved(target))) {
             emit reply->redirectAllowed();
@@ -174,7 +205,7 @@ void EmoteLoader::startList(ListJob job)
 {
     // Listen zuerst aus dem Netz, ohne Antwort aus dem Zwischenspeicher (Plan «Ohne Netz»)
     // https://doc.qt.io/qt-6.8/qnetworkrequest.html#CacheLoadControl-enum
-    QNetworkReply *reply = get(job.url, job.fromCacheTry ? QNetworkRequest::AlwaysCache : QNetworkRequest::PreferNetwork,
+    QNetworkReply *reply = get(m_network, job.url, job.fromCacheTry ? QNetworkRequest::AlwaysCache : QNetworkRequest::PreferNetwork,
                                kEmoteListMaxBytes);
     if (!reply) {
         qWarning("Emotes: %s, Server nicht erlaubt", qPrintable(listLabel(job.provider, job.channel)));
@@ -279,15 +310,39 @@ QString EmoteLoader::image(const Emote &emote, bool animate)
     if (real.isEmpty())
         return {};
     const QString key = real.toString();
-    if (m_imageReplies.value(key))
-        return key;
     // Bilder zuerst aus dem Zwischenspeicher (Plan «Ohne Netz»)
-    QNetworkReply *reply = get(real, QNetworkRequest::PreferCache, kEmoteImageMaxBytes);
-    if (!reply)
+    if (!startImage(m_network, real, key, QNetworkRequest::PreferCache, kEmoteImageMaxBytes, &EmoteLoader::imageLoaded))
         return {};
+    return key;
+}
+
+QString EmoteLoader::gif(const QString &url)
+{
+    // StrictMode: eine Adresse, die Qt erst umschreiben müsste, bleibt Text
+    const QUrl real(url, QUrl::StrictMode);
+    if (!real.isValid() || real.isRelative()) {
+        qWarning("Emotes: GIF ohne gültige Adresse, bleibt Text");
+        return {};
+    }
+    // Ohne Zwischenspeicher: m_gifNetwork hat keinen (Konstruktor), immer aus dem Netz
+    if (!startImage(m_gifNetwork, real, url, QNetworkRequest::AlwaysNetwork, kGifMaxBytes, &EmoteLoader::gifLoaded)) {
+        qWarning("Emotes: GIF von %s nicht erlaubt, bleibt Text", qPrintable(real.host()));
+        return {};
+    }
+    return url;
+}
+
+bool EmoteLoader::startImage(QNetworkAccessManager *network, const QUrl &real, const QString &key, int cacheControl,
+                             qint64 maxBytes, void (EmoteLoader::*loaded)(const QString &, const QByteArray &))
+{
+    if (m_imageReplies.value(key))
+        return true;
+    QNetworkReply *reply = get(network, real, cacheControl, maxBytes);
+    if (!reply)
+        return false;
     m_imageReplies.insert(key, reply);
     const QString host = real.host();
-    connect(reply, &QNetworkReply::finished, this, [this, reply, key, host] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, key, host, maxBytes, loaded] {
         m_imageReplies.remove(key);
         reply->deleteLater();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -299,17 +354,17 @@ QString EmoteLoader::image(const Emote &emote, bool animate)
             error = QStringLiteral("Netzwerkfehler %1").arg(int(reply->error()));
         if (error.isEmpty()) {
             bytes = reply->readAll();
-            if (bytes.size() > kEmoteImageMaxBytes) {
+            if (bytes.size() > maxBytes) {
                 bytes.clear();
-                error = QStringLiteral("grösser als %1 MiB, nicht gelesen").arg(kEmoteImageMaxBytes / (1024 * 1024));
+                error = QStringLiteral("grösser als %1 MiB, nicht gelesen").arg(maxBytes / (1024 * 1024));
             }
         }
         // Protokoll ohne Adresse, nur der Server
         if (!error.isEmpty())
             qWarning("Emotes: Bild von %s nicht geladen: %s", qPrintable(host), qPrintable(error));
-        emit imageLoaded(key, bytes);
+        emit (this->*loaded)(key, bytes);
     });
-    return key;
+    return true;
 }
 
 } // namespace dss

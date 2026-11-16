@@ -397,15 +397,25 @@ private slots:
 
     void gifFragment()
     {
-        // em-3 liest gif_id und gif_url; angezeigt wird das GIF erst ab em-9, bis dahin Text
+        // em-3 liest gif_id und gif_url; ab em-9 steht das GIF in der eigenen Zeile (chatGifs),
+        // nicht im Text, mit und ohne Index. Der Text der Zelle bleibt die ganze Nachricht.
         const EmoteIndex index;
-        const ChatRow row = *chatRow(twitchEvent("chat_gif.json"), std::nullopt, &index);
-        QCOMPARE(row.fragments.size(), 1);
-        const ChatFragment &gif = row.fragments.first();
-        QCOMPARE(gif.type, QStringLiteral("gif"));
-        QCOMPARE(gif.gifId, QStringLiteral("testgif0000000001"));
-        QVERIFY(gif.gifUrl.startsWith(QLatin1String("https://")));
-        QCOMPARE(row.segments, (QList<ChatSegment>{{"[Test GIF eins]", std::nullopt}}));
+        for (const EmoteIndex *emotes : {&index, static_cast<const EmoteIndex *>(nullptr)}) {
+            const ChatRow row = *chatRow(twitchEvent("chat_gif.json"), std::nullopt, emotes);
+            QCOMPARE(row.fragments.size(), 1);
+            const ChatFragment &gif = row.fragments.first();
+            QCOMPARE(gif.type, QStringLiteral("gif"));
+            QCOMPARE(gif.gifId, QStringLiteral("testgif0000000001"));
+            QCOMPARE(chatGifs(row.fragments),
+                     (QList<ChatGif>{{"https://media4.giphy.com/media/testgif0000000001/giphy.gif?cid=test&ct=g",
+                                      "[Test GIF eins]"}}));
+            QVERIFY(row.segments.isEmpty());
+            QCOMPARE(row.text, QStringLiteral("[Test GIF eins]"));
+        }
+        // Feldname gif_id laut Changelog
+        const ChatRow other = *chatRow(twitchEvent("chat_gif_changelog.json"), std::nullopt, &index);
+        QCOMPARE(other.fragments.first().gifId, QStringLiteral("testgif0000000002"));
+        QCOMPARE(chatGifs(other.fragments).size(), 1);
     }
 
     void setEmotesChangesRows()

@@ -33,6 +33,13 @@ struct EmoteImageLimits
     int maxFrames = 256;           // Bilder je Animation
 };
 
+// P14 Emotes em-9: GIFs im Chat in eigener Zeile, 112 px hoch (Plan em-9), Breite nach
+// Seitenverhältnis. Grenzen eigene Werte, nicht gemessen: Giphy liefert das Original
+// (giphy.gif, oft um 480 px breit und einige MiB), darum mehr Bytes und Pixel als ein Emote.
+inline constexpr int kGifHeight = 112;
+inline constexpr EmoteImageLimits kGifImageLimits{
+    .height = kGifHeight, .maxWidthFactor = 4, .maxBytes = kGifMaxBytes, .maxSide = 1024, .maxFrames = 256};
+
 class EmoteImages
 {
 public:

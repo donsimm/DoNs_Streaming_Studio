@@ -438,6 +438,16 @@ QList<ChatFragment> chatFragments(const QJsonValue &fragments)
     return out;
 }
 
+QList<ChatGif> chatGifs(const QList<ChatFragment> &fragments)
+{
+    QList<ChatGif> out;
+    for (const ChatFragment &fragment : fragments) {
+        if (fragment.isGif())
+            out.append({fragment.gifUrl, fragment.text});
+    }
+    return out;
+}
+
 namespace {
 
 void appendText(QList<ChatSegment> *segments, const QString &text)
@@ -489,6 +499,8 @@ QList<ChatSegment> chatSegments(const QList<ChatFragment> &fragments, const Emot
             appendEmote(&segments, emote);
             continue;
         }
+        if (fragment.isGif())
+            continue;
         if (fragment.type != QLatin1String("text")) {
             appendText(&segments, fragment.text);
             continue;

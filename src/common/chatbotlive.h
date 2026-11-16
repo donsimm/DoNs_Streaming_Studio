@@ -87,7 +87,8 @@ private:
 // messageId: Kennung der Nachricht bei Twitch (nicht angezeigt), gegen doppelte Zeilen.
 // P14 Emotes em-3: platform für das Symbol vor der Zeile (aus dem Typ, twitch.* → Twitch; None
 // für Zeilen ohne Plattform wie actions.*). fragments und segments nur bei Nachrichten (nicht
-// isEvent): segments ist, was der Delegat zeichnet (Text und Emotes). awaitingEcho: Zeile aus
+// isEvent): segments ist, was der Delegat zeichnet (Text und Emotes); GIFs (em-9) zeichnet er in
+// einer eigenen Zeile aus chatGifs(fragments), sie fehlen in segments. awaitingEcho: Zeile aus
 // twitch.chat_sent, deren Echo noch nicht da ist.
 enum class ChatPlatform { None, Twitch, YouTube };
 struct ChatRow

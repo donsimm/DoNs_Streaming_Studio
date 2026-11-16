@@ -75,7 +75,10 @@ public:
     // P14 Emotes em-6: Bilder der Emotes (gehören dem Aufrufer, nullptr = nur Text). Ein Emote
     // erscheint, sobald images ein Bild unter dem Schlüssel chatEmoteImageKey hat; danach
     // emoteImagesChanged() aufrufen (zeichnet nur neu, keine neuen Zeilen).
-    void setEmoteImages(const dss::EmoteImages *images);
+    // P14 Emotes em-9: GIFs der Nachrichten (Fragmente gif) stehen in einer eigenen Zeile unter
+    // dem Kopf, kGifHeight hoch; das Bild kommt aus gifs unter der Adresse des GIFs (ChatGif::url),
+    // ohne Bild steht dort der Text des Fragments. Die Zeilen mit GIF sind dafür höher.
+    void setEmoteImages(const dss::EmoteImages *images, const dss::EmoteImages *gifs = nullptr);
     void emoteImagesChanged();
     // Eingabezeile nur aus dss::chatSendView (Zähler, «zu lang», Freigabe, Konten, Grund).
     void setChatSend(const dss::ChatSendView &view);
@@ -136,6 +139,7 @@ private:
     QCheckBox *m_hideChat = nullptr;
     QTreeWidget *m_chat = nullptr;
     const dss::EmoteImages *m_emoteImages = nullptr; // liest der Delegat der Liste «Chat»
+    const dss::EmoteImages *m_gifImages = nullptr;   // GIFs (em-9), ebenso
     QTimer *m_emoteTimer = nullptr;
     QElapsedTimer m_emoteClock; // eine Uhr für alle Emotes (Recherche Emotes, Abschnitt 6)
     QComboBox *m_chatAccount = nullptr;

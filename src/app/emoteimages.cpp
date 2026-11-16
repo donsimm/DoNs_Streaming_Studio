@@ -47,7 +47,7 @@ bool EmoteImages::add(const QString &key, const QByteArray &bytes, const EmoteIm
     reader.setDecideFormatFromContent(true);
     // Grösse vor dem Dekodieren prüfen. QImageReader::setAllocationLimit ist statisch und gälte
     // für alle Bilder des Fensters (auch die Medien der Leinwand); die Seitengrenze hier und je
-    // Bild unten hält ein Bild unter 512 × 512 × 4 Bytes.
+    // Bild unten hält ein Bild unter maxSide × maxSide × 4 Bytes (Emotes 512, GIFs 1024).
     const QSize declared = reader.size();
     if (declared.width() > limits.maxSide || declared.height() > limits.maxSide) {
         reject(key, "Bild zu gross");

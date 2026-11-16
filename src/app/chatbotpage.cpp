@@ -79,6 +79,8 @@ constexpr int kChatColorRole = Qt::UserRole + 3;
 constexpr int kChatTextRole = Qt::UserRole + 4;
 constexpr int kChatSegmentsRole = Qt::UserRole + 5; // QList<dss::ChatSegment> (P14 Emotes em-6)
 constexpr int kChatPlatformRole = Qt::UserRole + 6; // dss::ChatPlatform als int
+constexpr int kChatGifsRole = Qt::UserRole + 7;     // QList<dss::ChatGif> (P14 Emotes em-9)
+constexpr int kChatFragmentsRole = Qt::UserRole + 8; // bool: Zeile hat Fragmente (em-9)
 
 // Takt der Animation (Plan P14 Emotes, «Annahmen»: 30 ms mit gemeinsamer Uhr)
 constexpr int kEmoteTickMs = 30;
@@ -104,6 +106,24 @@ void fillChatItem(QTreeWidgetItem *item, const dss::ChatRow &row)
     item->setData(1, kChatTextRole, row.text);
     item->setData(1, kChatSegmentsRole, QVariant::fromValue(row.segments));
     item->setData(1, kChatPlatformRole, int(row.platform));
+    item->setData(1, kChatGifsRole, QVariant::fromValue(dss::chatGifs(row.fragments)));
+    item->setData(1, kChatFragmentsRole, !row.fragments.isEmpty());
+}
+
+// Höhe der GIF-Zeile unter dem Kopf (mit Abstand), 0 ohne GIF; Daten in Spalte 1
+int gifLineHeight(const QModelIndex &index)
+{
+    return index.siblingAtColumn(1).data(kChatGifsRole).value<QList<dss::ChatGif>>().isEmpty()
+               ? 0
+               : dss::kGifHeight + kChatGap;
+}
+
+// Rahmen der Zelle ohne die GIF-Zeile: darin stehen Zeit und Kopf wie in einer Zeile ohne GIF
+QStyleOptionViewItem headOption(const QStyleOptionViewItem &option, int gifLine)
+{
+    QStyleOptionViewItem head(option);
+    head.rect.setHeight(option.rect.height() - gifLine);
+    return head;
 }
 
 QTreeWidgetItem *chatItem(const dss::ChatRow &row)
@@ -133,25 +153,28 @@ struct ChatPiece
 // (Text und Emotes). Ein Emote ohne Bild bleibt sein Name als Text. Jede Zeile hält den Platz
 // des Symbols frei, auch ohne Symbol (Entscheid des Nutzers 2026-11-16): Namen und Texte der
 // Ereigniszeilen stehen bündig in einer Spalte.
+// P14 Emotes em-9: GIFs in einer eigenen Zeile unter dem Kopf, bündig mit dem Namen (wie
+// Chatterino, Recherche 2026-11-16-twitch-gif, Abschnitt 6); ohne Bild der Text des Fragments.
 class ChatRowDelegate : public QStyledItemDelegate
 {
 public:
-    // clock und images gehören der Seite; *images = nullptr heisst nur Text.
+    // clock, images und gifs gehören der Seite; *images = nullptr heisst nur Text.
     ChatRowDelegate(const Theme &theme, const QElapsedTimer *clock, const dss::EmoteImages *const *images,
-                    QObject *parent)
-        : QStyledItemDelegate(parent), m_theme(theme), m_clock(clock), m_images(images)
+                    const dss::EmoteImages *const *gifs, QObject *parent)
+        : QStyledItemDelegate(parent), m_theme(theme), m_clock(clock), m_images(images), m_gifs(gifs)
     {
     }
 
-    // Jede Zeile gleich hoch (setUniformRowHeights): mindestens ein Emote plus die Polsterung
-    // des Stylesheets (#chatBotChat::item), die der Stil schon um die Textzeile legt.
+    // Jede Zeile ohne GIF gleich hoch: mindestens ein Emote plus die Polsterung des Stylesheets
+    // (#chatBotChat::item), die der Stil schon um die Textzeile legt. Mit GIF kommt die GIF-Zeile
+    // dazu, auch solange das Bild fehlt (die Liste springt nicht, wenn es kommt).
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         QSize size = QStyledItemDelegate::sizeHint(option, index);
         QStyleOptionViewItem opt(option);
         initStyleOption(&opt, index);
         const int padding = size.height() - opt.fontMetrics.height();
-        size.setHeight(qMax(size.height(), dss::kEmoteHeight + padding));
+        size.setHeight(qMax(size.height(), dss::kEmoteHeight + padding) + gifLineHeight(index));
         return size;
     }
 
@@ -160,20 +183,33 @@ public:
         const bool event = index.data(kChatEventRole).toBool();
         if (event && !option.state.testFlag(QStyle::State_Selected))
             painter->fillRect(option.rect, m_theme.chatEventRow);
-        if (index.column() == 0) {
-            QStyledItemDelegate::paint(painter, option, index);
-            return;
-        }
+        const int gifLine = gifLineHeight(index);
         QStyleOptionViewItem opt(option);
         initStyleOption(&opt, index);
         const QWidget *widget = opt.widget;
         QStyle *style = widget ? widget->style() : QApplication::style();
+        if (index.column() == 0) {
+            if (gifLine == 0) {
+                QStyledItemDelegate::paint(painter, option, index);
+                return;
+            }
+            // Zeit auf der Höhe des Kopfs, nicht mittig in der hohen Zeile: Hintergrund über die
+            // ganze Zeile, danach die Zeit vom Stil im Rahmen ohne GIF-Zeile. Ohne Hover und
+            // Auswahl zeichnet das Stylesheet dort keinen zweiten Hintergrund (QTreeView::item
+            // ohne background in theme.cpp), die Textfarbe ist in allen Zuständen @text@.
+            QStyleOptionViewItem head = headOption(opt, gifLine);
+            opt.text.clear();
+            style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
+            head.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver | QStyle::State_HasFocus);
+            style->drawControl(QStyle::CE_ItemViewItem, &head, painter, widget);
+            return;
+        }
         const Layout layout = layoutRow(opt, index);
         opt.text.clear();
         style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
 
         painter->save();
-        painter->setClipRect(layout.textRect);
+        painter->setClipRect(layout.gifRect.isNull() ? layout.textRect : layout.textRect | layout.gifRect);
         painter->setRenderHint(QPainter::Antialiasing);
         const QRect &textRect = layout.textRect;
         // Symbol unverändert (nicht eingefärbt, Seitenverhältnis der Datei), mittig in der Zeile
@@ -211,11 +247,18 @@ public:
             painter->drawText(QRect(layout.ellipsisX, textRect.top(), textRect.right() - layout.ellipsisX + 1,
                                     textRect.height()),
                               Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("…"));
+        // GIF-Zeile: Bild oben links, ohne Bild der Text auf der Höhe einer Textzeile
+        for (const GifPiece &gif : layout.gifs) {
+            if (gif.image)
+                painter->drawImage(gif.rect.topLeft(), *gif.image);
+            else
+                painter->drawText(gif.rect, Qt::AlignLeft | Qt::AlignVCenter, gif.text);
+        }
         painter->restore();
     }
 
     // Tooltip über einem Emote: «<Name> (<Anbieter>)» aus dss::emoteToolTip, bei Zero-Width eine
-    // Zeile je Emote; sonst wie bisher der Text der Zelle.
+    // Zeile je Emote; über einem GIF der Text des Fragments; sonst wie bisher der Text der Zelle.
     bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option,
                    const QModelIndex &index) override
     {
@@ -223,6 +266,14 @@ public:
             QStyleOptionViewItem opt(option);
             initStyleOption(&opt, index);
             const Layout layout = layoutRow(opt, index);
+            for (const GifPiece &gif : layout.gifs) {
+                if (!gif.rect.contains(event->pos()) || gif.tip.isEmpty())
+                    continue;
+                QToolTip::showText(event->globalPos(), gif.tip, view);
+                return true;
+            }
+            if (event->pos().y() > layout.textRect.bottom())
+                return QStyledItemDelegate::helpEvent(event, view, option, index);
             for (const ChatPiece &piece : layout.pieces) {
                 if (!piece.isEmote() || event->pos().x() < piece.x || event->pos().x() >= piece.x + piece.width)
                     continue;
@@ -237,9 +288,19 @@ public:
     }
 
 private:
+    // Ein GIF der GIF-Zeile: mit Bild dessen Lage, ohne Bild der Text (gekürzt) an rect
+    struct GifPiece
+    {
+        QRect rect;
+        const QImage *image = nullptr; // gilt nur während paint bzw. helpEvent
+        QString text;
+        QString tip; // Text des Fragments
+    };
     struct Layout
     {
-        QRect textRect;
+        QRect textRect; // Kopf der Nachricht
+        QRect gifRect;  // GIF-Zeile, leer ohne GIF
+        QList<GifPiece> gifs;
         QImage symbol;
         QFont badgeFont;
         QList<QPair<QRect, QString>> badges;
@@ -255,9 +316,12 @@ private:
         Layout layout;
         const QWidget *widget = opt.widget;
         QStyle *style = widget ? widget->style() : QApplication::style();
-        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1
+        // Rand des Textes wie QCommonStyle (viewItemDrawText): PM_FocusFrameHMargin + 1. Mit GIF
+        // gilt für den Kopf der Rahmen ohne GIF-Zeile (headOption).
         const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
-        layout.textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget)
+        const int gifLine = gifLineHeight(index);
+        const QStyleOptionViewItem head = headOption(opt, gifLine);
+        layout.textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &head, widget)
                               .adjusted(margin, 0, -margin, 0);
         const QRect &textRect = layout.textRect;
         const QFontMetrics &fm = opt.fontMetrics;
@@ -287,8 +351,10 @@ private:
             layout.nameX = x;
             layout.name = index.data(kChatNameRole).toString() + QStringLiteral(": ");
             x += badgeMetrics.horizontalAdvance(layout.name);
+            // Mit Fragmenten gilt die Liste der Abschnitte, auch leer (Nachricht nur aus GIFs:
+            // Kopf nur «Name:»); der Zellentext nur ohne Fragmente
             segments = index.data(kChatSegmentsRole).value<QList<dss::ChatSegment>>();
-            if (segments.isEmpty())
+            if (segments.isEmpty() && !index.data(kChatFragmentsRole).toBool())
                 segments.append(dss::ChatSegment{index.data(kChatTextRole).toString(), std::nullopt});
         }
         QList<ChatPiece> pieces = chatPieces(segments);
@@ -318,7 +384,38 @@ private:
             x += piece.width;
         }
         layout.pieces = pieces;
+        if (gifLine > 0 && !event)
+            layoutGifs(&layout, index, fm, right);
         return layout;
+    }
+
+    // GIF-Zeile unter dem Kopf. Decided (Nutzer, 2026-11-16): Alle GIFs beginnen in derselben
+    // Spalte, dem Beginn von Abzeichen und Namen (nach der Spalte des Symbols), auch wenn die
+    // Zeile Abzeichen hat; GIFs nebeneinander mit kChatGap. Was nicht mehr passt, wird gekürzt: ein Bild
+    // abgeschnitten (Clip), Text mit «…».
+    void layoutGifs(Layout *layout, const QModelIndex &index, const QFontMetrics &fm, int right) const
+    {
+        const QRect &textRect = layout->textRect;
+        const int left = textRect.left() + symbolColumn(fm.height());
+        layout->gifRect = QRect(left, textRect.bottom() + 1 + kChatGap, right - left, dss::kGifHeight);
+        const qint64 elapsed = m_clock->elapsed();
+        int x = left;
+        for (const dss::ChatGif &gif : index.data(kChatGifsRole).value<QList<dss::ChatGif>>()) {
+            if (x >= right)
+                break;
+            GifPiece piece;
+            piece.tip = gif.text;
+            piece.image = *m_gifs ? (*m_gifs)->frame(gif.url, elapsed) : nullptr;
+            if (piece.image) {
+                piece.rect = QRect(QPoint(x, layout->gifRect.top()), piece.image->size());
+            } else {
+                piece.text = fm.elidedText(gif.text, Qt::ElideRight, right - x);
+                // Tooltip-Bereich nur so hoch wie die Textzeile; die GIF-Zeile bleibt reserviert
+                piece.rect = QRect(x, layout->gifRect.top(), fm.horizontalAdvance(piece.text), textRect.height());
+            }
+            x = piece.rect.right() + 1 + kChatGap;
+            layout->gifs.append(piece);
+        }
     }
 
     // Abschnitte → Stücke. Emote mit Bild: eigenes Stück; ohne Bild der Name als Text. Ein
@@ -443,6 +540,7 @@ private:
     Theme m_theme;
     const QElapsedTimer *m_clock;
     const dss::EmoteImages *const *m_images;
+    const dss::EmoteImages *const *m_gifs;
     mutable QHash<int, Symbol> m_symbols; // je Plattform, neu nur bei anderer Höhe
     mutable SymbolColumn m_symbolColumn;
 };
@@ -588,14 +686,16 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_chat->setColumnCount(2);
     m_chat->setHeaderHidden(true);
     m_chat->setRootIsDecorated(false);
-    m_chat->setUniformRowHeights(true);
+    // P14 Emotes em-9: Zeilen mit GIF sind um die GIF-Zeile höher (Plan em-9: eigene Zeile unter
+    // dem Kopf), darum keine gleichen Zeilenhöhen; höchstens dss::ChatRows::kMaxRows Zeilen
+    m_chat->setUniformRowHeights(false);
     m_chat->setSelectionMode(QAbstractItemView::SingleSelection);
     m_chat->setFocusPolicy(Qt::NoFocus);
     m_chat->header()->setStretchLastSection(true);
     // P14 Emotes em-6: Schrift der Liste aus dem Stylesheet (#chatBotChat, Theme fontSizeChat);
     // die Breite der Zeitspalte setzt eventFilter, sobald die Schrift gilt
     m_emoteClock.start();
-    m_chat->setItemDelegate(new ChatRowDelegate(m_theme, &m_emoteClock, &m_emoteImages, m_chat));
+    m_chat->setItemDelegate(new ChatRowDelegate(m_theme, &m_emoteClock, &m_emoteImages, &m_gifImages, m_chat));
     // Gemeinsamer Takt: nur neu zeichnen, die Bilder wählt der Delegat nach der Uhr
     m_emoteTimer = new QTimer(this);
     m_emoteTimer->setObjectName(QStringLiteral("chatBotEmoteTimer"));
@@ -742,9 +842,10 @@ void ChatBotPage::appendChat(const dss::RowsAppend &change, const dss::ChatRow &
     appendItem(m_chat, change.removedFront, change.appended ? chatItem(row) : nullptr);
 }
 
-void ChatBotPage::setEmoteImages(const dss::EmoteImages *images)
+void ChatBotPage::setEmoteImages(const dss::EmoteImages *images, const dss::EmoteImages *gifs)
 {
     m_emoteImages = images; // liest der Delegat
+    m_gifImages = gifs;
     emoteImagesChanged();
 }
 
@@ -757,7 +858,8 @@ void ChatBotPage::emoteImagesChanged()
 void ChatBotPage::refreshEmoteTimer()
 {
     // isVisible: Modul «Chat-Bot», Unterreiter «Live» und das Fenster sind sichtbar
-    const bool run = m_emoteImages && m_emoteImages->hasAnimated() && m_chat->isVisible();
+    const bool run = ((m_emoteImages && m_emoteImages->hasAnimated()) || (m_gifImages && m_gifImages->hasAnimated()))
+                     && m_chat->isVisible();
     if (run && !m_emoteTimer->isActive())
         m_emoteTimer->start();
     else if (!run)

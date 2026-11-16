@@ -7,6 +7,7 @@
 #include "emotes.h"
 #include "emotestub.h"
 
+#include <QDirIterator>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -87,7 +88,7 @@ private slots:
     void standardEndpointsOnlyFourProviders()
     {
         const EmoteEndpoints e = EmoteEndpoints::standard();
-        QCOMPARE(e.list.size(), 7);
+        QCOMPARE(e.list.size(), 8); // dazu *.giphy.com (em-9, gifEndpoints)
         for (const EmoteEndpoint &endpoint : e.list)
             QCOMPARE(endpoint.base.scheme(), QStringLiteral("https"));
         const QUrl list = emoteListUrl(EmoteProvider::SevenTv, std::nullopt);
@@ -105,6 +106,119 @@ private slots:
         QVERIFY(local.allows(local.map(list)));
         QVERIFY(!local.allows(stub.base(QStringLiteral("7tv.iox"))));
         QVERIFY(!local.allows(local.map(list).resolved(QUrl(QStringLiteral("../../../evil/x")))));
+    }
+
+    // P14 Emotes em-9: GIFs nur von *.giphy.com über https, Adresse unverändert (auch die Query)
+    void gifEndpoints()
+    {
+        const EmoteEndpoints e = EmoteEndpoints::standard();
+        const QString text = QStringLiteral("https://media4.giphy.com/media/dsstest/giphy.gif?cid=a%2Fb&rid=giphy.gif&ct=g");
+        const QUrl gif(text, QUrl::StrictMode);
+        QCOMPARE(e.map(gif), gif);
+        QCOMPARE(e.map(gif).toEncoded(), text.toLatin1());
+        QVERIFY(e.allows(gif));
+        QVERIFY(e.allows(QUrl(QStringLiteral("https://i.giphy.com/dsstest.gif"))));
+        QVERIFY(e.allows(QUrl(QStringLiteral("https://MEDIA0.Giphy.com/x.gif"))));
+        QVERIFY(!e.allows(QUrl(QStringLiteral("https://giphy.com/x.gif"))));             // nur Hosts darunter
+        QVERIFY(!e.allows(QUrl(QStringLiteral("https://evilgiphy.com/x.gif"))));
+        QVERIFY(!e.allows(QUrl(QStringLiteral("https://media.giphy.com.evil.example/x.gif"))));
+        QVERIFY(!e.allows(QUrl(QStringLiteral("http://media4.giphy.com/x.gif"))));       // kein https
+        QVERIFY(!e.allows(QUrl(QStringLiteral("https://media4.giphy.com:8443/x.gif")))); // anderer Port
+        QVERIFY(!e.allows(QUrl(QStringLiteral("https://user@media4.giphy.com/x.gif"))));
+        QVERIFY(e.map(QUrl(QStringLiteral("http://media4.giphy.com/x.gif"))).isEmpty());
+        QVERIFY(e.map(QUrl(QStringLiteral("https://media.example/x.gif"))).isEmpty());
+        // Stub: alle Hosts unter giphy.com auf /*.giphy.com/<Pfad>, Query unverändert
+        HttpStub stub;
+        const EmoteEndpoints local = stub.endpoints();
+        const QUrl mapped = local.map(gif);
+        QCOMPARE(mapped.toEncoded(), stub.base(QStringLiteral("*.giphy.com")).toEncoded()
+                                         + "/media/dsstest/giphy.gif?cid=a%2Fb&rid=giphy.gif&ct=g");
+        QVERIFY(local.allows(mapped));
+    }
+
+    // Laden nur in den Arbeitsspeicher: jede Anfrage geht ins Netz, im Ordner des
+    // Zwischenspeichers entsteht keine Datei (Giphy: «Do not … cache or store copies»)
+    void gifOnlyInMemory()
+    {
+        HttpStub stub;
+        const QString url = QStringLiteral("https://media4.giphy.com/media/dsstest/giphy.gif?cid=a%2Fb&rid=giphy.gif&ct=g");
+        const QByteArray path = "/*.giphy.com/media/dsstest/giphy.gif?cid=a%2Fb&rid=giphy.gif&ct=g";
+        // Kopf, mit dem ein HTTP-Zwischenspeicher die Antwort behalten würde
+        const QByteArray cacheable = "Content-Type: image/gif\r\nCache-Control: public, max-age=86400\r\n";
+        stub.routes.insert(path, {200, "gif-1", cacheable});
+        QTemporaryDir cache;
+        EmoteLoader loader(cache.path(), stub.endpoints());
+        QList<QPair<QString, QByteArray>> gifs;
+        connect(&loader, &EmoteLoader::gifLoaded, this,
+                [&](const QString &key, const QByteArray &bytes) { gifs.append({key, bytes}); });
+        Results r(&loader);
+        QCOMPARE(loader.gif(url), url);
+        QCOMPARE(loader.gif(url), url); // läuft schon: keine zweite Anfrage
+        QTRY_COMPARE(gifs.size(), 1);
+        QCOMPARE(gifs.at(0), (QPair<QString, QByteArray>{url, "gif-1"}));
+        QVERIFY(r.images.isEmpty()); // eigenes Signal, nicht imageLoaded
+        QCOMPARE(stub.requests.size(), 1);
+        QCOMPARE(stub.requests.at(0).method, QByteArray("GET"));
+        QCOMPARE(stub.requests.at(0).path, path); // Adresse unverändert
+        QVERIFY(!stub.requests.at(0).head.toLower().contains("authorization"));
+        // Noch einmal: wieder aus dem Netz, nicht aus einem Zwischenspeicher
+        loader.gif(url);
+        QTRY_COMPARE(gifs.size(), 2);
+        QCOMPARE(stub.requests.size(), 2);
+        const auto files = [&] {
+            QStringList out;
+            QDirIterator it(cache.path(), QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+            while (it.hasNext())
+                out.append(it.next());
+            return out;
+        };
+        QVERIFY2(files().isEmpty(), qPrintable(files().join(QLatin1Char(' '))));
+        // Gegenprobe: ein Emote-Bild mit demselben Kopf landet im Zwischenspeicher
+        const Emote emote = bttvEmote();
+        stub.routes.insert(stubPath(emoteImageUrl(emote, false, true)), {200, "bild-1", cacheable});
+        loader.image(emote, false);
+        QTRY_COMPARE(r.images.size(), 1);
+        QTRY_VERIFY(!files().isEmpty());
+    }
+
+    void gifHostAndLimits()
+    {
+        HttpStub stub;
+        HttpStub foreign;
+        QTemporaryDir cache;
+        EmoteLoader loader(cache.path(), stub.endpoints());
+        QList<QPair<QString, QByteArray>> gifs;
+        connect(&loader, &EmoteLoader::gifLoaded, this,
+                [&](const QString &key, const QByteArray &bytes) { gifs.append({key, bytes}); });
+        // Fremder Host, keine Adresse: keine Anfrage, der Text bleibt (http statt https weisen die
+        // echten Endpunkte ab, gifEndpoints; der Stub ersetzt das Schema)
+        QTest::ignoreMessage(QtWarningMsg, "Emotes: GIF von media.example nicht erlaubt, bleibt Text");
+        QVERIFY(loader.gif(QStringLiteral("https://media.example/x.gif")).isEmpty());
+        QTest::ignoreMessage(QtWarningMsg, "Emotes: GIF von giphy.com nicht erlaubt, bleibt Text");
+        QVERIFY(loader.gif(QStringLiteral("https://giphy.com/x.gif")).isEmpty());
+        QTest::ignoreMessage(QtWarningMsg, "Emotes: GIF ohne gültige Adresse, bleibt Text");
+        QVERIFY(loader.gif(QStringLiteral("keine Adresse")).isEmpty());
+        QTest::qWait(100);
+        QCOMPARE(stub.requests.size(), 0);
+        QVERIFY(gifs.isEmpty());
+
+        // Zu gross: nicht gelesen, leere Bytes
+        const QString big = QStringLiteral("https://media4.giphy.com/media/gross/giphy.gif");
+        stub.routes.insert("/*.giphy.com/media/gross/giphy.gif", {200, QByteArray(kGifMaxBytes + 1, 'x'), {}});
+        QTest::ignoreMessage(QtWarningMsg, "Emotes: Bild von media4.giphy.com nicht geladen: grösser als 8 MiB, nicht gelesen");
+        QCOMPARE(loader.gif(big), big);
+        QTRY_COMPARE(gifs.size(), 1);
+        QCOMPARE(gifs.at(0), (QPair<QString, QByteArray>{big, {}}));
+        // Weiterleitung an einen fremden Server abgewiesen
+        const QString moved = QStringLiteral("https://media4.giphy.com/media/weiter/giphy.gif");
+        stub.routes.insert("/*.giphy.com/media/weiter/giphy.gif",
+                           {302, {}, "Location: " + foreign.base(QStringLiteral("*.giphy.com")).toEncoded() + "/x.gif\r\n"});
+        QTest::ignoreMessage(QtWarningMsg,
+                             "Emotes: Bild von media4.giphy.com nicht geladen: Weiterleitung an einen fremden Server abgewiesen");
+        loader.gif(moved);
+        QTRY_COMPARE(gifs.size(), 2);
+        QVERIFY(gifs.at(1).second.isEmpty());
+        QCOMPARE(foreign.requests.size(), 0);
     }
 
     void sixListsOnlyGet()

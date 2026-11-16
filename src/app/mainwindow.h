@@ -316,6 +316,9 @@ private:
     // nicht geladenen, damit ein fehlendes Bild nicht bei jeder Zeile neu angefragt wird.
     dss::EmoteLoader *m_emoteLoader = nullptr;
     dss::EmoteImages m_emoteImages;
+    // em-9: GIFs im Chat nur hier im Arbeitsspeicher (eigener LRU, Grösse wie m_emoteImages),
+    // Schlüssel ist die Adresse; bestellt werden sie ebenfalls über m_emoteRequested
+    dss::EmoteImages m_gifImages;
     std::optional<QString> m_emoteChannel;
     QSet<QString> m_emoteRequested;
     // Statuszeile: zuletzt gezeigte Emote-Meldung (darf ersetzt werden) und die wartende

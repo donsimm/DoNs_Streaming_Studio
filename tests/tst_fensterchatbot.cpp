@@ -2689,6 +2689,251 @@ private slots:
         page.setEmoteImages(nullptr);
     }
 
+    // P14 Emotes em-9: GIFs im Chat in einer eigenen Zeile unter dem Kopf, 112 px hoch, bündig mit
+    // dem Namen, animiert über den gemeinsamen Takt; ohne Bild der Text des Fragments; Tooltip mit
+    // dem Text; Zeitspalte auf der Höhe des Kopfs. Testbild twoFrameGif() (112x56, rot/blau).
+    void chatGifs()
+    {
+        const Theme theme = darkTheme();
+        ChatBotPage page(theme);
+        page.resize(1800, 600);
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page));
+        auto *chat = page.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+        auto *timer = page.findChild<QTimer *>(QStringLiteral("chatBotEmoteTimer"));
+        QVERIFY(chat && timer);
+
+        const QString url = QStringLiteral("https://media4.giphy.com/media/dsstestgif/giphy.gif?cid=test&ct=g");
+        const QString gifText = QStringLiteral("[DSS Test GIF]");
+        const auto message = [](const QString &name, const QList<ChatFragment> &fragments) {
+            ChatRow row;
+            row.time = QStringLiteral("12:00:00");
+            row.name = name;
+            row.color = QStringLiteral("#40C0FF");
+            row.platform = ChatPlatform::Twitch;
+            row.fragments = fragments;
+            for (const ChatFragment &f : fragments) {
+                row.text += f.text;
+                if (!f.isGif())
+                    row.segments.append(ChatSegment{f.text, std::nullopt});
+            }
+            return row;
+        };
+        const ChatFragment gif{QStringLiteral("gif"), gifText, {}, {}, QStringLiteral("dsstestgif"), url};
+        const ChatRow plain = message(QStringLiteral("Zuschauer"), {{QStringLiteral("text"), QStringLiteral("Hallo"), {}, {}, {}, {}}});
+        // Derselbe Name wie plain: der Rand des ersten Buchstabens ist gleich (Vergleich der Lage)
+        const ChatRow withGif = message(QStringLiteral("Zuschauer"), {{QStringLiteral("text"), QStringLiteral("Schau "), {}, {}, {}, {}}, gif});
+        page.resetChat({plain, withGif, plain});
+        QApplication::processEvents();
+        QTreeWidgetItem *gifItem = chat->topLevelItem(1);
+        // Text der Zelle bleibt die ganze Nachricht
+        QCOMPARE(gifItem->text(1), QStringLiteral("Zuschauer: Schau ") + gifText);
+
+        const auto cell = [&](int row, int column = 1) {
+            const QRect r = chat->visualItemRect(chat->topLevelItem(row));
+            return QRect(chat->header()->sectionViewportPosition(column), r.top(), chat->header()->sectionSize(column), r.height());
+        };
+        const auto grabCell = [&](int row, int column = 1) { return chat->viewport()->grab(cell(row, column)).toImage(); };
+        const auto pixels = [](const QImage &image, const QColor &color, int tolerance = 0) {
+            QList<QPoint> found;
+            for (int y = 0; y < image.height(); ++y)
+                for (int x = 0; x < image.width(); ++x) {
+                    const QColor p = image.pixelColor(x, y);
+                    if (qAbs(p.red() - color.red()) <= tolerance && qAbs(p.green() - color.green()) <= tolerance
+                        && qAbs(p.blue() - color.blue()) <= tolerance)
+                        found.append(QPoint(x, y));
+                }
+            return found;
+        };
+        const auto bounds = [](const QList<QPoint> &points) {
+            QRect r;
+            for (const QPoint &p : points)
+                r |= QRect(p, QSize(1, 1));
+            return r;
+        };
+
+        // Zeilenhöhe: ohne GIF wie bisher, mit GIF um die GIF-Zeile (112 px) und den Abstand (4 px)
+        // höher, auch solange das Bild fehlt
+        const int rowHeight = chat->visualItemRect(chat->topLevelItem(0)).height();
+        const int gifRowHeight = chat->visualItemRect(gifItem).height();
+        qInfo("Zeilenhöhe: ohne GIF %d px, mit GIF %d px", rowHeight, gifRowHeight);
+        QCOMPARE(chat->visualItemRect(chat->topLevelItem(2)).height(), rowHeight);
+        QCOMPARE(gifRowHeight, rowHeight + kGifHeight + 4);
+
+        // Ohne Bild: Text des Fragments in der GIF-Zeile, unter dem Kopf; der Kopf zeigt ihn nicht
+        const QImage withoutImage = grabCell(1);
+        const QList<QPoint> textPixels = pixels(withoutImage, theme.text);
+        int below = 0;
+        for (const QPoint &p : textPixels)
+            below += p.y() >= rowHeight ? 1 : 0;
+        QVERIFY(below > 0);
+        QVERIFY(pixels(withoutImage, Qt::red).isEmpty());
+        // Name im Kopf: obere rowHeight Pixel, wie in einer Zeile ohne GIF
+        const QColor nameColor(0x40, 0xc0, 0xff);
+        const QRect nameRect = bounds(pixels(withoutImage, nameColor));
+        const QRect plainName = bounds(pixels(grabCell(0), nameColor));
+        QCOMPARE(nameRect.top(), plainName.top());
+        QCOMPARE(nameRect.left(), plainName.left());
+        // Zeit auf der Höhe des Kopfs wie in der Zeile ohne GIF
+        const QRect time = bounds(pixels(grabCell(1, 0), theme.text));
+        const QRect plainTime = bounds(pixels(grabCell(0, 0), theme.text));
+        QCOMPARE(time, plainTime);
+
+        // Bild kommt: dieselben Zeilen und Höhen; GIF 224x112 unter dem Kopf, bündig mit dem Namen
+        EmoteImages images;
+        EmoteImages gifs;
+        QVERIFY(gifs.add(url, twoFrameGif(), kGifImageLimits));
+        page.setEmoteImages(&images, &gifs);
+        QApplication::processEvents();
+        QCOMPARE(chat->topLevelItem(1), gifItem);
+        QCOMPARE(chat->visualItemRect(gifItem).height(), gifRowHeight);
+        const QImage withImage = grabCell(1);
+        const QList<QPoint> red = pixels(withImage, Qt::red);
+        const QList<QPoint> blue = pixels(withImage, Qt::blue);
+        const QRect gifRect = bounds(red.isEmpty() ? blue : red);
+        qInfo("GIF: %d,%d %dx%d in der Zelle %dx%d", gifRect.x(), gifRect.y(), gifRect.width(), gifRect.height(),
+              withImage.width(), withImage.height());
+        QCOMPARE(gifRect.size(), QSize(224, kGifHeight));
+        // Bündig: nur um den Rand des ersten Buchstabens daneben (wie die Ereigniszeile, em-6)
+        QVERIFY(qAbs(gifRect.left() - nameRect.left()) <= 2);
+        QVERIFY(gifRect.top() > nameRect.bottom());
+        QVERIFY(gifRect.bottom() < withImage.height());
+        // Der Text des Fragments steht nicht mehr da (nur noch «Schau» im Kopf)
+        for (const QPoint &p : pixels(withImage, theme.text))
+            QVERIFY(p.y() < gifRect.top());
+
+        // Takt läuft, das GIF wechselt rot und blau
+        QVERIFY(timer->isActive());
+        bool sawRed = false;
+        bool sawBlue = false;
+        const auto sawBoth = [&] {
+            const QImage image = grabCell(1);
+            sawRed = sawRed || !pixels(image, Qt::red).isEmpty();
+            sawBlue = sawBlue || !pixels(image, Qt::blue).isEmpty();
+            return sawRed && sawBlue;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(sawBoth(), 3000);
+
+        // Tooltip über dem GIF: Text des Fragments
+        const QPoint onGif = cell(1).topLeft() + gifRect.center();
+        QHelpEvent help(QEvent::ToolTip, onGif, chat->viewport()->mapToGlobal(onGif));
+        QApplication::sendEvent(chat->viewport(), &help);
+        QTRY_VERIFY_WITH_TIMEOUT(QToolTip::isVisible(), 3000);
+        QCOMPARE(QToolTip::text(), gifText);
+        QToolTip::hideText();
+        QTRY_VERIFY_WITH_TIMEOUT(!QToolTip::isVisible(), 3000);
+
+        // Bild des Bereichs für den Prüfer
+        const QString picture = QCoreApplication::applicationDirPath() + QStringLiteral("/../emotes-gif.png");
+        QVERIFY(chat->parentWidget()->grab().save(picture));
+        qInfo("Bild: %s", qPrintable(QFileInfo(picture).canonicalFilePath()));
+
+        // Ohne animiertes Bild steht der Takt; ohne GIF-Bilder wieder Text
+        page.setEmoteImages(&images);
+        QVERIFY(!timer->isActive());
+        QApplication::processEvents();
+        QVERIFY(pixels(grabCell(1), Qt::red).isEmpty() && pixels(grabCell(1), Qt::blue).isEmpty());
+        page.setEmoteImages(nullptr);
+    }
+
+    // P14 Emotes em-9 Nacharbeit: Nachricht nur aus einem GIF zeigt im Kopf nur «Name:» (nicht den
+    // Text des GIFs); alle GIFs beginnen in derselben Spalte, mit und ohne Abzeichen (Entscheid
+    // des Nutzers 2026-11-16); ohne Bild ist der Tooltip-Bereich nur so hoch wie die Textzeile.
+    void chatGifOnlyAndColumn()
+    {
+        const Theme theme = darkTheme();
+        ChatBotPage page(theme);
+        page.resize(1800, 600);
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page));
+        auto *chat = page.findChild<QTreeWidget *>(QStringLiteral("chatBotChat"));
+        QVERIFY(chat);
+
+        const QString url = QStringLiteral("https://media4.giphy.com/media/dsstestgif/giphy.gif?cid=test&ct=g");
+        const QString gifText = QStringLiteral("[DSS Test GIF]");
+        const auto message = [](const QStringList &badges, const QList<ChatFragment> &fragments) {
+            ChatRow row;
+            row.time = QStringLiteral("12:00:00");
+            row.name = QStringLiteral("Zuschauer");
+            row.color = QStringLiteral("#40C0FF");
+            row.platform = ChatPlatform::Twitch;
+            row.badges = badges;
+            row.fragments = fragments;
+            for (const ChatFragment &f : fragments) {
+                row.text += f.text;
+                if (!f.isGif())
+                    row.segments.append(ChatSegment{f.text, std::nullopt});
+            }
+            return row;
+        };
+        const ChatFragment gif{QStringLiteral("gif"), gifText, {}, {}, QStringLiteral("dsstestgif"), url};
+        // Zeile 0: nur «Zuschauer:» ohne Fragmente (Vergleich des Kopfs, gleiche Hintergrundfarbe
+        // wie Zeile 2); Zeile 1: Abzeichen, Text und GIF; Zeile 2: nur ein GIF
+        const ChatRow nameOnly = message({}, {});
+        const ChatRow withBadge = message({QStringLiteral("VIP")}, {{QStringLiteral("text"), QStringLiteral("Hi "), {}, {}, {}, {}}, gif});
+        const ChatRow gifOnly = message({}, {gif});
+        page.resetChat({nameOnly, withBadge, gifOnly});
+        QApplication::processEvents();
+        // Text der Zelle bleibt die ganze Nachricht
+        QCOMPARE(chat->topLevelItem(2)->text(1), QStringLiteral("Zuschauer: ") + gifText);
+
+        const auto cell = [&](int row) {
+            const QRect r = chat->visualItemRect(chat->topLevelItem(row));
+            return QRect(chat->header()->sectionViewportPosition(1), r.top(), chat->header()->sectionSize(1), r.height());
+        };
+        const auto grabCell = [&](int row) { return chat->viewport()->grab(cell(row)).toImage(); };
+        const auto bounds = [](const QImage &image, const QColor &color, int top) {
+            QRect r;
+            for (int y = top; y < image.height(); ++y)
+                for (int x = 0; x < image.width(); ++x)
+                    if (image.pixelColor(x, y).rgb() == color.rgb())
+                        r |= QRect(x, y, 1, 1);
+            return r;
+        };
+        const int rowHeight = chat->visualItemRect(chat->topLevelItem(0)).height();
+        QCOMPARE(chat->visualItemRect(chat->topLevelItem(2)).height(), rowHeight + kGifHeight + 4);
+        const auto head = [&](int row) { return grabCell(row).copy(0, 0, cell(row).width(), rowHeight); };
+
+        // Ohne Bild: Kopf wie «Zuschauer:» ohne Text, der Text des GIFs nur in der GIF-Zeile;
+        // er beginnt in beiden Zeilen in derselben Spalte
+        QCOMPARE(head(2), grabCell(0));
+        const QRect textOnly = bounds(grabCell(2), theme.text, rowHeight);
+        const QRect textBadge = bounds(grabCell(1), theme.text, rowHeight);
+        qInfo("GIF-Text ohne Bild: x %d (nur GIF), x %d (mit Abzeichen)", textOnly.left(), textBadge.left());
+        QVERIFY(!textOnly.isEmpty());
+        QCOMPARE(textBadge.left(), textOnly.left());
+
+        // Tooltip ohne Bild: auf dem Text der Text des GIFs, darunter in der reservierten Zeile keiner
+        const QPoint onText = cell(2).topLeft() + textOnly.center();
+        QHelpEvent help(QEvent::ToolTip, onText, chat->viewport()->mapToGlobal(onText));
+        QApplication::sendEvent(chat->viewport(), &help);
+        QTRY_VERIFY_WITH_TIMEOUT(QToolTip::isVisible(), 3000);
+        QCOMPARE(QToolTip::text(), gifText);
+        const QPoint belowText = onText + QPoint(0, kGifHeight / 2);
+        QHelpEvent helpBelow(QEvent::ToolTip, belowText, chat->viewport()->mapToGlobal(belowText));
+        QApplication::sendEvent(chat->viewport(), &helpBelow);
+        QTRY_VERIFY_WITH_TIMEOUT(!QToolTip::isVisible(), 3000);
+
+        // Mit Bild: Kopf unverändert, GIF in beiden Zeilen in derselben Spalte
+        EmoteImages images;
+        EmoteImages gifs;
+        QVERIFY(gifs.add(url, twoFrameGif(), kGifImageLimits));
+        page.setEmoteImages(&images, &gifs);
+        QApplication::processEvents();
+        QCOMPARE(head(2), grabCell(0));
+        const auto gifLeft = [&](int row) {
+            const QImage image = grabCell(row);
+            const QRect red = bounds(image, Qt::red, rowHeight);
+            return red.isEmpty() ? bounds(image, Qt::blue, rowHeight) : red;
+        };
+        const QRect gifOnlyRect = gifLeft(2);
+        const QRect gifBadgeRect = gifLeft(1);
+        qInfo("GIF mit Bild: x %d (nur GIF), x %d (mit Abzeichen)", gifOnlyRect.left(), gifBadgeRect.left());
+        QCOMPARE(gifOnlyRect.size(), QSize(224, kGifHeight));
+        QCOMPARE(gifBadgeRect.left(), gifOnlyRect.left());
+        page.setEmoteImages(nullptr);
+    }
+
     // P14 Emotes em-7 Nacharbeit: resetChat (auch bei neuen Emote-Listen) rollt nur nach unten,
     // wenn die Liste unten stand (leer gilt als unten); weiter oben bleibt die Leseposition.
     void chatResetKeepsPosition()
@@ -2881,6 +3126,30 @@ private slots:
             QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), event}}));
             QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, QStringLiteral("DSS-Test Zuschauer: DSS-Test ") + ffzEmote->name), 3000);
             QCOMPARE(stub.count(ffzImage), 1);
+
+            // em-9: GIF aus dem Fragment, Adresse unverändert beim Stub, nur einmal bestellt
+            const QString gifText = QStringLiteral("[DSS-Test GIF]");
+            QJsonObject gifEvent = chatEvent(gifText, false, QStringLiteral("#40C0FF"));
+            QJsonObject gifData = gifEvent.value(QStringLiteral("data")).toObject();
+            gifData.insert(QStringLiteral("fragments"),
+                           QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("gif")},
+                                                  {QStringLiteral("text"), gifText},
+                                                  {QStringLiteral("emote_id"), QJsonValue::Null},
+                                                  {QStringLiteral("emote_format"), QJsonValue::Null},
+                                                  {QStringLiteral("gif_id"), QStringLiteral("dsstestgif")},
+                                                  {QStringLiteral("gif_url"),
+                                                   QStringLiteral("https://media4.giphy.com/media/dsstestgif/giphy.gif?cid=test&ct=g")}}});
+            gifEvent.insert(QStringLiteral("data"), gifData);
+            const QByteArray gifPath = "/*.giphy.com/media/dsstestgif/giphy.gif?cid=test&ct=g";
+            stub.routes.insert(gifPath, {200, twoFrameGif(), {}});
+            QVERIFY(post(QString::fromLatin1(msg::kTestEvent), {{QStringLiteral("event"), gifEvent}}));
+            const QString gifLine = QStringLiteral("DSS-Test Zuschauer: ") + gifText;
+            QTRY_VERIFY_WITH_TIMEOUT(findRow(chat, 1, gifLine), 3000);
+            QTRY_VERIFY_WITH_TIMEOUT(cellShowsColor(chat, findRow(chat, 1, gifLine), Qt::red, 1)
+                                         || cellShowsColor(chat, findRow(chat, 1, gifLine), Qt::blue, 1),
+                                     5000);
+            QCOMPARE(stub.count(gifPath), 1);
+            QVERIFY(chat->visualItemRect(findRow(chat, 1, gifLine)).height() > kGifHeight);
 
             // Echo der eigenen Nachricht: die Zeile aus chat_sent bekommt Twitch-Emote und Chatfarbe
             auto *account = window.findChild<QComboBox *>(QStringLiteral("chatBotChatAccount"));
