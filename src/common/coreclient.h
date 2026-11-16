@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actionprotocol.h"
 #include "overlaylive.h"
 #include "protocol.h"
 
@@ -116,6 +117,12 @@ public:
     // Gilt auch für spätere Verbindungen: nach hello geht die Bestellung mit Verlauf erneut los.
     // Antworten über eventHistoryReceived, eventReceived und eventsDropped.
     void subscribeEvents(const QStringList &filters);
+    // P14 e2-11: Zustand des Aktionssystems (actions_status, nach hello und bei jeder Änderung);
+    // ohne Verbindung leer.
+    std::optional<ActionsStatus> actionsStatus() const { return m_actionsStatus; }
+    // Schickt eine Anfrage an das Aktionssystem (actionsEditMessage, z. B. actionsSetEnabledEdit);
+    // requestId wird hier vergeben. Antwort über changeFinished. 0 = nicht verbunden.
+    qint64 sendActionsEdit(const ActionsEdit &edit);
 
     // P14 d: Laufzustand eines Overlays (overlay_live, nach hello und bei jeder Änderung); die
     // Restdauer ist ab dem Empfang heruntergezählt (nie unter 0). Ohne Verbindung leer.
@@ -188,6 +195,8 @@ signals:
     void obsRequestFinished(const dss::ChangeResult &result);
     // twitchStatus() hat sich geändert bzw. Antwort auf sendTwitchAccountRequest (P13), nur hier.
     void twitchStatusChanged();
+    // actionsStatus() hat sich geändert (P14 e2-11).
+    void actionsStatusChanged();
     void twitchRequestFinished(const dss::ChangeResult &result);
     // P13: Verlauf nach einer Bestellung (älteste zuerst), neues Ereignis, verworfene Ereignisse.
     void eventHistoryReceived(const QList<dss::events::Event> &events);
@@ -247,6 +256,7 @@ private:
     QSet<qint64> m_obsRequests;
     std::optional<TwitchStatusInfo> m_twitchStatus;
     QSet<qint64> m_twitchRequests;
+    std::optional<ActionsStatus> m_actionsStatus;
     QStringList m_eventFilters;
     MediaListData m_mediaList;
     QList<ImportProgressData> m_imports;

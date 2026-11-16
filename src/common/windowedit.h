@@ -63,7 +63,7 @@ int newSourceIndex(const Overlay &overlay, int insertRow);
 
 // Filter für «Hinzufügen» im Dock «Medien»: alle erlaubten Endungen, dann je Art.
 QString mediaLibraryFileFilter();
-// P14 t: Länge eines Tons: «0.4 s», «12.0 s» unter einer Minute, sonst «3:07» bzw. «1:02:03»;
+// P14 t: Länge eines Tons: «0,4 s», «12,0 s» unter einer Minute, sonst «3:07» bzw. «1:02:03»;
 // leer bei 0 (unbekannt).
 QString mediaDurationText(qint64 ms);
 // Spalte «Art» im Dock «Medien»: «Bild», …, bei Tönen mit Länge «Ton · 2.5 s».

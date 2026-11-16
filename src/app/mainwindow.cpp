@@ -514,6 +514,21 @@ void MainWindow::connectChatBot()
     });
     connect(m_client, &dss::CoreClient::eventsDropped, this,
             [this](qint64 count) { showStatus(dss::eventsDroppedText(count)); });
+    // P14 e2-11: Schalter «Chat-Bot aktiv». Den Stand zeigt erst actions_status; bei Ablehnung
+    // (Meldung über onChangeFinished) wieder den Stand des Kerns.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshChatBotHeader);
+    connect(m_chatBot, &ChatBotPage::enabledClicked, this, [this](bool enabled) {
+        m_actionsEnabledRequest = m_client->sendActionsEdit(dss::actionsSetEnabledEdit(enabled));
+        if (m_actionsEnabledRequest == 0)
+            refreshChatBotHeader();
+    });
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionsEnabledRequest == 0 || result.requestId != m_actionsEnabledRequest)
+            return;
+        m_actionsEnabledRequest = 0;
+        if (!result.ok)
+            refreshChatBotHeader();
+    });
     m_client->subscribeEvents(dss::chatBotEventFilters());
 }
 
@@ -523,7 +538,8 @@ void MainWindow::refreshChatBotHeader()
     const dss::ConnectionState channel = connected
         ? m_client->connectionStates().value(dss::Connection::Twitch, dss::ConnectionState::Off)
         : dss::ConnectionState::Off;
-    m_chatBot->setHeader(dss::chatBotHeaderView(channel, connected ? m_client->twitchStatus() : std::nullopt));
+    m_chatBot->setHeader(dss::chatBotHeaderView(channel, connected ? m_client->twitchStatus() : std::nullopt,
+                                                 m_client->actionsStatus()));
 }
 
 void MainWindow::saveCanvasImage()

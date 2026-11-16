@@ -222,6 +222,17 @@ if(DSS_BUILD_APP)
   set_tests_properties(tst_fensterbearbeiten PROPERTIES SKIP_RETURN_CODE 77
     FIXTURES_REQUIRED dss_media
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/fenster-config")
+
+  # P14 e2-11: Reiter «Chat-Bot» im echten Fenster (Schalter «Chat-Bot aktiv», Unterreiter
+  # «Aktionen») mit eigenem dss-core; ohne X11 übersprungen (77).
+  qt_add_executable(tst_fensterchatbot tst_fensterchatbot.cpp)
+  target_link_libraries(tst_fensterchatbot PRIVATE dss_app_ui dss_warnings Qt6::Test)
+  target_compile_definitions(tst_fensterchatbot PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+  add_dependencies(tst_fensterchatbot dss-core)
+  add_test(NAME tst_fensterchatbot COMMAND tst_fensterchatbot)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fenster-config-chatbot)
+  set_tests_properties(tst_fensterchatbot PROPERTIES SKIP_RETURN_CODE 77
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/fenster-config-chatbot")
 endif()
 
 # P09: Rechnungen des Zeichners und des Bearbeitens auf der Leinwand, ohne Qt Gui.

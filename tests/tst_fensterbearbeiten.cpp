@@ -2070,7 +2070,7 @@ private slots:
         QCOMPARE(header->sizePolicy().verticalPolicy(), QSizePolicy::Fixed);
         QCOMPARE(live->text(), QStringLiteral("Live"));
         QVERIFY(live->isChecked());
-        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 1);
+        QCOMPARE(m_window->findChild<QFrame *>(QStringLiteral("chatBotTabs"))->findChildren<QToolButton *>().size(), 2); // «Live», «Aktionen» (P14 e2-11)
         QCOMPARE(events->columnCount(), 4);
         const QTreeWidgetItem *labels = events->headerItem();
         QCOMPARE(QStringList({labels->text(0), labels->text(1), labels->text(2), labels->text(3)}),
@@ -2079,7 +2079,9 @@ private slots:
         for (QLabel *l : page->findChildren<QLabel *>(QStringLiteral("chatBotPanelTitle")))
             panelTitle = panelTitle || l->text() == QStringLiteral("Ereignisse");
         QVERIFY(panelTitle);
-        QTRY_VERIFY_WITH_TIMEOUT(state->text().startsWith(QStringLiteral("Twitch: ")) && state->text() != QStringLiteral("Twitch: –"), 3000);
+        // P14 e2-11: mit actions_status zeigt die Kopfzeile «aus» oder «stumm: …» (ohne
+        // --einsatz-verbindung je nach laufender Version im Einsatz), sonst den Text von Twitch.
+        QTRY_VERIFY_WITH_TIMEOUT(!state->text().isEmpty() && state->text() != QStringLiteral("Twitch: –"), 3000);
 
         // Reiter wechseln: alle Docks aus, Menü «Docks» gesperrt; zurück: die vorher offenen wieder
         const QList<QDockWidget *> docks = m_window->findChildren<QDockWidget *>();

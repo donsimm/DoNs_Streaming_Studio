@@ -280,8 +280,8 @@ private slots:
         sound.bytes = 512;
         QCOMPARE(mediaKindText(sound), QStringLiteral("Ton"));
         sound.durationMs = 2450;
-        QCOMPARE(mediaKindText(sound), QStringLiteral("Ton · 2.5 s"));
-        QCOMPARE(mediaFileToolTip(sound), QStringLiteral("Glocke\nTon · 2.5 s · 512 Byte\nmedia/z.mp3\nUngenutzt"));
+        QCOMPARE(mediaKindText(sound), QStringLiteral("Ton · 2,5 s"));
+        QCOMPARE(mediaFileToolTip(sound), QStringLiteral("Glocke\nTon · 2,5 s · 512 Byte\nmedia/z.mp3\nUngenutzt"));
         QCOMPARE(mediaKindText(m.files[0]), QStringLiteral("Bild"));
     }
 
@@ -289,9 +289,10 @@ private slots:
     {
         QCOMPARE(mediaDurationText(0), QString());
         QCOMPARE(mediaDurationText(-5), QString());
-        QCOMPARE(mediaDurationText(1), QStringLiteral("0.0 s"));
-        QCOMPARE(mediaDurationText(400), QStringLiteral("0.4 s"));
-        QCOMPARE(mediaDurationText(59'940), QStringLiteral("59.9 s"));
+        QCOMPARE(mediaDurationText(1), QStringLiteral("0,0 s"));
+        QCOMPARE(mediaDurationText(400), QStringLiteral("0,4 s"));
+        QCOMPARE(mediaDurationText(2'500), QStringLiteral("2,5 s"));
+        QCOMPARE(mediaDurationText(59'940), QStringLiteral("59,9 s"));
         QCOMPARE(mediaDurationText(60'000), QStringLiteral("1:00"));
         QCOMPARE(mediaDurationText(187'400), QStringLiteral("3:07"));
         QCOMPARE(mediaDurationText(3'599'400), QStringLiteral("59:59"));

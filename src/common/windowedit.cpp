@@ -125,10 +125,11 @@ QString mediaDurationText(qint64 ms)
 {
     if (ms <= 0)
         return {};
-    // Unter einer Minute mit Zehnteln (Töne des Chat-Bots sind oft kürzer als 1 s); Punkt wie
-    // mediaSizeText.
+    // Unter einer Minute mit Zehnteln (Töne des Chat-Bots sind oft kürzer als 1 s); Komma wie
+    // durationText in actionview.cpp (Entscheid des Nutzers, 2026-11-16).
     if (ms < 60'000)
-        return QStringLiteral("%1 s").arg(double(ms) / 1000.0, 0, 'f', 1);
+        return QStringLiteral("%1 s").arg(
+            QString::number(double(ms) / 1000.0, 'f', 1).replace(QLatin1Char('.'), QLatin1Char(',')));
     const qint64 seconds = (ms + 500) / 1000;
     const QString mmss = QStringLiteral("%1:%2").arg(seconds / 60 % 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
     if (seconds < 3600)

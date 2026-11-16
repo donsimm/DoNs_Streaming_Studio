@@ -1,9 +1,11 @@
 #include "chatbotpage.h"
 
+#include "actionspage.h"
 #include "headerbar.h"
 #include "panels.h"
 
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -38,6 +40,7 @@ ChatBotPage::ChatBotPage(QWidget *parent) : QWidget(parent)
     header->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     auto *headerRow = new QHBoxLayout(header);
     headerRow->setContentsMargins(0, 0, 0, 0);
+    headerRow->setSpacing(6);
     auto *tabs = new QFrame(header);
     tabs->setObjectName(QStringLiteral("chatBotTabs"));
     m_tabRow = new QHBoxLayout(tabs);
@@ -47,6 +50,13 @@ ChatBotPage::ChatBotPage(QWidget *parent) : QWidget(parent)
     m_tabs->setExclusive(true);
     headerRow->addWidget(tabs, 0, Qt::AlignVCenter);
     headerRow->addStretch(1);
+    // P14 e2-11: Stand und Freigabe nur aus setHeader; ein Klick meldet nur den Wunsch, den Stand
+    // setzt erst die Antwort des Kerns (actions_status).
+    m_enabled = new QCheckBox(QStringLiteral("Chat-Bot aktiv"), header);
+    m_enabled->setObjectName(QStringLiteral("chatBotEnabled"));
+    m_enabled->setEnabled(false);
+    connect(m_enabled, &QCheckBox::clicked, this, &ChatBotPage::enabledClicked);
+    headerRow->addWidget(m_enabled, 0, Qt::AlignVCenter);
     // Eine Zeile ohne Umbruch; ein langer Text wird abgeschnitten, Einzelheiten im Tooltip.
     m_state = new QLabel(header);
     m_state->setObjectName(QStringLiteral("chatBotState"));
@@ -82,6 +92,9 @@ ChatBotPage::ChatBotPage(QWidget *parent) : QWidget(parent)
     m_events->setColumnWidth(1, digit * 16);
     m_events->setColumnWidth(2, digit * 16);
     addLivePanel(QStringLiteral("Ereignisse"), m_events, 1);
+
+    m_actions = new ActionsPage(m_pages);
+    addSubTab(QStringLiteral("Aktionen"), m_actions);
 }
 
 int ChatBotPage::addSubTab(const QString &title, QWidget *page)
@@ -109,6 +122,8 @@ void ChatBotPage::setHeader(const dss::ChatBotHeaderView &view)
     // Das Stylesheet wertet [state="…"] nur beim Polieren aus (wie HeaderBar::setConnectionState).
     m_state->style()->unpolish(m_state);
     m_state->style()->polish(m_state);
+    m_enabled->setChecked(view.switchChecked);
+    m_enabled->setEnabled(view.switchEnabled);
 }
 
 void ChatBotPage::resetEvents(const QList<dss::EventRow> &rows)

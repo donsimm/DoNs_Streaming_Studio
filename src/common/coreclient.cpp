@@ -194,6 +194,15 @@ qint64 CoreClient::sendTwitchAccountRequest(const char *type, const QString &acc
     return id;
 }
 
+qint64 CoreClient::sendActionsEdit(const ActionsEdit &edit)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    send(actionsEditMessage(edit, id));
+    return id;
+}
+
 LiveElements CoreClient::live(const QUuid &overlayId) const
 {
     LiveElements elements = m_live.value(overlayId);
@@ -559,6 +568,14 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_twitchStatus = info;
         emit twitchStatusChanged();
+    } else if (type == QLatin1String(msg::kActionsStatus)) {
+        ActionsStatus status;
+        if (!parseActionsStatus(message, &status, &error)) {
+            qWarning("Kern: actions_status ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_actionsStatus = status;
+        emit actionsStatusChanged();
     } else if (type == QLatin1String(msg::kEventHistory)) {
         QList<events::Event> list;
         if (!parseEventHistory(message, &list, &error)) {
@@ -716,6 +733,10 @@ void CoreClient::clearData()
     if (m_twitchStatus) {
         m_twitchStatus.reset();
         emit twitchStatusChanged();
+    }
+    if (m_actionsStatus) {
+        m_actionsStatus.reset();
+        emit actionsStatusChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();
