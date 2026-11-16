@@ -12,6 +12,8 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 │   └── <Kennung>.json        ein Overlay je Datei, Name = Kennung des Overlays
 ├── media/
 │   └── <SHA-256>.<Endung>    Kopien der Dateien des Nutzers (Bild, Video, Schrift)
+├── live-bilder/
+│   └── <SHA-256>.<png|jpg>   Profilbilder des Laufzustands (P14 d), beim Start des Kerns geleert
 ├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
 ├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
 ├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
@@ -24,7 +26,8 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 ```
 
 - **overlays/**: Jede Datei ist JSON in UTF-8. Gespeichert wird atomar (`QSaveFile`: temporäre Datei, danach Umbenennen).
-- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
+- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`; seit P14 t Ton `mp3`, `wav`, `ogg`, `m4a` (Töne für den Chat-Bot, ohne Quelle in einem Overlay; `medien.json` bleibt in Format 1).
+- **live-bilder/** (seit P14 d): Profilbilder, die der Kern für den Laufzustand eines Overlays lädt (`docs/08-kern-schnittstelle.md`, «Laufzustand»). Nur der Kern schreibt hier, höchstens 200 Dateien, die ältesten ungenutzten werden gelöscht; beim Start leert er den Ordner. Keine Overlay-Datei verweist darauf.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
 - **obs-quellen.json** (seit P10c, E-29): Zuordnung Overlay zu Browserquelle in OBS, gespeichert atomar (`QSaveFile`), nur vom Kern. Inhalt: `{"format":1,"quellen":[{"overlay":"<Kennung>","input_uuid":"<Kennung in OBS>","input_name":"<Name in OBS>"}]}`. Die Zuordnung läuft über `input_uuid`, bleibt also beim Umbenennen in OBS gültig. Fehlt die Quelle in OBS, bleibt der Eintrag: Bei einer anderen Szenensammlung fehlt sie nur scheinbar. Ohne Token und ohne Adresse. Ungültige Datei: wird in `obs-quellen.json.ungueltig-<JJJJMMTT-hhmmss>` umbenannt, der Kern beginnt ohne Zuordnung (bestehende Quellen übernimmt der Abgleich, wenn die Adresse genau stimmt).
 

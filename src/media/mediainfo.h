@@ -41,4 +41,12 @@ int readVideoOrientation(const QString &path);
 // av_find_best_stream), https://ffmpeg.org/doxygen/7.1/group__lavc__core.html (avcodec_get_name)
 bool readVideoCodec(const QString &path, QString *codec, QString *error);
 
+// P14 t: Länge einer Tondatei in ms (Dock «Medien»). Aus der Dauer des Containers
+// (AVFormatContext::duration, in AV_TIME_BASE), sonst aus der Dauer des besten Tonstroms. Öffnet nur
+// die Datei und liest die Angaben der Ströme, ohne zu dekodieren. false mit Meldung, wenn es keinen
+// Ton oder keine Dauer gibt.
+// https://ffmpeg.org/doxygen/7.1/structAVFormatContext.html (duration),
+// https://ffmpeg.org/doxygen/7.1/structAVStream.html (duration, time_base)
+bool readMediaDuration(const QString &path, qint64 *durationMs, QString *error);
+
 } // namespace dss

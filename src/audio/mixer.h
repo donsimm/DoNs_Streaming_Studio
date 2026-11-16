@@ -39,6 +39,13 @@
 // wird nach den Regeln oben ausgeglichen. Meldet die Seite eine Wiederholung, bevor die Quelle sie
 // erreicht hat, springt die Quelle sofort. Hinter der Länge liest die Quelle nichts, auch nicht für
 // die Interpolation; ist die Tonspur kürzer, bleibt es bis zur Länge still.
+//
+// Freie Stimme (P14 t, Plan P14 Abschnitt 4.3, Töne des Chat-Bots): startFree() spielt einen
+// Durchgang ab dem nächsten Abruf von vorne, Probe für Probe, ohne Uhr einer Seite, ohne Nachführen
+// und ohne Versatz. Lautstärke bis kMaxFreeGain (200 %); jede freie Stimme und die Summe des Abrufs
+// sind auf ±1,0 begrenzt. Das Ende des Durchgangs (nächste Marke im Ring) meldet sourceStats()
+// mit ended; ist der Ring leer, weil der Decoder fertig ist, sieht der Aufrufer das am Decoder
+// (gespielte Rahmen = geschriebene Rahmen, ActionSound).
 
 namespace dss {
 
@@ -81,10 +88,13 @@ public:
     // Pause des Videos beim Wiederholen: Startwert aus M2 (Median 58,59 ms), nachgeführt
     static constexpr int64_t kLoopGapStartNs = 58'600'000;
     static constexpr int64_t kLoopGapMaxNs = 500'000'000;
+    // Grösste Lautstärke einer freien Stimme (Plan P14, 4.3: 0 bis 200 %)
+    static constexpr float kMaxFreeGain = 2.0f;
 
     struct SourceStats
     {
         bool playing = false;
+        bool ended = false;          // freie Stimme: Durchgang zu Ende (nächste Marke erreicht)
         uint32_t pass = 0;           // Durchgang im Ring, der gerade spielt
         uint32_t loops = 0;          // Wiederholungen seit dem Start
         uint64_t frames = 0;         // gespielte Rahmen mit Daten aus dem Ring
@@ -124,8 +134,10 @@ public:
     void prepare(int id, uint32_t pass);
     // Neue Meldung der Seite (Lage etwa jede Sekunde, Wiederholung mit loop + 1).
     void report(int id, const PageClock &clock);
+    // P14 t: freie Stimme mit Durchgang `pass` (AudioDecoder::firstPass), Start beim nächsten Abruf.
+    void startFree(int id, uint32_t pass);
     void stop(int id);
-    // gain 0 bis 1 (linear)
+    // gain 0 bis 1 (linear); freie Stimme 0 bis kMaxFreeGain
     void setVolume(int id, float gain, bool muted);
     // Länge des Videos in Rahmen, die die Seite meldet (0 = unbekannt), und ob es sich wiederholt.
     void setLength(int id, int64_t frames, bool loop);

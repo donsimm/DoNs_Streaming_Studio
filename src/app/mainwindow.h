@@ -27,6 +27,7 @@ class QListWidgetItem;
 class QMenu;
 class QMenuBar;
 class QStackedWidget;
+class QTimer;
 class QTreeWidgetItem;
 
 namespace dss {
@@ -119,11 +120,16 @@ private:
     // P10c, E-29: Zeile «OBS» im Dock «Steuerung»
     void refreshObsSource();
     // P12b b5: Zeile «Ton Videos» im Dock «Steuerung» aus Einstellungen und Ausgängen des Kerns;
-    // Änderungen gehen mit update_settings an den Kern.
+    // Änderungen gehen mit update_settings an den Kern. P14 t: dazu die Zeile «Ton Chat-Bot».
     void refreshAudioRoute();
-    void sendAudioRoute(const dss::AudioRouteChange &change);
+    void sendAudioRoute(const QString &purpose, const dss::AudioRouteChange &change);
     void showObsSourceDialog();
     std::optional<dss::Overlay> selectedOverlay() const;
+    // P14 d: gewähltes Overlay mit dem Laufzustand darüber (für Leinwand und Zeichner, K-07)
+    std::optional<dss::Overlay> canvasOverlay() const;
+    // P14 d: Bereich «Chat-Bot» im Dock «Eigenschaften»; zählt die Restdauer mit m_liveTimer herunter
+    void refreshLiveRow();
+    void hideLive();
 
     // Bearbeiten (mainwindowedit.cpp)
     bool editingAllowed() const;
@@ -228,6 +234,7 @@ private:
     bool m_firstPaintReported = false;
 
     dss::CoreClient *m_client = nullptr;
+    QTimer *m_liveTimer = nullptr; // P14 d: nächste Anzeige der Restdauer im Bereich «Chat-Bot»
     // Zustand des Fensters (Regel 9): Auswahl und Verlauf der Anzeigen.
     QUuid m_selectedOverlay;
     QUuid m_selectedFolder;

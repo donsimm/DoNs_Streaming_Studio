@@ -8,11 +8,13 @@
 #include "obsevents.h"
 #include "obssecretstore.h"
 #include "obssources.h"
+#include "overlaylivestate.h"
 #include "version.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "actionsound.h"
 #include "audiooutput.h"
 #include "mixer.h"
 #endif
@@ -70,6 +72,11 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
 #endif
     // Namen und Ordner der Medien schreibt nur der Kern (P10b, Teil A 1).
     m_store->setWritesMediaLibrary(true);
+    // P14 d: Laufzustand der Overlays, Profilbilder unter <Datenordner>/live-bilder
+    dss::OverlayLiveState::Options liveOptions;
+    liveOptions.imageDir = m_store->dataDir() + QLatin1Char('/') + QLatin1String(dss::kLiveImageDir);
+    m_live = new dss::OverlayLiveState(m_store, liveOptions, this);
+    connect(m_live, &dss::OverlayLiveState::changed, this, &CoreService::onLiveChanged);
     m_progressTimer = new QTimer(this);
     m_progressTimer->setInterval(kProgressIntervalMs);
     connect(m_progressTimer, &QTimer::timeout, this, &CoreService::broadcastImportProgress);
@@ -150,6 +157,9 @@ CoreService::ListenResult CoreService::listen(QString *error)
         return ListenResult::Failed;
     }
     qInfo("Verbindung offen: %s", qPrintable(m_server->fullServerName()));
+    // P14 d: Profilbilder der letzten Sitzung weg (Laufzustand beginnt leer)
+    if (const int removed = m_live->clearImages(); removed > 0)
+        qInfo("Laufzustand: %d alte Profilbilder gelöscht", removed);
     m_sinceLastSample.start();
     sampleStats();
     m_statsTimer->start();
@@ -255,6 +265,9 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
     const QJsonObject listAfter = listMessage();
     if (listAfter != listBefore)
         broadcast(listAfter);
+    // P14 d: Laufzustand gelöschter Overlays und Quellen fällt weg
+    if (changed > 0 || removed > 0)
+        m_live->overlaysChanged();
 #if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
     // P12b b4: Stopp-Regeln (Ausgabe aus, Quelle verborgen, gelöscht oder geändert)
     if (m_videoAudio && (changed > 0 || removed > 0))
@@ -400,6 +413,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, obsSourcesMessage());
         send(socket, twitchStatusMessage());
         send(socket, audioOutputsMessage());
+        send(socket, dss::overlayLiveMessage(m_live->all())); // P14 d
         // P14 b3: Aktionssystem (actions_config, actions_status)
         if (m_actions) {
             for (const QJsonObject &m : m_actions->helloMessages())
@@ -431,6 +445,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleObsSourceRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kObsAddToScene)) {
         handleObsSourceRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveSet)) {
+        handleLiveRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveReset)) {
+        handleLiveRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
         QUuid id;
         if (!dss::parseGetBrowserSource(message, &id, &error)) {
@@ -526,6 +544,7 @@ void CoreService::setOverlayServer(dss::OverlayServer *server)
 {
 #if DSS_CORE_OVERLAY_SERVER
     m_overlayServer = server;
+    server->setLiveState(m_live); // P14 d
     connect(server, &dss::OverlayServer::statusChanged, this,
             [this] { broadcast(serverStatusMessage()); });
     connect(server, &dss::OverlayServer::pageOpened, this, &CoreService::onPageOpened);
@@ -569,6 +588,48 @@ void CoreService::onPageOpened(const QUuid &overlayId, const QString &page)
 #else
     Q_UNUSED(overlayId);
     Q_UNUSED(page);
+#endif
+}
+
+void CoreService::handleLiveRequest(QLocalSocket *socket, const QJsonObject &message, bool reset)
+{
+    const QString type = dss::messageType(message);
+    QString error;
+    const QPointer<QLocalSocket> target(socket);
+    const auto answer = [this, target](const dss::ChangeResult &result) {
+        if (target && m_clients.contains(target))
+            send(target, dss::changeResultMessage(result));
+    };
+    if (reset) {
+        dss::LiveResetRequest r;
+        if (!dss::parseLiveReset(message, &r, &error)) {
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+            return;
+        }
+        error = m_live->reset(r);
+        answer({r.requestId, error.isEmpty(), QUuid(),
+                error.isEmpty() ? QString() : QString::fromLatin1(dss::err::kUnknownOverlay), error});
+        return;
+    }
+    dss::LiveSetRequest r;
+    if (!dss::parseLiveSet(message, &r, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, type);
+        return;
+    }
+    const qint64 requestId = r.requestId;
+    m_live->set(r, [answer, requestId](const dss::OverlayLiveState::Result &result) {
+        answer({requestId, result.ok, QUuid(), result.code, result.message, result.warning});
+    });
+}
+
+void CoreService::onLiveChanged(const QUuid &overlayId)
+{
+    broadcast(dss::overlayLiveMessage(m_live->all()));
+#if DSS_CORE_OVERLAY_SERVER
+    if (m_overlayServer)
+        m_overlayServer->liveChanged(overlayId);
+#else
+    Q_UNUSED(overlayId);
 #endif
 }
 
@@ -893,6 +954,21 @@ void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
     };
     applyAudioSettings();
 }
+
+void CoreService::setActionAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
+{
+    m_actionOutput = output;
+    m_actionMixer = mixer;
+    m_actionSound = new dss::ActionSound(m_store->dataDir(), mixer, output, this);
+    // Wie setAudioOutput: Rückrufe im Thread des Ausgangs, nur weiterreichen.
+    output->onChange = [this] {
+        QMetaObject::invokeMethod(this, &CoreService::onAudioChanged, Qt::QueuedConnection);
+    };
+    output->onLog = [this](const QString &line) {
+        QMetaObject::invokeMethod(this, [line] { qInfo("Ton Chat-Bot: %s", qPrintable(line)); }, Qt::QueuedConnection);
+    };
+    applyAudioSettings();
+}
 #endif
 
 void CoreService::connectVideoAudio()
@@ -913,19 +989,29 @@ void CoreService::stopAudio()
     if (m_videoAudio)
         m_videoAudio->shutdown();
 #endif
+#if DSS_CORE_AUDIO
+    if (m_actionSound)
+        m_actionSound->shutdown();
+#endif
 }
 
 void CoreService::applyAudioSettings()
 {
 #if DSS_CORE_AUDIO
-    if (!m_audioOutput || !m_settings)
+    if (!m_settings)
         return;
-    const dss::AudioRoute route =
-        m_settings->settings().audioRoutes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
-    m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
-    // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
-    // (neu gewählt, pwoutput.h).
-    m_audioOutput->setTarget(route.output);
+    const QMap<QString, dss::AudioRoute> routes = m_settings->settings().audioRoutes;
+    if (m_audioOutput) {
+        const dss::AudioRoute route = routes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
+        m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
+        // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
+        // (neu gewählt, pwoutput.h).
+        m_audioOutput->setTarget(route.output);
+    }
+    // P14 t: Ohne gewählten Ausgang legt PwOutput keinen Strom an (Plan P14, 4.3: «nur offen,
+    // solange ein Ausgang gewählt ist»). Der Versatz wirkt bei freien Stimmen nicht.
+    if (m_actionOutput)
+        m_actionOutput->setTarget(routes.value(QString::fromLatin1(dss::kAudioPurposeActions)).output);
 #endif
 }
 
@@ -941,6 +1027,18 @@ QJsonObject CoreService::audioOutputsMessage() const
         info.routes.insert(QString::fromLatin1(dss::kAudioPurposeVideo),
                            {QString::fromLatin1(dss::AudioOutput::stateName(m_audioOutput->state())),
                             m_audioOutput->stateDetail()});
+    }
+    // P14 t: Die Liste der Ausgänge kommt vom Ausgang der Videos (dieselbe Registry von PipeWire).
+    if (m_actionOutput) {
+        info.enabled = true;
+        if (!m_audioOutput) {
+            const QList<dss::AudioDevice> devices = m_actionOutput->devices();
+            for (const dss::AudioDevice &d : devices)
+                info.devices.append({d.name, d.description, d.isDefault});
+        }
+        info.routes.insert(QString::fromLatin1(dss::kAudioPurposeActions),
+                           {QString::fromLatin1(dss::AudioOutput::stateName(m_actionOutput->state())),
+                            m_actionOutput->stateDetail()});
     }
 #endif
     return dss::audioOutputsMessage(info);
@@ -1339,9 +1437,7 @@ QString CoreService::fileToImport(const dss::ChangeRequest &r, dss::MediaUse *us
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind)
             return {};
-        *use = *kind == MediaKind::Image ? MediaUse::Image
-               : *kind == MediaKind::Video ? MediaUse::Video
-                                           : MediaUse::Font;
+        *use = mediaUseOf(*kind);
         return r.file;
     }
     if (type == QLatin1String(msg::kAddTextSource)) {
@@ -1431,6 +1527,7 @@ dss::MediaListData CoreService::mediaListData() const
         f.kind = dss::mediaKindOf(e.file).value_or(dss::MediaKind::Image);
         f.bytes = std::max<qint64>(m_store->mediaBytes(e.file), 0);
         f.codec = m_store->videoCodec(e.file);
+        f.durationMs = m_store->mediaDurationMs(e.file);
         f.browserProblem = m_store->browserProblem(e.file);
         f.usedIn = usages.value(e.file);
         data.files.append(f);
@@ -1648,15 +1745,12 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind) {
             QStringList all;
-            for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font})
-                all.append(allowedMediaSuffixes(use));
+            for (MediaKind k : kMediaKinds)
+                all.append(allowedMediaSuffixes(mediaUseOf(k)));
             return fail(err::kRejected, QStringLiteral("Endung «%1» nicht erlaubt, erlaubt sind: %2.")
                                             .arg(QFileInfo(r.file).suffix(), all.join(QStringLiteral(", "))));
         }
-        const MediaUse use = *kind == MediaKind::Image   ? MediaUse::Image
-                             : *kind == MediaKind::Video ? MediaUse::Video
-                                                         : MediaUse::Font;
-        const QString reference = m_store->importMedia(r.file, use, &error, r.folderId);
+        const QString reference = m_store->importMedia(r.file, mediaUseOf(*kind), &error, r.folderId);
         if (reference.isEmpty())
             return fail(err::kRejected, error);
         ChangeResult result = done(true, QString());

@@ -9,6 +9,8 @@
 // der Grenze erreichen. Der Test scheitert ausserdem, wenn ein Bild fehlt, die Grösse nicht stimmt,
 // ein Video mit «Am Ende anhalten» nicht das letzte Bild zeigt (K-05) oder die Ausrichtung eines
 // WebM nicht stimmt (Punkt 80).
+// laufzustand (P14 d): Overlay «Laufzustand» mit Laufzustand vom Kern (Platzhalter im Text, Text
+// gezeigt, Bild ersetzt, Bild versteckt), Seite gegen Editor mit den Grenzen je Quellenart.
 //
 // Chromium läuft in einem echten X11-Fenster ausserhalb des Bildschirms, ohne Fenstermanager und
 // ohne Fokus (wie P02, M2 «ausserhalb»; Regel 6). Abgriff wie tst_browserquelle.
@@ -47,16 +49,19 @@
 
 #include "bildvergleich.h"
 #include "coreclient.h"
+#include "coresession.h"
 #include "coresettings.h"
 #include "mediainfo.h"
 #include "obsprotocol.h"
 #include "obssecretstore.h"
 #include "obstestserver.h"
 #include "overlayimage.h"
+#include "overlaylive.h"
 #include "overlaystore.h"
 #include "prozesshilfe.h"
 #include "sourcerenderer.h"
 #include "version.h"
+#include "windowdata.h"
 
 #include <QApplication>
 #include <QBuffer>
@@ -190,6 +195,7 @@ struct TestOverlay
     QList<FieldVideo> fieldVideos;
     QList<Region> oriented; // Ausrichtung ablesen: Viertel rot, grün, blau, gelb
     QRect lastFrame;        // K-05: bildwechsel.mp4, letztes Bild Grau 128
+    bool live = false;      // P14 d: nur in laufzustand(), mit Laufzustand gezeichnet
 };
 
 // Absichtlicher Fehler «BT.601 statt BT.709» (deckende Farbe): nach Y'CbCr mit BT.709 und mit BT.601
@@ -661,6 +667,10 @@ private:
     QHash<QString, QImage> m_pages;
     QHash<QString, QImage> m_editors;
     QHash<QString, Overlay> m_overlayData;
+    // P14 d, Overlay «Laufzustand»: Quellen in der Reihenfolge von buildOverlays()
+    QList<QUuid> m_liveSources;
+    QString m_liveImageFile; // Verweis «media/…» von einzelheiten.png, ersetzt live das Bild alpha.png
+    QRect m_liveHiddenBox;   // Bild, das live versteckt wird
 
     QVariant js(const QString &code)
     {
@@ -843,6 +853,36 @@ private:
              QStringLiteral("#FFFFFFFF"), QStringLiteral("Text über dem Video"));
         text(QStringLiteral("Be Vietnam Pro rechts"), kVietnam + QStringLiteral("/BeVietnamPro-Bold.ttf"), 700,
              QRect(1300, 950, 600, 100), 48, TextAlign::Right, QStringLiteral("#FFE040FF"), QStringLiteral("Text rechts"));
+
+        // Laufzustand (P14 d, Plan 10.4): Text mit Platzhalter im eigenen Text, Text in der Datei
+        // versteckt und live mit eigenem Text gezeigt, Bild live durch eine andere Datei der Mediathek
+        // ersetzt, Bild live versteckt. Ein Bild bleibt wie in der Datei.
+        create(QStringLiteral("Laufzustand"), QSize(960, 540));
+        o->live = true;
+        text(QStringLiteral("Willkommen, %user%"), dejavu, 400, QRect(10, 10, 600, 80), 48, TextAlign::Left,
+             QStringLiteral("#FFFFFFFF"), QStringLiteral("Text mit Platzhalter"));
+        text(QStringLiteral("versteckt"), kVietnam + QStringLiteral("/BeVietnamPro-Bold.ttf"), 700, QRect(10, 110, 600, 80), 40,
+             TextAlign::Left, QStringLiteral("#FFE040FF"), QStringLiteral("Text live gezeigt"));
+        image(kData + QStringLiteral("/einzelheiten.png"), QRect(640, 10, 300, 225), QStringLiteral("Bild wie in der Datei"));
+        image(kData + QStringLiteral("/alpha.png"), QRect(10, 220, 400, 300), QStringLiteral("Bild live ersetzt"));
+        m_liveHiddenBox = QRect(640, 280, 300, 150);
+        image(kExif + QStringLiteral("/orientierung-1.png"), m_liveHiddenBox, QStringLiteral("Bild live versteckt"));
+        {
+            const Overlay *live = store.overlay(o->id);
+            QVERIFY(live && live->sources.size() == 5);
+            // Nach Lage: 0 Platzhalter, 1 versteckter Text, 2 Bild der Datei, 3 ersetzt, 4 versteckt
+            const QList<QPoint> corners = {{10, 10}, {10, 110}, {640, 10}, {10, 220}, m_liveHiddenBox.topLeft()};
+            for (const QPoint &p : corners) {
+                const auto it = std::find_if(live->sources.begin(), live->sources.end(),
+                                             [&](const Source &s) { return s.x == p.x() && s.y == p.y(); });
+                QVERIFY(it != live->sources.end());
+                m_liveSources.append(it->id);
+                if (p == corners.at(2))
+                    m_liveImageFile = it->file;
+            }
+            QVERIFY(m_liveImageFile.startsWith(QLatin1String("media/")));
+            QVERIFY2(store.setSourceVisible(o->id, m_liveSources.at(1), false, &error), qPrintable(error));
+        }
 
         // Weitere Formate (nur notieren): HEVC in MP4, zur Laufzeit erzeugt, dazu die Vorlage als PNG,
         // damit das Bild nie einfarbig ist, auch wenn kein Zeichner HEVC abspielt. ProRes gibt es nur in
@@ -1144,7 +1184,8 @@ private slots:
     {
         QTest::addColumn<int>("index");
         for (int i = 0; i < m_overlays.size(); ++i)
-            QTest::newRow(qPrintable(m_overlays.at(i).name)) << i;
+            if (!m_overlays.at(i).live)
+                QTest::newRow(qPrintable(m_overlays.at(i).name)) << i;
     }
 
     // Seite (Qt WebEngine) gegen Editor, mit OBS auch OBS gegen beide
@@ -1285,6 +1326,103 @@ private slots:
             }
         }
         // Feste Grenze (K-08); Bilder liegen schon in der Ausgabe
+        QVERIFY2(exceeded.isEmpty(), qPrintable(QStringLiteral("Seite–Editor über der Grenze (Bilder in %1):\n").arg(kOut)
+                                                 + exceeded.join(QLatin1Char('\n'))));
+    }
+
+    // P14 d (Plan 10.4): Laufzustand in beiden Zeichnern gleich (K-07). Der Kern bekommt
+    // overlay_live_set wie von dss-cli; die Seite legt ihn über das Overlay («event: live»), der Editor
+    // zeichnet applyLiveState() mit dem Laufzustand aus overlay_live. Grenzen der Bereiche je
+    // Quellenart; «ganzes Overlay» ist noch nicht gemessen und wird nur notiert ([OFFEN], Bericht).
+    void laufzustand()
+    {
+        const auto found = std::find_if(m_overlays.cbegin(), m_overlays.cend(), [](const TestOverlay &t) { return t.live; });
+        QVERIFY(found != m_overlays.cend());
+        const TestOverlay &o = *found;
+        QCOMPARE(m_liveSources.size(), 5);
+
+        CoreSession session;
+        QString error;
+        QVERIFY2(session.open(m_socket, QStringLiteral("tst_bildvergleich"), &error), qPrintable(error));
+        const auto send = [&](const LiveSetRequest &set) {
+            const auto result = session.request(liveSetMessage(set), &error);
+            return result && result->ok;
+        };
+        LiveSetRequest show;
+        show.overlayId = o.id;
+        show.mode = LiveMode::Show;
+        show.arguments = {{QStringLiteral("user"), QStringLiteral("Zuschauer42")}};
+        show.elements = {{m_liveSources.at(0), std::nullopt, QString()},
+                         {m_liveSources.at(1), QStringLiteral("Ersetzt: %user%"), QString()},
+                         {m_liveSources.at(3), std::nullopt, m_liveImageFile}};
+        QVERIFY2(send(show), qPrintable(error));
+        LiveSetRequest hide;
+        hide.overlayId = o.id;
+        hide.mode = LiveMode::Hide;
+        hide.elements = {{m_liveSources.at(4), std::nullopt, QString()}};
+        QVERIFY2(send(hide), qPrintable(error));
+        QTRY_COMPARE_WITH_TIMEOUT(m_client->live(o.id).size(), 4, 5000);
+
+        // Seite: eine neu geladene Seite bekommt den Laufzustand nach «overlay»
+        const QString url = urlOf(o.id);
+        QVERIFY(!url.isEmpty());
+        m_view->setGeometry(3840, 0, o.size.width(), o.size.height());
+        QSignalSpy loaded(m_view.get(), &QWebEngineView::loadFinished);
+        m_view->load(QUrl(url));
+        QVERIFY(loaded.wait(15000));
+        QVERIFY(QTest::qWaitFor([&] {
+            const QString t = js(QStringLiteral("document.body.innerText")).toString();
+            return t.contains(QStringLiteral("Willkommen, Zuschauer42")) && t.contains(QStringLiteral("Ersetzt: Zuschauer42"));
+        }, 15000));
+        QVERIFY(!js(QStringLiteral("document.body.innerText")).toString().contains(QLatin1Char('%')));
+        QVERIFY(pageReady(o));
+        QTest::qWait(300);
+        const QImage page = grab();
+        QCOMPARE(page.size(), o.size);
+
+        // Editor: Overlay aus der Datei, Laufzustand darüber wie im Fenster (MainWindow::canvasOverlay)
+        m_client->requestOverlay(o.id);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->overlay(o.id).has_value(), 5000);
+        const Overlay file = *m_client->overlay(o.id);
+        const Overlay overlay = applyLiveState(file, m_client->live(o.id));
+        SourceRenderer renderer;
+        renderer.setDataDir(m_client->coreHello().dataDir);
+        renderer.setOverlay(&overlay);
+        QTRY_VERIFY_WITH_TIMEOUT(renderer.imagesLoaded(), 5000);
+        const QImage editor = renderOverlayImage(renderer, overlay);
+        QCOMPARE(editor.size(), o.size);
+
+        save(page, QStringLiteral("laufzustand-seite.png"));
+        save(editor, QStringLiteral("laufzustand-editor.png"));
+        save(bv::differenceImage(page, editor, bv::edgeMask(page, editor)), QStringLiteral("laufzustand-differenz.png"));
+
+        // Versteckt: in beiden Zeichnern nichts Deckendes im Kasten; die Datei bleibt unverändert
+        const auto empty = [&](const QImage &img) {
+            for (int y = m_liveHiddenBox.top(); y <= m_liveHiddenBox.bottom(); ++y)
+                for (int x = m_liveHiddenBox.left(); x <= m_liveHiddenBox.right(); ++x)
+                    if (qAlpha(img.pixel(x, y)) != 0)
+                        return false;
+            return true;
+        };
+        QVERIFY(empty(page));
+        QVERIFY(empty(editor));
+        QVERIFY(!findSource(file, m_liveSources.at(1))->visible);
+        QCOMPARE(findSource(file, m_liveSources.at(0))->text.content, QStringLiteral("Willkommen, %user%"));
+
+        QStringList exceeded;
+        record(QStringLiteral("Seite–Editor"), o, page, editor, &exceeded);
+        QVERIFY(m_recorder.flush());
+        const QString whole = QStringLiteral("%1 | ganzes Overlay: keine Grenze festgelegt").arg(o.name);
+        if (exceeded.removeAll(whole) > 0)
+            qInfo("%s: ganzes Overlay ohne Grenze, nur notiert", qPrintable(o.name));
+
+        // Zurücksetzen: Laufzustand im Kern leer
+        LiveResetRequest reset;
+        reset.overlayId = o.id;
+        const auto result = session.request(liveResetMessage(reset), &error);
+        QVERIFY2(result && result->ok, qPrintable(error));
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->live(o.id).isEmpty(), 5000);
+
         QVERIFY2(exceeded.isEmpty(), qPrintable(QStringLiteral("Seite–Editor über der Grenze (Bilder in %1):\n").arg(kOut)
                                                  + exceeded.join(QLatin1Char('\n'))));
     }

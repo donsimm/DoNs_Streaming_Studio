@@ -14,6 +14,7 @@ add_library(dss_actions STATIC
   placeholders.h placeholders.cpp
   variables.h variables.cpp
   viewerdata.h viewerdata.cpp
+  viewerimport.h viewerimport.cpp
   actionclock.h actionclock.cpp
   actionservices.h
   actionengine.h actionengine.cpp

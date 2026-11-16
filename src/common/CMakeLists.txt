@@ -36,6 +36,8 @@ add_library(dss_common STATIC
   coresession.h coresession.cpp
   browsersource.h browsersource.cpp
   canvasimage.h canvasimage.cpp
+  overlaylive.h overlaylive.cpp
+  overlaylivestate.h overlaylivestate.cpp
   actionview.h actionview.cpp
   actionprotocol.h actionprotocol.cpp # P14 b3: Nachrichten des Aktionssystems
 )

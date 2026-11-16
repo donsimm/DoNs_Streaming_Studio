@@ -42,8 +42,9 @@ set_tests_properties(tst_overlaystore PROPERTIES FIXTURES_REQUIRED dss_media)
 # P10b: Namen und Ordner der Mediendateien (medien.json), ohne Qt Gui und ohne Kern-Prozess.
 dss_add_test(tst_medienliste)
 target_compile_definitions(tst_medienliste PRIVATE DSS_TEST_MEDIA_DIR="${DSS_TEST_MEDIA_DIR}"
-  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md")
-set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED dss_media)
+  DSS_FORMAT_DOC="${PROJECT_SOURCE_DIR}/docs/06-overlay-format.md"
+  DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED "dss_media;dss_toene")
 
 # P07: Schnittstelle, Leistungswerte, Aufbereitung für das Fenster (ohne Qt Gui).
 dss_add_test(tst_protocol)
@@ -96,6 +97,19 @@ dss_add_test(tst_platzhalter)
 target_link_libraries(tst_platzhalter PRIVATE dss_actions)
 dss_add_test(tst_variablen)
 target_link_libraries(tst_variablen PRIVATE dss_actions)
+# P14 z1a: Import der Zuschauer-Daten aus Streamer.bot (Zuordnung, Probelauf, Sicherung) mit
+# erfundenen Exportdaten tests/daten/streamerbot-export/, ohne Qt Gui und ohne Kern.
+dss_add_test(tst_zuschauerimport)
+target_link_libraries(tst_zuschauerimport PRIVATE dss_actions)
+target_compile_definitions(tst_zuschauerimport PRIVATE
+  DSS_TEST_EXPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/streamerbot-export")
+# P14 z1b: dazu der Weg über den Kern (viewer_import, dss-cli zuschauer-import,
+# scripts/zuschauer-import.sh) mit dss-core und dss-cli als eigenen Prozessen.
+if(DSS_CORE_ACTIONS AND DSS_BUILD_CLI)
+  target_compile_definitions(tst_zuschauerimport PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_TEST_SCRIPT_DIR="${PROJECT_SOURCE_DIR}/scripts")
+  add_dependencies(tst_zuschauerimport dss-core dss-cli)
+endif()
 # P14 b1: Ablauf der Läufe (Zustandsmaschine, Warteschlangen, Grenzen) mit ersetzter Uhr und
 # ersetzten Diensten, ohne Qt Gui und ohne Netz.
 dss_add_test(tst_aktionsablauf)
@@ -258,6 +272,12 @@ if(TARGET dss_audiodecoder)
   dss_add_test(tst_tondecoder)
   target_link_libraries(tst_tondecoder PRIVATE dss_audiodecoder)
   target_compile_definitions(tst_tondecoder PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+  # P14 t: Tondateien ohne Bild (eingefroren im Repo); erzeugt sie nur, falls sie fehlen. Braucht
+  # dann ffmpeg mit libmp3lame und libvorbis (wie media_vorbereiten).
+  add_test(NAME toene_vorbereiten
+    COMMAND sh -c "test -f '${CMAKE_CURRENT_SOURCE_DIR}/daten/ton/ton-piep.m4a' || sh '${CMAKE_CURRENT_SOURCE_DIR}/daten/ton/erzeugen-toene.sh'")
+  set_tests_properties(toene_vorbereiten PROPERTIES FIXTURES_SETUP dss_toene)
+  set_tests_properties(tst_tondecoder PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
 # P12b b2: Mischer mit gedachter Uhr und gedachten Werten des Ausgangs, ohne Gerät; ein Fall mit
 # echtem Decoder und tests/daten/ton/blitz-piep.mp4.
@@ -265,6 +285,10 @@ if(TARGET dss_audio)
   dss_add_test(tst_tonmischer)
   target_link_libraries(tst_tonmischer PRIVATE dss_audio)
   target_compile_definitions(tst_tonmischer PRIVATE DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
+  # P14 t: freie Stimme mit echtem Decoder und tests/daten/ton/ton-piep.wav
+  if(TEST toene_vorbereiten)
+    set_tests_properties(tst_tonmischer PROPERTIES FIXTURES_REQUIRED dss_toene)
+  endif()
 endif()
 # P12b b3: Ausgabe über PipeWire mit eigenen virtuellen Senken (unhörbar, nur Stille), Liste, Wahl,
 # fehlender und verschwundener Ausgang, Wiederkehr, fremde Verbindung. Nur mit DSS_CORE_AUDIO.
@@ -274,12 +298,14 @@ if(TARGET dss_pwoutput)
 endif()
 # P12b b4: Kern als eigener Prozess mit Ersatzausgang ohne Gerät (--ersatzausgang): Meldungen der
 # Seite an den Mischer, Stopp-Regeln, Nachführen, Wiederholen. Braucht Ton und Overlay-Server.
+# P14 t: Zweck «aktionen» im Kern und Töne des Chat-Bots (ActionSound) mit Ersatzausgang im Prozess.
 if(DSS_CORE_AUDIO AND DSS_CORE_OVERLAY_SERVER)
   dss_add_test(tst_kernton)
-  target_link_libraries(tst_kernton PRIVATE dss_audio Qt6::Network)
+  target_link_libraries(tst_kernton PRIVATE dss_audiooutput Qt6::Network)
   target_compile_definitions(tst_kernton PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
     DSS_TEST_TON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/ton")
   add_dependencies(tst_kernton dss-core)
+  set_tests_properties(tst_kernton PROPERTIES FIXTURES_REQUIRED dss_toene)
 endif()
 
 # P09: Zeichner der Leinwand in der X11-Sitzung (Bild, gedreht, Text, WebM-Alpha, verborgen,
@@ -332,6 +358,16 @@ if(DSS_CORE_OVERLAY_SERVER AND TARGET dss_media)
     DSS_TEST_VIDEO_ROTATION_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/video-drehung"
     DSS_TEST_BILDVERGLEICH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/bildvergleich"
     DSS_VIDEO_ROTATION=$<BOOL:${DSS_VIDEO_ROTATION}>)
+endif()
+
+# P14 d: Laufzustand der Overlays (Platzhalter, Nachrichten, Dauer, Profilbilder gegen einen eigenen
+# HTTP-Server auf 127.0.0.1), Kern und dss-cli als eigene Prozesse. Ohne Qt Gui.
+if(DSS_BUILD_CLI)
+  dss_add_test(tst_laufzustand)
+  target_compile_definitions(tst_laufzustand PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_TEST_EXIF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif"
+    DSS_TEST_FONT="${DSS_TEST_FONT}")
+  add_dependencies(tst_laufzustand dss-core dss-cli)
 endif()
 
 # P10c: Protokoll von obs-websocket, ohne Verbindung und ohne Qt Gui.

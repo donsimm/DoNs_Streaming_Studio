@@ -28,7 +28,9 @@
 
 #include "bildvergleich.h"
 #include "coreclient.h"
+#include "coresession.h"
 #include "coresettings.h"
+#include "overlaylive.h"
 #include "overlayimage.h"
 #include "overlaystore.h"
 #include "mediainfo.h"
@@ -199,6 +201,7 @@ private:
     QRect m_videoTurned;
     QUuid m_videoSource;
     QUuid m_moveSource;
+    QUuid m_textSource; // «Hallo Welt …», P14 d Laufzustand
     std::unique_ptr<QWebEngineView> m_view;
     QString m_saveDir;
     QString m_oldToken;
@@ -403,6 +406,7 @@ private slots:
         m_textBox = QRect(10, 200, 380, 100);
         const QUuid text = store.addTextSource(m_id, QStringLiteral("Hallo Welt\nZweite Zeile ÄÖÜ"), QStringLiteral(DSS_TEST_FONT), &error);
         place(text, m_textBox);
+        m_textSource = text;
         {
             SourceChanges c;
             c.fontSize = 36;
@@ -652,6 +656,59 @@ private slots:
         QTest::qWait(500);
         QCOMPARE(js(QStringLiteral("window.dssState.applied")).toInt(), applied);
         QCOMPARE(js(QStringLiteral("[...document.querySelectorAll('video')].filter(v => v.dssMark === 1).length")).toInt(), 5);
+    }
+
+    // P14 d: Laufzustand über «event: live» ohne Neuladen; Platzhalter im Text, Ausblenden,
+    // Zurücksetzen; eine neu geladene Seite bekommt den Laufzustand sofort. Die Overlay-Datei bleibt.
+    void liveState()
+    {
+        CoreSession session;
+        QString error;
+        QVERIFY2(session.open(m_socket, QStringLiteral("tst_browserquelle"), &error), qPrintable(error));
+        const auto send = [&](const QJsonObject &message) {
+            const auto result = session.request(message, &error);
+            return result && result->ok;
+        };
+        const auto pageText = [&] { return js(QStringLiteral("document.body.innerText")).toString(); };
+        const auto liveCount = [&] { return js(QStringLiteral("window.dssState.live")).toInt(); };
+        js(QStringLiteral("window.dssMarker = 4712"));
+
+        LiveSetRequest set;
+        set.overlayId = m_id;
+        set.mode = LiveMode::Show;
+        set.elements = {{m_textSource, QStringLiteral("Neuer Follower: %user%"), QString()}};
+        set.arguments = {{QStringLiteral("user"), QStringLiteral("Zuschauer42")}};
+        int count = liveCount();
+        QVERIFY2(send(liveSetMessage(set)), qPrintable(error));
+        QVERIFY(QTest::qWaitFor([&] { return liveCount() > count && pageText().contains(QStringLiteral("Neuer Follower: Zuschauer42")); }, 5000));
+        QVERIFY(!pageText().contains(QStringLiteral("Hallo Welt")));
+        QCOMPARE(js(QStringLiteral("window.dssMarker")).toInt(), 4712);
+        save(grab(), QStringLiteral("laufzustand-text.png"));
+
+        // Neu laden: zuerst «overlay», dann «live»
+        m_view->load(QUrl(url()));
+        QVERIFY(QTest::qWaitFor([&] { return pageText().contains(QStringLiteral("Neuer Follower: Zuschauer42")); }, 15000));
+
+        // Ausblenden: Text weg, im Textkasten nichts Deckendes
+        set.mode = LiveMode::Hide;
+        set.elements = {{m_textSource, std::nullopt, QString()}};
+        QVERIFY2(send(liveSetMessage(set)), qPrintable(error));
+        QVERIFY(QTest::qWaitFor([&] { return !pageText().contains(QStringLiteral("Neuer Follower")); }, 5000));
+        QVERIFY(QTest::qWaitFor([&] { return allTransparent(grab().copy(m_textBox)); }, 5000));
+
+        // Zurücksetzen: wieder wie im Overlay
+        LiveResetRequest reset;
+        reset.overlayId = m_id;
+        QVERIFY2(send(liveResetMessage(reset)), qPrintable(error));
+        QVERIFY(QTest::qWaitFor([&] { return pageText().contains(QStringLiteral("Hallo Welt")); }, 5000));
+        QVERIFY(pageReady(5));
+        const auto overlay = session.getOverlay(m_id, &error);
+        QVERIFY2(overlay, qPrintable(error));
+        const auto it = std::find_if(overlay->sources.begin(), overlay->sources.end(),
+                                     [&](const Source &s) { return s.id == m_textSource; });
+        QVERIFY(it != overlay->sources.end());
+        QCOMPARE(it->text.content,QStringLiteral("Hallo Welt\nZweite Zeile ÄÖÜ"));
+        QVERIFY(it->visible);
     }
 
     // P12b b4: Seite in OBS (window.obsstudio und «obsSourceActiveChanged» nachgebildet). Meldungen

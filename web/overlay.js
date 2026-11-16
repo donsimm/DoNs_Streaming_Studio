@@ -7,6 +7,13 @@
 //     fonts: { "media/…": { units_per_em, ascent, descent, leading } } }
 // «gone»: Die Adresse gilt nicht mehr (neuer Token, neue Adresse, gelöscht) → neu laden; der
 // Server liefert dann die leere Seite.
+// «live» (P14 d, Laufzustand einer Aktion des Chat-Bots, nur «jetzt»):
+//   { elements: { "<Kennung der Quelle>": { visible: true|false|null, text: "…"|null,
+//                                           image: "media/…"|"live/…"|null } },
+//     media: { "<Pfad>": { orientation: 1..8 } } }
+//   Gesetzte Werte gelten statt Sichtbarkeit, Text bzw. Bild der Quelle. Jede neue Verbindung
+//   beginnt ohne Laufzustand; der Server schickt «live» nur, wenn es einen gibt (nach einem
+//   Neustart des Kerns ist er leer).
 //
 // Vorgaben wie im Editor (docs/01-festlegungen.md, «Zeichnen im Editor»):
 //   - Quellen in Zeichenreihenfolge (sources[0] ganz hinten), nur sichtbare, ganze Pixel.
@@ -56,9 +63,11 @@ const root = document.getElementById('overlay');
 const shown = new Map();     // Kennung der Quelle → { kind, key, box, inner }
 const fontFaces = new Map(); // Name der Schrift → { face, state: 'loading'|'ok'|'error' }
 let lastData = null;
+const noLive = { elements: {}, media: {} };
+let live = noLive;
 
 // Zustand für die Prüfung (Testprogramm liest ihn mit runJavaScript).
-window.dssState = { applied: 0, lastApplyMs: 0, output: null, connected: false, reports: [] };
+window.dssState = { applied: 0, lastApplyMs: 0, output: null, connected: false, reports: [], live: 0 };
 
 function report(text) {
   window.dssState.reports.push(text);
@@ -325,13 +334,28 @@ function removeShown(id) {
   shown.delete(id);
 }
 
+// Quelle mit dem Laufzustand (P14 d): Kopie mit Sichtbarkeit, Text bzw. Bild aus «live».
+function withLive(s) {
+  const e = live.elements[s.id];
+  if (!e)
+    return s;
+  const copy = Object.assign({}, s);
+  if (e.visible !== null)
+    copy.visible = e.visible;
+  if (e.text !== null && s.kind === 'text')
+    copy.text = Object.assign({}, s.text, { content: e.text });
+  if (e.image !== null && s.kind === 'image')
+    copy.image = Object.assign({}, s.image, { file: e.image });
+  return copy;
+}
+
 function apply(data) {
   lastData = data;
   const o = data.overlay;
   root.style.width = o.width + 'px';
   root.style.height = o.height + 'px';
   window.dssState.output = o.output;
-  const wanted = o.output ? o.sources.filter((s) => s.visible) : [];
+  const wanted = o.output ? o.sources.map(withLive).filter((s) => s.visible) : [];
   const ids = new Set(wanted.map((s) => s.id));
   // Verborgene, gelöschte Quellen und Ausgabe aus: weg (Videos beginnen beim Einblenden neu).
   for (const id of [...shown.keys()]) {
@@ -366,7 +390,7 @@ function apply(data) {
     placeBox(e.box, s);
     if (s.kind === 'image' || s.kind === 'video') {
       const file = s.kind === 'image' ? s.image.file : s.video.file;
-      const info = data.media[file];
+      const info = data.media[file] || live.media[file];
       placeMedia(e.inner, s, info ? info.orientation : 1);
     } else {
       renderText(e.inner, s, data.fonts[s.text.font_file]);
@@ -393,8 +417,17 @@ function apply(data) {
 // bleibt das letzte Bild stehen.
 function connect() {
   const source = new EventSource(obs ? 'events/' + clock.page : 'events');
-  source.addEventListener('open', () => { window.dssState.connected = true; });
+  source.addEventListener('open', () => {
+    window.dssState.connected = true;
+    live = noLive; // neue Verbindung: Laufzustand kommt neu (oder gar nicht)
+  });
   source.addEventListener('overlay', (event) => apply(JSON.parse(event.data)));
+  source.addEventListener('live', (event) => {
+    live = JSON.parse(event.data);
+    window.dssState.live += 1;
+    if (lastData)
+      apply(lastData);
+  });
   // Rückfall des Kerns (GetSourceActive): nur solange der Zustand unbekannt ist; ein Ereignis aus
   // OBS hat Vorrang.
   source.addEventListener('obs_active', (event) => {

@@ -61,6 +61,8 @@ class SourceList : public QListWidget
 
 public:
     static constexpr int kIdRole = Qt::UserRole;
+    // P14 d: Element im Laufzustand (bool): Markierung «live» rechts in der Zeile (Entwurf 5)
+    static constexpr int kLiveRole = Qt::UserRole + 1;
 
     explicit SourceList(QWidget *parent = nullptr);
 
@@ -77,6 +79,7 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
     QStringList mimeTypes() const override;
 
 private:

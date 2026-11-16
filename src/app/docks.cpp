@@ -386,6 +386,22 @@ PropertiesDock createPropertiesDock(QWidget *parent)
     g->setRowStretch(6, 1);
     r.kindPages->addWidget(textPage);
     formColumn->addWidget(r.kindPages);
+
+    // P14 d: Bereich «Chat-Bot» (Entwurf 5): Zustand im Laufzustand, Knopf «Ausblenden». Immer da,
+    // damit der Wechsel der Quelle die Anordnung nicht ändert; ohne Quelle leer und ausgegraut.
+    QWidget *live = section(QStringLiteral("Chat-Bot"), form, &g);
+    live->setObjectName(QStringLiteral("propertyLive"));
+    r.liveState = new QLabel(live);
+    r.liveState->setTextFormat(Qt::PlainText);
+    r.hideLive = new QPushButton(QStringLiteral("Ausblenden"), live);
+    r.hideLive->setToolTip(QStringLiteral("Element wieder wie im Overlay zeigen (Laufzustand beenden)"));
+    r.hideLive->setEnabled(false);
+    nameWidgets({{r.liveState, "liveState"}, {r.hideLive, "hideLiveButton"}});
+    g->addWidget(new QLabel(QStringLiteral("Jetzt"), live), 0, 0);
+    g->addWidget(r.liveState, 0, 1);
+    g->addWidget(r.hideLive, 1, 1, Qt::AlignLeft);
+    g->setColumnStretch(1, 1);
+    formColumn->addWidget(live);
     formColumn->addStretch(1);
     scroll->setWidget(form);
     column->addWidget(scroll, 1);
@@ -490,6 +506,23 @@ ControlDock createControlDock(QWidget *parent)
     result.audioOutput = audioOutput;
     result.audioOffset = audioOffset;
     result.audioOutputState = audioState;
+    // P14 t (Plan P14, 4.3): Zeile «Ton Chat-Bot» wie «Ton Videos», ohne Versatz (freie Stimmen
+    // haben keinen Bildbezug). Der Zustand belegt die Spalte des Versatzes mit.
+    auto *actionsOutput = new QComboBox(content);
+    actionsOutput->setAccessibleName(QStringLiteral("Ausgang für den Ton des Chat-Bots"));
+    actionsOutput->setToolTip(QStringLiteral("Ausgang für den Ton des Chat-Bots"));
+    actionsOutput->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    actionsOutput->setMinimumContentsLength(6);
+    actionsOutput->addItem(QStringLiteral("Kein Ausgang"), QString());
+    auto *actionsState = new QLabel(QStringLiteral("–"), content);
+    actionsState->setWordWrap(true);
+    actionsState->setFixedHeight(actionsState->fontMetrics().size(0, QStringLiteral("a\nb")).height());
+    actionsState->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    actionsOutput->setEnabled(false);
+    actionsState->setEnabled(false);
+    nameWidgets({{actionsOutput, "actionsAudioOutput"}, {actionsState, "actionsAudioOutputState"}});
+    result.actionsAudioOutput = actionsOutput;
+    result.actionsAudioOutputState = actionsState;
     auto *output = new QComboBox(content);
     output->addItem(QStringLiteral("Browserquelle"));
     auto *outputState = new QLabel(QStringLiteral("Ausgabe: –"), content);
@@ -539,17 +572,20 @@ ControlDock createControlDock(QWidget *parent)
     grid->addWidget(audioOutput, 4, 1);
     grid->addWidget(audioOffset, 4, 2);
     grid->addWidget(audioState, 4, 3);
-    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 5, 0);
-    grid->addWidget(preview, 5, 1);
-    grid->addWidget(previewSmall, 5, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Ton Chat-Bot"), content), 5, 0);
+    grid->addWidget(actionsOutput, 5, 1);
+    grid->addWidget(actionsState, 5, 2, 1, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Vorschau"), content), 6, 0);
+    grid->addWidget(preview, 6, 1);
+    grid->addWidget(previewSmall, 6, 2, 1, 2);
     auto *snapRow = new QHBoxLayout;
     snapRow->setSpacing(8);
     snapRow->addWidget(snap);
     snapRow->addStretch(1);
     snapRow->addWidget(gridCheck);
-    grid->addLayout(snapRow, 6, 0, 1, 2);
-    grid->addWidget(gridSize, 6, 2);
-    grid->addWidget(clearGuides, 6, 3);
+    grid->addLayout(snapRow, 7, 0, 1, 2);
+    grid->addWidget(gridSize, 7, 2);
+    grid->addWidget(clearGuides, 7, 3);
     // Auflösung des gewählten Overlays (P09, Entscheid 5), ganze Pixel wie beim Anlegen.
     result.overlayWidth = pixelBox(1920, dss::kOverlayMinSize, content);
     result.overlayWidth->setMaximum(dss::kOverlayMaxWidth);
@@ -562,13 +598,13 @@ ControlDock createControlDock(QWidget *parent)
     result.overlayWidth->setEnabled(false);
     result.overlayHeight->setEnabled(false);
     nameWidgets({{result.overlayWidth, "overlayWidth"}, {result.overlayHeight, "overlayHeight"}});
-    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 7, 0);
-    grid->addWidget(result.overlayWidth, 7, 1);
-    grid->addWidget(result.overlayHeight, 7, 2);
+    grid->addWidget(new QLabel(QStringLiteral("Auflösung"), content), 8, 0);
+    grid->addWidget(result.overlayWidth, 8, 1);
+    grid->addWidget(result.overlayHeight, 8, 2);
 
     grid->setColumnStretch(1, 1);
     grid->setColumnStretch(2, 1);
-    grid->setRowStretch(8, 1);
+    grid->setRowStretch(9, 1);
     result.dock = dock(QStringLiteral("Steuerung"), QStringLiteral("controlDock"), content, parent);
     return result;
 }

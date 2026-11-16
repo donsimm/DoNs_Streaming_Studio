@@ -33,6 +33,9 @@
 //   [ton-video]
 //   ausgang=alsa_output.usb-…
 //   versatz_ms=0
+//   [ton-aktionen]
+//   ausgang=
+//   versatz_ms=0
 //   [twitch]
 //   aktiv=nein
 //   client-id=…
@@ -68,13 +71,16 @@ inline constexpr int kObsDefaultPort = 4455;
 
 // P12b b3: Zwecke der Tonausgänge: Kennung in der Schnittstelle und Abschnitt in kern.ini. Weitere
 // Zwecke (Chat-Bot) kommen hier dazu, ohne Umbau (Antwort 2 des Nutzers, 2026-11-09).
+// P14 t: «aktionen» für die Töne des Chat-Bots (Zeile «Ton Chat-Bot», Plan P14 Abschnitt 4.3);
+// versatz_ms steht auch dort, wirkt aber nicht (freie Stimmen haben keine Lage zum Bild).
 struct AudioPurpose
 {
     const char *id;      // Schnittstelle (settings, update_settings, audio_outputs)
     const char *section; // Abschnitt in kern.ini
 };
-inline constexpr AudioPurpose kAudioPurposes[] = {{"video", "ton-video"}};
+inline constexpr AudioPurpose kAudioPurposes[] = {{"video", "ton-video"}, {"aktionen", "ton-aktionen"}};
 inline constexpr char kAudioPurposeVideo[] = "video";
+inline constexpr char kAudioPurposeActions[] = "aktionen";
 QStringList audioPurposeIds();
 // Versatz in ms (Annahme nach Frage 6 des Plans P12, Empfehlung −500 bis +500, Schritt 1)
 inline constexpr int kAudioOffsetMinMs = -500;

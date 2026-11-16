@@ -158,18 +158,23 @@ void MainWindow::refreshMedia()
     for (const dss::MediaFolder &f : data.folders)
         place(folders.value(f.id), f.parent);
 
+    // P14 t: Töne haben kein Vorschaubild, sondern das Symbol «Lautstärke» des Stils (wie Ordner
+    // und Warnzeichen aus dem Stil).
+    const QIcon audioIcon = style()->standardIcon(QStyle::SP_MediaVolume);
     for (const dss::MediaFileData &f : data.files) {
-        const QString kind = dss::mediaKindName(f.kind);
+        const QString kind = dss::mediaKindText(f);
         QTreeWidgetItem *item = MediaTree::createItem({false, f.entry.name, kind, f.bytes, f.entry.file});
         const bool unused = f.usedIn.isEmpty();
         item->setText(MediaTree::NameColumn, f.entry.name);
         item->setText(MediaTree::KindColumn, kind);
         item->setText(MediaTree::SizeColumn, dss::mediaSizeText(f.bytes));
         item->setTextAlignment(MediaTree::SizeColumn, Qt::AlignRight | Qt::AlignVCenter);
-        QIcon preview = placeholder;
+        QIcon preview = f.kind == dss::MediaKind::Audio ? audioIcon : placeholder;
 #if DSS_APP_RENDERER
-        if (const QImage image = m_mediaPreviews->preview(f.entry.file); !image.isNull())
-            preview = QIcon(QPixmap::fromImage(image));
+        if (f.kind != dss::MediaKind::Audio) {
+            if (const QImage image = m_mediaPreviews->preview(f.entry.file); !image.isNull())
+                preview = QIcon(QPixmap::fromImage(image));
+        }
 #endif
         item->setIcon(MediaTree::NameColumn, preview);
         // Teil A 4: Warnzeichen, wenn die Browserquelle das Video nicht abspielt
@@ -485,7 +490,7 @@ void MainWindow::addSourceFromMedia(const QString &reference, const QPoint &cent
     if (m_selectedOverlay.isNull())
         return;
     const std::optional<dss::MediaKind> kind = dss::mediaKindOf(reference);
-    if (!kind || *kind == dss::MediaKind::Font)
+    if (!kind || (*kind != dss::MediaKind::Image && *kind != dss::MediaKind::Video))
         return;
     dss::ChangeRequest r =
         request(*kind == dss::MediaKind::Video ? dss::msg::kAddVideoSource : dss::msg::kAddImageSource);

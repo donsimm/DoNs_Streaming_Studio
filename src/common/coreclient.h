@@ -1,7 +1,9 @@
 #pragma once
 
+#include "overlaylive.h"
 #include "protocol.h"
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QList>
 #include <QLocalSocket>
@@ -115,6 +117,13 @@ public:
     // Antworten über eventHistoryReceived, eventReceived und eventsDropped.
     void subscribeEvents(const QStringList &filters);
 
+    // P14 d: Laufzustand eines Overlays (overlay_live, nach hello und bei jeder Änderung); die
+    // Restdauer ist ab dem Empfang heruntergezählt (nie unter 0). Ohne Verbindung leer.
+    LiveElements live(const QUuid &overlayId) const;
+    // Schickt overlay_live_reset (leere Liste = alle Elemente); Antwort über changeFinished.
+    // Rückgabe: request_id, 0 ohne Verbindung.
+    qint64 sendLiveReset(const QUuid &overlayId, const QList<QUuid> &sources = {});
+
     // Fragt ein ganzes Overlay an; die Antwort meldet overlayChanged(id).
     void requestOverlay(const QUuid &id);
     void requestOverlayList();
@@ -187,6 +196,8 @@ signals:
     // P10b: mediaList() bzw. imports() hat sich geändert.
     void mediaListChanged();
     void importProgressChanged();
+    // P14 d: live() hat sich geändert (der Kern schickt den Laufzustand aller Overlays).
+    void liveChanged();
 
 private:
     void tryConnect();
@@ -241,6 +252,8 @@ private:
     QList<ImportProgressData> m_imports;
     ConnectionStates m_connectionStates;
     std::optional<QuitReply> m_quitReply;
+    QHash<QUuid, LiveElements> m_live;
+    QElapsedTimer m_liveReceived;
 };
 
 } // namespace dss

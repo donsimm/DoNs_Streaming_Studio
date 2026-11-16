@@ -1,8 +1,20 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-15 (P14 b3, Aktionssystem). Version der Schnittstelle: **15** (vorläufig, Nummer vergibt Lotse beim Zusammenführen paralleler Spuren). Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
+Stand: 2026-11-16 (P14 b3, t und d zusammengeführt, z1b). Version der Schnittstelle: **17**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3), `tst_zuschauerimport` (Zuschauer-Import ohne Kern, seit P14 z1b auch über Kern, `dss-cli` und `scripts/zuschauer-import.sh`), `tst_laufzustand` (Laufzustand, Platzhalter, Profilbilder gegen einen Testserver auf `127.0.0.1`, Kern und `dss-cli live…`, seit P14 d); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 17 (P14 z1b)
+
+Neu ist der Zuschauer-Import aus Streamer.bot (Abschnitt «Aktionen», Plan P14 9.4): die Anfrage `viewer_import` und die Antwort `viewer_import_result`. Ein Kern der Version 16 würde die Anfrage mit `unknown_type` beantworten. Darum stieg die Version.
+
+### Version 16 (P14 t und d)
+
+P14 t und d entstanden parallel zu P13 und P14 b3 mit der vorläufigen Nummer 14. Beim Zusammenführen der Spuren bekamen P13 die 14 und P14 b3 die 15; die Änderungen von P14 t und d kamen als Letzte dazu und tragen darum die 16. Ein Kern oder Fenster der Version 15 kennt sie nicht.
+
+`media_list` kennt die Art `audio` (Medienart «Ton»: `mp3`, `wav`, `ogg`, `m4a`) und das Pflichtfeld `files[].duration_ms`. Ein Fenster der Version 15 würde eine Medienliste mit einem Ton als ungültig verwerfen (unbekannte Art), und einer Medienliste eines Kerns der Version 15 fehlte das neue Pflichtfeld. Darum stieg die Version. Dazu kommt der Zweck `aktionen` (Töne des Chat-Bots, Abschnitt `[ton-aktionen]`) in `audio_outputs.routes`, `settings.audio_routes` und `update_settings.audio_routes`; die Felder bleiben dieselben.
+
+Seit P14 d (gleiche Nummer): Laufzustand der Overlays (Abschnitt «Laufzustand»), neu `overlay_live` (nach `hello` und bei jeder Änderung an alle), `overlay_live_set` und `overlay_live_reset`. Ein Kern der Version 15 würde die Anfragen mit `unknown_type` beantworten. Der Overlay-Server hat dazu das Ereignis `live` und den Pfad `…/live/<name>`. Die Typen stehen in `src/common/overlaylive.h`, nicht in `protocol.h`.
 
 ### Version 15 (P14 b3)
 
@@ -99,6 +111,7 @@ Fenster                                 Kern
    | <--- obs_status --------------------- |   seit Version 11 (P10c)
    | <--- obs_sources -------------------- |   seit Version 11 (P10c)
    | <--- audio_outputs ------------------ |   seit Version 12 (P12b)
+   | <--- overlay_live ------------------- |   seit Version 16 (P14 d)
    | <--- stats (letzte Messung) --------- |
    | <--- stats ------------------------- |   einmal pro Sekunde
    | ---- get_overlay {id} --------------> |
@@ -140,9 +153,9 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 15 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 15».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 17 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 17».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
-4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12) und, falls schon gemessen, die letzte `stats`.
+4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12), `actions_config` und `actions_status` (seit Version 15, P14 b3), `overlay_live` (seit Version 16, P14 d) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
@@ -172,11 +185,11 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `type` | Text | `hello` |
 | `program` | Text | `dss-core` |
 | `version` | Text | Version des Kerns, zum Beispiel `0.1.0` (aus `CMakeLists.txt`) |
-| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `13` |
+| `protocol_version` | ganze Zahl ab 1 | Version der Schnittstelle, heute `17` |
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":14,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":17,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -300,9 +313,10 @@ Medienliste (E-28): alle Dateien in `media/` mit Namen und Ordner aus `medien.js
 | `files[].file` | Text | Verweis `media/<SHA-256>.<Endung>` |
 | `files[].name` | Text | Name im Dock: ursprünglicher Dateiname oder Ersatzname «Bild vom 2026-11-02» (Datei ohne Namen, zum Beispiel aus P10) |
 | `files[].folder` | Text oder `null` | Ordner; `null` = oberste Ebene |
-| `files[].kind` | Text | `image`, `video` oder `font` (aus der Endung) |
+| `files[].kind` | Text | `image`, `video`, `font` oder seit Version 16 `audio` (aus der Endung) |
 | `files[].bytes` | Zahl | Grösse der Datei in Byte |
 | `files[].codec` | Text oder `null` | nur Video: Name des Formats in FFmpeg (`vp9`, `h264`, `hevc`, `mpeg4`, `prores`, …); `null` bei Bild, Schrift oder nicht lesbar |
+| `files[].duration_ms` | Zahl oder `null` | seit Version 16, nur Ton: Länge in ms (ganze Zahl ab 1, aus den Angaben der Datei, `readMediaDuration`); `null` bei Bild, Video, Schrift oder nicht lesbar |
 | `files[].browser_problem` | Text oder `null` | Hinweis, wenn die Browserquelle das Video nicht abspielt (HEVC, MPEG-4 Part 2, ProRes; Punkt 81, `src/common/videoformat.h`): «zaehler.mov (ProRes) wird in der Browserquelle nicht angezeigt. In H.264 oder VP9 umwandeln.» |
 | `files[].used_in` | Liste | Verwendungen: `overlay_id`, `overlay_name`, `source_id`, `source_name` (Bild- und Videoquellen über die Datei, Textquellen über ihre Schrift). Leer = ungenutzt, darf gelöscht werden |
 | `error` | Text oder `null` | `medien.json` ungültig: Meldung; die Dateien stehen trotzdem in der Liste (mit Ersatznamen), Umbenennen, Verschieben und Ordner werden abgewiesen (`rejected`), bis die Datei repariert ist. Sonst `null` |
@@ -447,7 +461,7 @@ Stand der Quellen in OBS. Geht nach `hello` an die neue Verbindung und bei jeder
 
 ### `audio_outputs` (seit Version 12, P12b)
 
-Ausgänge für den Ton und Zustand je Zweck (heute nur `video`, Ton der Videos). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle (Ausgang erschienen oder verschwunden, Zustand geändert). Das Dock «Steuerung» zeigt daraus die Zeile «Ton Videos» (Auswahlliste, Hinweis «Ausgang fehlt»).
+Ausgänge für den Ton und Zustand je Zweck (`video`, Ton der Videos; seit P14 t `aktionen`, Töne des Chat-Bots). Geht nach `hello` an die neue Verbindung und bei jeder Änderung an alle (Ausgang erschienen oder verschwunden, Zustand geändert). Das Dock «Steuerung» zeigt daraus die Zeilen «Ton Videos» und «Ton Chat-Bot» (Auswahlliste, Hinweis «Ausgang fehlt»). Die Liste `devices` kommt vom Ausgang der Videos; beide Ausgänge sehen dieselben Geräte von PipeWire.
 
 | Feld | Typ | Inhalt |
 |---|---|---|
@@ -456,7 +470,7 @@ Ausgänge für den Ton und Zustand je Zweck (heute nur `video`, Ton der Videos).
 | `routes` | Objekt | je Zweck `state` (`no_pipewire`, `no_target` = kein Ausgang gewählt, `missing` = gewählter Ausgang fehlt, `connecting`, `playing`, `error`) und `detail` (Text oder `null`) |
 
 ```json
-{"devices":[{"default":true,"description":"Gerät Analog Stereo","name":"alsa_output.<gerät>.analog-stereo"}],"enabled":true,"routes":{"video":{"detail":null,"state":"no_target"}},"type":"audio_outputs"}
+{"devices":[{"default":true,"description":"Gerät Analog Stereo","name":"alsa_output.<gerät>.analog-stereo"}],"enabled":true,"routes":{"aktionen":{"detail":null,"state":"no_target"},"video":{"detail":null,"state":"no_target"}},"type":"audio_outputs"}
 ```
 
 Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann nichts und weicht auf kein anderes Gerät aus (`target.object`, `node.dont-reconnect`, `node.dont-fallback`, `node.dont-move`); kommt der Ausgang wieder, spielt er ohne Neustart weiter. Hängt der Strom an einem fremden Knoten, gibt er Stille aus und bleibt auf `error`, bis der Ausgang neu gewählt wird. Code: `src/audio/pwoutput.cpp`.
@@ -488,7 +502,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `14`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `16`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `overlay_live`, `actions_config`, `actions_status`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -500,11 +514,13 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 | `get_browser_source` | `overlay_id` (Text oder `null` = keine Adresse mehr schicken; seit Version 7) | `browser_source` an diese Verbindung, danach bei jeder Änderung von selbst |
 | `obs_create_source` | `request_id`, `overlay_id`, `scene_uuid`, `name` (seit Version 11) | legt eine Browserquelle in OBS an und fügt sie in die Szene ein: `obs_sources` an alle, dann `change_result`. Die Antwort kommt später, OBS antwortet über das Netz |
 | `obs_add_to_scene` | `request_id`, `overlay_id`, `scene_uuid` (seit Version 11) | fügt die vorhandene Quelle in eine weitere Szene ein, dann `change_result` |
+| `overlay_live_set` | `request_id`, `overlay_id`, `mode`, `elements`, `duration_ms`, `arguments` (seit Version 16, Abschnitt «Laufzustand») | `overlay_live` an alle (wenn geändert), dann `change_result`; mit Profilbild erst nach dem Laden |
+| `overlay_live_reset` | `request_id`, `overlay_id`, `sources` (seit Version 16) | `overlay_live` an alle (wenn geändert), dann `change_result` |
 | `subscribe_events` | `types` (Liste von Filtern, leer = abbestellen), `history` (true/false) (seit Version 14, Abschnitt «Ereignisfluss») | bei `history` `event_history` an diese Verbindung, danach `event` für jedes neue passende Ereignis; ungültiger Filter: `error` `invalid_message`, die bisherige Bestellung bleibt |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
 ```json
-{"program":"dss-app","protocol_version":14,"type":"hello","version":"0.1.0"}
+{"program":"dss-app","protocol_version":17,"type":"hello","version":"0.1.0"}
 {"type":"get_fonts"}
 {"type":"get_overlay_list"}
 {"id":"db7f47a9-dee3-4de5-b056-40b5b3507607","type":"get_overlay"}
@@ -580,6 +596,7 @@ Das Aktionssystem (Chat-Bot, Plan `docs/archiv/prompts/P14-chatbot.md`, Abschnit
 | `get_variables` | – | `variables` mit `persisted` (wie `variablen.json`, mit Herkunft), `volatile_global`, `volatile_users`, `file_error` |
 | `get_viewers` | `user_ids` (Liste von Twitch-IDs) | `viewers` mit `viewers` (nur bekannte: `login`, `display_name`, …) |
 | `get_quotes` | – | `quotes` mit `quotes` |
+| `viewer_import` | `path` (absoluter Pfad des Exports von Streamer.bot, meist `<Datenordner>/import/export`), `dry_run`, `overwrite` (seit Version 17) | `viewer_import_result` mit `dry_run`, `report` (Bericht auf Deutsch, nur Anzahlen und Namen von Variablen, keine Namen, IDs oder Werte von Zuschauern), `written` (geschriebene Dateien, Probelauf leer), `backup` (Ordner der Sicherung relativ zum Datenordner, zum Beispiel `import/sicherung-20261116-120000`, oder `null`). Abschnitt «Zuschauer-Import» |
 | `test_event` | `event` (wie in `event`) | nur mit `dss-core --testereignisse` (Tests): legt das Ereignis auf den Fluss; sonst `change_result` `unknown_type` |
 
 Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_failed`, `unknown_action`, `unknown_run`, `actions_unavailable`, `invalid_message` (Feld fehlt oder falsche Art).
@@ -595,7 +612,9 @@ Codes: `rejected` (ungültig), `actions_file_error` (Datei ungültig), `save_fai
 {"code":null,"id":"<run-uuid>","message":null,"ok":true,"request_id":12,"type":"change_result","warning":null}
 ```
 
-**Werkzeug:** `dss-cli aktionen`, `aktion-setzen DATEI.json`, `aktion-loeschen AKTION`, `aktion-test AKTION [--echt] [ARG=WERT …]`, `laeufe [--folgen]`, `warteschlange NAME anhalten|fortsetzen|leeren`, `variablen [--zaehlen]` (über den laufenden Kern, `--verbindung` wählt ihn).
+**Werkzeug:** `dss-cli aktionen`, `aktion-setzen DATEI.json`, `aktion-loeschen AKTION`, `aktion-test AKTION [--echt] [ARG=WERT …]`, `laeufe [--folgen]`, `warteschlange NAME anhalten|fortsetzen|leeren`, `variablen [--zaehlen]`, `zuschauer-import ORDNER [--endgueltig] [--ueberschreiben]` (über den laufenden Kern, `--verbindung` wählt ihn).
+
+**Zuschauer-Import (P14 z1b, seit Version 17, Plan P14 9.4):** `viewer_import` liest den Export (`src/actions/viewerimport.h`) und ordnet ihn dem Stand im Speicher des Kerns zu (Variablen, Zuschauer, Zitate, Benutzergruppen aus `aktionen.json`; das Archiv `streamerbot-archiv.json` aus der Datei). `dry_run` (Standard in `dss-cli`) schreibt nichts. Endgültig schreibt der Kern zuerst ungespeicherte Variablen und Zuschauer, sichert dann die betroffenen Dateien nach `<Datenordner>/import/sicherung-<zeit>/` und schreibt erst danach; der neue Stand gilt sofort im Speicher (bei geänderten Gruppen `actions_config` an alle). Werte aus Streamer.bot ersetzen gleichnamige, im Studio geänderte (`origin` `studio`) bleiben ausser mit `overwrite`, nur im Studio vorhandene bleiben immer. Ist eine der Dateien ungültig, gibt es keinen Import (`actions_file_error`); ein nicht lesbarer Export gibt `rejected`. Das Protokoll des Kerns nennt nur Probelauf oder endgültig, die geschriebenen Dateien und die Sicherung. Für den Nutzer: `scripts/zuschauer-import.sh` (Probelauf, dann Rückfrage).
 
 ## Änderungen (P08)
 
@@ -744,6 +763,9 @@ port=4455
 [ton-video]
 ausgang=
 versatz_ms=0
+[ton-aktionen]
+ausgang=
+versatz_ms=0
 ```
 
 | Wert | Festlegung |
@@ -756,7 +778,10 @@ versatz_ms=0
 | `[ton-video] ausgang` | seit P12b b3: Ausgang für den Ton der Videos, `node.name` in PipeWire (wie `audio_outputs.devices[].name`); leer = kein Ausgang, kein Ton (Standard, ein neuer Kern hat «Kein Ausgang», Entscheid 6 vom 2026-11-12). Höchstens so lang wie im Code (`kAudioOutputMaxLength`), ohne Steuerzeichen und ohne Leerzeichen am Rand. Ein Name, den es gerade nicht gibt, ist erlaubt (Zustand `missing`) |
 | `[ton-video] versatz_ms` | seit P12b b3: Versatz in ms, −500 bis +500, Standard 0. Bedeutung: Weg des Tons hinter dem Ausgang (Mischpult, Streaming-PC); so viel früher spielt der Kern. Vorzeichen und Bereich sind eine Annahme bis zum Handtest H2 |
 
-Ein Abschnitt je Zweck; heute nur `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`). Weitere Zwecke (Chat-Bot, Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
+| `[ton-aktionen] ausgang` | seit P14 t: Ausgang für die Töne des Chat-Bots, Regeln wie `[ton-video] ausgang`, Standard leer. Eigener Strom (`dss_core_ton_aktionen` bzw. `dss_core_entwicklung_ton_aktionen`), nur offen, solange ein Ausgang gewählt ist |
+| `[ton-aktionen] versatz_ms` | wird gelesen und geschrieben wie bei `[ton-video]`, wirkt aber nicht (Töne ohne Bild) |
+
+Ein Abschnitt je Zweck: `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`) und seit P14 t `[ton-aktionen]` (`aktionen`, Töne des Chat-Bots, Plan P14 Abschnitt 4.3). Weitere Zwecke (Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Ein Kern vor P14 t liest eine `kern.ini` mit `[ton-aktionen]` nicht («unbekannter Abschnitt»). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
 
 Das Passwort von OBS steht nicht in `kern.ini` (Regel 12), sondern verschlüsselt in `obs-passwort.cred` neben ihr, Rechte 0600, je Version getrennt (`src/obs/obssecretstore.h`, `systemd-creds --user`, Entscheid F1). Der Kern ruft `systemd-creds` über `QProcess` mit stdin und stdout auf, das Passwort steht nie in der Befehlszeile. Quelle: https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html. Grenze: Andere Programme desselben Benutzers könnten es ebenfalls entschlüsseln, und der Host-Schlüssel liegt auf derselben Platte.
 
@@ -775,13 +800,13 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `settings_error` | Text oder `null` | Meldung, wenn die Datei ungültig ist |
 | `obs_enabled`, `obs_host`, `obs_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[obs]`, seit Version 11 |
 | `obs_password_set` | wahr/falsch | Ein Passwort ist gespeichert. Der Wert selbst geht nie an ein Fenster (Regel 12), seit Version 11 |
-| `audio_routes` | Objekt | seit Version 12: je Zweck (`video`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` |
+| `audio_routes` | Objekt | seit Version 12: je Zweck (`video`, seit Version 16 auch `aktionen`) ein Objekt mit `output` (Text, leer = kein Ausgang) und `offset_ms` (ganze Zahl) aus `[ton-video]` bzw. `[ton-aktionen]` |
 | `audio_offset_min_ms`, `audio_offset_max_ms` | ganze Zahlen | seit Version 12: gültiger Bereich des Versatzes (−500, 500); das Fenster stellt sein Feld «Versatz» danach ein |
 | `twitch_enabled`, `twitch_client_id` | wahr/falsch, Text | Abschnitt `[twitch]`, seit Version 14 |
 | `twitch_client_secret_set` | wahr/falsch | Ein Client Secret von Twitch ist gespeichert; der Wert geht nie an ein Fenster, seit Version 14 |
 
 ```json
-{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
@@ -848,6 +873,8 @@ Alles liegt unter `/o/<adresse>/<token>/` (`<adresse>` aus der Overlay-Datei, `<
 | `…/overlay.js` | GET, HEAD | Zeichner der Seite |
 | `…/events` | GET | Server-Sent Events: zuerst `retry: 1000`, dann `event: overlay` mit `data: {"overlay": <Overlay im Dateiformat ohne Token>, "media": {"media/…": {"orientation": 1 bis 8}}, "fonts": {"media/….ttf": {"units_per_em", "ascent", "descent", "leading"}}}` bei jeder Änderung (immer das ganze Overlay, K-02), ein neues `overlay` nur, wenn sich die Daten geändert haben; alle 15 s eine Kommentarzeile `:` (tote Verbindungen erkennen) |
 | `…/media/<sha256>.<endung>` | GET, HEAD | nur Dateien, die das Overlay benutzt; `Range` (206, 416), `Cache-Control: max-age=31536000, immutable` (Dateien heissen nach ihrem Inhalt). Bei JPEG/PNG steht die EXIF-Ausrichtung in den gelieferten Bytes auf 1 (PNG mit neuer CRC des Blocks `eXIf`), bei MP4/MOV die Matrix in `mvhd` und `tkhd` auf der Einheitsmatrix, bei WebM (Matroska) `ProjectionPoseYaw` und `ProjectionPoseRoll` jeder Videospur auf 0.0 (nur Projektion «rechteckig», gleiche Länge, seit P11, Punkt 80): Die Seite dreht selbst nach `media[…].orientation`, unabhängig davon, ob die Chromium-Version es selbst täte. Die Datei im Datenordner bleibt unverändert |
+| `…/events` (Laufzustand) | GET | seit P14 d: nach `overlay` und bei jeder Änderung `event: live` mit `data: {"elements": {"<quelle>": {"visible": true|false|null, "text": Text|null, "image": "media/…"|"live/…"|null}}, "media": {"media/…"|"live/…": {"orientation": 1 bis 8}}}`; `null` = wie im Overlay. Neue Verbindungen bekommen `live` nur, wenn der Laufzustand nicht leer ist; nach dem Zurücksetzen kommt ein leeres `elements` (Abschnitt «Laufzustand») |
+| `…/live/<sha256>.<png\|jpg>` | GET, HEAD | seit P14 d: Profilbild des Laufzustands aus `<Datenordner>/live-bilder/`, nur solange der Laufzustand dieses Overlays es benutzt (sonst 404), Ausrichtung neutralisiert wie bei `media/`, `Cache-Control` wie `media/`. Eine Datei aus `media/`, die nur der Laufzustand benutzt, liefert `…/media/…` in dieser Zeit ebenfalls |
 | `…/events/<page>` | GET | seit P12b b4: wie `…/events`, dazu kennt der Server die Seite (`<page>` = `[a-z0-9]{8,32}`, von der Seite beim Laden gewählt). Beginn und Ende der Verbindung gehen an den Kern (Stopp «Seite getrennt», Rückfall `obs_active`). Ungültige Adresse: `event: gone` wie `…/events`. Nur dorthin schickt der Kern `event: obs_active` mit `data: {"active": true|false}` (unten, «Ton der Videos») |
 | `…/clock` | POST | seit P12b b4: Meldungen der Uhr der Seite in OBS (unten, «Ton der Videos»). Antworten: 204 angenommen, 400 falsche Daten (auch eine Quelle, die keine Videoquelle dieses Overlays ist), 413 zu gross (über 2048 Byte), 429 über der Grenze, 404 falscher Token, 405 andere Methode |
 | `…/report` | POST | Meldung der Seite (zum Beispiel «Video nicht abspielbar: «name» (media/…) (Fehler 4 …)»), höchstens 20 pro Minute, 300 Zeichen, Steuerzeichen ersetzt; Protokoll «Browserquelle /o/<adresse>/… meldet: …»; Antwort 204 |
@@ -862,7 +889,39 @@ Der Token wird mit gleichbleibender Laufzeit verglichen (`constantTimeEquals` in
 
 ### Seite (zweiter Zeichner)
 
-`web/overlay.js` zeichnet aus dem Overlay dasselbe wie der Editor (K-07): Kästen als `div` mit `rotate(θ) scale(±1, ±1)` um die Mitte, darin Bild bzw. Video gestreckt mit der Ausrichtung aus `media` (zuerst spiegeln, dann drehen, bei 5 bis 8 Breite und Höhe getauscht), Text als SVG mit derselben Schriftdatei (`FontFace`), Grundlinien aus `fonts` wie Qt 6.8 (`fontMetricPixels`, `src/render/sourcegeometry.h`), abgeschnitten am Kasten, waagrecht ausgerichtet. Videos stumm, beginnen immer von vorne (Einblenden, Laden, Ausgabe ein, andere Datei), Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Ausgabe aus: nichts gezeichnet, Verbindung bleibt. Bricht die Verbindung ab, bleibt das letzte Bild stehen, und `EventSource` verbindet sich nach 1 s wieder. Für Prüfungen steht der Zustand in `window.dssState` (`applied`, `output`, `connected`, `reports`). Abweichungen zum Editor in Zahlen: Bericht P10.
+`web/overlay.js` zeichnet aus dem Overlay dasselbe wie der Editor (K-07): Kästen als `div` mit `rotate(θ) scale(±1, ±1)` um die Mitte, darin Bild bzw. Video gestreckt mit der Ausrichtung aus `media` (zuerst spiegeln, dann drehen, bei 5 bis 8 Breite und Höhe getauscht), Text als SVG mit derselben Schriftdatei (`FontFace`), Grundlinien aus `fonts` wie Qt 6.8 (`fontMetricPixels`, `src/render/sourcegeometry.h`), abgeschnitten am Kasten, waagrecht ausgerichtet. Videos stumm, beginnen immer von vorne (Einblenden, Laden, Ausgabe ein, andere Datei), Ende wie im Editor (`loop`, `hold_at_end`, sonst leer). Ausgabe aus: nichts gezeichnet, Verbindung bleibt. Bricht die Verbindung ab, bleibt das letzte Bild stehen, und `EventSource` verbindet sich nach 1 s wieder. Für Prüfungen steht der Zustand in `window.dssState` (`applied`, `output`, `connected`, `reports`, seit P14 d `live` = Anzahl empfangener `live`). Den Laufzustand legt die Seite vor dem Zeichnen über das Overlay (sichtbar, Text, Datei), nach jedem Neuverbinden beginnt sie ohne Laufzustand. Abweichungen zum Editor in Zahlen: Bericht P10.
+
+## Laufzustand (P14 d)
+
+Während des Streams zeigt der Chat-Bot Elemente eines Overlays (Plan `docs/archiv/prompts/P14-chatbot.md`, 4.4, 6, 7). Code: `src/common/overlaylive.h/.cpp` (Nachrichten, Platzhalter, Anwenden, ohne Qt Gui), `src/common/overlaylivestate.h/.cpp` (Zustand im Kern, Ablauf der Dauer, Profilbilder).
+
+- **Nur im Speicher:** Der Laufzustand ändert die Overlay-Datei nie, `overlay_changed` kommt deshalb nicht. Nach einem Neustart des Kerns ist er leer. Wird ein Overlay geändert oder gelöscht, fallen Einträge zu Quellen weg, die es nicht mehr gibt.
+- **Je Element:** sichtbar (`show`, `hide`, `toggle`; `toggle` geht vom jetzigen Laufzustand aus, sonst vom Overlay), Text (nur Text-Elemente, höchstens 2000 Zeichen, länger wird mit Hinweis gekürzt), Bild (nur Bild-Elemente) und Restdauer. Mit `duration_ms` (1 bis 3 600 000) fällt der Eintrag nach Ablauf weg; ohne bleibt er bis zum Zurücksetzen.
+- **Platzhalter:** `%name%` im Text wird durch das Argument `name` ersetzt (Gross- und Kleinschreibung zählt, Name ohne Leerzeichen und `%`); Unbekanntes bleibt stehen, ebenso `~name~`. Höchstens 200 Argumente. Werte der Argumente kommen nie ins Protokoll.
+- **Bild:** ein Verweis `media/…` auf ein Bild (PNG, JPEG, …, muss es geben) oder eine Adresse `https://` vom Bildserver von Twitch (`static-cdn.jtvnw.net`, Profilbilder aus «Get User Info for Target», Feld `targetUserProfileImageUrl`). Andere Adressen: Hinweis, das Bild bleibt wie im Overlay. Der Kern lädt höchstens 2 MiB (10 s, keine Weiterleitung), nimmt nur PNG und JPEG (nach den ersten Bytes) und legt die Datei unter `<Datenordner>/live-bilder/<sha256>.<png|jpg>` ab. Höchstens 200 Dateien; die ältesten, die gerade niemand zeigt, werden gelöscht. Beim Start des Kerns wird der Ordner geleert. Ins Protokoll kommt nur der Name des Servers, nie die Adresse.
+
+### `overlay_live` (Kern → Fenster, seit Version 16)
+
+Nach `hello` und bei jeder Änderung an alle; immer der Laufzustand aller Overlays, Overlays ohne Einträge fehlen.
+
+```json
+{"type":"overlay_live","overlays":[{"overlay_id":"…","elements":[{"source":"…","visible":true,"text":"Neuer Follower: Zuschauer42","image":null,"remaining_ms":4200}]}]}
+```
+
+`visible`, `text`, `image` = `null`: wie im Overlay. `image` ist ein Verweis relativ zum Datenordner (`media/…` oder `live-bilder/…`). `remaining_ms` = `null`: ohne Dauer; sonst die Restdauer beim Senden (das Fenster zählt selbst herunter).
+
+### `overlay_live_set` und `overlay_live_reset` (Fenster/`dss-cli` → Kern, seit Version 16)
+
+```json
+{"type":"overlay_live_set","request_id":5,"overlay_id":"…","mode":"show","elements":[{"source":"…","text":"Neuer Follower: %user%","image":null}],"duration_ms":5000,"arguments":{"user":"Zuschauer42"}}
+{"type":"overlay_live_reset","request_id":6,"overlay_id":"…","sources":[]}
+```
+
+`mode`: `show`, `hide` oder `toggle`; `elements` 1 bis 32 Quellen des Overlays; `duration_ms` 0 = ohne Dauer. `sources` leer = alle Elemente des Overlays. Antwort `change_result` an die fragende Verbindung, mit `warning` (zum Beispiel Profilbild «nur vom Bildserver von Twitch» oder nicht geladen, Bild nicht in der Mediathek); `ok: false` mit `rejected` (unbekannte Quelle, Text bei einem Bild, zu viele Elemente, Dauer ausserhalb) oder `unknown_overlay`. Eine Nachricht mit falschen Feldern beantwortet der Kern mit `error` `invalid_message`. Wird ein Profilbild geladen, kommt `change_result` erst danach.
+
+`dss-cli` (gleiche Nachrichten, `src/cli/main.cpp`): `live OVERLAY` (Tabelle Nr, Name, Jetzt, Text, Bild), `live-zeigen OVERLAY NR[,NR…] [--verstecken|--umschalten] [--dauer MS] [--text TEXT] [--bild VERWEIS|URL] [NAME=WERT …]`, `live-ausblenden OVERLAY [NR[,NR…]]`. NR wie bei `quelle-liste`. Läuft der Kern nicht: Exit-Code 4.
+
+Fenster (`dss-app`): Leinwand und Zeichner des Editors zeichnen das Overlay mit `applyLiveState` (K-07), die Felder des Docks «Eigenschaften» zeigen weiter die Datei. Dock «Quellen»: Marke «live» rechts in der Zeile, das Auge bleibt wie in der Datei. Dock «Eigenschaften», Bereich «Chat-Bot»: «Jetzt» (zum Beispiel «live sichtbar, noch 6 s», zählt selbst herunter) und «Ausblenden» (`overlay_live_reset` für die gewählte Quelle).
 
 ### Ton der Videos (P12b)
 
@@ -905,7 +964,8 @@ Kern (`src/core/videoaudio.cpp`, Mischer `src/audio/mixer.cpp`, Ausgang `src/aud
 - Mehrere Seiten auf dasselbe Overlay: Die Seite, die zuerst startet, führt; der Ton kommt einmal je Videoquelle.
 - Stopp sofort bei `stop` (Seite inaktiv), `end`, Ausgabe des Overlays aus, Quelle verborgen, gelöscht oder geändert (andere Datei, Wiederholen umgeschaltet), Overlay gelöscht, Ende von `…/events/<page>`, 3 s ohne Meldung. Kommt danach wieder `frame` oder `loop` (zum Beispiel nach einem Neustart des Kerns), steigt der Ton an der gemeldeten Lage ein («Ton: Einstieg …»).
 - Protokoll: «Ton: Start», «Ton: Einstieg», «Ton: Stopp … (gespielt, Wiederholungen, Sprünge, weich, Abweichung zuletzt)», «Ton: Nachführen» (höchstens einmal je Sekunde), alle 10 s «Ton: Lage …» mit Abweichung; Ausgang «Ton (ton-video): …» (Zustand, Ausgänge erschienen oder verschwunden, abgebrochene Zyklen, Abrufe ohne Puffer, Wechsel von `delay` und `size`).
-- Testoption `dss-core --ersatzausgang`: Ersatzausgang ohne Gerät und ohne PipeWire (für `tst_kernton`). Schalter `DSS_CORE_AUDIO` (Standard ON; OFF = Kern ohne Ton, ohne libpipewire).
+- Testoption `dss-core --ersatzausgang`: Ersatzausgang ohne Gerät und ohne PipeWire (für `tst_kernton`), seit P14 t für beide Zwecke. Schalter `DSS_CORE_AUDIO` (Standard ON; OFF = Kern ohne Ton, ohne libpipewire).
+- Töne des Chat-Bots (seit P14 t, `src/audio/actionsound.h`): zweiter Mischer und eigener Strom aus `[ton-aktionen]` mit bis zu 8 freien Stimmen ohne Seite und ohne Versatz, Lautstärke 0 bis 200 %, jede Stimme und die Summe auf ±1,0 begrenzt. Ohne gewählten Ausgang gibt es keinen Strom, ein Ton meldet dann «Kein Ausgang für «Ton Chat-Bot» gewählt (Dock «Steuerung»).». Protokoll «Ton Chat-Bot: Start …» und «Ton Chat-Bot: Ende …», Ausgang «Ton Chat-Bot: …». Ausgelöst wird ein Ton erst mit dem Schritt «Ton abspielen» des Chat-Bots (später in P14).
 
 ## Fehlerfälle
 

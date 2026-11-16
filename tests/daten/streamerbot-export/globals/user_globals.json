@@ -1,0 +1,60 @@
+[
+  {
+    "_id": "6540a0000000000000000001",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "watchtime",
+    "platform": "twitch",
+    "userId": "100000001",
+    "value": 1200
+  },
+  {
+    "_id": "6540a0000000000000000002",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "watchtime",
+    "platform": "twitch",
+    "userId": "100000002",
+    "value": 300
+  },
+  {
+    "_id": "6540a0000000000000000003",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "firsts",
+    "platform": "twitch",
+    "userId": "100000001",
+    "value": 5
+  },
+  {
+    "_id": "6540a0000000000000000004",
+    "lastWrite": "2026-11-03T18:00:00.0000000Z",
+    "name": "firsts",
+    "platform": "twitch",
+    "userId": "100000001",
+    "value": 7
+  },
+  {
+    "_id": "6540a0000000000000000005",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "hugsReceived",
+    "platform": "twitch",
+    "userId": "",
+    "userLogin": "TestZuschauer3",
+    "value": "2"
+  },
+  {
+    "_id": "6540a0000000000000000006",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "hugsGiven",
+    "platform": "twitch",
+    "userId": "",
+    "userLogin": "testzuschauer9",
+    "value": 1
+  },
+  {
+    "_id": "6540a0000000000000000007",
+    "lastWrite": "2026-11-01T18:00:00.0000000Z",
+    "name": "watchtime",
+    "platform": "kick",
+    "userId": "kick-testzuschauer1",
+    "value": 10
+  }
+]

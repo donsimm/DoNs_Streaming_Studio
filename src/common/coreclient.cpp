@@ -194,6 +194,26 @@ qint64 CoreClient::sendTwitchAccountRequest(const char *type, const QString &acc
     return id;
 }
 
+LiveElements CoreClient::live(const QUuid &overlayId) const
+{
+    LiveElements elements = m_live.value(overlayId);
+    const qint64 elapsed = m_liveReceived.isValid() ? m_liveReceived.elapsed() : 0;
+    for (LiveElement &e : elements) {
+        if (e.remainingMs >= 0)
+            e.remainingMs = std::max<qint64>(0, e.remainingMs - elapsed);
+    }
+    return elements;
+}
+
+qint64 CoreClient::sendLiveReset(const QUuid &overlayId, const QList<QUuid> &sources)
+{
+    if (!m_connected)
+        return 0;
+    const qint64 id = m_nextRequestId++;
+    send(liveResetMessage({id, overlayId, sources}));
+    return id;
+}
+
 qint64 CoreClient::sendChange(ChangeRequest request, const QString &coalesceKey)
 {
     if (!m_connected)
@@ -608,6 +628,17 @@ void CoreClient::handleMessage(const QJsonObject &message)
         emit changeFinished(result);
         if (imported)
             emit pendingImportsChanged();
+    } else if (type == QLatin1String(msg::kOverlayLive)) {
+        QList<OverlayLiveInfo> overlays;
+        if (!parseOverlayLive(message, &overlays, &error)) {
+            qWarning("Kern: overlay_live ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_live.clear();
+        for (const OverlayLiveInfo &o : std::as_const(overlays))
+            m_live.insert(o.overlayId, o.elements);
+        m_liveReceived.start();
+        emit liveChanged();
     } else if (type == QLatin1String(msg::kError)) {
         ErrorInfo info;
         if (!parseError(message, &info, &error)) {
@@ -695,6 +726,10 @@ void CoreClient::clearData()
     if (!m_imports.isEmpty()) {
         m_imports.clear();
         emit importProgressChanged();
+    }
+    if (!m_live.isEmpty()) {
+        m_live.clear();
+        emit liveChanged();
     }
     for (Connection c : kAllConnections)
         m_connectionStates.insert(c, ConnectionState::Off);

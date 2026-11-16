@@ -345,7 +345,7 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #serverMessage { font-weight: bold; color: @coreDisconnected@; }
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
-#obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+#obsSourceState[state="problem"], #audioOutputState[state="problem"], #actionsAudioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
 /* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
 #settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
 )");

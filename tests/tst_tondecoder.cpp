@@ -9,6 +9,8 @@
 //   von vorne, Nummern steigend.
 // - restart: Neubeginn mitten im Durchgang, neuer Durchgang von vorne mit der Nummer aus restart().
 // - stopWhileFull: Zerstören bei vollem Ring endet sofort.
+// - audioOnly (P14 t): Tondateien ohne Bildspur (WAV, MP3, Ogg Vorbis, M4A aus
+//   tests/daten/ton/erzeugen-toene.sh): 1 s lang, ein Piep von 0,1 bis 0,3 s auf beiden Kanälen.
 
 #include "audiodecoder.h"
 #include "audioring.h"
@@ -132,6 +134,8 @@ private slots:
     void loopLength();
     void restart();
     void stopWhileFull();
+    void audioOnly_data();
+    void audioOnly();
 };
 
 void TstTonDecoder::formats_data()
@@ -293,6 +297,64 @@ void TstTonDecoder::stopWhileFull()
     }
     QVERIFY2(timer.elapsed() < 500, qPrintable(QString::number(timer.elapsed())));
     QCOMPARE(ring.readable(), ring.capacity());
+}
+
+void TstTonDecoder::audioOnly_data()
+{
+    QTest::addColumn<QString>("file");
+    QTest::addColumn<int>("sourceRate");
+    QTest::addColumn<int>("sourceChannels");
+    QTest::addColumn<QString>("codec");
+    // Verschiebung des ganzen Tons in Rahmen zu 48 kHz, gemessen 2026-11-15. MP3: 1203 Rahmen
+    // (25 ms) = 1105 Proben bei 44,1 kHz, die Verzögerung des Encoders LAME (576 + 529); der Decoder
+    // bekommt sie aus der Datei nicht mitgeteilt und spielt sie als Stille (wie andere Programme
+    // bei MP3 ohne diese Angabe; ob die Datei die Angabe enthält, ist nicht geprüft). Ogg Vorbis:
+    // 128 Rahmen (2,7 ms) aus den Zeitstempeln der Datei. Für Töne des Chat-Bots ohne Bedeutung,
+    // sie haben keine Lage zu einem Bild (freie Stimme im Mischer).
+    QTest::addColumn<int>("shift");
+
+    QTest::newRow("wav") << ton("ton-piep.wav") << 48000 << 2 << "pcm_s16le" << 0;
+    QTest::newRow("mp3") << ton("ton-piep.mp3") << 44100 << 2 << "mp3float" << 1203;
+    QTest::newRow("ogg") << ton("ton-piep.ogg") << 48000 << 2 << "vorbis" << 128;
+    QTest::newRow("m4a") << ton("ton-piep.m4a") << 48000 << 1 << "aac" << 0;
+}
+
+void TstTonDecoder::audioOnly()
+{
+    QFETCH(QString, file);
+    QFETCH(int, sourceRate);
+    QFETCH(int, sourceChannels);
+    QFETCH(QString, codec);
+    QFETCH(int, shift);
+
+    AudioRing ring(1 << 15);
+    AudioDecoder decoder(file, &ring, false);
+    const std::vector<Pass> passes = readPasses(ring, decoder, 1);
+    QCOMPARE(decoder.state(), AudioDecoder::State::Ended);
+    QCOMPARE(int(passes.size()), 1);
+    QCOMPARE(decoder.info().sourceRate, sourceRate);
+    QCOMPARE(decoder.info().sourceChannels, sourceChannels);
+    QCOMPARE(decoder.info().codec, codec);
+
+    const Pass &p = passes[0];
+    qInfo("%s: %lld Rahmen", qPrintable(file.section(QLatin1Char('/'), -1)), (long long)p.count());
+    // Länge 1 s plus Verschiebung; der letzte Block kann über das Ende hinausreichen (MP3 1152,
+    // AAC 1024 Proben).
+    QVERIFY2(std::abs(p.count() - kRate - shift) <= 1152, qPrintable(QString::number(p.count())));
+    for (int channel = 0; channel < AudioRing::kChannels; ++channel) {
+        const std::vector<int64_t> found = onsets(p, channel);
+        // Einsatz bei 0,1 s und Ende des Pieps bei 0,3 s
+        int64_t last = -1;
+        for (int64_t i = 0; i < p.count(); ++i) {
+            if (std::fabs(p.frames[2 * i + channel]) > 0.1f)
+                last = i;
+        }
+        qInfo("%s Kanal %d: Einsatz %lld, Ende %lld Rahmen", qPrintable(file.section(QLatin1Char('/'), -1)), channel,
+              found.empty() ? -1LL : (long long)found[0], (long long)last);
+        QCOMPARE(int(found.size()), 1);
+        QVERIFY2(std::abs(found[0] - kRate / 10 - shift) <= kOnsetTolerance, qPrintable(QString::number(found[0])));
+        QVERIFY2(std::abs(last - 3 * kRate / 10 - shift) <= kOnsetTolerance, qPrintable(QString::number(last)));
+    }
 }
 
 QTEST_GUILESS_MAIN(TstTonDecoder)

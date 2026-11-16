@@ -1,6 +1,7 @@
 #pragma once
 
 #include "overlay.h"
+#include "overlaylive.h"
 #include "protocol.h"
 #include "systemstats.h"
 
@@ -56,6 +57,18 @@ struct SourceRow
 };
 QList<SourceRow> sourceRows(const Overlay &overlay);
 QString visibilityToolTip(bool visible); // «eingeblendet» / «ausgeblendet»
+
+// P14 d: Bereich «Chat-Bot» im Dock «Eigenschaften» zur gewählten Quelle (Laufzustand vom Kern).
+struct LiveRow
+{
+    QString text;         // «nicht live», «live sichtbar, noch 6 s», ohne Quelle leer
+    bool live = false;    // Markierung «live» im Dock «Quellen»
+    bool canHide = false; // Knopf «Ausblenden»: live und verbunden
+};
+LiveRow liveRow(const LiveElements &elements, const QUuid &sourceId, bool connected);
+// Abstand bis zur nächsten Anzeige der Restdauer in ms (auf die nächste volle Sekunde, mindestens
+// 50 ms); -1, wenn kein Element eine Dauer hat.
+int liveRefreshMs(const LiveElements &elements);
 
 // Quelle mit der Kennung, nullptr wenn es sie nicht gibt.
 const Source *findSource(const Overlay &overlay, const QUuid &sourceId);
