@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QToolButton>
@@ -220,11 +221,27 @@ void ActionsPage::createActionArea()
     m_realTest->setEnabled(false);
     connect(m_test, &QPushButton::clicked, this, &ActionsPage::testClicked);
 
+    // Abschnitte mit Bildlauf nur senkrecht ohne Rahmen wie rechts: Ihre Mindesthöhe (503 px) machte
+    // das Fenster höher als der Bildschirm (1920x1103 statt 1920x1080). Bei genug Platz füllen sie
+    // die Spalte wie ohne Bildlauf, die Leiste bleibt unten.
+    auto *scroll = new QScrollArea(area);
+    scroll->setObjectName(QStringLiteral("actionScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *sections = new QWidget(scroll);
+    sections->setObjectName(QStringLiteral("actionSections"));
+    auto *sectionColumn = new QVBoxLayout(sections);
+    sectionColumn->setContentsMargins(0, 0, 0, 0);
+    sectionColumn->setSpacing(0);
+    sectionColumn->addWidget(actionSection);
+    sectionColumn->addWidget(triggerSection, 1);
+    sectionColumn->addWidget(stepSection, 2);
+    scroll->setWidget(sections);
+
     auto *column = static_cast<QVBoxLayout *>(area->layout());
     column->setSpacing(0);
-    column->addWidget(actionSection);
-    column->addWidget(triggerSection, 1);
-    column->addWidget(stepSection, 2);
+    column->addWidget(scroll, 1);
     column->addWidget(buttonBar({m_stepAdd, m_stepRemove, m_stepUp, m_stepDown},
                                 {testLabel, m_testUser, m_test, m_realTest}, area));
 }
