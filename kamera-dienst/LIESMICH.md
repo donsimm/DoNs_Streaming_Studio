@@ -1,6 +1,6 @@
 # Kamera-Dienst
 
-Kleiner Dienst für den Streaming-PC: steuert die Kameras (OBSBOT Tiny 2, Logitech C922) und die Lampen und bietet dafür eine HTTP/JSON-Schnittstelle unter `/api/v1/`. Das Studio, das Stream Deck und später Chat-Befehle nutzen sie. Plan: `docs/archiv/prompts/P15-kamera.md`.
+Kleiner Dienst für den Streaming-PC: steuert die Kameras (OBSBOT Tiny 2, Logitech C922) und die Lampen und bietet dafür eine HTTP/JSON-Schnittstelle unter `/api/v1/`. Das Studio, das Stream Deck und später Chat-Befehle nutzen sie. Plan: `docs/archiv/prompts/P15-kamera.md`. Ganze Schnittstelle mit Beispielen, Ereignissen (`GET events`), Export und Fehlercodes: `docs/09-kamera-dienst.md`.
 
 Python ab 3.11, nur Standardbibliothek; auf dem Streaming-PC ist nichts zu installieren.
 

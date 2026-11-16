@@ -10,6 +10,8 @@ Platzhalter wie `{cam}` im Muster werden als Argumente übergeben.
 import json
 import logging
 import re
+import select
+import socket
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +23,11 @@ from .backend import Backend
 API_PREFIX = f"/api/v{API_VERSION}/"
 # Grösste Anfrage mit Inhalt; Presets und Werte sind wenige Kilobyte.
 MAX_BODY_BYTES = 64 * 1024
+# GET events: Warten auf das nächste Ereignis (danach prüfen, ob der Abonnent noch da ist),
+# Kommentarzeile gegen stille Verbindungen, Zeitgrenze, wenn der Abonnent nicht liest.
+STREAM_POLL_S = 0.5
+KEEPALIVE_S = 15.0
+STREAM_WRITE_TIMEOUT_S = 10.0
 
 log = logging.getLogger("dss_camera.http")
 
@@ -63,6 +70,14 @@ class Request:
         return data
 
 
+class Stream:
+    """Antwort von GET events: Der Handler schreibt die Ereignisse des Abonnenten, bis er geht."""
+
+    def __init__(self, hub, subscriber) -> None:
+        self.hub = hub
+        self.subscriber = subscriber
+
+
 class Router:
     def __init__(self) -> None:
         self._routes: list[tuple[str, re.Pattern, object]] = []
@@ -82,7 +97,7 @@ class Router:
 
 class Api:
     def __init__(self, backend: Backend, fake: bool, controls=None, mover=None, presets=None,
-                 lights=None, light_presets=None) -> None:
+                 lights=None, light_presets=None, events=None, export=None) -> None:
         self.backend = backend
         self.fake = fake
         # controls.ControlManager, motion.Mover, presets.CameraPresets, lights.Lights und
@@ -92,8 +107,14 @@ class Api:
         self.presets = presets
         self.lights = lights
         self.light_presets = light_presets
+        # events.Events und export.export (mit dem Datenordner); hier nicht importiert,
+        # weil beide Module ApiError aus diesem Modul brauchen.
+        self.events = events
+        self.export = export
         self.router = Router()
         self.router.add("GET", "status", self.get_status)
+        self.router.add("GET", "events", self.get_events)
+        self.router.add("GET", "export", self.get_export)
         self.router.add("GET", "cameras/{cam}/controls", self.get_controls)
         self.router.add("PUT", "cameras/{cam}/controls", self.put_controls)
         self.router.add("POST", "cameras/{cam}/wake", self.post_wake)
@@ -129,6 +150,16 @@ class Api:
             "camera_presets": self.backend.camera_presets(),
             "light_presets": self.backend.light_presets(),
         }
+
+    def get_events(self, request: Request) -> Stream:
+        if self.events is None:
+            raise ApiError(404, "not_found", "Ereignisse gibt es in diesem Lauf nicht.")
+        return Stream(self.events.hub, self.events.hub.subscribe())
+
+    def get_export(self, request: Request) -> dict:
+        if self.export is None:
+            raise ApiError(404, "not_found", "Export gibt es in diesem Lauf nicht.")
+        return self.export()
 
     def _control_manager(self):
         if self.controls is None:
@@ -272,6 +303,9 @@ def make_handler(api: Api, allowed_addresses: frozenset[str]):
                 # Kennungen enthalten «:», das Absender auch als %3A schicken.
                 args = {name: unquote(value) for name, value in args.items()}
                 body = func(Request(self, method, path), **args)
+                if isinstance(body, Stream):
+                    self._stream(body)
+                    return
                 self._send(200, {"ok": True, **body})
             except ApiError as error:
                 self._send(error.status, {"ok": False, "code": error.code, "message": error.message})
@@ -287,6 +321,48 @@ def make_handler(api: Api, allowed_addresses: frozenset[str]):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+
+        def _peer_closed(self) -> bool:
+            """True, wenn der Abonnent die Verbindung geschlossen hat (ohne zu schreiben)."""
+            try:
+                readable, _, _ = select.select([self.connection], [], [], 0)
+                return bool(readable) and self.connection.recv(1, socket.MSG_PEEK) == b""
+            except OSError:
+                return True
+
+        def _stream(self, stream: Stream) -> None:
+            """GET events: Server-Sent Events bis der Abonnent geht, abgemeldet oder zu langsam ist.
+
+            Quelle: https://html.spec.whatwg.org/multipage/server-sent-events.html (nicht abgerufen).
+            """
+            subscriber = stream.subscriber
+            self.close_connection = True
+            try:
+                self.send_response(200, "OK")
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                # Ein Abonnent, der nicht liest, hält diesen Faden höchstens so lange auf.
+                self.connection.settimeout(STREAM_WRITE_TIMEOUT_S)
+                self.wfile.write(b"retry: 2000\n\n")
+                idle = 0.0
+                while not subscriber.closed:
+                    event = subscriber.get(STREAM_POLL_S)
+                    if event is not None:
+                        self.wfile.write(event)
+                        idle = 0.0
+                        continue
+                    if self._peer_closed():
+                        break
+                    idle += STREAM_POLL_S
+                    if idle >= KEEPALIVE_S:
+                        self.wfile.write(b": \n\n")
+                        idle = 0.0
+            except OSError as error:
+                log.info("Ereignisse: Verbindung beendet (%s).", error.strerror or type(error).__name__)
+            finally:
+                stream.hub.unsubscribe(subscriber)
 
     return Handler
 

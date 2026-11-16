@@ -43,3 +43,9 @@ set_tests_properties(kd_presets PROPERTIES TIMEOUT 120)
 add_test(NAME kd_licht
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_licht.py)
 set_tests_properties(kd_licht PROPERTIES TIMEOUT 120)
+
+# Ereignisse (SSE): Reihenfolge bei zwei Abonnenten, Abmelden, langsamer Abonnent hält nichts
+# auf; Export mit Kamera-Einstellungen, Kamera- und Licht-Presets, ungültige Dateien.
+add_test(NAME kd_ereignisse
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ereignisse.py)
+set_tests_properties(kd_ereignisse PROPERTIES TIMEOUT 120)

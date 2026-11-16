@@ -178,6 +178,9 @@ class ControlManager:
         # Kamera → Zeitpunkt des Erscheinens, für den die gemerkten Werte gesetzt sind.
         self._restored: dict[str, float] = {}
         self.obsbot = obsbot.Obsbot(clock, sleep)
+        # Gerufen mit der Kennung, wenn sich Bildwerte oder Position geändert haben
+        # (Ereignis «controls», events.py); muss sofort zurückkehren.
+        self.on_change: Callable[[str], None] = lambda camera_id: None
 
     def _camera(self, camera_id: str) -> Camera:
         for camera in self._watcher.cameras():
@@ -278,6 +281,8 @@ class ControlManager:
                             device.set(control.id, raw)
                             remember[key] = to_api(control, device.get(control.id))
                 finally:
+                    if remember:
+                        self.on_change(camera_id)
                     # Auch bei einem Abbruch: Was geschrieben ist, bleibt gemerkt.
                     self._save(camera_id, remember)
                 result = self._read(device, camera) if not rejected else []
@@ -411,4 +416,6 @@ class ControlManager:
             # Plan 2.3 Regel 6: nichts nachsenden, beim nächsten Erscheinen neu.
             log.warning("Gemerkte Werte für %s nicht gesetzt: %s.", camera.id, error.strerror or error)
             return
+        if done:
+            self.on_change(camera.id)
         log.info("Gemerkte Werte gesetzt für %s: %s.", camera.id, ", ".join(done) or "keine")

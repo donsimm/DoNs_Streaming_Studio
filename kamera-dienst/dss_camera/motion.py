@@ -210,9 +210,9 @@ class Mover:
         found = axes(camera.model, camera.controls, settings)
         return found, {name: device.get(axis.control_id) for name, axis in found.items()}
 
-    def _cancel(self, camera_id: str) -> None:
+    def _cancel(self, camera_id: str) -> "Motion | None":
         with self._lock:
-            self._motions.pop(camera_id, None)
+            return self._motions.pop(camera_id, None)
 
     # --- Dauerbewegung ---------------------------------------------------------------
 
@@ -269,7 +269,9 @@ class Mover:
 
         Gelingt auch ohne Kamera (Loslassen, nachdem sie ausgesteckt wurde).
         """
-        self._cancel(camera_id)
+        if self._cancel(camera_id) is not None:
+            # Position nach der Bewegung als Ereignis (events.py).
+            self._manager.on_change(camera_id)
         return {"moving": False}
 
     def tick(self) -> None:
@@ -286,6 +288,7 @@ class Mover:
                     if motion.running:
                         log.info("Bewegung %s angehalten: keine Wiederholung seit %.1f s (Totmann).",
                                  camera_id, DEADMAN_S)
+                        self._manager.on_change(camera_id)
                     continue
                 if motion.aborted:
                     continue
@@ -374,6 +377,7 @@ class Mover:
                 values[name] = found[name].raw(value)
                 if values[name] != current[name]:
                     device.set(found[name].control_id, values[name])
+        self._manager.on_change(camera_id)
         return {"position": position(found, values)}
 
     # --- Faden -----------------------------------------------------------------------

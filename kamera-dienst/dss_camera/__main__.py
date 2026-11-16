@@ -16,6 +16,8 @@ from . import SERVICE_VERSION, config, lock
 from .backend import DeviceBackend
 from .controls import ControlManager, open_v4l2
 from .devices import DeviceWatcher
+from .events import Events
+from .export import export
 from .fake import FakeBackend, fake_watcher, open_fake_device
 from .http_api import Api, Servers
 from .lights import LightPresets, LightPresetStore, Lights, LightStore
@@ -88,8 +90,14 @@ def main(argv: list[str] | None = None) -> int:
         backend.light_controller = lights
         backend.light_preset_store = LightPresetStore(default_data_dir())
         light_presets = LightPresets(backend.light_preset_store, lights)
+    # GET events (SSE) und GET export (Plan 4).
+    events = Events(backend, None if manager is None else manager.get)
+    if manager is not None:
+        manager.on_change = events.controls_changed
+    data_dir = default_data_dir()
     api = Api(backend, fake=args.attrappe, controls=manager, mover=mover, presets=presets,
-              lights=lights, light_presets=light_presets)
+              lights=lights, light_presets=light_presets, events=events,
+              export=lambda: export(data_dir))
     try:
         servers = Servers(api, settings.listen_addresses, settings.port, settings.allowed_addresses)
     except OSError as error:
@@ -101,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         devices.start()
         mover.start()
         lights.start()
+    events.start()
 
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
@@ -112,6 +121,8 @@ def main(argv: list[str] | None = None) -> int:
     # Kurze Wartezeit statt wait() ohne Grenze, damit die Signal-Behandlung sicher drankommt.
     while not stop.wait(0.5):
         pass
+    # Erst die Ereignisse: Offene GET events enden, dann die Server.
+    events.close()
     servers.close()
     if devices is not None:
         lights.close()
