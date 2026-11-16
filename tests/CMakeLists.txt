@@ -105,7 +105,9 @@ add_dependencies(tst_aktionsformat dss-core)
 # P14 f1: mitgelieferte Aktionen (Vorlage, Anlegen durch den Kern, Zurücksetzen, Wiederherstellen)
 dss_add_test(tst_mitgeliefert)
 target_link_libraries(tst_mitgeliefert PRIVATE dss_actions)
-target_compile_definitions(tst_mitgeliefert PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>")
+# f2: Overlay «Chat-Bot» und ein zweites, anders gestaltetes Overlay (eigene Schrift und eigenes Bild)
+target_compile_definitions(tst_mitgeliefert PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+  DSS_TEST_FONT="${DSS_TEST_FONT}" DSS_TEST_IMAGE="${CMAKE_CURRENT_SOURCE_DIR}/daten/exif/orientierung-1.png")
 add_dependencies(tst_mitgeliefert dss-core)
 # P14 a: Platzhalter wie Streamer.bot, Variablen und Zähler (variablen.json), ohne Qt Gui.
 dss_add_test(tst_platzhalter)

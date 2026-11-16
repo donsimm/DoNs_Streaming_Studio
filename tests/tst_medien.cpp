@@ -117,6 +117,8 @@ class TestMedien : public QObject
 
         bool start()
         {
+            // ohne mitgelieferte Aktionen und Overlay «Chat-Bot» (P14 f1, f2): Medienliste wie angelegt
+            testhelp::writeEmptyActions(data.path());
             process = testhelp::startCore(data.path(), socket);
             if (!testhelp::waitForLog(process.get(), QStringLiteral("Verbindung offen"), &log))
                 return false;

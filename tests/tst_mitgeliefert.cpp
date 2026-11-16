@@ -1,7 +1,10 @@
 // Mitgelieferte Aktionen (P14 f1, Plan 7): Vorlage src/actions/vorlage/aktionen.json als Qt-Ressource,
-// Zustände beim Anlegen wie die Tabelle im Plan, Verweise (ohne Overlay «Chat-Bot», das kommt mit
-// f2), Anlegen durch den Kern bei fehlender Datei, vorhandene Datei bleibt unberührt, Zurücksetzen
-// (Kennung bleibt), Wiederherstellen einer gelöschten, dss-core --format-pruefen auf der Vorlage.
+// Zustände beim Anlegen wie die Tabelle im Plan, Verweise, Anlegen durch den Kern bei fehlender
+// Datei, vorhandene Datei bleibt unberührt, Zurücksetzen (Kennung bleibt), Wiederherstellen einer
+// gelöschten, dss-core --format-pruefen auf der Vorlage.
+// f2: Overlay «Chat-Bot» (Elemente, Kennungen, Ordner, nicht doppelt, kaputte Datei bleibt),
+// «Element fehlt» nach dem Löschen, und Plan 8: die Aktionen auf ein zweites, anders gestaltetes
+// Overlay umgestellt zeigen dessen Aussehen, nichts hängt am mitgelieferten Overlay.
 // Ohne Qt Gui; der Kern läuft als eigener Prozess mit eigenem Datenordner.
 
 #include "actionedit.h"
@@ -9,12 +12,18 @@
 #include "actionrefs.h"
 #include "actiontemplate.h"
 #include "actionview.h"
+#include "chatbotoverlay.h"
 #include "dataformat.h"
+#include "fontcatalog.h"
+#include "overlaylivestate.h"
+#include "overlaystore.h"
 #include "prozesshilfe.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <QDir>
 #include <QFile>
+#include <QRect>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QProcess>
@@ -97,6 +106,93 @@ QByteArray readFile(const QString &path)
 {
     QFile f(path);
     return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+}
+
+QUuid chatBotId()
+{
+    return QUuid::fromString(QLatin1String(kChatBotOverlayId));
+}
+
+// Verweise wie im Kern: Overlays mit ihren Quellen; Mediathek leer (die Bilder der Schritte sind
+// Platzhalter, keine Dateien)
+ReferenceContext contextOf(const dss::OverlayStore &store)
+{
+    QHash<QUuid, QSet<QUuid>> overlays;
+    for (const dss::Overlay &o : store.overlays()) {
+        QSet<QUuid> sources;
+        for (const dss::Source &s : o.sources)
+            sources.insert(s.id);
+        overlays.insert(o.id, sources);
+    }
+    ReferenceContext context;
+    context.overlays = overlays;
+    context.mediaFiles = QSet<QString>();
+    return context;
+}
+
+dss::ActionViewNames namesOf(const dss::OverlayStore &store)
+{
+    dss::ActionViewNames names;
+    for (const dss::Overlay &o : store.overlays()) {
+        names.overlays.insert(o.id, o.name);
+        for (const dss::Source &s : o.sources)
+            names.sources.insert(s.id, s.name);
+    }
+    return names;
+}
+
+// Alle Schritte «Overlay-Element zeigen» (auch in Gruppen und Zweigen)
+QList<Step> overlaySteps(const ActionsConfig &config)
+{
+    QList<Step> steps;
+    for (const Action &a : config.actions) {
+        forEachStep(a.steps, [&](const Step &s, const QList<int> &) {
+            if (s.type == QLatin1String(kStepOverlaySource))
+                steps.append(s);
+        });
+    }
+    return steps;
+}
+
+// Wie der Nutzer im Schritt: anderes Overlay und andere Elemente wählen
+void remapSteps(QList<Step> *steps, const QUuid &overlay, const QHash<QUuid, QUuid> &elements, int *count)
+{
+    for (Step &s : *steps) {
+        remapSteps(&s.steps, overlay, elements, count);
+        if (s.type != QLatin1String(kStepOverlaySource))
+            continue;
+        s.fields.insert(QStringLiteral("overlay"), overlay.toString(QUuid::WithoutBraces));
+        QJsonArray list;
+        for (const QJsonValue &v : s.fields.value(QStringLiteral("elements")).toArray()) {
+            QJsonObject e = v.toObject();
+            const QUuid source = QUuid::fromString(e.value(QStringLiteral("source")).toString());
+            e.insert(QStringLiteral("source"), elements.value(source).toString(QUuid::WithoutBraces));
+            list.append(e);
+        }
+        s.fields.insert(QStringLiteral("elements"), list);
+        ++*count;
+    }
+}
+
+// Der Schritt im Laufzustand, wie ActionService::OverlayForward (ohne Lauf: Platzhalter setzt hier
+// der Laufzustand ein)
+dss::LiveSetRequest liveRequest(const Step &s, const QHash<QString, QString> &arguments)
+{
+    dss::LiveSetRequest r;
+    r.overlayId = QUuid::fromString(s.fields.value(QStringLiteral("overlay")).toString());
+    r.mode = dss::LiveMode::Show;
+    for (const QJsonValue &v : s.fields.value(QStringLiteral("elements")).toArray()) {
+        const QJsonObject e = v.toObject();
+        dss::LiveElementRequest element;
+        element.source = QUuid::fromString(e.value(QStringLiteral("source")).toString());
+        if (e.value(QStringLiteral("text")).isString())
+            element.text = e.value(QStringLiteral("text")).toString();
+        element.image = e.value(QStringLiteral("image")).toString();
+        r.elements.append(element);
+    }
+    r.durationMs = int(s.fields.value(QStringLiteral("duration_ms")).toInteger());
+    r.arguments = arguments;
+    return r;
 }
 
 } // namespace
@@ -246,7 +342,7 @@ private slots:
         }
     }
 
-    // Verweise gültig bis auf das Overlay «Chat-Bot» (f2); alle Schritte nutzen dessen feste Kennungen
+    // Verweise gültig bis auf das Overlay «Chat-Bot»; alle Schritte nutzen dessen feste Kennungen
     void references()
     {
         const ActionsConfig &t = actionTemplate();
@@ -279,10 +375,267 @@ private slots:
         for (const ReferenceWarning &w : warnings)
             QVERIFY2(w.message.endsWith(QStringLiteral(": Overlay fehlt")), qPrintable(w.message));
 
-        // Mit dem Overlay aus f2: keine Warnung
-        ReferenceContext withOverlay = none;
-        withOverlay.overlays->insert(QUuid::fromString(QLatin1String(kChatBotOverlayId)), elements);
-        QVERIFY(checkReferences(t, withOverlay).isEmpty());
+        // Mit dem angelegten Overlay (f2): keine Warnung
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        dss::OverlayStore store(data.path());
+        QString error;
+        QString warning;
+        QVERIFY(store.load(&error));
+        QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Created);
+        const QList<ReferenceWarning> withOverlay = checkReferences(t, contextOf(store));
+        for (const ReferenceWarning &w : withOverlay)
+            qWarning("%s", qPrintable(w.message));
+        QVERIFY(withOverlay.isEmpty());
+    }
+
+    // f2, Plan 7: Overlay «Chat-Bot» mit den Kennungen der Vorlage, schlicht, alles unsichtbar
+    void overlayCreated()
+    {
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        dss::OverlayStore store(data.path());
+        store.setWritesMediaLibrary(true);
+        QString error;
+        QString warning;
+        QVERIFY(store.load(&error));
+        QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Created);
+        QVERIFY2(error.isEmpty() && warning.isEmpty(), qPrintable(error + warning));
+        QVERIFY(store.overlay(chatBotId()));
+        const dss::Overlay o = *store.overlay(chatBotId());
+        QCOMPARE(o.name, QStringLiteral("Chat-Bot"));
+        QCOMPARE(o.address, QStringLiteral("chat-bot"));
+        QCOMPARE(o.width, 1920);
+        QCOMPARE(o.height, 1080);
+        QVERIFY(o.output);
+        QCOMPARE(o.sources.size(), qsizetype(std::size(kChatBotElements)));
+
+        // Schrift: Kopie der mitgelieferten Be Vietnam Pro; Bild: Platzhalter aus der Ressource (PNG)
+        const QString font = o.sources.at(0).text.fontFile;
+        const QString image = o.sources.at(5).file;
+        QCOMPARE(readFile(store.mediaFilePath(font)), readFile(dss::defaultTextFontFile()));
+        const QByteArray png = readFile(store.mediaFilePath(image));
+        QCOMPARE(png, readFile(QString::fromLatin1(dss::kChatBotPlaceholderResource)));
+        QVERIFY(png.startsWith("\x89PNG\r\n\x1a\n"));
+        QCOMPARE(store.mediaName(image), QStringLiteral("chatbot-platzhalter.png"));
+        QCOMPARE(QDir(store.mediaDir()).entryList(QDir::Files).size(), 2);
+
+        const QStringList texts = {
+            QStringLiteral("Neuer Follower: %user%"), QStringLiteral("Neues Abo: %user%"),
+            QStringLiteral("%user% verschenkt %gifts% Abos"), QStringLiteral("%user%: %bits% Bits"),
+            QStringLiteral("Raid von %user% mit %viewers% Zuschauern"), QString(),
+            QStringLiteral("Willkommen, %user%"), QString(), QStringLiteral("Shoutout: %targetUser%")};
+        const QRect canvas(0, 0, o.width, o.height);
+        for (qsizetype i = 0; i < o.sources.size(); ++i) {
+            const dss::Source &s = o.sources.at(i);
+            QCOMPARE(s.id, QUuid::fromString(QLatin1String(kChatBotElements[i].id)));
+            QCOMPARE(s.name, QString::fromUtf8(kChatBotElements[i].name));
+            QVERIFY2(!s.visible, qPrintable(s.name));
+            QVERIFY(canvas.contains(QRect(s.x, s.y, s.width, s.height)));
+            QCOMPARE(s.rotation, 0);
+            if (texts.at(i).isEmpty()) {
+                QCOMPARE(s.kind, dss::SourceKind::Image);
+                QCOMPARE(s.file, image);
+                QCOMPARE(s.width, s.height); // Profilbilder sind quadratisch
+            } else {
+                QCOMPARE(s.kind, dss::SourceKind::Text);
+                QCOMPARE(s.text.content, texts.at(i));
+                QCOMPARE(s.text.fontFile, font);
+                QCOMPARE(s.text.color, QStringLiteral("#FFFFFFFF")); // weiss, keine Farbflächen
+            }
+        }
+
+        // Ordner «Chat-Bot»
+        dss::OverlayLayout layout = store.layout();
+        QCOMPARE(layout.entries.size(), 1);
+        QVERIFY(layout.entries.at(0).isFolder);
+        QCOMPARE(layout.entries.at(0).folder.name, QStringLiteral("Chat-Bot"));
+        QCOMPARE(layout.entries.at(0).folder.overlays, QList<QUuid>{chatBotId()});
+
+        // Nicht doppelt: nochmals und nach neuem Laden
+        QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Exists);
+        dss::OverlayStore again(data.path());
+        QVERIFY(again.load(&error));
+        QCOMPARE(dss::ensureChatBotOverlay(&again, &error, &warning), dss::ChatBotOverlayResult::Exists);
+        QCOMPARE(again.overlays().size(), 1);
+        QCOMPARE(*again.overlay(chatBotId()), o);
+        QCOMPARE(again.layout(), layout);
+        QCOMPARE(QDir(store.mediaDir()).entryList(QDir::Files).size(), 2);
+    }
+
+    // Ordner gleichen Namens wird benutzt; eine kaputte Datei mit der Kennung bleibt unberührt
+    void existingFolderAndBrokenFile()
+    {
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        dss::OverlayStore store(data.path());
+        QString error;
+        QString warning;
+        QVERIFY(store.load(&error));
+        const QUuid other = store.createOverlay(QStringLiteral("Anderes"), 1280, 720, &error);
+        const QUuid folder = store.createFolder(QStringLiteral("Chat-Bot"), &error);
+        QVERIFY(!other.isNull() && !folder.isNull());
+        QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Created);
+        QVERIFY2(warning.isEmpty(), qPrintable(warning));
+        const dss::OverlayLayout layout = store.layout();
+        QCOMPARE(layout.entries.size(), 2);
+        QCOMPARE(layout.entries.at(0).overlayId, other);
+        QCOMPARE(layout.entries.at(1).folder.id, folder);
+        QCOMPARE(layout.entries.at(1).folder.overlays, QList<QUuid>{chatBotId()});
+
+        QTemporaryDir broken;
+        QVERIFY(broken.isValid());
+        dss::OverlayStore brokenStore(broken.path());
+        QVERIFY(QDir().mkpath(broken.filePath(QStringLiteral("overlays"))));
+        const QByteArray bytes = "{kaputt";
+        {
+            QFile f(brokenStore.overlayFilePath(chatBotId()));
+            QVERIFY(f.open(QIODevice::WriteOnly) && f.write(bytes) == bytes.size());
+        }
+        QVERIFY(brokenStore.load(&error));
+        QCOMPARE(brokenStore.loadErrors().size(), 1);
+        QCOMPARE(dss::ensureChatBotOverlay(&brokenStore, &error, &warning), dss::ChatBotOverlayResult::Exists);
+        QCOMPARE(readFile(brokenStore.overlayFilePath(chatBotId())), bytes);
+        QVERIFY(brokenStore.overlays().isEmpty());
+        QVERIFY(QDir(brokenStore.mediaDir()).entryList(QDir::Files).isEmpty());
+    }
+
+    // Plan 7: Löscht der Nutzer Elemente oder das Overlay, zeigen die Schritte «Element fehlt» bzw.
+    // «Overlay fehlt»; Plan 8: auf ein zweites, anders gestaltetes Overlay umgestellt zeigen die
+    // mitgelieferten Aktionen dessen Aussehen und Wortlaut, nichts hängt am Overlay «Chat-Bot».
+    void secondOverlay()
+    {
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        dss::OverlayStore store(data.path());
+        store.setWritesMediaLibrary(true);
+        QString error;
+        QString warning;
+        QVERIFY(store.load(&error));
+        QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Created);
+        const ActionsConfig &t = actionTemplate();
+        const Action *follow = byName(t, QStringLiteral("Alert Follow"));
+        const Step &followStep = follow->steps.at(1);
+        QCOMPARE(followStep.type, QString::fromLatin1(kStepOverlaySource));
+
+        // Element «Alert Follow» gelöscht: «Element fehlt»
+        const QUuid followElement = QUuid::fromString(QLatin1String(kChatBotElements[0].id));
+        QVERIFY(store.removeSource(chatBotId(), followElement, &error));
+        QCOMPARE(dss::stepSummary(followStep, t, namesOf(store)),
+                 QStringLiteral("zeigen: Element fehlt in Overlay «Chat-Bot» · 6 s"));
+        QList<ReferenceWarning> warnings = checkReferences(t, contextOf(store));
+        QCOMPARE(warnings.size(), 1);
+        QCOMPARE(warnings.at(0).objectId, follow->id);
+        QVERIFY2(warnings.at(0).message.endsWith(QStringLiteral(": Element 1 fehlt im Overlay")),
+                 qPrintable(warnings.at(0).message));
+
+        // Overlay gelöscht: «Overlay fehlt» in allen 7 Schritten
+        QVERIFY(store.removeOverlay(chatBotId(), &error));
+        QVERIFY(dss::stepSummary(followStep, t, namesOf(store)).contains(QStringLiteral("Overlay fehlt")));
+        QCOMPARE(checkReferences(t, contextOf(store)).size(), 7);
+
+        // Zweites Overlay, anders gestaltet: andere Auflösung, Lage, Grösse, Schrift, Farbe,
+        // Ausrichtung, Bild und eigener Wortlaut
+        const QUuid own = store.createOverlay(QStringLiteral("Eigene Meldungen"), 1280, 720, &error);
+        QVERIFY2(!own.isNull(), qPrintable(error));
+        const QHash<QString, QString> ownTexts = {
+            {QStringLiteral("Alert Follow"), QStringLiteral("Danke fürs Folgen, %user%")},
+            {QStringLiteral("Alert Sub"), QStringLiteral("Abo von %user%")},
+            {QStringLiteral("Alert Geschenk"), QStringLiteral("%gifts% Geschenke von %user%")},
+            {QStringLiteral("Alert Cheer"), QStringLiteral("%bits% Bits von %user%")},
+            {QStringLiteral("Alert Raid"), QStringLiteral("%viewers% Leute von %user%")},
+            {QStringLiteral("Begrüssung Name"), QStringLiteral("Hoi %user%")},
+            {QStringLiteral("Shoutout Name"), QStringLiteral("Schaut bei %targetUser% rein")},
+        };
+        QHash<QUuid, QUuid> mapped; // Element im Overlay «Chat-Bot» → eigenes Element
+        int row = 0;
+        for (const ChatBotElement &e : kChatBotElements) {
+            const QString name = QString::fromUtf8(e.name);
+            QUuid id;
+            dss::SourceChanges c;
+            c.name = QStringLiteral("Mein ") + name;
+            c.x = 20 + row % 2 * 640;
+            c.y = 20 + row / 2 * 120;
+            c.width = 600;
+            c.height = 100;
+            c.rotation = 50;
+            if (ownTexts.contains(name)) {
+                id = store.addTextSource(own, ownTexts.value(name), QStringLiteral(DSS_TEST_FONT), &error);
+                c.fontSize = 30;
+                c.color = QStringLiteral("#FFCC00FF");
+                c.align = dss::TextAlign::Right;
+            } else {
+                id = store.addImageSource(own, QStringLiteral(DSS_TEST_IMAGE), &error);
+            }
+            QVERIFY2(!id.isNull(), qPrintable(error));
+            QVERIFY2(store.updateSource(own, id, c, &error), qPrintable(error));
+            mapped.insert(QUuid::fromString(QLatin1String(e.id)), id);
+            ++row;
+        }
+
+        // Alle mitgelieferten Aktionen umstellen, wie der Nutzer im Schritt (action_put)
+        ActionsConfig c = t;
+        int remapped = 0;
+        for (const Action &a : t.actions) {
+            Action changed = a;
+            int count = 0;
+            remapSteps(&changed.steps, own, mapped, &count);
+            if (count == 0)
+                continue;
+            remapped += count;
+            ConfigEditResult r;
+            c = edited(c, QStringLiteral("action_put"), {{QStringLiteral("action"), actionToJson(changed)}}, &r);
+            QVERIFY2(r.ok, qPrintable(r.message));
+        }
+        QCOMPARE(remapped, 7);
+        QVERIFY(checkReferences(c, contextOf(store)).isEmpty());
+        QCOMPARE(dss::stepSummary(byName(c, QStringLiteral("Alert Follow"))->steps.at(1), c, namesOf(store)),
+                 QStringLiteral("zeigen: «Mein Alert Follow» in Overlay «Eigene Meldungen» · 6 s"));
+
+        // Laufzustand wie im Lauf: jedes Element zeigt das eigene Aussehen mit dem eigenen Wortlaut
+        dss::OverlayLiveState::Options options;
+        options.imageDir = data.filePath(QStringLiteral("live-bilder"));
+        dss::OverlayLiveState live(&store, options);
+        const QHash<QString, QString> arguments = {
+            {QStringLiteral("user"), QStringLiteral("Testname")}, {QStringLiteral("bits"), QStringLiteral("100")},
+            {QStringLiteral("gifts"), QStringLiteral("5")}, {QStringLiteral("viewers"), QStringLiteral("12")},
+            {QStringLiteral("targetUser"), QStringLiteral("Gast")},
+            {QStringLiteral("targetUserProfileImageUrl"), QString()}};
+        for (const Step &s : overlaySteps(c)) {
+            bool ok = false;
+            live.set(liveRequest(s, arguments), [&](const dss::OverlayLiveState::Result &r) {
+                ok = r.ok;
+                if (!r.ok || !r.warning.isEmpty())
+                    qWarning("%s %s", qPrintable(r.message), qPrintable(r.warning));
+            });
+            QVERIFY(ok);
+        }
+        QVERIFY(live.elements(chatBotId()).isEmpty());
+        const dss::Overlay before = *store.overlay(own);
+        const dss::Overlay shown = dss::applyLiveState(before, live.elements(own));
+        QCOMPARE(shown.sources.size(), 9);
+        for (qsizetype i = 0; i < shown.sources.size(); ++i) {
+            const dss::Source &s = shown.sources.at(i);
+            const dss::Source &b = before.sources.at(i);
+            QVERIFY2(s.visible, qPrintable(s.name));
+            // Lage, Grösse, Drehung, Schrift, Farbe, Ausrichtung, Bild: wie im eigenen Overlay
+            QCOMPARE(QRect(s.x, s.y, s.width, s.height), QRect(b.x, b.y, b.width, b.height));
+            QCOMPARE(s.rotation, 50);
+            QCOMPARE(s.file, b.file);
+            QCOMPARE(s.text.fontFile, b.text.fontFile);
+            QCOMPARE(s.text.color, b.text.color);
+            QCOMPARE(s.text.align, b.text.align);
+            QCOMPARE(s.text.fontSize, b.text.fontSize);
+        }
+        QStringList shownTexts;
+        for (const dss::Source &s : shown.sources) {
+            if (s.kind == dss::SourceKind::Text)
+                shownTexts.append(s.text.content);
+        }
+        QCOMPARE(shownTexts, (QStringList{QStringLiteral("Danke fürs Folgen, Testname"), QStringLiteral("Abo von Testname"),
+                                          QStringLiteral("5 Geschenke von Testname"), QStringLiteral("100 Bits von Testname"),
+                                          QStringLiteral("12 Leute von Testname"), QStringLiteral("Hoi Testname"),
+                                          QStringLiteral("Schaut bei Gast rein")}));
     }
 
     void coreCreatesMissingFile()
@@ -300,12 +653,56 @@ private slots:
         QCOMPARE(core->exitCode(), 0);
         log += QString::fromUtf8(core->readAllStandardError());
         QVERIFY2(log.contains(QStringLiteral("mitgelieferte Aktionen angelegt")), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("Overlay «Chat-Bot» angelegt")), qPrintable(log));
 
         ActionsConfig file;
         QString error;
         QVERIFY2(parseActions(readFile(path), &file, &error), qPrintable(error));
         QCOMPARE(file, actionTemplate());
         QVERIFY(!file.enabled);
+
+        // f2: Overlay «Chat-Bot» im Ordner «Chat-Bot», Verweise der Aktionen ohne Warnung
+        dss::OverlayStore store(data.path());
+        QVERIFY(store.load(&error, dss::OverlayStore::LoadMode::ReadOnly));
+        QVERIFY(store.loadErrors().isEmpty() && store.loadWarnings().isEmpty());
+        QCOMPARE(store.overlays().size(), 1);
+        QVERIFY(store.overlay(chatBotId()));
+        QCOMPARE(store.layout().entries.size(), 1);
+        QCOMPARE(store.layout().entries.at(0).folder.name, QStringLiteral("Chat-Bot"));
+        QCOMPARE(store.mediaName(store.overlay(chatBotId())->sources.at(5).file), QStringLiteral("chatbot-platzhalter.png"));
+        QVERIFY(checkReferences(file, contextOf(store)).isEmpty());
+    }
+
+    // aktionen.json fehlt, das Overlay «Chat-Bot» gibt es (vom Nutzer umgestaltet): bleibt, wie es ist
+    void coreKeepsExistingOverlay()
+    {
+        std::unique_ptr<QTemporaryDir> run = runtimeDir();
+        QTemporaryDir data;
+        QVERIFY(run->isValid() && data.isValid());
+        QString error;
+        QString warning;
+        QByteArray before;
+        {
+            dss::OverlayStore store(data.path());
+            QVERIFY(store.load(&error));
+            QCOMPARE(dss::ensureChatBotOverlay(&store, &error, &warning), dss::ChatBotOverlayResult::Created);
+            QVERIFY(store.renameOverlay(chatBotId(), QStringLiteral("Meine Alerts"), false, &error));
+            QVERIFY(store.removeSource(chatBotId(), QUuid::fromString(QLatin1String(kChatBotElements[8].id)), &error));
+            before = readFile(store.overlayFilePath(chatBotId()));
+        }
+        const QStringList mediaBefore = QDir(data.filePath(QStringLiteral("media"))).entryList(QDir::Files);
+        QString log;
+        std::unique_ptr<QProcess> core = startCore(data.path(), run->path() + QStringLiteral("/a.sock"));
+        QVERIFY2(waitForLog(core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));
+        core->terminate();
+        QVERIFY(core->waitForFinished(10000));
+        QCOMPARE(core->exitCode(), 0);
+        log += QString::fromUtf8(core->readAllStandardError());
+        QVERIFY2(log.contains(QStringLiteral("mitgelieferte Aktionen angelegt")), qPrintable(log));
+        QVERIFY2(log.contains(QStringLiteral("Overlay «Chat-Bot» gibt es schon")), qPrintable(log));
+        dss::OverlayStore store(data.path());
+        QCOMPARE(readFile(store.overlayFilePath(chatBotId())), before);
+        QCOMPARE(QDir(data.filePath(QStringLiteral("media"))).entryList(QDir::Files), mediaBefore);
     }
 
     void existingFileUntouched()
@@ -329,6 +726,9 @@ private slots:
         log += QString::fromUtf8(core->readAllStandardError());
         QVERIFY2(!log.contains(QStringLiteral("mitgelieferte Aktionen angelegt")), qPrintable(log));
         QCOMPARE(readFile(path), empty);
+        // f2: kein Overlay «Chat-Bot» ohne die mitgelieferten Aktionen
+        QVERIFY2(!log.contains(QStringLiteral("Overlay «Chat-Bot»")), qPrintable(log));
+        QVERIFY(!QFile::exists(dss::OverlayStore(data.path()).overlayFilePath(chatBotId())));
     }
 
     void resetToTemplate()

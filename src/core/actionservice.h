@@ -74,6 +74,9 @@ public:
         std::function<dss::ActionSound *()> actionSound;
         // c2: Laufzustand der Overlays; nullptr = nicht verfügbar. Lebt länger als der Dienst.
         dss::OverlayLiveState *overlayLive = nullptr;
+        // f2: nach dem Anlegen der mitgelieferten Aktionen (aktionen.json fehlte); der Kern legt
+        // dann das Overlay «Chat-Bot» an, wenn es fehlt. Leer = nichts.
+        std::function<void()> templateCreated;
     };
 
     ActionService(dss::events::EventBus *bus, const Options &options, QObject *parent = nullptr);

@@ -62,9 +62,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-set(DSS_QT_COMPONENTS Core Network WebSockets) # WebSockets: dss_obs (P10c)
+# WebSockets: dss_obs (P10c). Gui: dss_render (P10-vor) und seit P14 f2 immer das Bauwerkzeug
+# dss-platzhalterbild (src/common); Kern und dss_common bleiben ohne Qt Gui.
+set(DSS_QT_COMPONENTS Core Gui Network WebSockets)
 if(DSS_BUILD_APP)
-  list(APPEND DSS_QT_COMPONENTS Gui Widgets) # Gui: dss_render (P10-vor)
+  list(APPEND DSS_QT_COMPONENTS Widgets)
 endif()
 if(DSS_BUILD_TESTS)
   list(APPEND DSS_QT_COMPONENTS Test)

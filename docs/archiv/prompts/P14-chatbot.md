@@ -544,7 +544,7 @@ Dauer in Sitzungen des Agenten à 4 bis 5 h. Jeder Abschnitt endet mit Bau ohne 
 | z1 Import | `viewer_import`, Zuordnung, Probelauf, Sicherung, `scripts/zuschauer-import.sh`, `tst_zuschauerimport` | 2 | 1 | a, z0; Auflösen per Login über Twitch nach P13 | **ja** (ohne Auflösen über Twitch) |
 | c Schritte nach aussen | c1 Twitch (`TwitchApi`, Chat, Benutzerinfo, Shoutout, Ansage, Testserver); c2 Schritte «Ton abspielen» und «Overlay-Element zeigen» an t und d | 2 | 1 | P13, b, t, d | nein |
 | e Editor | e1 Ansichtslogik in `dss_common` (nur a nötig); e2 «Live» (Chat, Läufe) und «Aktionen» mit Einstellungen rechts; e3 «Befehle», «Zeitnachrichten», «Variablen», Dialog «Warteschlangen» | 3 | 1,75 | e1: a; e2, e3: b3 | e1 ja |
-| f Mitgeliefert | Vorlage, Overlay «Chat-Bot», «Zurücksetzen», `tst_mitgeliefert` (auch mit zweitem Overlay, Abschnitt 8); Dokumente, Bericht | 2 | 0,75 | c, e | nein |
+| f Mitgeliefert | Vorlage, Overlay «Chat-Bot», «Zurücksetzen», `tst_mitgeliefert` (auch mit zweitem Overlay, Abschnitt 8); Dokumente, Bericht. **Erledigt 2026-11-16** (f1, f2; Bericht `docs/archiv/berichte/P14-bericht.md`) | 2 | 0,75 | c, e | nein |
 | **Summe P14-1** | | | **~8,5** | | |
 | **P14-2 «Komfort»** (nach dem ersten Stream) | | | | | |
 | o OBS | Schritt `obs_source_visible`, neue Anfragen in `dss_obs`, Auswahl aus OBS | 1 | 0,5 | b3 | – |

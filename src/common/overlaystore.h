@@ -75,6 +75,11 @@ public:
 
     // Overlays (E-01). Rückgabe der neuen Kennung, bei Fehler eine leere QUuid.
     QUuid createOverlay(const QString &name, int width, int height, QString *error);
+    // P14 f2: fertiges Overlay mit eigenen Kennungen anlegen (mitgeliefertes Overlay «Chat-Bot»).
+    // Abgewiesen, wenn es die Kennung schon gibt oder eine Datei mit ihr liegt (auch eine kaputte,
+    // sie wird nie überschrieben). Adresse aus dem Namen (eindeutig), neuer Token, ans Ende der
+    // Liste. Die Verweise "media/…" der Quellen müssen schon im Datenordner liegen (importMedia).
+    bool addOverlay(const Overlay &overlay, QString *error);
     // changeAddress = false: Adresse bleibt (Entscheid 5).
     bool renameOverlay(const QUuid &overlayId, const QString &newName, bool changeAddress,
                        QString *error);

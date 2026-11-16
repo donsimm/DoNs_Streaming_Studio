@@ -362,6 +362,7 @@ void ActionService::load()
     // aktionen.json; fehlt sie, legt der Kern die mitgelieferten Aktionen an (Plan 2.11 und 7,
     // Hauptschalter aus), nie über eine vorhandene Datei
     dss::actions::ActionsConfig config;
+    bool created = false;
     m_configError.clear();
     if (!readFile(filePath(dss::actions::kActionsFileName), &bytes, &exists, &error)
         || (exists && !dss::actions::parseActions(bytes, &config, &error))) {
@@ -371,14 +372,18 @@ void ActionService::load()
     } else if (!exists) {
         QString templateError;
         config = dss::actions::actionTemplate(&templateError);
-        if (!templateError.isEmpty())
+        if (!templateError.isEmpty()) {
             qCritical("Aktionen: %s", qPrintable(templateError));
-        else if (!writeConfig(config, &error))
+        } else if (!writeConfig(config, &error)) {
             qCritical("Aktionen: mitgelieferte Aktionen nicht gespeichert: %s", qPrintable(error));
-        else
+        } else {
             qInfo("Aktionen: aktionen.json fehlte, mitgelieferte Aktionen angelegt");
+            created = true;
+        }
     }
     m_config = config;
+    if (created && m_options.templateCreated)
+        m_options.templateCreated(); // f2: Overlay «Chat-Bot», wenn es fehlt
 
     dss::actions::VariablesData variables;
     bytes.clear();

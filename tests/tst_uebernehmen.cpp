@@ -98,6 +98,8 @@ private:
 
     bool startCore()
     {
+        // ohne mitgelieferte Aktionen und Overlay «Chat-Bot» (P14 f1, f2): media/ bleibt wie angelegt
+        testhelp::writeEmptyActions(dataDir());
         m_core = testhelp::startCore(dataDir(), m_socket);
         m_coreLog.clear();
         return waitForLog(m_core.get(), QStringLiteral("Verbindung offen"), &m_coreLog);

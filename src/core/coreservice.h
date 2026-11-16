@@ -114,6 +114,11 @@ public:
     // bindet Abschnitt c2 hier an.
     dss::OverlayLiveState *overlayLive() const { return m_live; }
 
+    // P14 f2: mitgeliefertes Overlay «Chat-Bot» anlegen, wenn es fehlt (chatbotoverlay.h), und den
+    // neuen Stand an alle Fenster schicken. Ruft das Aktionssystem nach dem Anlegen der
+    // mitgelieferten Aktionen.
+    void createChatBotOverlay();
+
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
     // DSS_CORE_IMPORT_THREAD aus) immer 0.

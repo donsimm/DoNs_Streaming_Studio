@@ -3,6 +3,7 @@
 #include "actionprotocol.h"
 #include "actionservice.h"
 #include "browsersource.h"
+#include "chatbotoverlay.h"
 #include "eventtypes.h"
 #include "obsconnection.h"
 #include "obsevents.h"
@@ -312,6 +313,31 @@ void CoreService::reload()
         m_broadcastFonts = true;
         startFontLoading();
     }
+}
+
+void CoreService::createChatBotOverlay()
+{
+    const QList<dss::Overlay> before = m_store->overlays();
+    const QJsonObject listBefore = listMessage();
+    QString error;
+    QString warning;
+    switch (dss::ensureChatBotOverlay(m_store, &error, &warning)) {
+    case dss::ChatBotOverlayResult::Exists:
+        qInfo("Overlay «Chat-Bot» gibt es schon, nicht angelegt");
+        return;
+    case dss::ChatBotOverlayResult::Failed:
+        qCritical("Overlay «Chat-Bot» nicht angelegt: %s", qPrintable(error));
+        break; // Schrift oder Bild können schon in der Mediathek sein
+    case dss::ChatBotOverlayResult::Created:
+        qInfo("Overlay «Chat-Bot» angelegt");
+        if (!warning.isEmpty())
+            qWarning("%s", qPrintable(warning));
+        break;
+    }
+    broadcastDifferences(before, listBefore);
+    broadcastMediaListIfChanged();
+    updateBrowserSources();
+    updateObsSources();
 }
 
 void CoreService::onNewConnection()

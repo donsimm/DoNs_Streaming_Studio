@@ -141,6 +141,8 @@ private:
 
     bool startCore()
     {
+        // ohne mitgelieferte Aktionen und Overlay «Chat-Bot» (P14 f1, f2): die Liste bleibt wie angelegt
+        testhelp::writeEmptyActions(m_data.path());
         m_core = testhelp::startCore(m_data.path(), m_socket, m_config.path());
         m_coreLog.clear();
         return waitForLog(m_core.get(), QStringLiteral("Verbindung offen"), &m_coreLog);

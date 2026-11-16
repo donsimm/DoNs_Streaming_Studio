@@ -604,6 +604,31 @@ QUuid OverlayStore::createOverlay(const QString &name, int width, int height, QS
     return overlay.id;
 }
 
+bool OverlayStore::addOverlay(const Overlay &overlay, QString *error)
+{
+    if (overlay.id.isNull() || indexOf(overlay.id) >= 0 || QFileInfo::exists(overlayFilePath(overlay.id))) {
+        *error = QStringLiteral("Overlay %1 gibt es schon.").arg(overlay.id.toString(QUuid::WithoutBraces));
+        return false;
+    }
+    Overlay added = overlay;
+    added.address = uniqueAddress(addressFromName(overlay.name), takenAddresses());
+    if (const QString e = validateOverlay(added); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    for (const Source &source : std::as_const(added.sources)) {
+        const QString file = source.kind == SourceKind::Text ? source.text.fontFile : source.file;
+        if (!QFileInfo(mediaFilePath(file)).isFile()) {
+            *error = QStringLiteral("Datei %1 fehlt im Datenordner.").arg(file);
+            return false;
+        }
+    }
+    if (!addNewOverlay(added, error))
+        return false;
+    return followLayout([&](OverlayLayout *l) { return addOverlayToLayout(l, added.id); },
+                        QStringLiteral("Overlay angelegt"), error);
+}
+
 bool OverlayStore::renameOverlay(const QUuid &overlayId, const QString &newName,
                                  bool changeAddress, QString *error)
 {

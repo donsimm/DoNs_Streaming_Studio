@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-16 (P14 e3: neue Punkte 122 bis 125; davor P13: Punkt 92 erledigt und ins Archiv verschoben, neue Punkte 113 bis 120; davor Punkt 3: Umfang des Chat-Bots und Übernahme der Zuschauer-Daten entschieden; davor P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 126 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-16 (P14 f: neue Punkte 126 bis 128; davor P14 e3: neue Punkte 122 bis 125; davor P13: Punkt 92 erledigt und ins Archiv verschoben, neue Punkte 113 bis 120; davor Punkt 3: Umfang des Chat-Bots und Übernahme der Zuschauer-Daten entschieden; davor P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 129 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -66,6 +66,9 @@ Stand: 2026-11-16 (P14 e3: neue Punkte 122 bis 125; davor P13: Punkt 92 erledigt
 123. Aus P14 e2/e3: Prüfmeldungen aus der Verweisprüfung des Kerns (`checkReferences`, etwa eine fehlende Aktion oder Warteschlange) stehen nicht in den Zeilen der Listen (`[OFFEN]` aus e2-14). Zu entscheiden, ob und wo sie angezeigt werden.
 124. Aus P14 e3: Die Meldung zu einer ungültigen Variablen-Datei verschwindet nach der Reparatur; dafür gibt es keinen automatischen Test (Fall `fileError`).
 125. Aus P14 e3: Ein Befehl, den keine Aktion benutzt, wird ohne Rückfrage gelöscht (wie bei Aktionen ohne Verweise). Zu entscheiden, ob auch dann eine Rückfrage kommt.
+126. Aus P14 f1/f2: Wortlaut der mitgelieferten Chat-Texte (Vorlage `src/actions/vorlage/aktionen.json`) und der Texte im Overlay «Chat-Bot» (zum Beispiel «Neuer Follower: %user%», «%user% verschenkt %gifts% Abos», `src/common/chatbotoverlay.cpp`) hat der Agent formuliert; Lage und Grösse der Elemente ebenso (Alerts nacheinander an derselben Stelle oben in der Mitte, Begrüssung unten links, Shoutout unten rechts). Prüft der Nutzer im Handtest.
+127. Aus P14 f1: Nach «Zurücksetzen» im Menü der Liste (gelöschte mitgelieferte Aktionen wiederherstellen) zeigt die Statuszeile «Gespeichert: N Aktionen»; dafür gibt es kein Vorbild im Entwurf. Prüft der Nutzer im Handtest.
+128. Aus P14 f2: Das Overlay «Chat-Bot» legt der Kern nur zusammen mit den mitgelieferten Aktionen an (fehlende `aktionen.json`, Plan 7). «Zurücksetzen» einer Aktion legt ein gelöschtes Overlay oder Element nicht wieder an; der Schritt zeigt dann «Overlay fehlt» bzw. «Element fehlt». Zu entscheiden, ob es dafür einen eigenen Weg braucht (zum Beispiel «Overlay «Chat-Bot» wiederherstellen»).
 
 ## Machbarkeitstests
 

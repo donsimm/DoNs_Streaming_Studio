@@ -342,6 +342,8 @@ private slots:
         }
         m_run = testhelp::runtimeDir();
         const QString socket = m_run->filePath(QStringLiteral("kern.sock"));
+        // ohne mitgelieferte Aktionen und Overlay «Chat-Bot» (P14 f1, f2): die Liste bleibt wie angelegt
+        QVERIFY(testhelp::writeEmptyActions(m_data.path()));
         m_core = testhelp::startCore(m_data.path(), socket);
         QString log;
         QVERIFY2(testhelp::waitForLog(m_core.get(), QStringLiteral("Verbindung offen"), &log), qPrintable(log));

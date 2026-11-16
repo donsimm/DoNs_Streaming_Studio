@@ -369,6 +369,8 @@ int main(int argc, char *argv[])
 #endif
     // c2: Laufzustand der Overlays und Töne des Chat-Bots (ActionSound legt erst der Block «Ton» an)
     actionOptions.overlayLive = service.overlayLive();
+    // f2: Overlay «Chat-Bot» zusammen mit den mitgelieferten Aktionen
+    actionOptions.templateCreated = [&service] { service.createChatBotOverlay(); };
 #if DSS_CORE_AUDIO
     actionOptions.actionSound = [&service] { return service.actionSound(); };
 #endif
