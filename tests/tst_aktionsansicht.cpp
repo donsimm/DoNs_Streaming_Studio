@@ -4,7 +4,9 @@
 // (erfunden, Plan 2.10) und erfundene Variablen und Zuschauer.
 
 #include "actionjson.h"
+#include "actionprotocol.h"
 #include "actionview.h"
+#include "protocol.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
@@ -281,6 +283,19 @@ private slots:
         r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Test"));
         QCOMPARE(r.problem, QStringLiteral("Die Gruppe «Test» gibt es schon."));
         QVERIFY(r.edits.isEmpty());
+        // ohne Rücksicht auf Gross- und Kleinschreibung (Entscheid 2026-11-16): andere Schreibweise einer
+        // anderen Gruppe abgewiesen, mit deren Schreibweise; eigene Schreibweise ändern erlaubt
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("TEST"));
+        QCOMPARE(r.problem, QStringLiteral("Die Gruppe «Test» gibt es schon."));
+        QVERIFY(r.edits.isEmpty());
+        r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("shoutout"));
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits.size(), 2);
+        QCOMPARE(putAction(r, 0).group, QStringLiteral("shoutout"));
+        QCOMPARE(putAction(r, 1).group, QStringLiteral("shoutout"));
+        r = renameActionGroup(config, QStringLiteral("SHOUTOUT"), QStringLiteral("Shoutouts"));
+        QCOMPARE(r.edits.size(), 2);
+        QCOMPARE(putAction(r, 1).group, QStringLiteral("Shoutouts"));
         r = renameActionGroup(config, QStringLiteral("Shoutout"), QStringLiteral("Shoutout "));
         QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
         r = renameActionGroup(config, QStringLiteral("gibt es nicht"), QStringLiteral("Neu"));
@@ -295,6 +310,68 @@ private slots:
         QVERIFY(removeActionGroup(config, QStringLiteral("gibt es nicht")).edits.isEmpty());
         // Aktionen ohne Gruppe sind keine Gruppe
         QVERIFY(removeActionGroup(config, QString()).edits.isEmpty());
+    }
+
+    void groupsIgnoreCase()
+    {
+        const ActionsConfig original = loadConfig();
+        // «Shoutout ausführen» steht vor «Shoutout per Befehl»; dieser bekommt «shoutout»
+        ActionsConfig config = original;
+        for (Action &a : config.actions) {
+            if (a.id == kShoutoutCommand)
+                a.group = QStringLiteral("shoutout");
+        }
+
+        // Liste: eine Gruppe in der Schreibweise der ersten Aktion, auch an ihren Aktionen
+        const QList<ActionListRow> rows = actionListRows(config, QString(), {});
+        QCOMPARE(rowTexts(rows), rowTexts(actionListRows(original, QString(), {})));
+        int groupRows = 0;
+        for (const ActionListRow &row : rows) {
+            if (row.isGroup && row.group.compare(QStringLiteral("shoutout"), Qt::CaseInsensitive) == 0) {
+                ++groupRows;
+                QCOMPARE(row.text, QStringLiteral("Shoutout"));
+                QCOMPARE(row.detail, QStringLiteral("(2)"));
+            }
+            if (row.actionId == kShoutoutCommand)
+                QCOMPARE(row.group, QStringLiteral("Shoutout"));
+        }
+        QCOMPARE(groupRows, 1);
+        QCOMPARE(actionGroupChoices(config), actionGroupChoices(original));
+
+        // Löschen und Rückfrage über beide Schreibweisen
+        const QList<ActionsEdit> removeAll = removeActionGroup(original, QStringLiteral("Shoutout")).edits;
+        QCOMPARE(removeActionGroup(config, QStringLiteral("shoutout")).edits, removeAll);
+        QCOMPARE(removeActionGroup(config, QStringLiteral("Shoutout")).edits, removeAll);
+        const QString question =
+            QStringLiteral("Gruppe «Shoutout» mit 2 Aktionen löschen? Sie werden von 1 Befehl benutzt.");
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("shoutout")), question);
+        QCOMPARE(removeActionGroupQuestion(config, QStringLiteral("SHOUTOUT")), question);
+
+        // Umbenennen in die Schreibweise der ersten Aktion: nur die abweichende Aktion
+        EditResult r = renameActionGroup(config, QStringLiteral("shoutout"), QStringLiteral("Shoutout"));
+        QCOMPARE(r.edits.size(), 1);
+        QCOMPARE(putAction(r).id, kShoutoutCommand);
+        QCOMPARE(putAction(r).group, QStringLiteral("Shoutout"));
+
+        // Neu in der Gruppe und «Neue Gruppe» übernehmen bzw. meiden bestehende Schreibweisen
+        QCOMPARE(putAction(newAction(original, QStringLiteral(" shoutout "))).group, QStringLiteral("Shoutout"));
+        Action lower = putAction(newAction(original, QStringLiteral("neue gruppe")));
+        QCOMPARE(lower.group, QStringLiteral("neue gruppe"));
+        ActionsConfig withLower = original;
+        withLower.actions.append(lower);
+        QCOMPARE(putAction(newActionGroup(withLower)).group, QStringLiteral("Neue Gruppe 2"));
+
+        // Feld «Gruppe»: bestehende Schreibweise einer anderen Aktion wird übernommen
+        const Action begruessung = *original.action(kBegruessung);
+        Action after = begruessung;
+        after.group = QStringLiteral(" shoutout ");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("Shoutout"));
+        // allein in der Gruppe: die eigene Schreibweise darf sich ändern
+        after.group = QStringLiteral("begrüssung");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("begrüssung"));
+        // neue Gruppe: wie eingegeben, ohne Leerzeichen am Rand
+        after.group = QStringLiteral(" Neu ");
+        QCOMPARE(putAction(putAction(original, begruessung, after)).group, QStringLiteral("Neu"));
     }
 
     void removeQuestions()
@@ -974,6 +1051,81 @@ private slots:
         QCOMPARE(removeVariable(variables(), {{QStringLiteral("motto"), 1}}, {}, volatileGlobal).edits.size(), 1);
         QCOMPARE(variableValueText(QJsonValue(0.1)), QStringLiteral("0.1"));
         QCOMPARE(variableValueText(QJsonValue(-5.0)), QStringLiteral("-5"));
+    }
+
+    // «▶ Testen» (Plan 3.6, e2-7): Auswahl «Testwerte: Benutzer», Anfrage action_test, stumm
+    void testRun()
+    {
+        const ActionsConfig config = loadConfig();
+        // Ohne Anmeldung des Kanals (oder Kern ohne Twitch) nur «Testzuschauer»
+        const TestUserChoice viewer{QStringLiteral("Testzuschauer"), QStringLiteral("Testzuschauer"),
+                                    QStringLiteral("testzuschauer"), QStringLiteral("0")};
+        TwitchStatusInfo twitch;
+        twitch.enabled = true;
+        QCOMPARE(testUserChoices(twitch), QList<TestUserChoice>{viewer});
+        twitch.channel.state = QStringLiteral("ok");
+        twitch.channel.login = QStringLiteral("kanal_login");
+        twitch.channel.userId = QStringLiteral("100000009");
+        const TestUserChoice channel{QStringLiteral("eigener Kanal"), QStringLiteral("kanal_login"),
+                                     QStringLiteral("kanal_login"), QStringLiteral("100000009")};
+        QCOMPARE(testUserChoices(twitch), (QList<TestUserChoice>{viewer, channel}));
+        twitch.enabled = false;
+        QCOMPARE(testUserChoices(twitch).size(), 1);
+        twitch.enabled = true;
+        twitch.channel.userId.clear();
+        QCOMPARE(testUserChoices(twitch).size(), 1);
+
+        // Argumente des Auslösers «Test» (user, bits), darüber der gewählte Benutzer; Probelauf
+        const Action &all = *config.action(kAllTriggers);
+        EditResult r = testAction(all, channel, false);
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits,
+                 (QList<ActionsEdit>{{QStringLiteral("action_test"),
+                                      {{QStringLiteral("action_id"), kAllTriggers.toString(QUuid::WithoutBraces)},
+                                       {QStringLiteral("arguments"),
+                                        QJsonObject{{QStringLiteral("user"), QStringLiteral("kanal_login")},
+                                                    {QStringLiteral("userName"), QStringLiteral("kanal_login")},
+                                                    {QStringLiteral("userId"), QStringLiteral("100000009")},
+                                                    {QStringLiteral("bits"), QStringLiteral("100")}}},
+                                       {QStringLiteral("dry_run"), true}}}}));
+        // Echt: dry_run aus
+        r = testAction(all, viewer, true);
+        QCOMPARE(r.edits.first().fields.value(QStringLiteral("dry_run")), QJsonValue(false));
+        QCOMPARE(r.edits.first().fields.value(QStringLiteral("arguments")).toObject().value(QStringLiteral("userId")),
+                 QJsonValue(QStringLiteral("0")));
+        // Ohne Auslöser «Test»: nur die Angaben zum Benutzer
+        const Action &greeting = *config.action(kBegruessung);
+        QCOMPARE(testAction(greeting, viewer, false).edits.first().fields.value(QStringLiteral("arguments")).toObject(),
+                 (QJsonObject{{QStringLiteral("user"), QStringLiteral("Testzuschauer")},
+                              {QStringLiteral("userName"), QStringLiteral("testzuschauer")},
+                              {QStringLiteral("userId"), QStringLiteral("0")}}));
+        // Die Anfrage besteht die Prüfung des Protokolls
+        QString error;
+        ActionsRequest request;
+        QVERIFY2(parseActionsRequest(actionsEditMessage(r.edits.first(), 1), &request, &error), qPrintable(error));
+        QVERIFY(!request.fields.value(QStringLiteral("dry_run")).toBool());
+
+        // Erlaubt: an, aus (Hauptschalter, wie im Kern), stumm nur Probelauf, sonst nichts
+        ActionsStatus status;
+        status.state = QStringLiteral("on");
+        QVERIFY(testAllowed(all, status));
+        QVERIFY(realTestAllowed(all, status));
+        status.state = QStringLiteral("off");
+        QVERIFY(testAllowed(all, status));
+        QVERIFY(realTestAllowed(all, status));
+        status.state = QStringLiteral("muted");
+        QVERIFY(testAllowed(all, status));
+        QVERIFY(!realTestAllowed(all, status));
+        for (const char *state : {"unavailable", "file_error"}) {
+            status.state = QString::fromLatin1(state);
+            QVERIFY(!testAllowed(all, status));
+            QVERIFY(!realTestAllowed(all, status));
+        }
+        status.state = QStringLiteral("on");
+        QVERIFY(!testAllowed(Action{}, status));
+
+        QCOMPARE(testStartedStatusText(QStringLiteral("Begrüssung"), false), QStringLiteral("Probelauf gestartet: Begrüssung"));
+        QCOMPARE(testStartedStatusText(QStringLiteral("Begrüssung"), true), QStringLiteral("Gestartet: Begrüssung"));
     }
 };
 

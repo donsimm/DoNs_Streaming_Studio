@@ -1,7 +1,10 @@
 #include "actionview.h"
 
 #include "actionjson.h"
+#include "actionprotocol.h"
+#include "eventtypes.h"
 #include "fieldspec.h"
+#include "protocol.h"
 #include "steptypes.h"
 #include "triggertypes.h"
 
@@ -33,12 +36,30 @@ bool nameLess(const QString &a, const QString &b)
     return c != 0 ? c < 0 : a < b;
 }
 
-QString uniqueName(const QString &base, const QStringList &names)
+QString uniqueName(const QString &base, const QStringList &names, Qt::CaseSensitivity cs = Qt::CaseSensitive)
 {
     QString name = base;
-    for (int n = 2; names.contains(name); ++n)
+    for (int n = 2; names.contains(name, cs); ++n)
         name = QStringLiteral("%1 %2").arg(base, QString::number(n));
     return name;
+}
+
+// Gruppennamen sind ohne Rücksicht auf Gross- und Kleinschreibung eindeutig (Entscheid des Nutzers,
+// 2026-11-16).
+bool sameGroup(const QString &a, const QString &b)
+{
+    return !a.isEmpty() && QString::compare(a, b, Qt::CaseInsensitive) == 0;
+}
+
+// Schreibweise der Gruppe bei der ersten Aktion in der Datei (ohne die Aktion except); leer, wenn es
+// die Gruppe nicht gibt.
+QString groupSpelling(const actions::ActionsConfig &config, const QString &group, const QUuid &except = QUuid())
+{
+    for (const actions::Action &a : config.actions) {
+        if ((except.isNull() || a.id != except) && sameGroup(a.group, group))
+            return a.group;
+    }
+    return QString();
 }
 
 QString quoted(const QString &text)
@@ -580,14 +601,17 @@ QList<ActionListRow> actionListRows(const ActionsConfig &config, const QString &
                 rows.append(actionRow(a, 0));
             continue;
         }
-        if (groupsDone.contains(a.group))
+        const QString key = a.group.toCaseFolded();
+        if (groupsDone.contains(key))
             continue;
-        groupsDone.insert(a.group);
+        groupsDone.insert(key);
         const bool groupMatches = matches(a.group, search);
         QList<ActionListRow> members;
         for (const Action &m : config.actions) {
-            if (m.group == a.group && (groupMatches || actionMatches(m)))
+            if (sameGroup(m.group, a.group) && (groupMatches || actionMatches(m))) {
                 members.append(actionRow(m, 1));
+                members.last().group = a.group;
+            }
         }
         if (members.isEmpty())
             continue;
@@ -611,6 +635,9 @@ EditResult newAction(const ActionsConfig &config, const QString &group)
     a.id = QUuid::createUuid();
     a.name = uniqueName(QStringLiteral("Neue Aktion"), names);
     a.group = group.trimmed();
+    const QString existing = groupSpelling(config, a.group);
+    if (!existing.isEmpty())
+        a.group = existing;
     EditResult r;
     r.edits.append(edit("action_put", {{QStringLiteral("action"), actionToJson(a)}}));
     r.created = a.id;
@@ -620,7 +647,8 @@ EditResult newAction(const ActionsConfig &config, const QString &group)
 EditResult newActionGroup(const ActionsConfig &config)
 {
     // Gruppen gibt es nur über ihre Aktionen (Plan 2.3): Die neue Gruppe entsteht mit einer neuen Aktion.
-    return newAction(config, uniqueName(QStringLiteral("Neue Gruppe"), actionGroupChoices(config)));
+    return newAction(config,
+                     uniqueName(QStringLiteral("Neue Gruppe"), actionGroupChoices(config), Qt::CaseInsensitive));
 }
 
 EditResult copyAction(const ActionsConfig &config, const QUuid &actionId)
@@ -666,15 +694,18 @@ QString resetActionQuestion(const Action &action)
 EditResult renameActionGroup(const ActionsConfig &config, const QString &group, const QString &name)
 {
     const QString newName = name.trimmed();
-    if (group.isEmpty() || newName == group || !actionGroupChoices(config).contains(group))
+    if (groupSpelling(config, group).isEmpty())
         return {};
     if (newName.isEmpty())
         return problem(emptyNameProblem());
-    if (actionGroupChoices(config).contains(newName))
-        return problem(QStringLiteral("Die Gruppe «%1» gibt es schon.").arg(newName));
+    // Nur eine andere Schreibweise derselben Gruppe ist ein Umbenennen, sonst kein Zusammenführen.
+    for (const Action &a : config.actions) {
+        if (!sameGroup(a.group, group) && sameGroup(a.group, newName))
+            return problem(QStringLiteral("Die Gruppe «%1» gibt es schon.").arg(a.group));
+    }
     EditResult r;
     for (const Action &a : config.actions) {
-        if (a.group != group)
+        if (!sameGroup(a.group, group) || a.group == newName)
             continue;
         Action after = a;
         after.group = newName;
@@ -689,10 +720,8 @@ EditResult renameActionGroup(const ActionsConfig &config, const QString &group, 
 EditResult removeActionGroup(const ActionsConfig &config, const QString &group)
 {
     EditResult r;
-    if (group.isEmpty())
-        return r;
     for (const Action &a : config.actions) {
-        if (a.group == group)
+        if (sameGroup(a.group, group))
             r.edits.append(edit("action_remove", {{QStringLiteral("action_id"), uuidText(a.id)}}));
     }
     return r;
@@ -713,13 +742,13 @@ QString removeActionGroupQuestion(const ActionsConfig &config, const QString &gr
 {
     QSet<QUuid> members;
     for (const Action &a : config.actions) {
-        if (!group.isEmpty() && a.group == group)
+        if (sameGroup(a.group, group))
             members.insert(a.id);
     }
     if (members.isEmpty())
         return QString();
     QString s = QStringLiteral("Gruppe «%1» mit %2 löschen?")
-                    .arg(group, countText(members.size(), QStringLiteral("Aktion"), QStringLiteral("Aktionen")));
+                    .arg(groupSpelling(config, group), countText(members.size(), QStringLiteral("Aktion"), QStringLiteral("Aktionen")));
     const QString uses = actionUsesText(config, members);
     if (!uses.isEmpty())
         s += (members.size() == 1 ? QStringLiteral(" Sie wird von %1 benutzt.") : QStringLiteral(" Sie werden von %1 benutzt."))
@@ -732,6 +761,72 @@ QString removeActionGroupQuestion(const ActionsConfig &config, const QString &gr
 QString actionTitle(const Action &action)
 {
     return QStringLiteral("Aktion %1").arg(quoted(action.name));
+}
+
+namespace {
+
+// Name des Arguments zu einem Feld user_* der Chat-Nachricht (eventtypes.h, Plan 1.3)
+QString userArgument(const char *field)
+{
+    const events::EventType *type = events::findEventType(QString::fromLatin1(kTriggerChatMessage));
+    Q_ASSERT(type);
+    for (const events::EventField &f : type->fields) {
+        if (qstrcmp(f.name, field) == 0)
+            return QString::fromLatin1(f.argument);
+    }
+    Q_UNREACHABLE_RETURN(QString());
+}
+
+bool testState(const ActionsStatus &status)
+{
+    return status.state != QLatin1String("unavailable") && status.state != QLatin1String("file_error");
+}
+
+} // namespace
+
+QList<TestUserChoice> testUserChoices(const TwitchStatusInfo &twitch)
+{
+    // Erfunden; 0 ist keine Twitch-ID, Variablen je Zuschauer treffen so keinen echten Zuschauer
+    QList<TestUserChoice> choices{{QStringLiteral("Testzuschauer"), QStringLiteral("Testzuschauer"),
+                                   QStringLiteral("testzuschauer"), QStringLiteral("0")}};
+    const TwitchAccountInfo &channel = twitch.channel;
+    if (twitch.enabled && !channel.login.isEmpty() && !channel.userId.isEmpty())
+        choices.append({QStringLiteral("eigener Kanal"), channel.login, channel.login, channel.userId});
+    return choices;
+}
+
+bool testAllowed(const Action &action, const ActionsStatus &status)
+{
+    return !action.id.isNull() && testState(status);
+}
+
+bool realTestAllowed(const Action &action, const ActionsStatus &status)
+{
+    return testAllowed(action, status) && status.state != QLatin1String("muted");
+}
+
+EditResult testAction(const Action &action, const TestUserChoice &user, bool real)
+{
+    QJsonObject arguments;
+    for (const Trigger &trigger : action.triggers) {
+        if (trigger.type == QLatin1String(kTriggerTest)) {
+            arguments = trigger.fields.value(QStringLiteral("variables")).toObject();
+            break;
+        }
+    }
+    arguments.insert(userArgument("user_name"), user.user);
+    arguments.insert(userArgument("user_login"), user.userName);
+    arguments.insert(userArgument("user_id"), user.userId);
+    EditResult r;
+    r.edits.append(edit(msg::kActionTest, {{QStringLiteral("action_id"), uuidText(action.id)},
+                                           {QStringLiteral("arguments"), arguments},
+                                           {QStringLiteral("dry_run"), !real}}));
+    return r;
+}
+
+QString testStartedStatusText(const QString &name, bool real)
+{
+    return real ? QStringLiteral("Gestartet: %1").arg(name) : QStringLiteral("Probelauf gestartet: %1").arg(name);
 }
 
 QList<QueueChoice> queueChoices(const ActionsConfig &config, const QUuid &current)
@@ -761,7 +856,7 @@ QStringList actionGroupChoices(const ActionsConfig &config)
 {
     QStringList groups;
     for (const Action &a : config.actions) {
-        if (!a.group.isEmpty() && !groups.contains(a.group))
+        if (!a.group.isEmpty() && !groups.contains(a.group, Qt::CaseInsensitive))
             groups.append(a.group);
     }
     std::sort(groups.begin(), groups.end(), nameLess);
@@ -799,6 +894,15 @@ EditResult putAction(const Action &before, const Action &after)
     EditResult r;
     r.edits.append(edit("action_put", {{QStringLiteral("action"), json}}));
     return r;
+}
+
+EditResult putAction(const ActionsConfig &config, const Action &before, const Action &after)
+{
+    Action a = after;
+    const QString existing = groupSpelling(config, a.group.trimmed(), a.id);
+    if (!existing.isEmpty())
+        a.group = existing;
+    return putAction(before, a);
 }
 
 // --- «Aktionen», Bereich «Auslöser» ---
