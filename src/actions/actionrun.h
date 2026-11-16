@@ -83,6 +83,7 @@ private:
     bool m_inLoop = false;
     bool m_resumeAgain = false;
     bool m_hadError = false;
+    QString m_firstError; // erste Fehlermeldung eines Schritts, wird Meldung des Laufs
     bool m_playedSound = false; // Schritt «Ton abspielen» gestartet: beim Abbruch stopRun
 };
 

@@ -137,8 +137,8 @@ private slots:
     void texts()
     {
         QCOMPARE(durationText(500), QStringLiteral("500 ms"));
-        QCOMPARE(durationText(1500), QStringLiteral("1.5 s"));
-        QCOMPARE(durationText(1250), QStringLiteral("1.25 s"));
+        QCOMPARE(durationText(1500), QStringLiteral("1,5 s"));
+        QCOMPARE(durationText(1250), QStringLiteral("1,25 s"));
         QCOMPARE(durationText(10000), QStringLiteral("10 s"));
         QCOMPARE(durationText(90000), QStringLiteral("90 s"));
         QCOMPARE(durationText(1200000), QStringLiteral("20 min"));

@@ -11,6 +11,7 @@ add_library(dss_app_ui STATIC
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp
+  panels.h panels.cpp
   dockviews.h dockviews.cpp
   dialogs.h dialogs.cpp
   obssourcedialog.h obssourcedialog.cpp

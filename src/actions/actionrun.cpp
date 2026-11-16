@@ -140,7 +140,12 @@ void ActionRun::loop()
 {
     while (!m_waiting && !isFinished(m_record.state)) {
         if (m_frames.isEmpty()) {
-            finish(m_hadError ? RunState::Error : RunState::Ok);
+            // Erste Fehlermeldung als Meldung des Laufs, damit «Läufe» den Grund zeigt
+            // (Entscheid Nutzer 2026-11-16)
+            if (m_hadError)
+                finish(RunState::Error, m_firstError);
+            else
+                finish(RunState::Ok);
             return;
         }
         Frame &frame = m_frames.last();
@@ -629,8 +634,10 @@ void ActionRun::log(StepLogEntry::Result result, const QString &message)
     entry.result = result;
     entry.message = message;
     m_record.log.append(entry);
-    if (result == StepLogEntry::Result::Error)
+    if (result == StepLogEntry::Result::Error && !m_hadError) {
         m_hadError = true;
+        m_firstError = message;
+    }
 }
 
 void ActionRun::note(const QString &message)

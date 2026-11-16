@@ -141,6 +141,8 @@ endif()
 dss_add_test(tst_aktionsansicht)
 target_compile_definitions(tst_aktionsansicht PRIVATE
   DSS_TEST_AKTIONEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/aktionen")
+# P14 e2-8: Felder der Schritte für die rechte Spalte (Beschriftung, Reihenfolge, Abschnitte, Titel)
+dss_add_test(tst_aktionsfelder)
 
 # Schrift des Fensters (P06): lädt src/app/schriften/ ohne Fenster (Plattform offscreen).
 # Braucht Qt Gui, deshalb nur mit dem Fenster (DSS_BUILD_APP).

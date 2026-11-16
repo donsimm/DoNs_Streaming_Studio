@@ -39,6 +39,7 @@ add_library(dss_common STATIC
   overlaylive.h overlaylive.cpp
   overlaylivestate.h overlaylivestate.cpp
   actionview.h actionview.cpp
+  actionfields.h actionfields.cpp # P14 e2-8: Felder der rechten Spalte im Unterreiter «Aktionen»
   actionprotocol.h actionprotocol.cpp # P14 b3: Nachrichten des Aktionssystems
   chatbotlive.h chatbotlive.cpp # P14 e2-5: Ansichtslogik «Chat-Bot» › «Live»
 )

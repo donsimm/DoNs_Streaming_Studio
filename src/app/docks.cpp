@@ -3,7 +3,7 @@
 #include "coresettings.h"
 #include "dockviews.h"
 #include "overlay.h"
-#include "symbols.h"
+#include "panels.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -37,53 +37,6 @@ QDockWidget *dock(const QString &title, const QString &objectName, QWidget *cont
     return d;
 }
 
-// Ausgegrauter Symbolknopf; ohne Symboldatei steht der Ersatztext da.
-QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
-                          const QString &toolTip, QWidget *parent)
-{
-    auto *button = new QToolButton(parent);
-    button->setText(fallback);
-    const QIcon icon = loadSymbol(symbolFile, QSize(14, 14));
-    if (!icon.isNull())
-        button->setIcon(icon);
-    button->setIconSize(QSize(14, 14));
-    button->setToolTip(toolTip);
-    button->setAccessibleName(toolTip);
-    button->setEnabled(false);
-    return button;
-}
-
-// Liste mit einer Knopfleiste darunter.
-QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent)
-{
-    auto *box = new QWidget(parent);
-    auto *column = new QVBoxLayout(box);
-    column->setContentsMargins(0, 0, 0, 0);
-    column->setSpacing(0);
-    list->setParent(box);
-    column->addWidget(list, 1);
-    auto *bar = new QWidget(box);
-    bar->setObjectName(QStringLiteral("dockButtons"));
-    bar->setAttribute(Qt::WA_StyledBackground);
-    auto *row = new QHBoxLayout(bar);
-    row->setContentsMargins(6, 4, 6, 4);
-    row->setSpacing(6);
-    for (QToolButton *b : buttons) {
-        b->setParent(bar);
-        row->addWidget(b);
-    }
-    row->addStretch(1);
-    column->addWidget(bar);
-    return box;
-}
-
-// Zahlenfeld nie schmaler als sein sizeHint (längster Wert mit Einheit), damit der Wert
-// neben den Pfeilknöpfen ganz sichtbar bleibt (P06). Ändert nur die Mindestbreite.
-void keepValueVisible(QAbstractSpinBox *spin)
-{
-    spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
-}
-
 // Ganze Pixel der Overlay-Auflösung (CLAUDE.md Regel 11). Ohne keyboardTracking meldet das Feld
 // einen Wert erst nach Enter, beim Verlassen oder mit den Pfeilen, nicht bei jeder Ziffer.
 // https://doc.qt.io/qt-6.8/qabstractspinbox.html#keyboardTracking-prop
@@ -103,41 +56,6 @@ void nameWidgets(std::initializer_list<std::pair<QObject *, const char *>> widge
 {
     for (const auto &[w, name] : widgets)
         w->setObjectName(QString::fromLatin1(name));
-}
-
-// Bereich im Dock «Eigenschaften» (P09b, E-26): kleiner Titel, darunter eine feine Linie wie
-// der Rahmen des Kopfbereichs (Farbe border), darunter die Felder im Raster *grid. Knöpfe in
-// titleButtons stehen in der Titelzeile am rechten Rand (P10a, Teil A 2).
-QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
-                 const QList<QToolButton *> &titleButtons = {})
-{
-    auto *w = new QWidget(parent);
-    auto *column = new QVBoxLayout(w);
-    column->setContentsMargins(8, 6, 8, 8);
-    column->setSpacing(4);
-    auto *titleRow = new QHBoxLayout;
-    titleRow->setContentsMargins(0, 0, 0, 0);
-    titleRow->setSpacing(4);
-    auto *label = new QLabel(title, w);
-    label->setObjectName(QStringLiteral("propertySectionTitle"));
-    titleRow->addWidget(label);
-    titleRow->addStretch(1);
-    for (QToolButton *b : titleButtons) {
-        b->setParent(w);
-        titleRow->addWidget(b);
-    }
-    column->addLayout(titleRow);
-    auto *line = new QFrame(w);
-    line->setObjectName(QStringLiteral("propertySectionLine"));
-    line->setFixedHeight(1);
-    column->addWidget(line);
-    column->addSpacing(2);
-    *grid = new QGridLayout;
-    (*grid)->setContentsMargins(0, 0, 0, 0);
-    (*grid)->setHorizontalSpacing(8);
-    (*grid)->setVerticalSpacing(6);
-    column->addLayout(*grid);
-    return w;
 }
 
 } // namespace
