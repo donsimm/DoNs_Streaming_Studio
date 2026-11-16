@@ -857,21 +857,25 @@ private:
         // Laufzustand (P14 d, Plan 10.4): Text mit Platzhalter im eigenen Text, Text in der Datei
         // versteckt und live mit eigenem Text gezeigt, Bild live durch eine andere Datei der Mediathek
         // ersetzt, Bild live versteckt. Ein Bild bleibt wie in der Datei.
+        // Textkästen und Schriftgrössen wie «DejaVu links» und «Be Vietnam Pro fett rechts» im Overlay
+        // «Text»: Das Mittel gilt über den ganzen Kasten, die Grenze Text (1.9) ist mit dieser
+        // Textdichte gemessen. Mit 48 px in 600×80 lag das Mittel bei 2.56 und 2.26, je Textpixel aber
+        // gleich wie dort (rund 21; Messung Lotse 2026-11-16, kein Versatz zwischen Seite und Editor).
         create(QStringLiteral("Laufzustand"), QSize(960, 540));
         o->live = true;
-        text(QStringLiteral("Willkommen, %user%"), dejavu, 400, QRect(10, 10, 600, 80), 48, TextAlign::Left,
+        text(QStringLiteral("Willkommen, %user%"), dejavu, 400, QRect(10, 10, 460, 110), 36, TextAlign::Left,
              QStringLiteral("#FFFFFFFF"), QStringLiteral("Text mit Platzhalter"));
-        text(QStringLiteral("versteckt"), kVietnam + QStringLiteral("/BeVietnamPro-Bold.ttf"), 700, QRect(10, 110, 600, 80), 40,
+        text(QStringLiteral("versteckt"), kVietnam + QStringLiteral("/BeVietnamPro-Bold.ttf"), 700, QRect(10, 130, 460, 110), 30,
              TextAlign::Left, QStringLiteral("#FFE040FF"), QStringLiteral("Text live gezeigt"));
         image(kData + QStringLiteral("/einzelheiten.png"), QRect(640, 10, 300, 225), QStringLiteral("Bild wie in der Datei"));
-        image(kData + QStringLiteral("/alpha.png"), QRect(10, 220, 400, 300), QStringLiteral("Bild live ersetzt"));
+        image(kData + QStringLiteral("/alpha.png"), QRect(10, 260, 360, 270), QStringLiteral("Bild live ersetzt"));
         m_liveHiddenBox = QRect(640, 280, 300, 150);
         image(kExif + QStringLiteral("/orientierung-1.png"), m_liveHiddenBox, QStringLiteral("Bild live versteckt"));
         {
             const Overlay *live = store.overlay(o->id);
             QVERIFY(live && live->sources.size() == 5);
             // Nach Lage: 0 Platzhalter, 1 versteckter Text, 2 Bild der Datei, 3 ersetzt, 4 versteckt
-            const QList<QPoint> corners = {{10, 10}, {10, 110}, {640, 10}, {10, 220}, m_liveHiddenBox.topLeft()};
+            const QList<QPoint> corners = {{10, 10}, {10, 130}, {640, 10}, {10, 260}, m_liveHiddenBox.topLeft()};
             for (const QPoint &p : corners) {
                 const auto it = std::find_if(live->sources.begin(), live->sources.end(),
                                              [&](const Source &s) { return s.x == p.x() && s.y == p.y(); });
