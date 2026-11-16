@@ -43,6 +43,7 @@ add_library(dss_common STATIC
   actionprotocol.h actionprotocol.cpp # P14 b3: Nachrichten des Aktionssystems
   chatbotlive.h chatbotlive.cpp # P14 e2-5: Ansichtslogik «Chat-Bot» › «Live»
   emotes.h emotes.cpp # P14 Emotes em-2: Listen von BTTV, 7TV, FFZ und Bild-Adressen
+  emoteloader.h emoteloader.cpp # P14 Emotes em-4: Laden mit HTTP-Zwischenspeicher
 )
 target_include_directories(dss_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # Mitgelieferte Schrift Be Vietnam Pro (P08, Teil F): Kern (Standardschrift neuer Textquellen) und

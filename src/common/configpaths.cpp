@@ -32,6 +32,12 @@ QString configDir(Edition edition)
            + QLatin1Char('/') + appDirName(edition);
 }
 
+QString emoteCacheDir(Edition edition)
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
+           + QLatin1Char('/') + appDirName(edition) + QStringLiteral("/emotes");
+}
+
 QString userSymbolDir()
 {
     return configDir(Edition::Installed) + QStringLiteral("/symbole");

@@ -47,6 +47,23 @@ private slots:
         QCOMPARE(userSymbolDir(), m_config.path() + QStringLiteral("/dons-streaming-studio/symbole"));
     }
 
+    // P14 Emotes em-4: Zwischenspeicher unter XDG_CACHE_HOME, getrennt je Version
+    void emoteCacheDirFollowsXdgCacheHome()
+    {
+        QTemporaryDir cache;
+        QVERIFY(cache.isValid());
+        const QByteArray previous = qgetenv("XDG_CACHE_HOME");
+        qputenv("XDG_CACHE_HOME", cache.path().toLocal8Bit());
+        const QString development = emoteCacheDir();
+        const QString installed = emoteCacheDir(Edition::Installed);
+        if (previous.isEmpty())
+            qunsetenv("XDG_CACHE_HOME");
+        else
+            qputenv("XDG_CACHE_HOME", previous);
+        QCOMPARE(development, cache.path() + QStringLiteral("/dons-streaming-studio-entwicklung/emotes"));
+        QCOMPARE(installed, cache.path() + QStringLiteral("/dons-streaming-studio/emotes"));
+    }
+
     // P10a, Teil B: Orte und Namen je Version. Die Version im Einsatz hat dieselben wie bis P09b.
     void editions()
     {

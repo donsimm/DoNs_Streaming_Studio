@@ -56,6 +56,9 @@ target_compile_definitions(tst_chatbotlive PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_
 # P14 Emotes em-2: Listen von BTTV, 7TV, FFZ (Antworten vom 2026-11-16) und Bild-Adressen
 dss_add_test(tst_emotes)
 target_compile_definitions(tst_emotes PRIVATE DSS_TEST_EMOTES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/emotes")
+# P14 Emotes em-4: Laden über einen lokalen HTTP-Stub (127.0.0.1), Zwischenspeicher im QTemporaryDir
+dss_add_test(tst_emoteladen)
+target_compile_definitions(tst_emoteladen PRIVATE DSS_TEST_EMOTES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/emotes")
 dss_add_test(tst_systemstats)
 target_compile_definitions(tst_systemstats PRIVATE DSS_TEST_PROC_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/proc")
 # P10-vor: Einstellungen des Kerns (kern.ini), ohne Qt Gui.

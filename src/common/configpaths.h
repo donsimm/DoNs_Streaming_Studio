@@ -29,6 +29,11 @@ QString appDirName(Edition edition = buildEdition());
 // https://doc.qt.io/qt-6.8/qstandardpaths.html (GenericConfigLocation)
 QString configDir(Edition edition = buildEdition());
 
+// HTTP-Zwischenspeicher der Emotes (P14 Emotes em-4): ~/.cache/<appDirName>/emotes
+// (bzw. $XDG_CACHE_HOME/…), getrennt je Version, nicht im Datenordner (Regel 18).
+// https://doc.qt.io/qt-6.8/qstandardpaths.html (GenericCacheLocation)
+QString emoteCacheDir(Edition edition = buildEdition());
+
 // Eigene Symbole des Nutzers: ~/.config/dons-streaming-studio/symbole für beide Versionen
 // (nur lesen, P10a). Liegt ausserhalb des Repos, weil das Repo öffentlich ist
 // (docs/archiv/04-erledigte-punkte.md, «Entschieden nach P06»).
