@@ -1,6 +1,7 @@
 #include "actionfields.h"
 
 #include "steptypes.h"
+#include "triggertypes.h"
 
 namespace dss {
 
@@ -165,17 +166,59 @@ QList<FieldSection> sectionsFor(const QString &type)
     return {}; // Dann, Sonst, Abbruch: keine Felder
 }
 
-} // namespace
-
-QList<FieldSection> stepForm(const QString &type)
+// Bereich «von–bis» einer Anzahl mit Einheit (Plan 2.5; Einheiten wie triggerDetail in actionview.cpp)
+FieldSection countSection(const QString &title, const QString &unit)
 {
-    const StepTypeInfo *info = stepType(type);
-    if (!info)
-        return {};
-    QList<FieldSection> form = sectionsFor(type);
+    return {title, {row(QStringLiteral("min"), QStringLiteral("von"), {}, unit),
+                    row(QStringLiteral("max"), QStringLiteral("bis"), {}, unit)}};
+}
+
+// Stufen der Abos; leere Auswahl = alle (triggertypes.cpp). «Stufe 1» wie triggerDetail.
+FieldSection tiersSection()
+{
+    Values values;
+    for (const QString &tier : subscriptionTiers())
+        values.append({tier, QStringLiteral("Stufe %1").arg(tier.toInt() / 1000)});
+    return {QStringLiteral("Stufe"), {row(QStringLiteral("tiers"), QStringLiteral("Stufen"), values)}};
+}
+
+// Abschnitte je Auslösertyp ohne Art und Grenzen (Plan 2.5)
+QList<FieldSection> triggerSectionsFor(const QString &type)
+{
+    if (type == QLatin1String(kTriggerCommand))
+        return {{QStringLiteral("Befehl"),
+                 {row(QStringLiteral("command_id"), QStringLiteral("Befehl"), {}, {}, QStringLiteral("command"))}}};
+    if (type == QLatin1String(kTriggerTimer))
+        return {{QStringLiteral("Zeitnachricht"),
+                 {row(QStringLiteral("timer_id"), QStringLiteral("Zeitnachricht"), {}, {}, QStringLiteral("timer"))}}};
+    if (type == QLatin1String(kTriggerSubscribe) || type == QLatin1String(kTriggerGiftSub))
+        return {tiersSection()};
+    if (type == QLatin1String(kTriggerResubscribe))
+        return {tiersSection(),
+                {QStringLiteral("Monate"),
+                 {row(QStringLiteral("min_months"), QStringLiteral("ab"), {}, QStringLiteral("Monaten"))}}};
+    if (type == QLatin1String(kTriggerGiftBomb))
+        return {tiersSection(), countSection(QStringLiteral("Anzahl"), QStringLiteral("Abos"))};
+    if (type == QLatin1String(kTriggerCheer))
+        return {countSection(QStringLiteral("Bits"), QStringLiteral("Bits"))};
+    if (type == QLatin1String(kTriggerRaid))
+        return {countSection(QStringLiteral("Zuschauer"), QStringLiteral("Zuschauer"))};
+    // Gleicher Text wie triggerDetail in actionview.cpp
+    if (type == QLatin1String(kTriggerStreamOnline))
+        return {{QStringLiteral("Start"),
+                 {row(QStringLiteral("skip_at_start"),
+                      QStringLiteral("nicht beim Start des Studios im laufenden Stream"))}}};
+    if (type == QLatin1String(kTriggerTest))
+        return {{QStringLiteral("Testwerte"), {row(QStringLiteral("variables"), QStringLiteral("Testwerte"))}}};
+    return {}; // Chat-Nachricht, Erste Nachricht, Follow, Stream offline: keine Filter
+}
+
+// Art und Grenzen der Zeilen aus der Feldbeschreibung
+QList<FieldSection> withSpecs(QList<FieldSection> form, const QList<FieldSpec> &specs)
+{
     for (FieldSection &section : form) {
         for (FieldRow &r : section.rows) {
-            for (const FieldSpec &spec : info->fields) {
+            for (const FieldSpec &spec : specs) {
                 if (spec.name != r.name)
                     continue;
                 r.kind = spec.kind;
@@ -187,6 +230,30 @@ QList<FieldSection> stepForm(const QString &type)
         }
     }
     return form;
+}
+
+} // namespace
+
+QList<FieldSection> stepForm(const QString &type)
+{
+    const StepTypeInfo *info = stepType(type);
+    if (!info)
+        return {};
+    return withSpecs(sectionsFor(type), info->fields);
+}
+
+QList<FieldSection> triggerForm(const QString &type)
+{
+    const TriggerTypeInfo *info = triggerType(type);
+    if (!info)
+        return {};
+    return withSpecs(triggerSectionsFor(type), info->filters);
+}
+
+QString triggerTitle(const Trigger &trigger)
+{
+    const TriggerTypeInfo *info = triggerType(trigger.type);
+    return QStringLiteral("Auslöser «%1»").arg(info ? info->label : trigger.type);
 }
 
 FieldSection elementForm()

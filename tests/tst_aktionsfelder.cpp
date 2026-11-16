@@ -1,10 +1,12 @@
 // P14 e2-8: Felder der Schritte für die rechte Spalte im Unterreiter «Aktionen» (actionfields.h):
 // jedes Feld aus StepTypeInfo::fields genau einmal mit Art und Grenzen, Wertebezeichnungen zu jedem
 // Wert eines Enum, Reihenfolge und Abschnitte nach Plan 4 und 6, Titel und Abschnitt zu einem Feld.
+// P14 e2-9: dasselbe für die Filter der Auslöser (TriggerTypeInfo::filters, Plan 2.5).
 // Ohne Qt Gui (CLAUDE.md Regel 9).
 
 #include "actionfields.h"
 #include "steptypes.h"
+#include "triggertypes.h"
 
 #include <QSet>
 #include <QTest>
@@ -48,6 +50,13 @@ private slots:
     void sectionOfField();
     void elementContent();
     void unknownType();
+    void everyFilterOnce_data();
+    void everyFilterOnce();
+    void triggerOrder_data();
+    void triggerOrder();
+    void triggerLimitsAndChoices();
+    void triggerTitles();
+    void triggerSectionOfField();
 };
 
 void TestActionFields::everyFieldOnce_data()
@@ -231,6 +240,158 @@ void TestActionFields::elementContent()
 void TestActionFields::unknownType()
 {
     QVERIFY(stepForm(QStringLiteral("gibt_es_nicht")).isEmpty());
+    QVERIFY(triggerForm(QStringLiteral("gibt_es_nicht")).isEmpty());
+}
+
+// P14 e2-9: Felder der Auslöser (Plan 2.5)
+
+void TestActionFields::everyFilterOnce_data()
+{
+    QTest::addColumn<QString>("type");
+    for (const TriggerTypeInfo &t : triggerTypes())
+        QTest::newRow(qPrintable(t.key)) << t.key;
+}
+
+void TestActionFields::everyFilterOnce()
+{
+    QFETCH(QString, type);
+    const TriggerTypeInfo *info = triggerType(type);
+    QVERIFY(info);
+    const QList<FieldSection> form = triggerForm(type);
+
+    const QStringList names = rowNames(form);
+    QCOMPARE(QSet<QString>(names.cbegin(), names.cend()).size(), names.size()); // keine Doppelten
+    QStringList expected;
+    for (const FieldSpec &spec : info->filters)
+        expected.append(spec.name);
+    QStringList sortedNames = names;
+    sortedNames.sort();
+    expected.sort();
+    QCOMPARE(sortedNames, expected);
+
+    for (const FieldSection &s : form) {
+        QVERIFY2(!s.title.isEmpty(), qPrintable(type));
+        QVERIFY2(!s.rows.isEmpty(), qPrintable(s.title));
+        QVERIFY(!s.title.contains(QChar(0x00DF)));
+        for (const FieldRow &r : s.rows) {
+            QVERIFY2(!r.label.isEmpty(), qPrintable(r.name));
+            QVERIFY(!r.label.contains(QChar(0x00DF)));
+            const FieldSpec *spec = nullptr;
+            for (const FieldSpec &f : info->filters) {
+                if (f.name == r.name)
+                    spec = &f;
+            }
+            QVERIFY(spec);
+            QCOMPARE(int(r.kind), int(spec->kind));
+            if (r.kind == FieldKind::StringList && !spec->values.isEmpty()) {
+                QStringList values;
+                for (const auto &v : r.values) {
+                    values.append(v.first);
+                    QVERIFY2(!v.second.isEmpty(), qPrintable(v.first));
+                }
+                QCOMPARE(values, spec->values);
+            }
+        }
+    }
+}
+
+void TestActionFields::triggerOrder_data()
+{
+    QTest::addColumn<QString>("type");
+    QTest::addColumn<QStringList>("sections");
+    QTest::addColumn<QStringList>("fields");
+    QTest::newRow("command") << QStringLiteral("command") << QStringList{"Befehl"} << QStringList{"command_id"};
+    QTest::newRow("timer") << QStringLiteral("timer") << QStringList{"Zeitnachricht"} << QStringList{"timer_id"};
+    QTest::newRow("subscribe") << QStringLiteral("twitch.subscribe") << QStringList{"Stufe"}
+                               << QStringList{"tiers"};
+    QTest::newRow("resubscribe") << QStringLiteral("twitch.resubscribe") << QStringList{"Stufe", "Monate"}
+                                 << QStringList{"tiers", "min_months"};
+    QTest::newRow("gift_sub") << QStringLiteral("twitch.gift_sub") << QStringList{"Stufe"} << QStringList{"tiers"};
+    QTest::newRow("gift_bomb") << QStringLiteral("twitch.gift_bomb") << QStringList{"Stufe", "Anzahl"}
+                               << QStringList{"tiers", "min", "max"};
+    QTest::newRow("cheer") << QStringLiteral("twitch.cheer") << QStringList{"Bits"} << QStringList{"min", "max"};
+    QTest::newRow("raid") << QStringLiteral("twitch.raid") << QStringList{"Zuschauer"}
+                          << QStringList{"min", "max"};
+    QTest::newRow("stream_online") << QStringLiteral("twitch.stream_online") << QStringList{"Start"}
+                                   << QStringList{"skip_at_start"};
+    QTest::newRow("test") << QStringLiteral("test") << QStringList{"Testwerte"} << QStringList{"variables"};
+    QTest::newRow("chat_message") << QStringLiteral("twitch.chat_message") << QStringList{} << QStringList{};
+    QTest::newRow("first_message") << QStringLiteral("twitch.first_message") << QStringList{} << QStringList{};
+    QTest::newRow("follow") << QStringLiteral("twitch.follow") << QStringList{} << QStringList{};
+    QTest::newRow("stream_offline") << QStringLiteral("twitch.stream_offline") << QStringList{} << QStringList{};
+}
+
+void TestActionFields::triggerOrder()
+{
+    QFETCH(QString, type);
+    QFETCH(QStringList, sections);
+    QFETCH(QStringList, fields);
+    const QList<FieldSection> form = triggerForm(type);
+    QCOMPARE(sectionTitles(form), sections);
+    QCOMPARE(rowNames(form), fields);
+}
+
+void TestActionFields::triggerLimitsAndChoices()
+{
+    const QList<FieldSection> command = triggerForm(QStringLiteral("command"));
+    QCOMPARE(command[0].rows[0].choices, QStringLiteral("command"));
+    QCOMPARE(int(command[0].rows[0].kind), int(FieldKind::NullableUuid));
+    QCOMPARE(triggerForm(QStringLiteral("timer"))[0].rows[0].choices, QStringLiteral("timer"));
+
+    // Stufen wie triggerDetail in actionview.cpp
+    const QList<FieldSection> sub = triggerForm(QStringLiteral("twitch.subscribe"));
+    QStringList labels;
+    for (const auto &v : sub[0].rows[0].values)
+        labels.append(v.second);
+    QCOMPARE(labels, (QStringList{"Stufe 1", "Stufe 2", "Stufe 3"}));
+
+    const QList<FieldSection> resub = triggerForm(QStringLiteral("twitch.resubscribe"));
+    QCOMPARE(int(resub[1].rows[0].kind), int(FieldKind::Int));
+    QCOMPARE(resub[1].rows[0].min, 0.0);
+    QCOMPARE(resub[1].rows[0].suffix, QStringLiteral("Monaten"));
+
+    const QList<FieldSection> cheer = triggerForm(QStringLiteral("twitch.cheer"));
+    QCOMPARE(cheer[0].rows[0].label, QStringLiteral("von"));
+    QCOMPARE(cheer[0].rows[1].label, QStringLiteral("bis"));
+    QCOMPARE(cheer[0].rows[1].suffix, QStringLiteral("Bits"));
+    QCOMPARE(cheer[0].rows[0].min, 0.0);
+    QCOMPARE(triggerForm(QStringLiteral("twitch.raid"))[0].rows[0].suffix, QStringLiteral("Zuschauer"));
+    QCOMPARE(triggerForm(QStringLiteral("twitch.gift_bomb"))[1].rows[1].suffix, QStringLiteral("Abos"));
+
+    const QList<FieldSection> online = triggerForm(QStringLiteral("twitch.stream_online"));
+    QCOMPARE(int(online[0].rows[0].kind), int(FieldKind::Bool));
+    QCOMPARE(online[0].rows[0].label, QStringLiteral("nicht beim Start des Studios im laufenden Stream"));
+
+    // Testwerte als eigene Art
+    QCOMPARE(int(triggerForm(QStringLiteral("test"))[0].rows[0].kind), int(FieldKind::StringMap));
+}
+
+void TestActionFields::triggerTitles()
+{
+    for (const TriggerTypeInfo &t : triggerTypes()) {
+        Trigger trigger;
+        trigger.type = t.key;
+        QCOMPARE(triggerTitle(trigger), QStringLiteral("Auslöser «%1»").arg(t.label));
+    }
+    Trigger trigger;
+    trigger.type = QStringLiteral("twitch.cheer");
+    QCOMPARE(triggerTitle(trigger), QStringLiteral("Auslöser «Cheer»"));
+    trigger.type = QStringLiteral("gibt_es_nicht");
+    QCOMPARE(triggerTitle(trigger), QStringLiteral("Auslöser «gibt_es_nicht»"));
+}
+
+void TestActionFields::triggerSectionOfField()
+{
+    const QList<FieldSection> bomb = triggerForm(QStringLiteral("twitch.gift_bomb"));
+    QCOMPARE(fieldSection(bomb, QStringLiteral("tiers")), QStringLiteral("Stufe"));
+    QCOMPARE(fieldSection(bomb, QStringLiteral("max")), QStringLiteral("Anzahl"));
+    QCOMPARE(fieldSection(bomb, QStringLiteral("gibt_es_nicht")), QString());
+
+    for (const TriggerTypeInfo &t : triggerTypes()) {
+        const QList<FieldSection> form = triggerForm(t.key);
+        for (const FieldSpec &spec : t.filters)
+            QVERIFY2(!fieldSection(form, spec.name).isEmpty(), qPrintable(t.key + QLatin1Char('.') + spec.name));
+    }
 }
 
 QTEST_GUILESS_MAIN(TestActionFields)

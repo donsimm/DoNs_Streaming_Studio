@@ -14,6 +14,10 @@
 // Jedes Feld aus StepTypeInfo::fields (steptypes.h) kommt in stepForm genau einmal vor; Art und
 // Grenzen stammen von dort. Die Elemente des Overlay-Schritts sind eine Zeile der Art ElementList;
 // den Inhalt je Element beschreibt elementForm.
+//
+// Auslöser (P14 e2-9, Plan 2.5): triggerForm enthält jeden Filter aus TriggerTypeInfo::filters
+// (triggertypes.h) genau einmal, ebenso mit Art und Grenzen von dort. Die Testwerte des Auslösers
+// «Test» sind eine Zeile der Art StringMap.
 
 namespace dss {
 
@@ -26,7 +30,7 @@ struct FieldRow
     double min = 0;
     double max = 0;
     QString suffix;  // Einheit hinter dem Feld («ms», «%»), leer = keine
-    QString choices; // Auswahl aus den Daten: overlay, source, media, action, queue; leer = keine
+    QString choices; // Auswahl aus den Daten: overlay, source, media, action, queue, command, timer; leer = keine
 };
 
 struct FieldSection
@@ -41,7 +45,13 @@ QList<FieldSection> stepForm(const QString &type);
 FieldSection elementForm();
 // «Schritt «<Art>»»; Art = StepTypeInfo::label, bei unbekanntem Typ der Typ selbst.
 QString stepTitle(const actions::Step &step);
-// Titel des Abschnitts mit dem Feld, für die Prüfmeldung darunter; leer, wenn das Feld fehlt.
+// Abschnitte zum Auslösertyp; leer bei Typen ohne Filter (Chat-Nachricht, Erste Nachricht, Follow,
+// Stream offline) und unbekannten.
+QList<FieldSection> triggerForm(const QString &type);
+// «Auslöser «<Art>»»; Art = TriggerTypeInfo::label, bei unbekanntem Typ der Typ selbst.
+QString triggerTitle(const actions::Trigger &trigger);
+// Titel des Abschnitts mit dem Feld (Schritt oder Auslöser), für die Prüfmeldung darunter; leer, wenn
+// das Feld fehlt.
 QString fieldSection(const QList<FieldSection> &form, const QString &fieldName);
 
 } // namespace dss
