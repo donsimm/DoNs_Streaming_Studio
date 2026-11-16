@@ -55,6 +55,7 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QStyledItemDelegate>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
@@ -273,6 +274,31 @@ class TestFensterChatBot : public QObject
             if ((*it)->text(0) == text)
                 return *it;
         return nullptr;
+    }
+
+    // Text in Spalte 0 ungekürzt sichtbar (Entscheid 16.11.): Textfläche, wie der Stil sie beim Zeichnen
+    // bestimmt (Einzug, Kästchen, Polsterung aus dem Stylesheet), fasst den Text in der Schrift der Zeile.
+    // Rand wie QCommonStylePrivate::viewItemDrawText (PM_FocusFrameHMargin + 1 je Seite).
+    static bool fullyShown(QTreeWidget *tree, QTreeWidgetItem *item)
+    {
+        struct OptionDelegate : QStyledItemDelegate {
+            void init(QStyleOptionViewItem *option, const QModelIndex &index) const { initStyleOption(option, index); }
+        };
+        const QModelIndex index = tree->indexFromItem(item, 0);
+        QStyleOptionViewItem option;
+        option.initFrom(tree->viewport());
+        option.widget = tree;
+        option.features |= QStyleOptionViewItem::HasDisplay;
+        option.rect = tree->visualRect(index);
+        OptionDelegate().init(&option, index);
+        QStyle *style = tree->style();
+        const QRect text = style->subElementRect(QStyle::SE_ItemViewItemText, &option, tree);
+        const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, tree) + 1;
+        const int needed = QFontMetrics(option.font).horizontalAdvance(option.text) + 2 * margin;
+        if (needed <= text.width())
+            return true;
+        qWarning("%s: Text %d px, Fläche %d px", qPrintable(option.text), needed, text.width());
+        return false;
     }
 
     bool putTestAction(const QUuid &id, const QString &name, const QString &group)
@@ -1377,6 +1403,29 @@ private slots:
         QTest::mouseClick(stepRemove, Qt::LeftButton);
         QTRY_COMPARE_WITH_TIMEOUT(stepCount(id), 0, 3000);
         QTRY_COMPARE_WITH_TIMEOUT(steps->topLevelItemCount(), 0, 3000);
+
+        // Handtest 16.11.: Titel «Chat senden» (fett, mit Kästchen) und ein Name, der bei offener Seite in
+        // eine Gruppe dazukommt, werden nicht gekürzt; Spalte 0 wächst mit (Entscheid 16.11.)
+        addStep(actions::stepType(QString::fromLatin1(actions::kStepChatSend))->label, 1);
+        QTRY_COMPARE_WITH_TIMEOUT(steps->topLevelItemCount(), 1, 3000);
+        QVERIFY(steps->topLevelItem(0)->font(0).bold());
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(steps, steps->topLevelItem(0)), 3000);
+        QTest::mouseClick(stepRemove, Qt::LeftButton); // leerer Schritt: ohne Rückfrage
+        QTRY_COMPARE_WITH_TIMEOUT(stepCount(id), 0, 3000);
+        const QUuid longId = QUuid::createUuid();
+        const QString longName = QStringLiteral("DSS-Test senden mit einem langen Namen");
+        QVERIFY(putTestAction(longId, longName, QStringLiteral("Test")));
+        QTRY_VERIFY_WITH_TIMEOUT(treeItem(tree, longName), 3000);
+        QVERIFY(treeItem(tree, longName)->parent()); // in der Gruppe, also eingerückt
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(tree, treeItem(tree, longName)), 3000);
+        QVERIFY(putTestAction(longId, longName + QStringLiteral(" und noch länger"), QStringLiteral("Test")));
+        QTRY_VERIFY_WITH_TIMEOUT(treeItem(tree, longName + QStringLiteral(" und noch länger")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(tree, treeItem(tree, longName + QStringLiteral(" und noch länger"))), 3000);
+        const std::optional<ChangeResult> removeLong = request(
+            {QString::fromLatin1(msg::kActionRemove),
+             QJsonObject{{QStringLiteral("action_id"), longId.toString(QUuid::WithoutBraces)}}});
+        QVERIFY(removeLong && removeLong->ok);
+        QVERIFY(page->selectAction(id));
 
         // «▶ Testen» mit «Testzuschauer»: Probelauf im Testkern
         QVERIFY(testUser->findText(QStringLiteral("Testzuschauer")) >= 0);

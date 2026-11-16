@@ -4,6 +4,7 @@
 
 #include <QAbstractSpinBox>
 #include <QApplication>
+#include <QFontMetricsF>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -11,6 +12,7 @@
 #include <QLocale>
 #include <QPainter>
 #include <QStyle>
+#include <QtMath>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -38,6 +40,24 @@ void ForegroundDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
     painter->drawText(textRect, int(opt.displayAlignment),
                       opt.fontMetrics.elidedText(text, opt.textElideMode, textRect.width()));
     painter->restore();
+}
+
+QSize NameColumnDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    QSize size = ForegroundDelegate::sizeHint(option, index);
+    if (index.column() != 0)
+        return size;
+    QStyleOptionViewItem opt(option);
+    initStyleOption(&opt, index);
+    opt.rect = QRect(QPoint(0, 0), size);
+    const QWidget *widget = opt.widget;
+    QStyle *style = widget ? widget->style() : QApplication::style();
+    // Rand wie beim Zeichnen (viewItemDrawText): PM_FocusFrameHMargin + 1 je Seite
+    const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
+    const int needed = qCeil(QFontMetricsF(opt.font).horizontalAdvance(opt.text)) + 2 * margin;
+    const int available = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, widget).width();
+    size.rwidth() += qMax(0, needed - available);
+    return size;
 }
 
 QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,

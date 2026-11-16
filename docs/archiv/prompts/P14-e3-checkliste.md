@@ -237,3 +237,4 @@ Dialog «Warteschlangen» gegen «Dialog» (eigener Rahmen `QDialog`), Referenz 
 - Kurzinhalt des Auslösers «Zeitnachricht» in «Aktionen» auch in Minuten («alle 7,5 min»), mit e3-6.
 - Knöpfe und Rückfragen heissen «… löschen», nie «entfernen» (aus e2, Checkliste e2 Abschnitt 8).
 - 16.11.: Löschen einer benutzten Warteschlange stellt die betroffenen Aktionen im selben Stapel auf «Standard» um (statt «Warteschlange fehlt»); die Rückfrage «Diese laufen danach in «Standard».» bleibt (e3-8b).
+- 16.11.: «Aktionen» (links) und «Schritte» ohne Kopfzeile; die erste Spalte ist immer so breit wie der längste Eintrag (mit Einrückung, Kästchen, fetter Schrift), wächst mit neuen oder umbenannten Einträgen mit, nichts wird abgeschnitten, kein Ziehen (e3-10).

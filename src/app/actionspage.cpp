@@ -127,7 +127,9 @@ ActionsPage::ActionsPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     // Doppelklick benennt die Gruppe um wie im Dock «Medien»; auf- und zuklappen mit dem Pfeil
     m_tree->setExpandsOnDoubleClick(false);
-    // Name so breit wie nötig, der Kurzinhalt (Anzahl bzw. Auslöser) nimmt den Rest
+    // Name so breit wie nötig und nie gekürzt (NameColumnDelegate, Entscheid 16.11.), der Kurzinhalt
+    // (Anzahl bzw. Auslöser) nimmt den Rest
+    m_tree->setItemDelegate(new NameColumnDelegate(m_tree));
     m_tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_tree->header()->setStretchLastSection(true);
     connect(m_tree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem *current) {
@@ -307,6 +309,8 @@ QWidget *ActionsPage::createTriggerSection()
     w->setObjectName(QStringLiteral("triggerSection"));
     m_triggers = detailTree(QStringLiteral("actionTriggers"), QStringLiteral("Auslöser"));
     m_triggers->setRootIsDecorated(false);
+    // wie «Schritte»: Namen nicht gekürzt (NameColumnDelegate, Entscheid 16.11.)
+    m_triggers->setItemDelegate(new NameColumnDelegate(m_triggers));
     m_triggers->setEnabled(false);
     grid->addWidget(m_triggers, 0, 0);
     m_problems[TriggerSection] = problemLine(w);
@@ -334,8 +338,9 @@ QWidget *ActionsPage::createStepSection()
     QWidget *w = section(QStringLiteral("Schritte"), nullptr, &grid);
     w->setObjectName(QStringLiteral("stepSection"));
     m_steps = detailTree(QStringLiteral("actionSteps"), QStringLiteral("Schritte"));
-    // Abgeschaltete Schritte rot (stateError aus dem Theme): Farbe in Bäumen nur über den Delegaten
-    m_steps->setItemDelegate(new ForegroundDelegate(m_steps));
+    // Abgeschaltete Schritte rot (stateError aus dem Theme): Farbe in Bäumen nur über den Delegaten;
+    // fette Titel nicht gekürzt (NameColumnDelegate, Entscheid 16.11.)
+    m_steps->setItemDelegate(new NameColumnDelegate(m_steps));
     m_steps->setEnabled(false);
     grid->addWidget(m_steps, 0, 0);
     m_problems[StepSection] = problemLine(w);

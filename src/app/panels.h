@@ -73,3 +73,16 @@ public:
     using QStyledItemDelegate::QStyledItemDelegate;
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 };
+
+// Spalte 0 eines Baums ohne Kopfzeile so breit wie der längste Eintrag, nichts gekürzt (Entscheid
+// 16.11.): Mit dem Stylesheet ist die Breite aus QStyledItemDelegate::sizeHint bis 1 px kleiner als
+// die Textfläche, die der Stil beim Zeichnen nimmt (im Handtest «Chat send…», tst_fensterchatbot).
+// Darum misst sizeHint den Text in der Schrift der Zeile (auch fett) gegen SE_ItemViewItemText und
+// legt den Rest dazu. Einzug und Kästchen rechnet QTreeView bzw. der Stil; ResizeToContents
+// übernimmt die Breite bei neuen und umbenannten Einträgen.
+class NameColumnDelegate : public ForegroundDelegate
+{
+public:
+    using ForegroundDelegate::ForegroundDelegate;
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+};
