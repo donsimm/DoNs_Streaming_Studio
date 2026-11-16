@@ -12,6 +12,7 @@ add_library(dss_app_ui STATIC
   actionspage.h actionspage.cpp
   listdetailpage.h listdetailpage.cpp
   commandspage.h commandspage.cpp
+  timerspage.h timerspage.cpp
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp
@@ -21,6 +22,7 @@ add_library(dss_app_ui STATIC
   obssourcedialog.h obssourcedialog.cpp
   mainwindowedit.cpp
   mainwindowcommands.cpp
+  mainwindowtimers.cpp
   translation.h translation.cpp
 )
 target_include_directories(dss_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

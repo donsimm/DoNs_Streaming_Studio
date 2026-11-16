@@ -10,6 +10,7 @@
 class ActionsPage;
 class CommandForm;
 class ListDetailPage;
+class TimerForm;
 class QButtonGroup;
 class QCheckBox;
 class QComboBox;
@@ -48,6 +49,7 @@ public:
     ListDetailPage *commandsPage() const { return m_commands; }
     CommandForm *commandForm() const { return m_commandForm; } // P14 e3-5: rechts in «Befehle»
     ListDetailPage *timersPage() const { return m_timers; }
+    TimerForm *timerForm() const { return m_timerForm; } // P14 e3-6: rechts in «Zeitnachrichten»
     QWidget *variablesArea(int which) const { return m_variableAreas[which]; } // 0 Für alle, 1 Je Zuschauer
     // Bereich «Ereignisse»: sichtbare Liste neu (dss::EventRows::visibleRows) bzw. eine Änderung
     // nach dss::EventRows::add; row gilt nur bei change.appended.
@@ -118,5 +120,6 @@ private:
     ListDetailPage *m_commands = nullptr;
     CommandForm *m_commandForm = nullptr;
     ListDetailPage *m_timers = nullptr;
+    TimerForm *m_timerForm = nullptr;
     QWidget *m_variableAreas[2] = {};
 };

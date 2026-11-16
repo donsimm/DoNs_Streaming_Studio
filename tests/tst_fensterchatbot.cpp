@@ -22,6 +22,7 @@
 #include "steptypes.h"
 #include "symbols.h"
 #include "theme.h"
+#include "timerspage.h"
 #include "triggertypes.h"
 #include "twitchtestserver.h"
 #include "version.h"
@@ -1740,6 +1741,205 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!coreCommand(game.id), 3000);
         QTRY_VERIFY_WITH_TIMEOUT(page->selectedRow().isNull() && !page->detailShown(), 3000);
         QCOMPARE(page->detailTitle(), QStringLiteral("Befehl"));
+        const std::optional<ChangeResult> removeAction = request(
+            {QStringLiteral("action_remove"), QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
+        QVERIFY(removeAction && removeAction->ok);
+    }
+
+    // P14 e3-6: Unterreiter «Zeitnachrichten» (Zeilen, Minuten mit Komma, «Zufällig» nur Freigabe,
+    // Prüfmeldung, Löschen mit Rückfrage, «Öffnen»)
+    void timersTab()
+    {
+        auto *chatBot = child<ChatBotPage>("chatBotPage");
+        ListDetailPage *page = chatBot->timersPage();
+        TimerForm *form = chatBot->timerForm();
+        QVERIFY(page && form);
+        const auto coreTimer = [this](const QUuid &id) -> std::optional<actions::Timer> {
+            const std::optional<ActionsConfigInfo> info = m_client->actionsConfig();
+            const actions::Timer *t = info && info->config ? info->config->timer(id) : nullptr;
+            return t ? std::optional<actions::Timer>(*t) : std::nullopt;
+        };
+        const auto status = [this] { return m_window->statusBar()->currentMessage(); };
+
+        actions::Timer info;
+        info.id = QUuid::createUuid();
+        info.name = QStringLiteral("DSS-Test Info");
+        info.intervalS = 1200;
+        info.lines = 5;
+        actions::Timer once;
+        once.id = QUuid::createUuid();
+        once.name = QStringLiteral("DSS-Test Einmal");
+        once.enabled = false;
+        once.repeat = false;
+        once.onlyLive = false;
+        for (const actions::Timer &t : {info, once}) {
+            const std::optional<ChangeResult> put = request(
+                {QStringLiteral("timer_put"), QJsonObject{{QStringLiteral("timer"), actions::timerToJson(t)}}});
+            QVERIFY2(put && put->ok, put ? qPrintable(put->message) : "keine Antwort");
+        }
+        actions::Action action;
+        action.id = QUuid::createUuid();
+        action.name = QStringLiteral("DSS-Test Info-Zeitaktion");
+        actions::Trigger trigger = actions::newTrigger(QString::fromLatin1(actions::kTriggerTimer));
+        trigger.fields.insert(QStringLiteral("timer_id"), info.id.toString(QUuid::WithoutBraces));
+        action.triggers = {trigger};
+        const std::optional<ChangeResult> putAction = request(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(action)}}});
+        QVERIFY2(putAction && putAction->ok, putAction ? qPrintable(putAction->message) : "keine Antwort");
+
+        QTest::mouseClick(child<QToolButton>("chatBotTab3"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+
+        // Zeilen: Spalten aus TimerRow, abgeschaltet grau, kein Hinweis in der Leiste
+        auto *table = page->findChild<QTreeWidget *>(QStringLiteral("timersTable"));
+        QTRY_VERIFY_WITH_TIMEOUT(findRow(table, 1, info.name) && findRow(table, 1, once.name), 3000);
+        QTreeWidgetItem *infoItem = findRow(table, 1, info.name);
+        QCOMPARE(infoItem->text(2), QStringLiteral("20 min"));
+        QCOMPARE(infoItem->text(3), QStringLiteral("5"));
+        QCOMPARE(infoItem->text(4), QStringLiteral("ja"));
+        QCOMPARE(infoItem->text(5), action.name);
+        QTreeWidgetItem *onceItem = findRow(table, 1, once.name);
+        QCOMPARE(onceItem->text(2), QStringLiteral("einmal nach 20 min"));
+        QCOMPARE(onceItem->text(3), QStringLiteral("—"));
+        QCOMPARE(onceItem->checkState(0), Qt::Unchecked);
+        QCOMPARE(onceItem->foreground(1).color(), darkTheme().textDisabled);
+        QVERIFY(!page->findChild<QToolButton *>(QStringLiteral("timersAdd"))
+                     ->parentWidget()->findChild<QLabel *>(QStringLiteral("hintLabel")));
+        QVERIFY(page->findChild<QToolButton *>(QStringLiteral("timersAdd"))->isEnabled());
+
+        // Kästchen «Aktiv» → timer_put mit enabled
+        findRow(table, 1, once.name)->setCheckState(0, Qt::Checked);
+        QTRY_VERIFY_WITH_TIMEOUT(coreTimer(once.id) && coreTimer(once.id)->enabled, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: DSS-Test Einmal"), 3000);
+
+        // Auswahl: Titel und Werte; ein Wechsel schafft keine neuen Felder
+        QVERIFY(page->selectRow(info.id));
+        QVERIFY(page->detailShown());
+        QCOMPARE(page->detailTitle(), QStringLiteral("Zeitnachricht «DSS-Test Info»"));
+        auto *name = form->findChild<QLineEdit *>(QStringLiteral("timerName"));
+        auto *interval = form->findChild<QDoubleSpinBox *>(QStringLiteral("timerInterval"));
+        auto *random = form->findChild<QCheckBox *>(QStringLiteral("timerRandom"));
+        auto *randomMin = form->findChild<QDoubleSpinBox *>(QStringLiteral("timerRandomMin"));
+        auto *randomMax = form->findChild<QDoubleSpinBox *>(QStringLiteral("timerRandomMax"));
+        auto *lines = form->findChild<QSpinBox *>(QStringLiteral("timerLines"));
+        auto *actionChoice = form->findChild<QComboBox *>(QStringLiteral("timerAction"));
+        QVERIFY(name && interval && random && randomMin && randomMax && lines && actionChoice);
+        QCOMPARE(name->text(), info.name);
+        QCOMPARE(interval->text(), QStringLiteral("20 min"));
+        QCOMPARE(interval->suffix(), QStringLiteral(" min"));
+        QCOMPARE(interval->minimum(), 1.0); // kleinster Wert aus minutesRow
+        QVERIFY(!interval->keyboardTracking());
+        QCOMPARE(lines->value(), 5);
+        QCOMPARE(lines->maximum(), kMaxTimerLines); // Grenze aus der Logik
+        QCOMPARE(actionChoice->currentText(), action.name);
+        QCOMPARE(interval->maximum(), 1440.0); // 24 h aus minutesRow
+        QLabel *intervalLabel = nullptr;
+        for (QLabel *label : form->findChildren<QLabel *>())
+            if (label->buddy() == interval)
+                intervalLabel = label;
+        QVERIFY(intervalLabel);
+        // «von» und «bis» ohne «Zufällig» ausgegraut, aber sichtbar; «Abstand» frei
+        QVERIFY(!random->isChecked());
+        QVERIFY(randomMin->isVisible() && randomMax->isVisible());
+        QVERIFY(!randomMin->isEnabled() && !randomMax->isEnabled());
+        QVERIFY(interval->isEnabled() && intervalLabel->isEnabled());
+        const int widgetCount = int(form->findChildren<QWidget *>().size());
+        QVERIFY(page->selectRow(once.id));
+        QCOMPARE(name->text(), once.name);
+        QCOMPARE(actionChoice->currentIndex(), 0);
+        QVERIFY(!form->findChild<QPushButton *>(QStringLiteral("timerOpenAction"))->isEnabled());
+        QCOMPARE(int(form->findChildren<QWidget *>().size()), widgetCount);
+        QVERIFY(page->selectRow(info.id));
+
+        // Minuten mit Komma: «7,5» → 450 s im timer_put
+        interval->setFocus();
+        interval->selectAll();
+        QTest::keyClicks(interval, QStringLiteral("7,5"));
+        QTest::keyClick(interval, Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(coreTimer(info.id) && coreTimer(info.id)->intervalS == 450, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: DSS-Test Info"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(findRow(table, 1, info.name)->text(2), QStringLiteral("7,5 min"), 3000);
+        QCOMPARE(interval->text(), QStringLiteral("7,5 min"));
+
+        // «Zufällig» schaltet nur die Freigabe von «Abstand» und «von»/«bis»; ohne Bereich gilt der Abstand
+        QTest::mouseClick(random, Qt::LeftButton, {}, QPoint(4, random->height() / 2));
+        QTRY_VERIFY_WITH_TIMEOUT(coreTimer(info.id) && coreTimer(info.id)->random, 3000);
+        QCOMPARE(coreTimer(info.id)->randomMinS, 450);
+        QCOMPARE(coreTimer(info.id)->randomMaxS, 450);
+        QTRY_VERIFY_WITH_TIMEOUT(randomMin->isEnabled() && randomMax->isEnabled(), 3000);
+        QVERIFY(!interval->isEnabled() && !intervalLabel->isEnabled());
+        QVERIFY(interval->isVisible() && intervalLabel->isVisible());
+        QCOMPARE(randomMin->text(), QStringLiteral("7,5 min"));
+        QCOMPARE(int(form->findChildren<QWidget *>().size()), widgetCount);
+
+        // Prüfmeldung unter «Abstand» (bis kürzer als von), danach wieder der Wert des Kerns
+        auto *intervalSection = form->findChild<QWidget *>(QStringLiteral("timerIntervalSection"));
+        auto *problem = intervalSection->findChild<QLabel *>(QStringLiteral("fieldProblem"));
+        QVERIFY(problem && problem->isVisible() && problem->text().isEmpty()); // Zeile immer da
+        randomMax->setValue(5);
+        QTRY_COMPARE_WITH_TIMEOUT(problem->text(),
+                                  QStringLiteral("Der längste Abstand darf nicht kürzer sein als der kürzeste."), 3000);
+        QCOMPARE(randomMax->text(), QStringLiteral("7,5 min"));
+        QCOMPARE(coreTimer(info.id)->randomMaxS, 450);
+        QVERIFY(problem->geometry().top() > randomMax->geometry().bottom());
+        randomMax->setValue(10);
+        QTRY_VERIFY_WITH_TIMEOUT(coreTimer(info.id) && coreTimer(info.id)->randomMaxS == 600, 3000);
+        QVERIFY(problem->text().isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(findRow(table, 1, info.name)->text(2), QStringLiteral("7,5 bis 10 min, zufällig"), 3000);
+        QTest::mouseClick(random, Qt::LeftButton, {}, QPoint(4, random->height() / 2));
+        QTRY_VERIFY_WITH_TIMEOUT(coreTimer(info.id) && !coreTimer(info.id)->random, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!randomMin->isEnabled() && randomMin->isVisible(), 3000);
+        QVERIFY(interval->isEnabled() && intervalLabel->isEnabled());
+
+        // «Ausführen»: «Keine» gibt den Auslöser ab, die Aktion bekommt ihn wieder
+        actionChoice->setCurrentIndex(0);
+        emit actionChoice->activated(0);
+        QTRY_VERIFY_WITH_TIMEOUT(timerAction(*m_client->actionsConfig()->config, info.id).isNull(), 3000);
+        const int actionIndex = actionChoice->findText(action.name);
+        QVERIFY(actionIndex > 0);
+        actionChoice->setCurrentIndex(actionIndex);
+        emit actionChoice->activated(actionIndex);
+        QTRY_COMPARE_WITH_TIMEOUT(timerAction(*m_client->actionsConfig()->config, info.id), action.id, 3000);
+
+        // «Öffnen» springt nach «Aktionen» und wählt die Aktion
+        auto *open = form->findChild<QPushButton *>(QStringLiteral("timerOpenAction"));
+        QTRY_VERIFY_WITH_TIMEOUT(open->isEnabled(), 3000);
+        QTest::mouseClick(open, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(chatBot->actionsPage()->isVisible(), 3000);
+        QCOMPARE(chatBot->actionsPage()->selectedAction(), action.id);
+        QTest::mouseClick(child<QToolButton>("chatBotTab3"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(page->isVisible(), 3000);
+
+        // Hinzufügen: neue Zeitnachricht gewählt
+        QTest::mouseClick(page->findChild<QToolButton *>(QStringLiteral("timersAdd")), Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(name->text(), QStringLiteral("Neue Zeitnachricht"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gespeichert: Neue Zeitnachricht"), 3000);
+        const QUuid added = page->selectedRow();
+        QVERIFY(coreTimer(added));
+
+        // Löschen: unbenutzt ohne Rückfrage, benutzt mit Rückfrage («Abbrechen» lässt sie stehen)
+        auto *remove = page->findChild<QToolButton *>(QStringLiteral("timersRemove"));
+        QVERIFY(remove->isEnabled());
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreTimer(added), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gelöscht: Neue Zeitnachricht"), 3000);
+        QVERIFY(page->selectRow(info.id));
+        QString question;
+        answerQuestion(QStringLiteral("Abbrechen"), &question);
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QCOMPARE(question, QStringLiteral("Zeitnachricht «DSS-Test Info» löschen? Sie wird von 1 Aktion benutzt."));
+        QVERIFY(coreTimer(info.id));
+        question.clear();
+        answerQuestion(QStringLiteral("Löschen"), &question);
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreTimer(info.id), 3000);
+        QVERIFY(!question.isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(status(), QStringLiteral("Gelöscht: DSS-Test Info"), 3000);
+        QVERIFY(page->selectRow(once.id));
+        QTest::mouseClick(remove, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!coreTimer(once.id), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(page->selectedRow().isNull() && !page->detailShown(), 3000);
+        QCOMPARE(page->detailTitle(), QStringLiteral("Zeitnachricht"));
         const std::optional<ChangeResult> removeAction = request(
             {QStringLiteral("action_remove"), QJsonObject{{QStringLiteral("action_id"), action.id.toString(QUuid::WithoutBraces)}}});
         QVERIFY(removeAction && removeAction->ok);

@@ -33,33 +33,6 @@ namespace {
 // keepValueVisible misst den längsten Wert, so breit darf kein Feld werden. 2^31 − 1 wie QSpinBox.
 constexpr double kSpinLimit = 2147483647.0;
 
-// Zahl mit Komma und ohne Nullen am Ende, «8,5 s» statt «8,500 s» (Entscheid des Nutzers,
-// 2026-11-16; Komma wie durationText und mediaDurationText). Die Nachkommastellen aus FieldRow
-// bleiben eingebbar. QDoubleSpinBox::textFromValue: https://doc.qt.io/qt-6/qdoublespinbox.html#textFromValue
-class FieldSpinBox : public QDoubleSpinBox
-{
-public:
-    explicit FieldSpinBox(QWidget *parent) : QDoubleSpinBox(parent)
-    {
-        QLocale comma(QLocale::German, QLocale::Germany);
-        comma.setNumberOptions(QLocale::OmitGroupSeparator);
-        setLocale(comma);
-    }
-
-    QString textFromValue(double value) const override
-    {
-        QString text = locale().toString(value, 'f', decimals());
-        const QString point = locale().decimalPoint();
-        if (decimals() > 0 && text.contains(point)) {
-            while (text.endsWith(QLatin1Char('0')))
-                text.chop(1);
-            if (text.endsWith(point))
-                text.chop(point.size());
-        }
-        return text;
-    }
-};
-
 QString pageKey(ActionFieldsPanel::Target target, const QString &type)
 {
     return (target == ActionFieldsPanel::Target::Step ? QStringLiteral("step:") : QStringLiteral("trigger:")) + type;

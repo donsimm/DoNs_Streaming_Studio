@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDoubleSpinBox>
 #include <QList>
 #include <QString>
 #include <QStyledItemDelegate>
@@ -22,11 +23,26 @@ QToolButton *symbolButton(const QString &symbolFile, const QString &fallback,
 // neben den Pfeilknöpfen ganz sichtbar bleibt (P06). Ändert nur die Mindestbreite.
 void keepValueVisible(QAbstractSpinBox *spin);
 
+// Zahl mit Komma und ohne Nullen am Ende, «8,5 s» statt «8,500 s» (Entscheid des Nutzers,
+// 2026-11-16; Komma wie durationText und mediaDurationText). Die Nachkommastellen bleiben
+// eingebbar. P14 e2-9b in «Aktionen» rechts, seit e3-6 auch für die Abstände der Zeitnachrichten.
+// QDoubleSpinBox::textFromValue: https://doc.qt.io/qt-6/qdoublespinbox.html#textFromValue
+class FieldSpinBox : public QDoubleSpinBox
+{
+public:
+    explicit FieldSpinBox(QWidget *parent = nullptr);
+    QString textFromValue(double value) const override;
+};
+
 // Bereich wie im Dock «Eigenschaften»: kleiner Titel (#propertySectionTitle), feine Linie
 // (#propertySectionLine), darunter die Felder im Raster *grid. Knöpfe in titleButtons stehen
 // in der Titelzeile am rechten Rand.
 QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
                  const QList<QToolButton *> &titleButtons = {});
+
+// Beschriftung eines Felds im Raster von section(), mit dem Feld als Buddy (P14 e3-5, seit e3-6
+// geteilt für die Formulare rechts in «Befehle» und «Zeitnachrichten»).
+QLabel *fieldLabel(const QString &text, QWidget *buddy, QWidget *parent);
 
 // Knopfleiste unter einer Liste (#dockButtons): left linksbündig, right nach einer Dehnung
 // rechtsbündig. Ist stretchWidget gesetzt (ein Element aus left), nimmt es den freien Platz

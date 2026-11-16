@@ -425,13 +425,24 @@ QString minutesText(int seconds);
 // keiner Zahl, negativ oder zu gross für int. Die Grenze von 60 s prüft putTimer.
 std::optional<int> secondsFromMinutes(const QString &text);
 
+// Obere Grenze der Chat-Zeilen; putTimer weist grössere Werte ab, das Feld nutzt sie (P14 e3-6)
+inline constexpr int kMaxTimerLines = 1000;
+// Obere Grenze von Abstand, «von» und «bis» (24 h, Entscheid des Nutzers, 2026-11-16); putTimer weist
+// grössere Werte ab, minutesRow nutzt sie
+inline constexpr int kMaxTimerIntervalS = 86400;
+// «Zufällig» schalten (P14 e3-6). Beim Einschalten ohne gültigen Bereich (von unter 60 s oder bis
+// kürzer als von) gilt von = bis = Abstand, damit putTimer nicht ablehnt; ausgeschaltet bleibt der
+// Bereich wie er ist.
+void setTimerRandom(actions::Timer &timer, bool random);
+
 EditResult newTimer(const actions::ActionsConfig &config);
 EditResult copyTimer(const actions::ActionsConfig &config, const QUuid &timerId);
 EditResult removeTimer(const actions::ActionsConfig &config, const QUuid &timerId);
 // Rückfrage (siehe removeActionQuestion): «Zeitnachricht «Info» löschen? Sie wird von 1 Aktion benutzt.»
 QString removeTimerQuestion(const actions::ActionsConfig &config, const QUuid &timerId);
-// timer_put; Name nicht leer, Abstand mindestens 60 s, bei Zufall Bereich ab 60 s und von ≤ bis,
-// sonst wie der Kern beim Lesen (timerFromJson). Gleich wie before: nichts.
+// timer_put; Name nicht leer, Abstand von 60 s bis kMaxTimerIntervalS, bei Zufall Bereich ebenso und von ≤ bis,
+// Chat-Zeilen von 0 bis kMaxTimerLines, sonst wie der Kern beim Lesen (timerFromJson). Meldungen
+// nennen die Abstände in Minuten. Gleich wie before: nichts.
 EditResult putTimer(const actions::Timer &before, const actions::Timer &after);
 
 // --- Dialog «Warteschlangen» ---

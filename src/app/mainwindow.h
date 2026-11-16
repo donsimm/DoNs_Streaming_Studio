@@ -4,6 +4,7 @@
 #include "actionview.h"
 #include "canvasedit.h"
 #include "commandspage.h"
+#include "timerspage.h"
 #include "connectionstate.h"
 #include "docks.h"
 #include "theme.h"
@@ -148,6 +149,15 @@ private:
     void editShownCommand(CommandForm::Section section, const std::function<void(dss::actions::Command &)> &change);
     void startCommandTest(int userIndex);
     void sendNextCommandTest();
+    // P14 e3-6: Unterreiter «Zeitnachrichten» (mainwindowtimers.cpp), wie «Befehle»
+    void connectTimers();
+    void refreshTimerList();
+    void refreshTimerDetail(bool resetFields = false);
+    void runTimerEdits(const dss::EditResult &result, const QString &savedName,
+                       TimerForm::Section section = TimerForm::NoSection, bool deleted = false);
+    void sendNextTimerEdit();
+    // Bearbeitung der gezeigten Zeitnachricht: change ändert eine Kopie aus dem Kern (putTimer)
+    void editShownTimer(TimerForm::Section section, const std::function<void(dss::actions::Timer &)> &change);
     // Variablen holen, solange «Befehle» sichtbar ist (Spalte «Benutzt»)
     void requestShownVariables();
     void saveCanvasImage(); // P10-vor: Datei → Leinwand als Bild speichern
@@ -295,6 +305,12 @@ private:
     QList<dss::ActionsEdit> m_commandTests; // noch zu schickende action_test von «▶ Testen als …»
     qint64 m_commandTestRequest = 0;
     QString m_commandTestName;
+    QList<dss::ActionsEdit> m_timerEdits; // P14 e3-6: wie m_commandEdits
+    qint64 m_timerEditRequest = 0;
+    QString m_timerEditSaved;
+    QUuid m_timerEditCreated;
+    TimerForm::Section m_timerEditSection = TimerForm::NoSection;
+    bool m_timerEditDeleted = false;
     dss::ModuleDocks m_moduleDocks;    // P13: Docks je Reiter
     QByteArray m_editorLayout;         // P13: Anordnung beim Verlassen von «Overlays» (saveLayout)
     CanvasWidget *m_canvas = nullptr;

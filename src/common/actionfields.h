@@ -78,7 +78,7 @@ double fromDisplay(const FieldRow &row, double shown);
 
 // Feld für einen Abstand der Zeitnachricht (interval_s, random_min_s, random_max_s), P14 e3-2:
 // gespeichert in Sekunden, angezeigt in Minuten (scale 60, suffix «min», 1 Nachkommastelle, Art Int),
-// kleinster Wert 1 min (= kMinTimerIntervalS). Beschriftung vom Aufrufer.
+// kleinster Wert 1 min (= kMinTimerIntervalS), grösster 1440 min (= kMaxTimerIntervalS). Beschriftung vom Aufrufer.
 FieldRow minutesRow(const QString &name, const QString &label);
 
 // Abschnitte zum Schritttyp; leer bei Typen ohne Felder (Dann, Sonst, Abbruch) und unbekannten.

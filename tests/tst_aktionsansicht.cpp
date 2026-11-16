@@ -506,6 +506,16 @@ private slots:
         QCOMPARE(rows.at(8).detail, QStringLiteral("nicht beim Start des Studios im laufenden Stream"));
         QCOMPARE(rows.at(10).text, QStringLiteral("Zeitnachricht · Info alle 20 min"));
         QCOMPARE(rows.at(10).detail, QStringLiteral("alle 20 min"));
+        {
+            // Abstand in Minuten mit Komma, auch links in der Zusammenfassung (Nachtrag des Nutzers,
+            // 2026-11-16); vorher «alle 450 s»
+            ActionsConfig minutes = config;
+            for (Timer &t : minutes.timers)
+                t.intervalS = 450;
+            QCOMPARE(triggerRows(*minutes.action(kAllTriggers), minutes, {}).at(10).detail,
+                     QStringLiteral("alle 7,5 min"));
+            QVERIFY(actionTriggerSummary(*minutes.action(kAllTriggers), minutes).contains(QStringLiteral("alle 7,5 min")));
+        }
         QCOMPARE(rows.at(11).text, QStringLiteral("Test"));
         QCOMPARE(rows.at(11).detail, QStringLiteral("2 Testwerte"));
         QCOMPARE(triggerRows(*config.action(kShoutoutCommand), config, {}).first().text,
@@ -942,15 +952,37 @@ private slots:
         Timer after = before;
         QVERIFY(putTimer(before, after).edits.isEmpty());
         after.intervalS = 59;
-        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der Abstand muss mindestens 60 s sein."));
+        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der Abstand muss mindestens 1 min sein."));
+        // Obergrenze 24 h (Entscheid des Nutzers, 2026-11-16)
+        after.intervalS = kMaxTimerIntervalS + 1;
+        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der Abstand darf höchstens 1440 min sein."));
+        after.intervalS = kMaxTimerIntervalS;
+        QCOMPARE(putTimer(before, after).edits.size(), 1);
         after.intervalS = 600;
+        after.lines = kMaxTimerLines + 1;
+        QCOMPARE(putTimer(before, after).problem,
+                 QStringLiteral("Die Zahl der Chat-Zeilen muss zwischen 0 und 1000 liegen."));
+        after.lines = -1;
+        QCOMPARE(putTimer(before, after).problem,
+                 QStringLiteral("Die Zahl der Chat-Zeilen muss zwischen 0 und 1000 liegen."));
+        after.lines = kMaxTimerLines;
+        QCOMPARE(putTimer(before, after).edits.size(), 1);
+        after.lines = before.lines;
         after.random = true;
         after.randomMinS = 30;
-        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der kürzeste Abstand muss mindestens 60 s sein."));
+        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der kürzeste Abstand muss mindestens 1 min sein."));
         after.randomMinS = 120;
         after.randomMaxS = 60;
         QCOMPARE(putTimer(before, after).problem,
                  QStringLiteral("Der längste Abstand darf nicht kürzer sein als der kürzeste."));
+        after.randomMaxS = kMaxTimerIntervalS + 1;
+        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der längste Abstand darf höchstens 1440 min sein."));
+        after.randomMinS = kMaxTimerIntervalS + 1;
+        QCOMPARE(putTimer(before, after).problem, QStringLiteral("Der kürzeste Abstand darf höchstens 1440 min sein."));
+        after.randomMinS = kMaxTimerIntervalS;
+        after.randomMaxS = kMaxTimerIntervalS;
+        QCOMPARE(putTimer(before, after).edits.size(), 1);
+        after.randomMinS = 120;
         after.randomMaxS = 300;
         EditResult r = putTimer(before, after);
         QCOMPARE(r.edits.size(), 1);
@@ -959,6 +991,22 @@ private slots:
         QVERIFY2(timerFromJson(r.edits.first().fields.value(QStringLiteral("timer")).toObject(), &saved, &error),
                  qPrintable(error));
         QCOMPARE(saved.randomMaxS, 300);
+
+        // «Zufällig»: ohne gültigen Bereich von = bis = Abstand, sonst bleibt der Bereich
+        Timer random = before;
+        random.randomMinS = 0;
+        random.randomMaxS = 0;
+        setTimerRandom(random, true);
+        QVERIFY(random.random);
+        QCOMPARE(random.randomMinS, before.intervalS);
+        QCOMPARE(random.randomMaxS, before.intervalS);
+        QCOMPARE(putTimer(before, random).edits.size(), 1);
+        random.randomMinS = 120;
+        random.randomMaxS = 300;
+        setTimerRandom(random, false);
+        setTimerRandom(random, true);
+        QCOMPARE(random.randomMinS, 120);
+        QCOMPARE(random.randomMaxS, 300);
 
         r = newTimer(config);
         QVERIFY(timerFromJson(r.edits.first().fields.value(QStringLiteral("timer")).toObject(), &saved, &error));

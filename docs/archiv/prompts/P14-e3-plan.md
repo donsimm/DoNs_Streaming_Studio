@@ -134,7 +134,7 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Tests: `tst_fensterchatbot` (Zeilen, Filter, Kästchen, Felder ohne Neuaufbau, Prüfmeldung unter dem Abschnitt, Löschen mit Rückfrage, «Öffnen», Testen gegen den Kern im Probelauf). `scripts/testen.sh -R '^tst_fensterchatbot$'`.
   - Handtest: H2.
 
-- [ ] **e3-6 «Zeitnachrichten».** Schreibt neu `src/app/timerspage.{h,cpp}`, `chatbotpage.cpp`, `mainwindow.cpp`.
+- [x] **e3-6 «Zeitnachrichten».** Schreibt neu `src/app/timerspage.{h,cpp}`, `chatbotpage.cpp`, `mainwindow.cpp`.
   - Checkliste:
     - Links «Zeitnachrichten», rechts `timerTitle()`; ohne Auswahl «Keine Zeitnachricht gewählt».
     - Kein Suchfeld und kein Filter (Plan 6).

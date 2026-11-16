@@ -473,7 +473,8 @@ void TestActionFields::minutesForTimerSeconds()
     QCOMPARE(r.decimals, 1);
     QCOMPARE(r.min, 1.0);
     QCOMPARE(fromDisplay(r, r.min), double(kMinTimerIntervalS));
-    QVERIFY(fromDisplay(r, r.max) <= double(std::numeric_limits<int>::max()));
+    QCOMPARE(r.max, 1440.0); // 24 h (Entscheid des Nutzers, 2026-11-16)
+    QCOMPARE(fromDisplay(r, r.max), double(kMaxTimerIntervalS));
     QCOMPARE(toDisplay(r, 450), 7.5);
     QCOMPARE(toDisplay(r, 1200), 20.0);
     QCOMPARE(fromDisplay(r, 7.5), 450.0);

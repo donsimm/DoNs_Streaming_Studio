@@ -8,6 +8,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QPainter>
 #include <QStyle>
 #include <QToolButton>
@@ -59,6 +60,26 @@ void keepValueVisible(QAbstractSpinBox *spin)
     spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
 }
 
+FieldSpinBox::FieldSpinBox(QWidget *parent) : QDoubleSpinBox(parent)
+{
+    QLocale comma(QLocale::German, QLocale::Germany);
+    comma.setNumberOptions(QLocale::OmitGroupSeparator);
+    setLocale(comma);
+}
+
+QString FieldSpinBox::textFromValue(double value) const
+{
+    QString text = locale().toString(value, 'f', decimals());
+    const QString point = locale().decimalPoint();
+    if (decimals() > 0 && text.contains(point)) {
+        while (text.endsWith(QLatin1Char('0')))
+            text.chop(1);
+        if (text.endsWith(point))
+            text.chop(point.size());
+    }
+    return text;
+}
+
 // P09b, E-26: Titel und Linie wie der Rahmen des Kopfbereichs (Farbe border); P10a, Teil A 2:
 // Knöpfe in der Titelzeile.
 QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
@@ -91,6 +112,13 @@ QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
     (*grid)->setVerticalSpacing(6);
     column->addLayout(*grid);
     return w;
+}
+
+QLabel *fieldLabel(const QString &text, QWidget *buddy, QWidget *parent)
+{
+    auto *l = new QLabel(text, parent);
+    l->setBuddy(buddy);
+    return l;
 }
 
 QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, QWidget *parent,

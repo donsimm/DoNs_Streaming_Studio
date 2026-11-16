@@ -283,8 +283,8 @@ FieldRow minutesRow(const QString &name, const QString &label)
     r.scale = 60;
     r.decimals = 1;
     r.min = double(kMinTimerIntervalS) / r.scale;
-    // Obergrenze wie timerFromJson (int in Sekunden)
-    r.max = double(std::numeric_limits<int>::max()) / r.scale;
+    // Obergrenze 24 h wie putTimer (Entscheid des Nutzers, 2026-11-16)
+    r.max = double(kMaxTimerIntervalS) / r.scale;
     return r;
 }
 

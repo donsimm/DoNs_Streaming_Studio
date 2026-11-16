@@ -2,6 +2,7 @@
 
 #include "actionspage.h"
 #include "commandspage.h"
+#include "timerspage.h"
 #include "headerbar.h"
 #include "listdetailpage.h"
 #include "panels.h"
@@ -346,19 +347,10 @@ ChatBotPage::ChatBotPage(const Theme &theme, QWidget *parent) : QWidget(parent),
     m_commands->setDetailBar(m_commandForm->testBar());
     addSubTab(QStringLiteral("Befehle"), m_commands);
 
-    ListDetailPage::Setup timers;
-    timers.name = QStringLiteral("timers");
-    timers.listTitle = QStringLiteral("Zeitnachrichten");
-    timers.detailTitle = QStringLiteral("Zeitnachricht");
-    timers.emptyHint = QStringLiteral("Keine Zeitnachricht gewählt");
-    timers.tableName = QStringLiteral("Zeitnachrichten");
-    timers.columns = {{QStringLiteral("Aktiv"), 8},         {QStringLiteral("Name"), 18},
-                      {QStringLiteral("Abstand"), 24},      {QStringLiteral("Chat-Zeilen"), 13},
-                      {QStringLiteral("Nur im Stream"), 15}, {QStringLiteral("Aktionen"), 0}};
-    timers.addTip = QStringLiteral("Zeitnachricht hinzufügen");
-    timers.copyTip = QStringLiteral("Zeitnachricht kopieren");
-    timers.removeTip = QStringLiteral("Zeitnachricht löschen");
-    m_timers = new ListDetailPage(m_theme, timers, m_pages);
+    // P14 e3-6: Aufbau und Formular von «Zeitnachrichten» in timerspage.h
+    m_timers = new ListDetailPage(m_theme, timersPageSetup(), m_pages);
+    m_timerForm = new TimerForm;
+    m_timers->setDetailForm(m_timerForm);
     addSubTab(QStringLiteral("Zeitnachrichten"), m_timers);
 
     // «Variablen»: «Für alle» und «Je Zuschauer» nebeneinander mit Teiler wie «Live»

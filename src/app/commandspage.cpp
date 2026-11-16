@@ -17,13 +17,6 @@
 
 namespace {
 
-QLabel *fieldLabel(const QString &text, QWidget *buddy, QWidget *parent)
-{
-    auto *l = new QLabel(text, parent);
-    l->setBuddy(buddy);
-    return l;
-}
-
 QLabel *hintLine(const QString &text, QWidget *parent)
 {
     auto *hint = new QLabel(text, parent);

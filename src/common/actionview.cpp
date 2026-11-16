@@ -232,7 +232,7 @@ QString triggerDetail(const Trigger &trigger, const ActionsConfig &config)
         parts.append(QStringLiteral("nicht beim Start des Studios im laufenden Stream"));
     if (trigger.type == QLatin1String(kTriggerTimer)) {
         if (const Timer *timer = config.timer(idField(f, "timer_id")))
-            parts.append(QStringLiteral("alle %1").arg(durationText(qint64(timer->intervalS) * 1000)));
+            parts.append(QStringLiteral("alle %1 min").arg(minutesText(timer->intervalS)));
     }
     if (trigger.type == QLatin1String(kTriggerTest)) {
         const qsizetype n = f.value(QStringLiteral("variables")).toObject().size();
@@ -570,7 +570,8 @@ QString actionTriggerSummary(const Action &action, const ActionsConfig &config)
                                            : c->commands.first();
         } else if (t.type == QLatin1String(kTriggerTimer)) {
             const Timer *timer = config.timer(idField(t.fields, "timer_id"));
-            part = timer ? QStringLiteral("alle %1").arg(durationText(qint64(timer->intervalS) * 1000))
+            // Abstand in Minuten wie in «Zeitnachrichten» (Nachtrag des Nutzers, 2026-11-16)
+            part = timer ? QStringLiteral("alle %1 min").arg(minutesText(timer->intervalS))
                          : QStringLiteral("Zeitnachricht fehlt");
         } else {
             const TriggerTypeInfo *info = triggerType(t.type);
@@ -1598,6 +1599,15 @@ std::optional<int> secondsFromMinutes(const QString &text)
     return int(seconds);
 }
 
+void setTimerRandom(Timer &timer, bool random)
+{
+    timer.random = random;
+    if (random && (timer.randomMinS < kMinTimerIntervalS || timer.randomMaxS < timer.randomMinS)) {
+        timer.randomMinS = timer.intervalS;
+        timer.randomMaxS = timer.intervalS;
+    }
+}
+
 EditResult newTimer(const ActionsConfig &config)
 {
     QStringList names;
@@ -1653,14 +1663,24 @@ EditResult putTimer(const Timer &before, const Timer &after)
     t.name = t.name.trimmed();
     if (t.name.isEmpty())
         return problem(emptyNameProblem());
+    // Abstände in Minuten wie im Feld (Entscheid des Nutzers, 2026-11-16)
     if (t.intervalS < kMinTimerIntervalS)
-        return problem(QStringLiteral("Der Abstand muss mindestens %1 s sein.").arg(kMinTimerIntervalS));
+        return problem(QStringLiteral("Der Abstand muss mindestens %1 min sein.").arg(minutesText(kMinTimerIntervalS)));
+    if (t.intervalS > kMaxTimerIntervalS)
+        return problem(QStringLiteral("Der Abstand darf höchstens %1 min sein.").arg(minutesText(kMaxTimerIntervalS)));
     if (t.random && t.randomMinS < kMinTimerIntervalS)
-        return problem(QStringLiteral("Der kürzeste Abstand muss mindestens %1 s sein.").arg(kMinTimerIntervalS));
+        return problem(
+            QStringLiteral("Der kürzeste Abstand muss mindestens %1 min sein.").arg(minutesText(kMinTimerIntervalS)));
+    if (t.random && t.randomMinS > kMaxTimerIntervalS)
+        return problem(
+            QStringLiteral("Der kürzeste Abstand darf höchstens %1 min sein.").arg(minutesText(kMaxTimerIntervalS)));
+    if (t.random && t.randomMaxS > kMaxTimerIntervalS)
+        return problem(
+            QStringLiteral("Der längste Abstand darf höchstens %1 min sein.").arg(minutesText(kMaxTimerIntervalS)));
     if (t.random && t.randomMaxS < t.randomMinS)
         return problem(QStringLiteral("Der längste Abstand darf nicht kürzer sein als der kürzeste."));
-    if (t.lines < 0)
-        return problem(QStringLiteral("Die Zahl der Chat-Zeilen darf nicht negativ sein."));
+    if (t.lines < 0 || t.lines > kMaxTimerLines)
+        return problem(QStringLiteral("Die Zahl der Chat-Zeilen muss zwischen 0 und %1 liegen.").arg(kMaxTimerLines));
     const QJsonObject json = timerToJson(t);
     Timer check;
     QString error;

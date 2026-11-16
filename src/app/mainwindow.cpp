@@ -603,6 +603,7 @@ void MainWindow::connectChatBot()
     m_client->subscribeEvents(dss::chatBotLiveFilters());
     connectActions();
     connectCommands();
+    connectTimers();
 }
 
 void MainWindow::openAction(const QUuid &actionId)
