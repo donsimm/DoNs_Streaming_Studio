@@ -224,12 +224,39 @@ int RunRows::visibleIndex(int index) const
     return n;
 }
 
-std::optional<ChatRow> chatRow(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch)
+namespace {
+
+// Ohne Index ein Abschnitt Text wie vor em-3
+QList<ChatSegment> rowSegments(const ChatRow &row, const EmoteIndex *emotes)
+{
+    if (emotes)
+        return chatSegments(row.fragments, *emotes);
+    if (row.text.isEmpty())
+        return {};
+    return {ChatSegment{row.text, std::nullopt}};
+}
+
+// Nachricht ohne Fragmente (twitch.chat_sent, ältere Verläufe): ein Fragment text
+QList<ChatFragment> messageFragments(const QJsonObject &data, const QString &text)
+{
+    QList<ChatFragment> fragments = chatFragments(data.value(QStringLiteral("fragments")));
+    if (fragments.isEmpty() && !text.isEmpty())
+        fragments.append(ChatFragment{QStringLiteral("text"), text, {}, {}, {}, {}});
+    return fragments;
+}
+
+} // namespace
+
+std::optional<ChatRow> chatRow(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch,
+                               const EmoteIndex *emotes)
 {
     ChatRow row;
     row.time = rowTimeText(event.time);
     const QJsonObject &d = event.data;
     const QString &t = event.type;
+    // Heute nur Twitch; YouTube ergänzt hier seinen Wert
+    if (t.startsWith(QLatin1String("twitch.")))
+        row.platform = ChatPlatform::Twitch;
     if (t == QLatin1String("twitch.chat_message")) {
         if (d.value(QStringLiteral("is_bot_account")).toBool())
             row.badges.append(QStringLiteral("Bot"));
@@ -241,6 +268,8 @@ std::optional<ChatRow> chatRow(const events::Event &event, const std::optional<T
         row.color = d.value(QStringLiteral("color")).toString();
         row.text = d.value(QStringLiteral("text")).toString();
         row.messageId = d.value(QStringLiteral("message_id")).toString();
+        row.fragments = messageFragments(d, row.text);
+        row.segments = rowSegments(row, emotes);
         return row;
     }
     if (t == QLatin1String("twitch.chat_sent")) {
@@ -253,6 +282,9 @@ std::optional<ChatRow> chatRow(const events::Event &event, const std::optional<T
             row.name = QStringLiteral("—");
         row.text = d.value(QStringLiteral("text")).toString();
         row.messageId = d.value(QStringLiteral("message_id")).toString();
+        row.fragments = messageFragments(QJsonObject(), row.text);
+        row.segments = rowSegments(row, emotes);
+        row.awaitingEcho = !row.messageId.isEmpty();
         return row;
     }
     row.isEvent = true;
@@ -287,9 +319,22 @@ void ChatRows::reset(const QList<events::Event> &events, const std::optional<Twi
 RowsAppend ChatRows::add(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch)
 {
     RowsAppend change;
-    const std::optional<ChatRow> row = chatRow(event, twitch);
-    if (!row || (!row->messageId.isEmpty() && contains(row->messageId)))
+    const std::optional<ChatRow> row = chatRow(event, twitch, emotes());
+    if (!row)
         return change;
+    const int existing = row->messageId.isEmpty() ? -1 : indexOf(row->messageId);
+    if (existing >= 0) {
+        // Echo der eigenen Nachricht: Fragmente mit Twitch-Emotes und Chatfarbe kennt erst EventSub
+        ChatRow &own = m_rows[existing];
+        if (own.awaitingEcho && event.type == QLatin1String("twitch.chat_message")) {
+            own.fragments = row->fragments;
+            own.segments = row->segments;
+            own.color = row->color;
+            own.awaitingEcho = false;
+            change.changed = existing;
+        }
+        return change;
+    }
     if (m_rows.size() >= kMaxRows) {
         m_rows.removeFirst();
         change.removedFront = 1;
@@ -299,9 +344,22 @@ RowsAppend ChatRows::add(const events::Event &event, const std::optional<TwitchS
     return change;
 }
 
-bool ChatRows::contains(const QString &messageId) const
+void ChatRows::setEmotes(const EmoteIndex &emotes)
 {
-    return std::any_of(m_rows.cbegin(), m_rows.cend(), [&](const ChatRow &r) { return r.messageId == messageId; });
+    m_emotes = emotes;
+    for (ChatRow &row : m_rows) {
+        if (!row.isEvent)
+            row.segments = rowSegments(row, &emotes);
+    }
+}
+
+int ChatRows::indexOf(const QString &messageId) const
+{
+    for (int i = 0; i < m_rows.size(); ++i) {
+        if (m_rows[i].messageId == messageId)
+            return i;
+    }
+    return -1;
 }
 
 namespace {

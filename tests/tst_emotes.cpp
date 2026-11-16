@@ -2,6 +2,7 @@
 // ohne Netz und ohne Fenster (P14 Emotes em-2, Regel 9). Antworten vom 2026-11-16 aus
 // tests/daten/emotes/ (Kanaldaten neutral); 7tv-kanal-mit-set.json und ffz-kanal-mit-raum.json
 // sind erfunden, in der Form der echten Antworten (der eigene Kanal hat dort nichts).
+// em-3: Vorrang im Index, Abschnitte einer Nachricht, Statustexte und Tooltips.
 
 #include "emotes.h"
 
@@ -15,6 +16,7 @@
 using namespace dss;
 
 Q_DECLARE_METATYPE(dss::EmoteProvider)
+Q_DECLARE_METATYPE(dss::EmoteLoadState)
 
 namespace {
 
@@ -451,6 +453,202 @@ private slots:
         QCOMPARE(emoteProviderName(EmoteProvider::Bttv), QStringLiteral("BTTV"));
         QCOMPARE(emoteProviderName(EmoteProvider::SevenTv), QStringLiteral("7TV"));
         QCOMPARE(emoteProviderName(EmoteProvider::Ffz), QStringLiteral("FFZ"));
+    }
+
+    // --- em-3: Erkennung, Abschnitte, Statustexte ---
+
+    void indexPriority()
+    {
+        // Derselbe Name in allen sechs Listen; Vorrang FFZ-Kanal, BTTV-Kanal, 7TV-Kanal, FFZ-global,
+        // BTTV-global, 7TV-global (Recherche 5). Jede Runde entfernt die Liste, die gewonnen hat.
+        struct List
+        {
+            EmoteProvider provider;
+            bool channel;
+        };
+        const QList<List> order{{EmoteProvider::Ffz, true},      {EmoteProvider::Bttv, true},
+                                {EmoteProvider::SevenTv, true},  {EmoteProvider::Ffz, false},
+                                {EmoteProvider::Bttv, false},    {EmoteProvider::SevenTv, false}};
+        EmoteIndex index;
+        // In umgekehrter Reihenfolge setzen: die Reihenfolge des Setzens zählt nicht
+        for (auto it = order.crbegin(); it != order.crend(); ++it)
+            index.setList(it->provider, it->channel, {named(it->provider, it->channel, "Dupe")});
+        for (const List &list : order) {
+            const Emote *found = index.find(QStringLiteral("Dupe"));
+            QVERIFY(found);
+            QCOMPARE(found->id, idOf(list.provider, list.channel));
+            index.setList(list.provider, list.channel, {});
+        }
+        QVERIFY(!index.find(QStringLiteral("Dupe")));
+        QVERIFY(index.isEmpty());
+        // Twitch hat keine Liste
+        index.setList(EmoteProvider::Twitch, false, {named(EmoteProvider::Twitch, false, "Kappa")});
+        QVERIFY(index.isEmpty());
+        // Innerhalb einer Liste gilt das erste
+        Emote second = named(EmoteProvider::Bttv, false, "Dupe");
+        second.id = QStringLiteral("zweites");
+        index.setList(EmoteProvider::Bttv, false, {named(EmoteProvider::Bttv, false, "Dupe"), second});
+        QCOMPARE(index.find(QStringLiteral("Dupe"))->id, idOf(EmoteProvider::Bttv, false));
+        QCOMPARE(index.count(EmoteProvider::Bttv), 2);
+    }
+
+    void indexFromTestLists()
+    {
+        const EmoteListResult bttv = parseEmoteList(EmoteProvider::Bttv, false, 200, testFile("bttv-global.json"));
+        const EmoteListResult ffz = parseEmoteList(EmoteProvider::Ffz, false, 200, testFile("ffz-global.json"));
+        QVERIFY(!bttv.emotes.isEmpty());
+        EmoteIndex index;
+        index.setList(EmoteProvider::Bttv, false, bttv.emotes);
+        index.setList(EmoteProvider::Ffz, false, ffz.emotes);
+        QCOMPARE(index.count(EmoteProvider::Bttv), int(bttv.emotes.size()));
+        QCOMPARE(index.count(EmoteProvider::Ffz), int(ffz.emotes.size()));
+        QCOMPARE(index.count(EmoteProvider::SevenTv), 0);
+        const Emote &first = bttv.emotes.first();
+        QVERIFY(index.find(first.name));
+    }
+
+    void segmentsWords()
+    {
+        EmoteIndex index;
+        index.setList(EmoteProvider::Bttv, false, {named(EmoteProvider::Bttv, false, "catJAM")});
+        const auto text = [](const QString &t) { return QList<ChatFragment>{{"text", t, {}, {}, {}, {}}}; };
+        const ChatSegment cat{"catJAM", named(EmoteProvider::Bttv, false, "catJAM")};
+
+        // Gross- und Kleinschreibung zählt, Satzzeichen bleiben am Wort (dann Text)
+        QCOMPARE(chatSegments(text("catjam CATJAM catJAM! (catJAM)"), index),
+                 (QList<ChatSegment>{{"catjam CATJAM catJAM! (catJAM)", std::nullopt}}));
+        // Mehrere Leerzeichen bleiben erhalten, Text wird zusammengefasst
+        QCOMPARE(chatSegments(text("  a  catJAM   b "), index),
+                 (QList<ChatSegment>{{"  a  ", std::nullopt}, cat, {"   b ", std::nullopt}}));
+        QCOMPARE(chatSegments(text("catJAM catJAM"), index), (QList<ChatSegment>{cat, {" ", std::nullopt}, cat}));
+        QVERIFY(chatSegments(text(QString()), index).isEmpty());
+        QVERIFY(chatSegments({}, index).isEmpty());
+        // Leerer Index: alles Text
+        QCOMPARE(chatSegments(text("catJAM"), EmoteIndex()), (QList<ChatSegment>{{"catJAM", std::nullopt}}));
+    }
+
+    void segmentsFragmentTypes()
+    {
+        EmoteIndex index;
+        index.setList(EmoteProvider::Bttv, false, {named(EmoteProvider::Bttv, false, "Kappa")});
+        const QList<ChatFragment> fragments{
+            {"mention", "@Kappa", {}, {}, {}, {}},
+            {"text", " ", {}, {}, {}, {}},
+            {"cheermote", "Kappa100", {}, {}, {}, {}},
+            {"text", " ", {}, {}, {}, {}},
+            {"emote", "Kappa", "25", {"static"}, {}, {}},
+            {"emote", "testka1Tanz", "emotesv2_1", {"static", "animated"}, {}, {}},
+            {"gif", "[GIF]", {}, {}, "g1", "https://media.example/g1.gif"},
+            // Fragment emote ohne Kennung: Text, ohne Suche im Index
+            {"emote", "Kappa", {}, {}, {}, {}},
+        };
+        const QList<ChatSegment> s = chatSegments(fragments, index);
+        QCOMPARE(s.size(), 4);
+        QCOMPARE(s.at(0), (ChatSegment{"@Kappa Kappa100 ", std::nullopt}));
+        // Twitch-Emote aus dem Fragment hat Vorrang vor dem gleichnamigen BTTV-Emote
+        QCOMPARE(s.at(1), (ChatSegment{"Kappa", Emote{EmoteProvider::Twitch, "25", "Kappa"}}));
+        QCOMPARE(s.at(2), (ChatSegment{"testka1Tanz", Emote{EmoteProvider::Twitch, "emotesv2_1", "testka1Tanz", true}}));
+        QCOMPARE(s.at(3), (ChatSegment{"[GIF]Kappa", std::nullopt}));
+    }
+
+    void segmentsZeroWidth()
+    {
+        EmoteIndex index;
+        Emote snowy = named(EmoteProvider::Bttv, false, "SoSnowy");
+        snowy.zeroWidth = true;
+        index.setList(EmoteProvider::Bttv, false, {named(EmoteProvider::Bttv, false, "catJAM"), snowy});
+        const auto zeroWidth = [&](const QString &t) {
+            QList<bool> out;
+            for (const ChatSegment &s : chatSegments({{"text", t, {}, {}, {}, {}}}, index)) {
+                if (s.emote)
+                    out.append(s.emote->zeroWidth);
+            }
+            return out;
+        };
+        // Vorne und hinter Text: normales Emote
+        QCOMPARE(zeroWidth("SoSnowy catJAM"), (QList<bool>{false, false}));
+        QCOMPARE(zeroWidth("hallo SoSnowy"), QList<bool>{false});
+        // Hinter einem Emote (auch über Leerzeichen und hinter einem anderen Zero-Width)
+        QCOMPARE(zeroWidth("catJAM SoSnowy"), (QList<bool>{false, true}));
+        QCOMPARE(zeroWidth("catJAM   SoSnowy SoSnowy"), (QList<bool>{false, true, true}));
+        // Hinter einem Twitch-Emote aus dem Fragment
+        const QList<ChatSegment> s =
+            chatSegments({{"emote", "Kappa", "25", {}, {}, {}}, {"text", " SoSnowy", {}, {}, {}, {}}}, index);
+        QVERIFY(s.last().emote->zeroWidth);
+    }
+
+    void statusTexts_data()
+    {
+        QTest::addColumn<EmoteLoadState>("state");
+        QTest::addColumn<QString>("text");
+        using Network = EmoteLoadState::Network;
+        const QList<QPair<EmoteProvider, int>> all{
+            {EmoteProvider::Bttv, 74}, {EmoteProvider::SevenTv, 312}, {EmoteProvider::Ffz, 15}};
+
+        QTest::newRow("geladen") << EmoteLoadState{Network::Online, all, {}, true, true}
+                                 << QStringLiteral("Emotes geladen: BTTV 74, 7TV 312, FFZ 15");
+        QTest::newRow("7TV nicht erreichbar")
+            << EmoteLoadState{Network::Online, {{EmoteProvider::Bttv, 74}, {EmoteProvider::Ffz, 15}}, {EmoteProvider::SevenTv}, true, true}
+            << QStringLiteral("Emotes geladen: BTTV 74, FFZ 15 · Emotes: 7TV nicht erreichbar, die Wörter bleiben Text");
+        QTest::newRow("keiner erreichbar")
+            << EmoteLoadState{Network::Online, {}, {EmoteProvider::Bttv, EmoteProvider::SevenTv, EmoteProvider::Ffz}, true, true}
+            << QStringLiteral("Emotes: BTTV, 7TV und FFZ nicht erreichbar, die Wörter bleiben Text");
+        QTest::newRow("zwei nicht erreichbar")
+            << EmoteLoadState{Network::Online, {{EmoteProvider::Ffz, 0}}, {EmoteProvider::Bttv, EmoteProvider::SevenTv}, true, true}
+            << QStringLiteral("Emotes geladen: FFZ 0 · Emotes: BTTV und 7TV nicht erreichbar, die Wörter bleiben Text");
+        QTest::newRow("ohne Netz, gespeichert") << EmoteLoadState{Network::OfflineCached, all, {}, true, true}
+                                                << QStringLiteral("Emotes: Ohne Netz, Listen vom letzten Mal");
+        QTest::newRow("ohne Netz, nichts gespeichert") << EmoteLoadState{Network::OfflineEmpty, {}, {}, true, true}
+                                                       << QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen");
+        QTest::newRow("ohne WebP")
+            << EmoteLoadState{Network::Online, {{EmoteProvider::Ffz, 15}}, {}, false, true}
+            << QStringLiteral("Emotes geladen: FFZ 15 · Emotes: WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text");
+        QTest::newRow("kein Kanal") << EmoteLoadState{Network::Online, all, {}, true, false}
+                                    << QStringLiteral("Emotes geladen: BTTV 74, 7TV 312, FFZ 15 · Emotes: kein Kanal angemeldet");
+    }
+
+    void statusTexts()
+    {
+        QFETCH(EmoteLoadState, state);
+        QFETCH(QString, text);
+        QCOMPARE(emoteStatusText(state), text);
+    }
+
+    void toolTips()
+    {
+        QCOMPARE(emoteToolTip(named(EmoteProvider::Twitch, false, "Kappa")), QStringLiteral("Kappa (Twitch)"));
+        QCOMPARE(emoteToolTip(named(EmoteProvider::Bttv, false, "catJAM")), QStringLiteral("catJAM (BTTV)"));
+        QCOMPARE(emoteToolTip(named(EmoteProvider::SevenTv, false, "peepoHey")), QStringLiteral("peepoHey (7TV)"));
+        QCOMPARE(emoteToolTip(named(EmoteProvider::Ffz, false, "LilZ")), QStringLiteral("LilZ (FFZ)"));
+    }
+
+    void fragmentsFromJson()
+    {
+        const QJsonArray array{
+            QJsonObject{{"type", "text"}, {"text", "Hallo "}, {"emote_id", QJsonValue::Null},
+                        {"emote_format", QJsonValue::Null}, {"gif_id", QJsonValue::Null}, {"gif_url", QJsonValue::Null}},
+            QJsonObject{{"type", "emote"}, {"text", "Kappa"}, {"emote_id", "25"},
+                        {"emote_format", QJsonArray{"static", "animated"}}},
+            QJsonObject{{"type", "gif"}, {"text", "[GIF]"}, {"gif_id", "g1"}, {"gif_url", "https://media.example/g1.gif"}},
+            QStringLiteral("kein Objekt"),
+        };
+        const QList<ChatFragment> f = chatFragments(array);
+        QCOMPARE(f.size(), 3);
+        QCOMPARE(f.at(0), (ChatFragment{"text", "Hallo ", {}, {}, {}, {}}));
+        QCOMPARE(f.at(1), (ChatFragment{"emote", "Kappa", "25", {"static", "animated"}, {}, {}}));
+        QCOMPARE(f.at(2), (ChatFragment{"gif", "[GIF]", {}, {}, "g1", "https://media.example/g1.gif"}));
+        QVERIFY(chatFragments(QJsonValue()).isEmpty());
+    }
+
+private:
+    static QString idOf(EmoteProvider provider, bool channel)
+    {
+        return emoteProviderName(provider) + (channel ? QStringLiteral("-kanal") : QStringLiteral("-global"));
+    }
+
+    static Emote named(EmoteProvider provider, bool channel, const QString &name)
+    {
+        return Emote{provider, idOf(provider, channel), name};
     }
 };
 

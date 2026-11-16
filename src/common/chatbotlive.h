@@ -1,6 +1,7 @@
 #pragma once
 
 #include "actionengine.h"
+#include "emotes.h"
 #include "windowdata.h"
 
 #include <QList>
@@ -84,6 +85,11 @@ private:
 // Name, Chatfarbe des Absenders (#RRGGBB, leer = Standard), Text. isEvent: graue Zeile für ein
 // Ereignis, eine ausgelöste Aktion oder eine nicht gesendete Nachricht, dann Name und badges leer.
 // messageId: Kennung der Nachricht bei Twitch (nicht angezeigt), gegen doppelte Zeilen.
+// P14 Emotes em-3: platform für das Symbol vor der Zeile (aus dem Typ, twitch.* → Twitch; None
+// für Zeilen ohne Plattform wie actions.*). fragments und segments nur bei Nachrichten (nicht
+// isEvent): segments ist, was der Delegat zeichnet (Text und Emotes). awaitingEcho: Zeile aus
+// twitch.chat_sent, deren Echo noch nicht da ist.
+enum class ChatPlatform { None, Twitch, YouTube };
 struct ChatRow
 {
     QString time;
@@ -93,17 +99,24 @@ struct ChatRow
     QString text;
     bool isEvent = false;
     QString messageId;
+    ChatPlatform platform = ChatPlatform::None;
+    QList<ChatFragment> fragments;
+    QList<ChatSegment> segments;
+    bool awaitingEcho = false;
 
     bool operator==(const ChatRow &) const = default;
 };
 // Zeile zu einem Ereignis aus chatBotLiveFilters(); nullopt, wenn der Typ im Chat keine Zeile hat.
-// twitch: Namen der Konten für Zeilen aus twitch.chat_sent (ohne Angabe «—»).
+// twitch: Namen der Konten für Zeilen aus twitch.chat_sent (ohne Angabe «—»). emotes: Emotes für
+// die Abschnitte; ohne Index ist die Nachricht ein Abschnitt Text wie vor em-3.
 std::optional<ChatRow> chatRow(const events::Event &event,
-                               const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
+                               const std::optional<TwitchStatusInfo> &twitch = std::nullopt,
+                               const EmoteIndex *emotes = nullptr);
 
 // Liste des Chats, älteste zuerst, höchstens kMaxRows; Zeilen kommen nur hinten dazu. Eine
-// Nachricht steht nur einmal: Nach twitch.chat_sent bringt twitch.chat_message mit derselben
-// message_id (Echo über EventSub, nicht belegt) keine zweite Zeile, und umgekehrt.
+// Nachricht steht nur einmal: Kommt nach twitch.chat_sent ein twitch.chat_message mit derselben
+// message_id (Echo über EventSub, nicht belegt), ersetzt es Fragmente, Abschnitte und Chatfarbe
+// dieser Zeile (RowsAppend::changed); umgekehrt bringt twitch.chat_sent keine zweite Zeile.
 class ChatRows
 {
 public:
@@ -112,12 +125,16 @@ public:
     // Ersetzt die Liste (event_history); von einem längeren Verlauf bleiben die neuesten.
     void reset(const QList<events::Event> &events, const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
     RowsAppend add(const events::Event &event, const std::optional<TwitchStatusInfo> &twitch = std::nullopt);
+    // Neue Emotes: rechnet die Abschnitte aller Zeilen neu; danach baut das Fenster die Liste neu.
+    void setEmotes(const EmoteIndex &emotes);
     const QList<ChatRow> &rows() const { return m_rows; }
 
 private:
-    bool contains(const QString &messageId) const;
+    int indexOf(const QString &messageId) const;
+    const EmoteIndex *emotes() const { return m_emotes ? &*m_emotes : nullptr; }
 
     QList<ChatRow> m_rows;
+    std::optional<EmoteIndex> m_emotes;
 };
 
 // --- Senden (Plan 4.1, chat_send) ---

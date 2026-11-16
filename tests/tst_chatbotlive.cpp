@@ -1,7 +1,9 @@
 // Prüft die Ansichtslogik «Chat-Bot» › «Live» ohne Fenster (P14 e2-5, Plan 3.5, Regel 9).
 
 #include "chatbotlive.h"
+#include "eventsubprotocol.h"
 
+#include <QFile>
 #include <QTest>
 #include <QTimeZone>
 
@@ -284,7 +286,8 @@ private slots:
         twitch.channel.login = QStringLiteral("testkanal");
         const events::Event bot = event("twitch.chat_sent", {{"message_id", "s1"}, {"account", "bot"}, {"text", "Hallo"}});
         QCOMPARE(*chatRow(bot, twitch),
-                 (ChatRow{rowTimeText(kTime), {"Bot"}, "testbot", QString(), "Hallo", false, "s1"}));
+                 (ChatRow{rowTimeText(kTime), {"Bot"}, "testbot", QString(), "Hallo", false, "s1", ChatPlatform::Twitch,
+                          {ChatFragment{"text", "Hallo", {}, {}, {}, {}}}, {ChatSegment{"Hallo", std::nullopt}}, true}));
         const events::Event channel = event("twitch.chat_sent", {{"message_id", "s2"}, {"account", "broadcaster"}, {"text", "Hi"}});
         QCOMPARE(chatRow(channel, twitch)->badges, QStringList{"Kanal"});
         QCOMPARE(chatRow(channel, twitch)->name, QStringLiteral("testkanal"));
@@ -299,7 +302,8 @@ private slots:
     void greyRows()
     {
         const std::optional<ChatRow> follow = chatRow(event("twitch.follow", {{"user_name", "Zuschauer42"}}));
-        QCOMPARE(*follow, (ChatRow{rowTimeText(kTime), {}, QString(), QString(), "Follow: Zuschauer42", true, QString()}));
+        QCOMPARE(*follow, (ChatRow{rowTimeText(kTime), {}, QString(), QString(), "Follow: Zuschauer42", true, QString(),
+                                   ChatPlatform::Twitch, {}, {}, false}));
         QCOMPARE(chatRow(event("twitch.raid", {{"from_user_name", "Zuschauer7"}, {"viewers", 23}}))->text,
                  QStringLiteral("Raid: Zuschauer7, 23 Zuschauer"));
         QCOMPARE(chatRow(event("twitch.stream_online", {}))->text, QStringLiteral("Stream online"));
@@ -342,6 +346,8 @@ private slots:
         const events::Event sent = event("twitch.chat_sent", {{"message_id", "s1"}, {"account", "bot"}, {"text", "Hallo"}});
         ChatRows rows;
         QCOMPARE(rows.add(sent), (RowsAppend{true, 0}));
+        // em-3: Das Echo ändert die bestehende Zeile, keine zweite
+        QCOMPARE(rows.add(chatEvent("s1", {{"is_bot_account", true}})), (RowsAppend{false, 0, 0}));
         QCOMPARE(rows.add(chatEvent("s1", {{"is_bot_account", true}})), RowsAppend{});
         // Umgekehrte Reihenfolge
         QCOMPARE(rows.add(chatEvent("s2")), (RowsAppend{true, 0}));
@@ -351,6 +357,96 @@ private slots:
         QCOMPARE(rows.add(event("twitch.follow", {{"user_name", "A"}})), (RowsAppend{true, 0}));
         QCOMPARE(rows.add(event("twitch.follow", {{"user_name", "A"}})), (RowsAppend{true, 0}));
         QCOMPARE(rows.rows().size(), 4);
+    }
+
+    // --- Emotes (P14 Emotes em-3) ---
+
+    void platform()
+    {
+        QCOMPARE(chatRow(chatEvent("m1"))->platform, ChatPlatform::Twitch);
+        QCOMPARE(chatRow(event("twitch.chat_sent", {{"message_id", "s1"}, {"account", "bot"}, {"text", "x"}}))->platform,
+                 ChatPlatform::Twitch);
+        QCOMPARE(chatRow(event("twitch.raid", {{"from_user_name", "A"}, {"viewers", 2}}))->platform, ChatPlatform::Twitch);
+        QCOMPARE(chatRow(event("actions.run_started", runEventData(record(RunState::Running))))->platform,
+                 ChatPlatform::None);
+    }
+
+    void segmentsFromEventSub()
+    {
+        const events::Event e = twitchEvent("chat_message.json");
+        // Ohne Index: ein Abschnitt Text wie vor em-3, Fragmente schon gelesen
+        const ChatRow plain = *chatRow(e);
+        QCOMPARE(plain.text, QStringLiteral("Hallo zusammen Kappa"));
+        QCOMPARE(plain.segments, (QList<ChatSegment>{{"Hallo zusammen Kappa", std::nullopt}}));
+        QCOMPARE(plain.fragments.size(), 2);
+        QCOMPARE(plain.fragments.at(1), (ChatFragment{"emote", "Kappa", "25", {"static"}, {}, {}}));
+
+        // Mit Index: Kappa ist ein Twitch-Emote aus dem Fragment, «zusammen» aus der Liste von BTTV
+        const EmoteIndex index = bttvIndex({"zusammen"});
+        const ChatRow row = *chatRow(e, std::nullopt, &index);
+        QCOMPARE(row.segments.size(), 4);
+        QCOMPARE(row.segments.at(0), (ChatSegment{"Hallo ", std::nullopt}));
+        QCOMPARE(row.segments.at(1).emote->provider, EmoteProvider::Bttv);
+        QCOMPARE(row.segments.at(2), (ChatSegment{" ", std::nullopt}));
+        QCOMPARE(row.segments.at(3), (ChatSegment{"Kappa", Emote{EmoteProvider::Twitch, "25", "Kappa"}}));
+
+        const ChatRow animated = *chatRow(twitchEvent("chat_emote_animiert.json"), std::nullopt, &index);
+        QVERIFY(animated.segments.last().emote->animated);
+        QCOMPARE(animated.segments.last().emote->id, QStringLiteral("emotesv2_00000000000000000000000000000001"));
+    }
+
+    void gifFragment()
+    {
+        // em-3 liest gif_id und gif_url; angezeigt wird das GIF erst ab em-9, bis dahin Text
+        const EmoteIndex index;
+        const ChatRow row = *chatRow(twitchEvent("chat_gif.json"), std::nullopt, &index);
+        QCOMPARE(row.fragments.size(), 1);
+        const ChatFragment &gif = row.fragments.first();
+        QCOMPARE(gif.type, QStringLiteral("gif"));
+        QCOMPARE(gif.gifId, QStringLiteral("testgif0000000001"));
+        QVERIFY(gif.gifUrl.startsWith(QLatin1String("https://")));
+        QCOMPARE(row.segments, (QList<ChatSegment>{{"[Test GIF eins]", std::nullopt}}));
+    }
+
+    void setEmotesChangesRows()
+    {
+        ChatRows rows;
+        rows.add(chatEvent("m1", {{"text", "Hallo zusammen"}}));
+        rows.add(event("twitch.follow", {{"user_name", "A"}}));
+        QCOMPARE(rows.rows().first().segments, (QList<ChatSegment>{{"Hallo zusammen", std::nullopt}}));
+        rows.setEmotes(bttvIndex({"zusammen"}));
+        QCOMPARE(rows.rows().first().segments.size(), 2);
+        QVERIFY(rows.rows().first().segments.last().emote);
+        // Graue Zeilen bleiben ohne Abschnitte
+        QVERIFY(rows.rows().last().segments.isEmpty());
+        // Neue Zeilen nutzen den Index
+        rows.add(chatEvent("m2", {{"text", "zusammen"}}));
+        QVERIFY(rows.rows().last().segments.first().emote);
+    }
+
+    void echoReplacesOwnMessage()
+    {
+        ChatRows rows;
+        rows.setEmotes(EmoteIndex());
+        rows.add(chatEvent("m0"));
+        const events::Event sent =
+            event("twitch.chat_sent", {{"message_id", "abo-msg"}, {"account", "broadcaster"}, {"text", "Hallo zusammen Kappa"}});
+        QCOMPARE(rows.add(sent), (RowsAppend{true, 0}));
+        // Ohne Echo: Kappa bleibt Text (Twitch-Emotes nur aus Fragmenten)
+        QCOMPARE(rows.rows().last().segments, (QList<ChatSegment>{{"Hallo zusammen Kappa", std::nullopt}}));
+        QVERIFY(rows.rows().last().awaitingEcho);
+
+        events::Event echo = twitchEvent("chat_message.json");
+        echo.data.insert("message_id", "abo-msg");
+        QCOMPARE(rows.add(echo), (RowsAppend{false, 0, 1}));
+        QCOMPARE(rows.rows().size(), 2);
+        const ChatRow &own = rows.rows().last();
+        QCOMPARE(own.segments.last().emote->id, QStringLiteral("25"));
+        QCOMPARE(own.color, echo.data.value("color").toString());
+        QCOMPARE(own.badges, QStringList{"Kanal"});
+        QVERIFY(!own.awaitingEcho);
+        // Ein zweites Echo ändert nichts mehr
+        QCOMPARE(rows.add(echo), RowsAppend{});
     }
 
     // --- Senden (e2-6, Plan 4.1) ---
@@ -467,6 +563,33 @@ private:
         for (auto it = extra.begin(); it != extra.end(); ++it)
             data.insert(it.key(), it.value());
         return event("twitch.chat_message", data);
+    }
+
+    // Testnachricht von EventSub (tests/daten/twitch) → Ereignis wie im Kern
+    static events::Event twitchEvent(const QString &name)
+    {
+        QFile file(QStringLiteral(DSS_TEST_TWITCH_DIR "/") + name);
+        if (!file.open(QIODevice::ReadOnly))
+            qFatal("Testdatei %s fehlt", qPrintable(name));
+        twitch::Message message;
+        QString error;
+        if (!twitch::parseMessage(file.readAll(), &message, &error))
+            qFatal("%s nicht lesbar: %s", qPrintable(name), qPrintable(error));
+        const std::optional<events::Event> e =
+            twitch::toEvent(message, {QStringLiteral("100000001"), QStringLiteral("100000002")}, &error);
+        if (!e)
+            qFatal("%s: %s", qPrintable(name), qPrintable(error));
+        return *e;
+    }
+
+    static EmoteIndex bttvIndex(const QStringList &names)
+    {
+        QList<Emote> emotes;
+        for (const QString &name : names)
+            emotes.append(Emote{EmoteProvider::Bttv, QStringLiteral("bttv-") + name, name});
+        EmoteIndex index;
+        index.setList(EmoteProvider::Bttv, false, emotes);
+        return index;
     }
 
     // Bot nicht angemeldet, Kanal kann senden

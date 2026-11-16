@@ -185,10 +185,13 @@ struct EventRow
 EventRow eventRow(const events::Event &event);
 // Was das Fenster an einer sichtbaren Liste ändern muss, wenn eine Zeile hinten dazukommt: erst
 // removedFront Zeilen vorne entfernen, dann bei appended die neue Zeile anhängen (P14 e2-6).
+// changed: Stelle einer bestehenden Zeile, die sich geändert hat, -1 = keine (P14 Emotes em-3,
+// Echo im Chat; EventRows setzt es nie).
 struct RowsAppend
 {
     bool appended = false;
     int removedFront = 0;
+    int changed = -1;
 
     bool operator==(const RowsAppend &) const = default;
 };

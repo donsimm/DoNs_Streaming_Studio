@@ -7,6 +7,8 @@
 #include <QJsonValue>
 #include <QSet>
 
+#include <algorithm>
+
 namespace dss {
 
 namespace {
@@ -368,6 +370,192 @@ QUrl emoteImageUrl(const Emote &emote, bool animate, bool webp)
                                      : QStringLiteral("https://cdn.frankerfacez.com/emote/%1/1").arg(emote.id));
     }
     return QUrl();
+}
+
+int EmoteIndex::listIndex(EmoteProvider provider, bool channel)
+{
+    // Vorrang nach Recherche 5: Kanal vor global, darin FFZ, BTTV, 7TV
+    int order = 0;
+    switch (provider) {
+    case EmoteProvider::Twitch:
+        return -1;
+    case EmoteProvider::Ffz:
+        order = 0;
+        break;
+    case EmoteProvider::Bttv:
+        order = 1;
+        break;
+    case EmoteProvider::SevenTv:
+        order = 2;
+        break;
+    }
+    return channel ? order : 3 + order;
+}
+
+void EmoteIndex::setList(EmoteProvider provider, bool channel, const QList<Emote> &emotes)
+{
+    const int list = listIndex(provider, channel);
+    if (list < 0)
+        return;
+    m_lists[list] = emotes;
+    m_byName.clear();
+    for (const QList<Emote> &l : m_lists) {
+        for (const Emote &emote : l) {
+            if (!m_byName.contains(emote.name))
+                m_byName.insert(emote.name, emote);
+        }
+    }
+}
+
+const Emote *EmoteIndex::find(const QString &name) const
+{
+    const auto it = m_byName.constFind(name);
+    return it == m_byName.cend() ? nullptr : &it.value();
+}
+
+int EmoteIndex::count(EmoteProvider provider) const
+{
+    const int channel = listIndex(provider, true);
+    if (channel < 0)
+        return 0;
+    return int(m_lists[channel].size() + m_lists[listIndex(provider, false)].size());
+}
+
+QList<ChatFragment> chatFragments(const QJsonValue &fragments)
+{
+    QList<ChatFragment> out;
+    const auto string = [](const QJsonObject &o, const char *key) { return o.value(QLatin1String(key)).toString(); };
+    for (const QJsonValue &value : fragments.toArray()) {
+        if (!value.isObject())
+            continue;
+        const QJsonObject o = value.toObject();
+        ChatFragment fragment{string(o, "type"), string(o, "text"), string(o, "emote_id"), {},
+                              string(o, "gif_id"), string(o, "gif_url")};
+        for (const QJsonValue &format : o.value(QStringLiteral("emote_format")).toArray())
+            fragment.formats.append(format.toString());
+        out.append(fragment);
+    }
+    return out;
+}
+
+namespace {
+
+void appendText(QList<ChatSegment> *segments, const QString &text)
+{
+    if (text.isEmpty())
+        return;
+    if (!segments->isEmpty() && !segments->last().emote)
+        segments->last().text += text;
+    else
+        segments->append({text, std::nullopt});
+}
+
+bool onlySpaces(const QString &text)
+{
+    return std::all_of(text.cbegin(), text.cend(), [](QChar c) { return c == u' '; });
+}
+
+// Steht vor dem nächsten Abschnitt ein Emote (Leerzeichen dazwischen zählen nicht)?
+bool afterEmote(const QList<ChatSegment> &segments)
+{
+    for (auto it = segments.crbegin(); it != segments.crend(); ++it) {
+        if (it->emote)
+            return true;
+        if (!onlySpaces(it->text))
+            return false;
+    }
+    return false;
+}
+
+void appendEmote(QList<ChatSegment> *segments, Emote emote)
+{
+    if (emote.zeroWidth && !afterEmote(*segments))
+        emote.zeroWidth = false;
+    segments->append({emote.name, emote});
+}
+
+} // namespace
+
+QList<ChatSegment> chatSegments(const QList<ChatFragment> &fragments, const EmoteIndex &index)
+{
+    QList<ChatSegment> segments;
+    for (const ChatFragment &fragment : fragments) {
+        if (fragment.type == QLatin1String("emote") && !fragment.emoteId.isEmpty() && !fragment.text.isEmpty()) {
+            Emote emote;
+            emote.provider = EmoteProvider::Twitch;
+            emote.id = fragment.emoteId;
+            emote.name = fragment.text;
+            emote.animated = fragment.formats.contains(QStringLiteral("animated"));
+            appendEmote(&segments, emote);
+            continue;
+        }
+        if (fragment.type != QLatin1String("text")) {
+            appendText(&segments, fragment.text);
+            continue;
+        }
+        // Wörter und Leerzeichen abwechselnd; nur Wörter werden gesucht
+        const QString &text = fragment.text;
+        qsizetype start = 0;
+        while (start < text.size()) {
+            qsizetype end = start;
+            if (text.at(start) == u' ') {
+                while (end < text.size() && text.at(end) == u' ')
+                    ++end;
+                appendText(&segments, text.mid(start, end - start));
+            } else {
+                while (end < text.size() && text.at(end) != u' ')
+                    ++end;
+                const QString word = text.mid(start, end - start);
+                if (const Emote *emote = index.find(word))
+                    appendEmote(&segments, *emote);
+                else
+                    appendText(&segments, word);
+            }
+            start = end;
+        }
+    }
+    return segments;
+}
+
+QString emoteStatusText(const EmoteLoadState &state)
+{
+    // Wortlaut: Checkliste P14 Emotes, Abschnitt 4 «Neue Texte»
+    const auto names = [](const QList<EmoteProvider> &providers) {
+        QStringList list;
+        for (EmoteProvider p : providers)
+            list.append(emoteProviderName(p));
+        const QString last = list.isEmpty() ? QString() : list.takeLast();
+        return list.isEmpty() ? last : list.join(QStringLiteral(", ")) + QStringLiteral(" und ") + last;
+    };
+    QStringList parts;
+    switch (state.network) {
+    case EmoteLoadState::Network::OfflineCached:
+        parts.append(QStringLiteral("Emotes: Ohne Netz, Listen vom letzten Mal"));
+        break;
+    case EmoteLoadState::Network::OfflineEmpty:
+        parts.append(QStringLiteral("Emotes: Ohne Netz und ohne gespeicherte Listen"));
+        break;
+    case EmoteLoadState::Network::Online: {
+        QStringList counts;
+        for (const auto &[provider, count] : state.counts)
+            counts.append(QStringLiteral("%1 %2").arg(emoteProviderName(provider)).arg(count));
+        if (!counts.isEmpty())
+            parts.append(QStringLiteral("Emotes geladen: ") + counts.join(QStringLiteral(", ")));
+        if (!state.unreachable.isEmpty())
+            parts.append(QStringLiteral("Emotes: %1 nicht erreichbar, die Wörter bleiben Text").arg(names(state.unreachable)));
+        break;
+    }
+    }
+    if (!state.webp)
+        parts.append(QStringLiteral("Emotes: WebP fehlt (Paket qt6-image-formats-plugins), BTTV und 7TV bleiben Text"));
+    if (!state.channel)
+        parts.append(QStringLiteral("Emotes: kein Kanal angemeldet"));
+    return parts.join(QStringLiteral(" · "));
+}
+
+QString emoteToolTip(const Emote &emote)
+{
+    return QStringLiteral("%1 (%2)").arg(emote.name, emoteProviderName(emote.provider));
 }
 
 } // namespace dss
