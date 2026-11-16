@@ -3,6 +3,8 @@
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <cmath>
+
 namespace dss {
 
 using namespace actions;
@@ -21,6 +23,23 @@ FieldRow row(const QString &name, const QString &label, const Values &values = {
     r.values = values;
     r.suffix = suffix;
     r.choices = choices;
+    return r;
+}
+
+// Zeit, gespeichert in ms, angezeigt in Sekunden mit 3 Nachkommastellen (jede ms bleibt erhalten).
+// Grenzen rechnet withSpecs um.
+FieldRow secondsRow(const QString &name, const QString &label)
+{
+    FieldRow r = row(name, label, {}, QStringLiteral("s"));
+    r.scale = 1000;
+    r.decimals = 3;
+    return r;
+}
+
+// Sichtbar, aber ausgegraut, bis die Funktion wirkt
+FieldRow inactive(FieldRow r, const QString &reason)
+{
+    r.inactiveReason = reason;
     return r;
 }
 
@@ -56,7 +75,6 @@ FieldSection variableSection()
 // Abschnitte je Typ ohne Art und Grenzen (Plan 2.4, 4.1–4.10 und 6)
 QList<FieldSection> sectionsFor(const QString &type)
 {
-    const QString ms = QStringLiteral("ms");
     const QString media = QStringLiteral("media");
     if (type == QLatin1String(kStepComment))
         return {{QStringLiteral("Kommentar"),
@@ -74,9 +92,9 @@ QList<FieldSection> sectionsFor(const QString &type)
                   row(QStringLiteral("auto_type"), QStringLiteral("Zahlen erkennen"))}}};
     if (type == QLatin1String(kStepDelay))
         return {{QStringLiteral("Pause"),
-                 {row(QStringLiteral("value_ms"), QStringLiteral("Dauer"), {}, ms),
+                 {secondsRow(QStringLiteral("value_ms"), QStringLiteral("Dauer")),
                   row(QStringLiteral("random"), QStringLiteral("zufällig")),
-                  row(QStringLiteral("max_value_ms"), QStringLiteral("bis"), {}, ms)}}};
+                  secondsRow(QStringLiteral("max_value_ms"), QStringLiteral("bis"))}}};
     if (type == QLatin1String(kStepRunAction))
         return {{QStringLiteral("Aktion"),
                  {row(QStringLiteral("action_id"), QStringLiteral("Aktion"), {}, {}, QStringLiteral("action")),
@@ -122,15 +140,20 @@ QList<FieldSection> sectionsFor(const QString &type)
                        {QStringLiteral("orange"), QStringLiteral("orange")},
                        {QStringLiteral("purple"), QStringLiteral("violett")}})}},
                 {QStringLiteral("Konto"), {row(QStringLiteral("use_bot"), QStringLiteral("als Bot"))}}};
-    // «Anhören» ist ein Knopf des Fensters (Plan 6), kein Feld
+    // «Anhören» ist ein Knopf (Plan 6), kein Feld; ausgegraut bis P14 e3 (Entscheid Nutzer, 2026-11-16)
     if (type == QLatin1String(kStepPlaySound))
         return {{QStringLiteral("Ton"),
                  {row(QStringLiteral("file"), QStringLiteral("Datei"), {}, {}, media),
                   row(QStringLiteral("volume"), QStringLiteral("Lautstärke"), {}, QStringLiteral("%")),
-                  row(QStringLiteral("wait"), QStringLiteral("Warten, bis zu Ende"))}}};
+                  row(QStringLiteral("wait"), QStringLiteral("Warten, bis zu Ende"))},
+                 {{QStringLiteral("listen"), QStringLiteral("Anhören"),
+                   QStringLiteral("Anhören kommt mit einer späteren Version.")}}}};
     if (type == QLatin1String(kStepOverlaySource)) {
         const Values transition{{QStringLiteral("none"), QStringLiteral("ohne")},
                                 {QStringLiteral("fade"), QStringLiteral("weich")}};
+        // Ein- und Ausblenden wirkt erst ab P14-2: sichtbar, aber ausgegraut (Entscheid Nutzer, 2026-11-16)
+        const QString notYet = QStringLiteral("Wirkt noch nicht: weiches Ein- und Ausblenden kommt mit einer "
+                                              "späteren Version.");
         return {{QStringLiteral("Overlay"),
                  {row(QStringLiteral("overlay"), QStringLiteral("Overlay"), {}, {}, QStringLiteral("overlay")),
                   row(QStringLiteral("mode"), QStringLiteral("Wirkung"),
@@ -140,12 +163,12 @@ QList<FieldSection> sectionsFor(const QString &type)
                 {QStringLiteral("Elemente"),
                  {row(QStringLiteral("elements"), QStringLiteral("Elemente"), {}, {}, QStringLiteral("source"))}},
                 {QStringLiteral("Dauer"),
-                 {row(QStringLiteral("duration_ms"), QStringLiteral("Dauer"), {}, ms),
+                 {secondsRow(QStringLiteral("duration_ms"), QStringLiteral("Dauer")),
                   row(QStringLiteral("wait"), QStringLiteral("Warten, bis ausgeblendet"))}},
                 {QStringLiteral("Einblenden/Ausblenden"),
-                 {row(QStringLiteral("transition_in"), QStringLiteral("Einblenden"), transition),
-                  row(QStringLiteral("transition_out"), QStringLiteral("Ausblenden"), transition),
-                  row(QStringLiteral("transition_ms"), QStringLiteral("Dauer weich"), {}, ms)}}};
+                 {inactive(row(QStringLiteral("transition_in"), QStringLiteral("Einblenden"), transition), notYet),
+                  inactive(row(QStringLiteral("transition_out"), QStringLiteral("Ausblenden"), transition), notYet),
+                  inactive(secondsRow(QStringLiteral("transition_ms"), QStringLiteral("Dauer weich")), notYet)}}};
     }
     if (type == QLatin1String(kStepObsSourceVisible))
         return {{QStringLiteral("OBS-Quelle"),
@@ -213,7 +236,7 @@ QList<FieldSection> triggerSectionsFor(const QString &type)
     return {}; // Chat-Nachricht, Erste Nachricht, Follow, Stream offline: keine Filter
 }
 
-// Art und Grenzen der Zeilen aus der Feldbeschreibung
+// Art und Grenzen der Zeilen aus der Feldbeschreibung; Grenzen als angezeigter Wert
 QList<FieldSection> withSpecs(QList<FieldSection> form, const QList<FieldSpec> &specs)
 {
     for (FieldSection &section : form) {
@@ -223,8 +246,8 @@ QList<FieldSection> withSpecs(QList<FieldSection> form, const QList<FieldSpec> &
                     continue;
                 r.kind = spec.kind;
                 if (spec.kind == FieldKind::Int || spec.kind == FieldKind::Number) {
-                    r.min = spec.min;
-                    r.max = spec.max;
+                    r.min = toDisplay(r, spec.min);
+                    r.max = toDisplay(r, spec.max);
                 }
             }
         }
@@ -233,6 +256,18 @@ QList<FieldSection> withSpecs(QList<FieldSection> form, const QList<FieldSpec> &
 }
 
 } // namespace
+
+double toDisplay(const FieldRow &row, double stored)
+{
+    return stored / row.scale;
+}
+
+double fromDisplay(const FieldRow &row, double shown)
+{
+    const double stored = shown * row.scale;
+    // 8,5 s × 1000 ist in double nicht immer genau 8500; Int-Felder auf ganze ms runden
+    return row.kind == FieldKind::Int ? std::round(stored) : stored;
+}
 
 QList<FieldSection> stepForm(const QString &type)
 {

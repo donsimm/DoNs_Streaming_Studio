@@ -12,7 +12,7 @@
 // zeigt die Abschnitte und Zeilen, wie sie hier stehen, und erfindet keine eigenen Texte.
 //
 // Jedes Feld aus StepTypeInfo::fields (steptypes.h) kommt in stepForm genau einmal vor; Art und
-// Grenzen stammen von dort. Die Elemente des Overlay-Schritts sind eine Zeile der Art ElementList;
+// Grenzen stammen von dort (Zeiten umgerechnet in Sekunden). Die Elemente des Overlay-Schritts sind eine Zeile der Art ElementList;
 // den Inhalt je Element beschreibt elementForm.
 //
 // Auslöser (P14 e2-9, Plan 2.5): triggerForm enthält jeden Filter aus TriggerTypeInfo::filters
@@ -27,17 +27,38 @@ struct FieldRow
     QString label; // Beschriftung im Fenster
     actions::FieldKind kind = actions::FieldKind::String;
     QList<QPair<QString, QString>> values; // Wert und deutsche Bezeichnung (Enum, Vorschläge bei Text)
+    // Grenzen, Einheit und Nachkommastellen gelten für den angezeigten Wert (P14 e2-9b): Zeiten in ms
+    // zeigt das Fenster in Sekunden (scale 1000, suffix «s», 3 Nachkommastellen). Umrechnen nur mit
+    // toDisplay und fromDisplay, das Fenster rechnet nicht selbst.
     double min = 0;
     double max = 0;
-    QString suffix;  // Einheit hinter dem Feld («ms», «%»), leer = keine
+    double scale = 1; // gespeicherter Wert = angezeigter Wert × scale
+    int decimals = 0; // Nachkommastellen des angezeigten Werts
+    QString suffix;  // Einheit hinter dem Feld («s», «%»), leer = keine
     QString choices; // Auswahl aus den Daten: overlay, source, media, action, queue, command, timer; leer = keine
+    // Leer = wirkt. Sonst sichtbar, aber ausgegraut, mit diesem Text als Tooltip (P14 e2-9b).
+    QString inactiveReason;
+};
+
+// Knopf eines Abschnitts ohne eigenes Feld, z. B. «Anhören» beim Ton (Plan 6)
+struct FieldButton
+{
+    QString name;           // Kennung für das Fenster
+    QString label;          // Beschriftung
+    QString inactiveReason; // wie FieldRow::inactiveReason
 };
 
 struct FieldSection
 {
     QString title;
     QList<FieldRow> rows;
+    QList<FieldButton> buttons = {}; // unter den Zeilen
 };
+
+// Gespeicherter Wert (aus aktionen.json) in den angezeigten Wert umrechnen, z. B. 8500 ms → 8,5 s.
+double toDisplay(const FieldRow &row, double stored);
+// Angezeigten Wert zurück in den gespeicherten; bei Art Int auf ganze Zahlen gerundet.
+double fromDisplay(const FieldRow &row, double shown);
 
 // Abschnitte zum Schritttyp; leer bei Typen ohne Felder (Dann, Sonst, Abbruch) und unbekannten.
 QList<FieldSection> stepForm(const QString &type);

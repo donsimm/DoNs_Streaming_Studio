@@ -57,6 +57,9 @@ private slots:
     void triggerLimitsAndChoices();
     void triggerTitles();
     void triggerSectionOfField();
+    void secondsForMilliseconds();
+    void inactiveRows();
+    void listenButton();
 };
 
 void TestActionFields::everyFieldOnce_data()
@@ -169,9 +172,9 @@ void TestActionFields::limitsAndChoices()
     QCOMPARE(overlay[2].rows[1].label, QStringLiteral("Warten, bis ausgeblendet"));
 
     const QList<FieldSection> delay = stepForm(QStringLiteral("delay"));
-    QCOMPARE(delay[0].rows[0].max, double(kMaxDelayMs));
-    QCOMPARE(delay[0].rows[2].max, double(kMaxDelayMs));
-    QCOMPARE(delay[0].rows[0].suffix, QStringLiteral("ms"));
+    QCOMPARE(delay[0].rows[0].max, double(kMaxDelayMs) / 1000);
+    QCOMPARE(delay[0].rows[2].max, double(kMaxDelayMs) / 1000);
+    QCOMPARE(delay[0].rows[0].suffix, QStringLiteral("s"));
 
     const QList<FieldSection> run = stepForm(QStringLiteral("run_action"));
     QCOMPARE(run[0].rows[0].choices, QStringLiteral("action"));
@@ -391,6 +394,109 @@ void TestActionFields::triggerSectionOfField()
         const QList<FieldSection> form = triggerForm(t.key);
         for (const FieldSpec &spec : t.filters)
             QVERIFY2(!fieldSection(form, spec.name).isEmpty(), qPrintable(t.key + QLatin1Char('.') + spec.name));
+    }
+}
+
+// P14 e2-9b (Entscheid Nutzer, 2026-11-16): jede Zeit in ms wird in Sekunden angezeigt und
+// eingegeben, gespeichert bleibt ms
+void TestActionFields::secondsForMilliseconds()
+{
+    QList<QPair<QList<FieldSection>, QList<FieldSpec>>> forms;
+    for (const StepTypeInfo &t : stepTypes())
+        forms.append({stepForm(t.key), t.fields});
+    for (const TriggerTypeInfo &t : triggerTypes())
+        forms.append({triggerForm(t.key), t.filters});
+
+    int msRows = 0;
+    for (const auto &form : forms) {
+        for (const FieldSection &s : form.first) {
+            for (const FieldRow &r : s.rows) {
+                QVERIFY2(r.suffix != QLatin1String("ms"), qPrintable(r.name));
+                if (!r.name.endsWith(QLatin1String("_ms"))) {
+                    QCOMPARE(r.scale, 1.0);
+                    QCOMPARE(toDisplay(r, 42), 42.0);
+                    QCOMPARE(fromDisplay(r, 42), 42.0);
+                    continue;
+                }
+                ++msRows;
+                QCOMPARE(r.suffix, QStringLiteral("s"));
+                QCOMPARE(r.scale, 1000.0);
+                QCOMPARE(r.decimals, 3);
+                QCOMPARE(int(r.kind), int(FieldKind::Int));
+                const FieldSpec *spec = nullptr;
+                for (const FieldSpec &f : form.second) {
+                    if (f.name == r.name)
+                        spec = &f;
+                }
+                QVERIFY(spec);
+                QCOMPARE(r.min, spec->min / 1000);
+                QCOMPARE(r.max, spec->max / 1000);
+                QCOMPARE(fromDisplay(r, r.min), spec->min);
+                if (spec->max <= double(kMaxDelayMs))
+                    QCOMPARE(fromDisplay(r, r.max), spec->max);
+
+                QCOMPARE(toDisplay(r, 8500), 8.5);
+                QCOMPARE(fromDisplay(r, 8.5), 8500.0);
+                for (const double ms : {0.0, 1.0, 999.0, 1250.0, 8500.0, 123457.0, double(kMaxDelayMs)})
+                    QCOMPARE(fromDisplay(r, toDisplay(r, ms)), ms);
+                QCOMPARE(fromDisplay(r, 0.001), 1.0);
+                QCOMPARE(fromDisplay(r, 0.1 + 0.2), 300.0); // ganze ms trotz Rundungsfehler
+            }
+        }
+    }
+    QCOMPARE(msRows, 4); // Pause «Dauer», «bis»; Overlay «Dauer», «Dauer weich»
+}
+
+// «weich» wirkt erst ab P14-2: nur der Abschnitt «Einblenden/Ausblenden» ist ausgegraut
+void TestActionFields::inactiveRows()
+{
+    QStringList inactive;
+    for (const StepTypeInfo &t : stepTypes()) {
+        for (const FieldSection &s : stepForm(t.key)) {
+            for (const FieldRow &r : s.rows) {
+                if (!r.inactiveReason.isEmpty()) {
+                    inactive.append(t.key + QLatin1Char('.') + r.name);
+                    QVERIFY(!r.inactiveReason.contains(QChar(0x00DF)));
+                }
+            }
+        }
+    }
+    for (const TriggerTypeInfo &t : triggerTypes()) {
+        for (const FieldSection &s : triggerForm(t.key)) {
+            for (const FieldRow &r : s.rows)
+                QVERIFY2(r.inactiveReason.isEmpty(), qPrintable(r.name));
+        }
+    }
+    for (const FieldRow &r : elementForm().rows)
+        QVERIFY(r.inactiveReason.isEmpty());
+    QCOMPARE(inactive, (QStringList{"overlay_source.transition_in", "overlay_source.transition_out",
+                                    "overlay_source.transition_ms"}));
+    const QList<FieldSection> overlay = stepForm(QStringLiteral("overlay_source"));
+    QCOMPARE(fieldSection(overlay, QStringLiteral("transition_ms")), QStringLiteral("Einblenden/Ausblenden"));
+}
+
+// «Anhören» ist ein Knopf im Abschnitt «Ton», ausgegraut bis e3; sonst keine Knöpfe
+void TestActionFields::listenButton()
+{
+    for (const StepTypeInfo &t : stepTypes()) {
+        const QList<FieldSection> form = stepForm(t.key);
+        for (int i = 0; i < form.size(); ++i) {
+            if (t.key == QLatin1String("play_sound") && i == 0) {
+                QCOMPARE(form[i].title, QStringLiteral("Ton"));
+                QCOMPARE(form[i].buttons.size(), 1);
+                const FieldButton &listen = form[i].buttons[0];
+                QCOMPARE(listen.name, QStringLiteral("listen"));
+                QCOMPARE(listen.label, QStringLiteral("Anhören"));
+                QVERIFY(!listen.inactiveReason.isEmpty());
+                QVERIFY(!listen.inactiveReason.contains(QChar(0x00DF)));
+            } else {
+                QVERIFY2(form[i].buttons.isEmpty(), qPrintable(t.key));
+            }
+        }
+    }
+    for (const TriggerTypeInfo &t : triggerTypes()) {
+        for (const FieldSection &s : triggerForm(t.key))
+            QVERIFY(s.buttons.isEmpty());
     }
 }
 
