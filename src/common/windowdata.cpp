@@ -321,7 +321,10 @@ QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInf
     return lines.join(QLatin1Char('\n'));
 }
 
-ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status)
+namespace {
+
+// Kopfzeile nur aus dem Stand von Twitch (P13)
+ChatBotHeaderView twitchHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status)
 {
     ChatBotHeaderView v;
     v.toolTip = twitchStatusText(status);
@@ -350,6 +353,55 @@ ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::opt
     else if (channelState == ConnectionState::Connected)
         v.state = botProblem.isEmpty() ? QStringLiteral("ok") : QStringLiteral("warning");
     return v;
+}
+
+} // namespace
+
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status,
+                                    const std::optional<ActionsStatus> &actions)
+{
+    ChatBotHeaderView v = twitchHeaderView(channelState, status);
+    if (!actions)
+        return v;
+    const QString &state = actions->state;
+    if (state == QLatin1String("unavailable") || state == QLatin1String("file_error")) {
+        // Der Kern nimmt keine Änderung an: Schalter aus und ausgegraut
+        v.text = actions->message;
+        v.state = QStringLiteral("error");
+        return v;
+    }
+    // Stumm: actions_status sagt nicht, ob der Hauptschalter an ist; ausgegraut, weil die Version
+    // ohnehin nicht sendet ([OFFEN] im Bericht e2-4)
+    v.switchEnabled = state != QLatin1String("muted");
+    v.switchChecked = state == QLatin1String("on");
+    if (channelState == ConnectionState::Error)
+        return v;
+    if (state == QLatin1String("off")) {
+        v.text = QStringLiteral("aus");
+        v.state = QStringLiteral("off");
+        return v;
+    }
+    if (state == QLatin1String("muted")) {
+        v.text = QStringLiteral("stumm: Version im Einsatz läuft");
+        v.state = QStringLiteral("warning");
+        return v;
+    }
+    // on: ohne verbundenen Kanal bleibt der Text von Twitch (verbinde, nicht eingerichtet)
+    if (channelState != ConnectionState::Connected || !status || !twitchAccountValid(status->channel))
+        return v;
+    if (!twitchBotProblem(status).isEmpty()) {
+        v.text = QStringLiteral("Bot nicht angemeldet: sendet als Kanal");
+        v.state = QStringLiteral("warning");
+        return v;
+    }
+    v.text = QStringLiteral("läuft · liest als %1 · sendet als %2").arg(status->channel.login, status->bot.login);
+    v.state = QStringLiteral("ok");
+    return v;
+}
+
+ActionsEdit actionsSetEnabledEdit(bool enabled)
+{
+    return {QString::fromLatin1(msg::kActionsSetEnabled), QJsonObject{{QStringLiteral("enabled"), enabled}}};
 }
 
 QStringList chatBotEventFilters()

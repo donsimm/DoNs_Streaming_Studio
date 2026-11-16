@@ -1,5 +1,6 @@
 #pragma once
 
+#include "actionprotocol.h"
 #include "overlay.h"
 #include "overlaylive.h"
 #include "protocol.h"
@@ -143,13 +144,23 @@ QString twitchToolTip(ConnectionState state, const std::optional<TwitchStatusInf
 
 // P13, Reiter «Chat-Bot»: Kopfzeile rechts. state für die Farbe im Theme: «ok» (Kanal verbunden,
 // Bot angemeldet), «warning» (Kanal verbunden, Bot fehlt), «error» (Kanal mit Fehler), «off».
+// P14 e2-4: mit actions_status dazu der Schalter «Chat-Bot aktiv». Reihenfolge: unavailable,
+// file_error (Text aus message, error, Schalter aus und ausgegraut), Twitch-Kanal mit Fehler (wie
+// ohne actions), off («aus»), muted («stumm: Version im Einsatz läuft», warning), on ohne Bot («Bot
+// nicht angemeldet: sendet als Kanal», warning), on («läuft · liest als … · sendet als …», ok).
+// Ohne actions_status oder ohne verbundenen Kanal: Text wie ohne actions.
 struct ChatBotHeaderView
 {
     QString text;
     QString toolTip; // Einzelheiten wie im Bereich «Twitch» (twitchStatusText)
     QString state = QStringLiteral("off");
+    bool switchChecked = false; // «Chat-Bot aktiv»
+    bool switchEnabled = false;
 };
-ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status);
+ChatBotHeaderView chatBotHeaderView(ConnectionState channelState, const std::optional<TwitchStatusInfo> &status,
+                                    const std::optional<ActionsStatus> &actions = std::nullopt);
+// Klick auf «Chat-Bot aktiv»: Anfrage actions_set_enabled
+ActionsEdit actionsSetEnabledEdit(bool enabled);
 
 // P13, Bereich «Ereignisse» im Unterreiter «Live»: was das Fenster bestellt (subscribe_events). Ohne
 // Chat-Nachrichten (die zeigt P14 im Bereich «Chat») und ohne Kanalpunkte und OBS (nicht im Entwurf).

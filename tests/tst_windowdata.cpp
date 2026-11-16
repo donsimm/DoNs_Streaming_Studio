@@ -346,6 +346,87 @@ private slots:
                                         "Bot: Anmeldung abgelaufen"));
         QCOMPARE(h.state, QStringLiteral("error"));
         QCOMPARE(h.toolTip, twitchStatusText(s));
+        QVERIFY(!h.switchChecked);
+        QVERIFY(!h.switchEnabled);
+    }
+
+    void chatBotHeaderWithActions()
+    {
+        TwitchStatusInfo s;
+        s.enabled = true;
+        s.channel.state = QStringLiteral("ok");
+        s.channel.login = QStringLiteral("testkanal");
+        s.bot.state = QStringLiteral("ok");
+        s.bot.login = QStringLiteral("testbot");
+        const QString tip = twitchStatusText(s);
+        const auto header = [&](const QString &state, const QString &message = QString(),
+                                ConnectionState channel = ConnectionState::Connected) {
+            ActionsStatus a;
+            a.state = state;
+            a.message = message;
+            return chatBotHeaderView(channel, s, a);
+        };
+        const auto check = [&](const ChatBotHeaderView &h, const QString &text, const QString &state, bool checked,
+                               bool enabled) {
+            QCOMPARE(h.text, text);
+            QCOMPARE(h.state, state);
+            QCOMPARE(h.toolTip, tip);
+            QCOMPARE(h.switchChecked, checked);
+            QCOMPARE(h.switchEnabled, enabled);
+        };
+
+        // Aktionssystem nicht gebaut oder Datei ungültig: Text vom Kern, rot, Schalter ausgegraut
+        check(header(QStringLiteral("unavailable"), QStringLiteral("Aktionssystem nicht gebaut")),
+              QStringLiteral("Aktionssystem nicht gebaut"), QStringLiteral("error"), false, false);
+        check(header(QStringLiteral("file_error"), QStringLiteral("aktionen.json ungültig, Chat-Bot aus: Zeile 3")),
+              QStringLiteral("aktionen.json ungültig, Chat-Bot aus: Zeile 3"), QStringLiteral("error"), false, false);
+        // Datei ungültig geht vor Twitch mit Fehler
+        check(header(QStringLiteral("file_error"), QStringLiteral("kaputt"), ConnectionState::Error),
+              QStringLiteral("kaputt"), QStringLiteral("error"), false, false);
+
+        // Läuft, aus, stumm
+        check(header(QStringLiteral("on")), QStringLiteral("läuft · liest als testkanal · sendet als testbot"),
+              QStringLiteral("ok"), true, true);
+        check(header(QStringLiteral("off")), QStringLiteral("aus"), QStringLiteral("off"), false, true);
+        check(header(QStringLiteral("muted")), QStringLiteral("stumm: Version im Einsatz läuft"),
+              QStringLiteral("warning"), false, false);
+
+        // Twitch-Kanal mit Fehler: Text wie ohne Aktionen, der Schalter bleibt bedienbar
+        const ChatBotHeaderView twitchError = chatBotHeaderView(ConnectionState::Error, s);
+        check(header(QStringLiteral("on"), QString(), ConnectionState::Error), twitchError.text,
+              QStringLiteral("error"), true, true);
+        check(header(QStringLiteral("off"), QString(), ConnectionState::Error), twitchError.text,
+              QStringLiteral("error"), false, true);
+
+        // Kanal verbindet noch: Text von Twitch, Schalter an
+        const ChatBotHeaderView connecting = chatBotHeaderView(ConnectionState::Connecting, s);
+        check(header(QStringLiteral("on"), QString(), ConnectionState::Connecting), connecting.text,
+              connecting.state, true, true);
+
+        // Bot fehlt: gelb, der Kanal sendet
+        s.bot = TwitchAccountInfo();
+        check(header(QStringLiteral("on")), QStringLiteral("Bot nicht angemeldet: sendet als Kanal"),
+              QStringLiteral("warning"), true, true);
+        // Ohne Twitch vom Kern: Text wie ohne Aktionen
+        ActionsStatus on;
+        on.state = QStringLiteral("on");
+        ChatBotHeaderView h = chatBotHeaderView(ConnectionState::Off, std::nullopt, on);
+        QCOMPARE(h.text, QStringLiteral("Twitch: –"));
+        QCOMPARE(h.state, QStringLiteral("off"));
+        QVERIFY(h.switchChecked);
+        QVERIFY(h.switchEnabled);
+
+        // Schalter: Anfrage actions_set_enabled
+        QCOMPARE(actionsSetEnabledEdit(true),
+                 (ActionsEdit{QStringLiteral("actions_set_enabled"), QJsonObject{{QStringLiteral("enabled"), true}}}));
+        QCOMPARE(actionsSetEnabledEdit(false),
+                 (ActionsEdit{QStringLiteral("actions_set_enabled"), QJsonObject{{QStringLiteral("enabled"), false}}}));
+        // Die Anfrage besteht die Prüfung des Protokolls
+        ActionsRequest request;
+        QString error;
+        QVERIFY2(parseActionsRequest(actionsEditMessage(actionsSetEnabledEdit(true), 7), &request, &error),
+                 qPrintable(error));
+        QCOMPARE(request.type, QStringLiteral("actions_set_enabled"));
     }
 
     void chatBotEvents()
