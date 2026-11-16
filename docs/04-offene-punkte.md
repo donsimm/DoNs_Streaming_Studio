@@ -1,6 +1,6 @@
 # 04 – Offene Punkte
 
-Stand: 2026-11-15 (P13: Punkt 92 erledigt und ins Archiv verschoben, neue Punkte 113 bis 120; davor Punkt 3: Umfang des Chat-Bots und Übernahme der Zuschauer-Daten entschieden; davor P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 121 weiter. Erledigte Punkte wandern ins Archiv.
+Stand: 2026-11-16 (P14 e3: neue Punkte 122 bis 125; davor P13: Punkt 92 erledigt und ins Archiv verschoben, neue Punkte 113 bis 120; davor Punkt 3: Umfang des Chat-Bots und Übernahme der Zuschauer-Daten entschieden; davor P12: neue Punkte 103 bis 112; davor Punkt 102 erledigt und ins Archiv verschoben, P11: Punkte 79, 80 und 101 erledigt, neue Punkte 96 bis 102). Hier steht nur Offenes. Entschiedenes und Erledigtes liegt in `docs/archiv/04-erledigte-punkte.md`. Die Nummern bleiben; neue Punkte zählen ab 126 weiter. Erledigte Punkte wandern ins Archiv.
 
 ## Aus P10b, noch nicht ausdrücklich bestätigt
 
@@ -61,6 +61,11 @@ Stand: 2026-11-15 (P13: Punkt 92 erledigt und ins Archiv verschoben, neue Punkte
 111. Aus P12b: In OBS nicht geprüft: verschachtelte Szenen (Rückfall `GetSourceActive`, `videoActive`), Verhalten mit «shutdown», Ruhe des Glättens bei der Streuung aus M3 (p95 24,9 ms), Ursache der rund 20 Bildaufrufe je Sekunde bei 30 Bildern/s.
 112. Aus P12b b1 (Klick 197, Z3c): Beim Wechsel des Quantums von PipeWire kann ein kurzes Stück Ton fehlen, ohne Lageverschiebung und ohne gemeldeten Unterlauf. Knoten und Hörbarkeit nicht geklärt; der Kern schreibt abgebrochene Zyklen ins Protokoll. Ob im Betrieb ein Programm das Quantum ändert, ist nicht geprüft.
 121. Aus P12 H3 (Dauerlauf 60 min in OBS, 2026-11-15): Am Wiederholpunkt schwankt die Pause von OBS zwischen 9 und 67 ms (M2: 58,6 ms fest). Der Mischer schätzt sie und gleicht danach aus; 8-mal lag die Abweichung dabei über 20 ms (−29 bis +44 ms), jeweils mit Sprung. Während des Videos höchstens 5,6 ms (358 Lagen), keine Aussetzer, keine Warnungen. Entscheid Nutzer: H3 gilt mit dieser Einschränkung als bestanden; verbessern später (z. B. auf die Meldung der Seite warten statt die Pause schätzen), Hörbarkeit an der Nahtstelle nicht geprüft.
+
+122. Aus P14 e3: Die Grenze von 24 h für den Abstand einer Zeitnachricht prüft nur das Fenster (`actionview`), der Kern (`readTimer`) nimmt auch längere Abstände an, etwa über `dss-cli` oder eine von Hand geänderte Datei. Zu entscheiden, ob der Kern die Grenze ebenfalls prüft.
+123. Aus P14 e2/e3: Prüfmeldungen aus der Verweisprüfung des Kerns (`checkReferences`, etwa eine fehlende Aktion oder Warteschlange) stehen nicht in den Zeilen der Listen (`[OFFEN]` aus e2-14). Zu entscheiden, ob und wo sie angezeigt werden.
+124. Aus P14 e3: Die Meldung zu einer ungültigen Variablen-Datei verschwindet nach der Reparatur; dafür gibt es keinen automatischen Test (Fall `fileError`).
+125. Aus P14 e3: Ein Befehl, den keine Aktion benutzt, wird ohne Rückfrage gelöscht (wie bei Aktionen ohne Verweise). Zu entscheiden, ob auch dann eine Rückfrage kommt.
 
 ## Machbarkeitstests
 

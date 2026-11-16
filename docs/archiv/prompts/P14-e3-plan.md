@@ -20,7 +20,7 @@ Status eines Abschnitts: offen `[ ]`, erledigt `[x]`, `parked — <Grund>` bleib
 
 ## Decided
 
-Entscheide des Nutzers vom 2026-11-16 (Checkliste, Abschnitt 7), in seinen Worten zusammengefasst:
+Entscheide des Nutzers vom 2026-11-16 (Checkliste, Abschnitt 7), in seinen Worten zusammengefasst. **Ergebnis:** alle so gebaut und im Handtest vom 2026-11-16 bestanden; dazu Nachträge aus dem Handtest (Checkliste, Abschnitt 8): Löschen einer benutzten Warteschlange stellt die Aktionen auf «Standard» (e3-8), Namensspalte in «Aktionen» und «Schritte» ohne Kopfzeile, wächst mit (e3-10). Frage 1 («▶ Testen als …») nach der Empfehlung gebaut (e3-5).
 
 - «Gemeinsamer Aufbau «Tabelle links, Gewähltes rechts» für «Befehle» und «Zeitnachrichten» (`ListDetailPage`), Dialog `QueuesDialog` in `src/app/queuesdialog.{h,cpp}`; der Farb-Delegat ist schon geteilt (`ForegroundDelegate`, e2-15).» Gibt e3-4 und e3-8 frei.
 - «Abstand der Zeitnachrichten im Feld in Minuten mit Komma («20 min», «7,5 min»), Umrechnung in der Logik, intern Sekunden.» Das überstimmt die Vorgabe der Checkliste bis zur Antwort (Sekunden mit `" s"`). Gibt e3-2 und e3-6 frei.
@@ -175,7 +175,9 @@ Jede Fenster-Aufgabe trägt ihre Checkliste: eine Momentaufnahme vom 2026-11-16 
   - Tests: `tst_fensterchatbot` (Öffnen aus «Aktionen», Neu → «Warteschlange 1», Umbenennen mit Prüfmeldung im Dialog, Kästchen, Löschen mit Rückfrage, «Standard» nicht löschbar, Steuerknöpfe ausgegraut, Auswahl in «Aktionen» danach wie vorher). `scripts/testen.sh -R '^tst_fensterchatbot$'`.
   - Handtest: H5.
 
-- [ ] **e3-9 Handtest e3 und Plan schliessen (Lotse).** Nach dem Handtest gehen die Entscheide unter «Decided» mit dem Ergebnis an den Nutzer, offene Punkte nach `docs/04-offene-punkte.md`.
+- [x] **e3-9 Handtest e3 und Plan schliessen (Lotse).** Nach dem Handtest gehen die Entscheide unter «Decided» mit dem Ergebnis an den Nutzer, offene Punkte nach `docs/04-offene-punkte.md`.
+  - Ergebnis 2026-11-16: Handtest e2 und e3 gemeinsam bestanden (Stand 1e53481, Befund danach in e3-10, 101a868), Merge auf `main` 4923161. Lotse: L2 Import echter Zuschauer bestanden, Senden als Bot und Kanal bestanden, Abbruch bestanden. Nicht gemacht: L1 Bildschirmfotos; «Benutzt» live in L2 (deckt `tst_fensterchatbot` commandsTab); Ton beim Abbruch (Testkern ohne Tonziel).
+  - Offene Punkte nach `docs/04-offene-punkte.md`, Punkte 122 bis 125.
 
 ## Handtest e3 (Regel 10)
 
