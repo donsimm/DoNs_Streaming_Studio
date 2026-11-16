@@ -86,7 +86,7 @@ Summe Agenten etwa 14,5 h (etwa 3 Sitzungen).
   - Tests: `tst_aktionsansicht` (Gruppen mit fehlender Gruppe; `testCommand` mit 0, 1 und 2 Aktionen, abgeschaltetem Auslöser, Argumenten, dry_run; Minuten hin und zurück mit 60, 450, 1200 s, «7,5», «7.5», «abc», «0,5»). `scripts/testen.sh -R '^tst_aktionsansicht$'`.
   - Handtest: H2, H3.
 
-- [ ] **e3-3 `CoreClient`: Variablen und Zuschauer** (`src/common/coreclient.{h,cpp}`).
+- [x] **e3-3 `CoreClient`: Variablen und Zuschauer** (`src/common/coreclient.{h,cpp}`).
   - `void requestVariables()`: schickt `get_variables`. Läuft schon eine Anfrage, wird nach deren Antwort genau eine weitere geschickt (Zusammenfassen, keine Flut bei vielen Läufen).
   - Antwort `variables` → `std::optional<VariablesInfo> variables() const`, Signal `variablesChanged()`. Danach `get_viewers` mit den noch unbekannten Twitch-IDs aus `persisted.users` und `volatileUsers`; Antwort `viewers` in einen Speicher (`actions::ViewersData viewers() const`), Signal `viewersChanged()`.
   - Nachführen: Nach einem erfolgreichen `variable_set` oder `variable_remove` aus diesem Fenster (Antwort `change_result`) holt der Client von sich aus neu. Mehr nicht im Client; wann das Fenster sonst holt, steht in e3-5 und e3-7.

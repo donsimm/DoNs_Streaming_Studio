@@ -2,6 +2,7 @@
 
 #include <QDeadlineTimer>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLocalSocket>
 #include <QProcess>
@@ -199,8 +200,60 @@ qint64 CoreClient::sendActionsEdit(const ActionsEdit &edit)
     if (!m_connected)
         return 0;
     const qint64 id = m_nextRequestId++;
+    if (edit.type == QLatin1String(msg::kVariableSet) || edit.type == QLatin1String(msg::kVariableRemove))
+        m_variableEdits.insert(id);
     send(actionsEditMessage(edit, id));
     return id;
+}
+
+void CoreClient::requestVariables()
+{
+    if (!m_connected)
+        return;
+    if (m_variablesRequest != 0) {
+        m_variablesAgain = true;
+        return;
+    }
+    sendGetVariables();
+}
+
+void CoreClient::sendGetVariables()
+{
+    m_variablesRequest = m_nextRequestId++;
+    m_variablesAgain = false;
+    send(actionsRequestMessage({m_variablesRequest, QString::fromLatin1(msg::kGetVariables), {}}));
+}
+
+// Antwort (variables oder Abweisung) auf die laufende get_variables: zurückgehaltene Anfrage schicken
+void CoreClient::variablesRequestDone()
+{
+    m_variablesRequest = 0;
+    if (m_variablesAgain)
+        sendGetVariables();
+}
+
+// get_viewers für die Twitch-IDs aus variables(), die noch nicht erfragt wurden
+void CoreClient::requestMissingViewers()
+{
+    if (!m_variables || !m_connected)
+        return;
+    QStringList ids;
+    const auto note = [&](const QString &id) {
+        if (!m_viewersAsked.contains(id)) {
+            m_viewersAsked.insert(id);
+            ids.append(id);
+        }
+    };
+    for (auto it = m_variables->persisted.users.cbegin(); it != m_variables->persisted.users.cend(); ++it)
+        note(it.key());
+    for (auto it = m_variables->volatileUsers.cbegin(); it != m_variables->volatileUsers.cend(); ++it)
+        note(it.key());
+    if (ids.isEmpty())
+        return;
+    const qint64 id = m_nextRequestId++;
+    m_viewersRequests.insert(id);
+    send(actionsRequestMessage({id, QString::fromLatin1(msg::kGetViewers),
+                                {{QStringLiteral("user_ids"), QJsonArray::fromStringList(ids)}}}));
 }
 
 LiveElements CoreClient::live(const QUuid &overlayId) const
@@ -591,6 +644,35 @@ void CoreClient::handleMessage(const QJsonObject &message)
             return;
         }
         emit actionRunsReceived(runs);
+    } else if (type == QLatin1String(msg::kVariables)) {
+        VariablesInfo info;
+        const bool parsed = parseVariablesMessage(message, &info, &error);
+        if (m_variablesRequest != 0 && messageRequestId(message) == m_variablesRequest)
+            variablesRequestDone();
+        if (!parsed) {
+            qWarning("Kern: variables ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_variables = info;
+        emit variablesChanged();
+        requestMissingViewers();
+    } else if (type == QLatin1String(msg::kViewers)) {
+        actions::ViewersData found;
+        m_viewersRequests.remove(messageRequestId(message));
+        if (!parseViewersMessage(message, &found, &error)) {
+            qWarning("Kern: viewers ungültig: %s", qPrintable(error));
+            return;
+        }
+        bool changed = false;
+        for (auto it = found.viewers.cbegin(); it != found.viewers.cend(); ++it) {
+            const auto known = m_viewers.viewers.constFind(it.key());
+            if (known != m_viewers.viewers.cend() && *known == it.value())
+                continue;
+            m_viewers.viewers.insert(it.key(), it.value());
+            changed = true;
+        }
+        if (changed)
+            emit viewersChanged();
     } else if (type == QLatin1String(msg::kEventHistory)) {
         QList<events::Event> list;
         if (!parseEventHistory(message, &list, &error)) {
@@ -649,6 +731,16 @@ void CoreClient::handleMessage(const QJsonObject &message)
             emit twitchRequestFinished(result);
             return;
         }
+        // Abweisung eigener Abfragen (z. B. actions_unavailable): nicht ans Fenster, das sie nicht
+        // geschickt hat; den Zustand zeigt actions_status.
+        if (result.requestId != 0 && result.requestId == m_variablesRequest) {
+            variablesRequestDone();
+            return;
+        }
+        if (m_viewersRequests.remove(result.requestId))
+            return;
+        if (m_variableEdits.remove(result.requestId) && result.ok)
+            requestVariables();
         const QString key = m_keyOfRequest.take(result.requestId);
         if (!key.isEmpty() && m_requestOfKey.value(key) == result.requestId) {
             m_requestOfKey.remove(key);
@@ -756,6 +848,19 @@ void CoreClient::clearData()
     if (m_actionsConfig) {
         m_actionsConfig.reset();
         emit actionsConfigChanged();
+    }
+    m_variablesRequest = 0;
+    m_variablesAgain = false;
+    m_variableEdits.clear();
+    m_viewersRequests.clear();
+    m_viewersAsked.clear();
+    if (m_variables) {
+        m_variables.reset();
+        emit variablesChanged();
+    }
+    if (!m_viewers.viewers.isEmpty()) {
+        m_viewers = actions::ViewersData();
+        emit viewersChanged();
     }
     if (!m_obsSources.isEmpty()) {
         m_obsSources.clear();

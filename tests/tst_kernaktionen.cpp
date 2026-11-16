@@ -11,6 +11,7 @@
 
 #include "actionjson.h"
 #include "actionprotocol.h"
+#include "coreclient.h"
 #include "coresettings.h"
 #include "eventbus.h"
 #include "eventtypes.h"
@@ -27,6 +28,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocalSocket>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -1030,6 +1032,98 @@ private slots:
         // Laufzustand nie in die Overlay-Datei (Plan 4.4)
         QCOMPARE(readFile(overlayFile), before);
         QVERIFY2(!core.log.contains(QStringLiteral("Zuschauer42")), qPrintable(core.log));
+    }
+
+    // e3-3: Fenster (CoreClient) holt Variablen und Zuschauer, fasst Anfragen zusammen, holt nach
+    // eigenem variable_set neu und leert bei Trennung. Daten: Import aus tests/daten/streamerbot-export.
+    void clientVariables()
+    {
+        QTemporaryDir data;
+        Core core = start(data.path(), QStringLiteral("a"));
+        {
+            CoreLink c(core.socket);
+            QVERIFY(c.isConnected());
+            const QJsonObject imported = c.request(QString::fromLatin1(msg::kViewerImport),
+                                                   {{QStringLiteral("path"), QStringLiteral(DSS_TEST_EXPORT_DIR)},
+                                                    {QStringLiteral("dry_run"), false},
+                                                    {QStringLiteral("overwrite"), false}},
+                                                   QString::fromLatin1(msg::kViewerImportResult));
+            QVERIFY2(messageType(imported) == QLatin1String(msg::kViewerImportResult),
+                     QJsonDocument(imported).toJson(QJsonDocument::Compact).constData());
+        }
+        const QString user1 = QStringLiteral("100000001");
+
+        CoreClient::Options o;
+        o.socketPath = core.socket;
+        o.program = QStringLiteral("tst_kernaktionen");
+        o.version = QStringLiteral("0");
+        auto client = std::make_unique<CoreClient>(o);
+        QSignalSpy variablesSpy(client.get(), &CoreClient::variablesChanged);
+        QSignalSpy viewersSpy(client.get(), &CoreClient::viewersChanged);
+        client->requestVariables(); // ohne Verbindung: nichts
+        client->start();
+        QTRY_VERIFY_WITH_TIMEOUT(client->isConnected(), 5000);
+        QVERIFY(!client->variables());
+        QVERIFY(client->viewers().viewers.isEmpty());
+
+        // Holen, danach Zuschauer zu den IDs der Variablen
+        client->requestVariables();
+        QTRY_COMPARE_WITH_TIMEOUT(variablesSpy.size(), 1, 5000);
+        QVERIFY(client->variables());
+        QVERIFY(client->variables()->fileError.isEmpty());
+        QCOMPARE(client->variables()->persisted.users.value(user1).value(QStringLiteral("firsts")).value, QJsonValue(7));
+        QTRY_COMPARE_WITH_TIMEOUT(viewersSpy.size(), 1, 5000);
+        QCOMPARE(client->viewers().viewers.value(user1).login, QStringLiteral("testzuschauer1"));
+        QCOMPARE(client->viewers().viewers.value(user1).displayName, QStringLiteral("TestZuschauer1"));
+
+        // Zusammenfassen: drei schnelle Anfragen geben zwei Antworten; Zuschauer nicht noch einmal
+        variablesSpy.clear();
+        client->requestVariables();
+        client->requestVariables();
+        client->requestVariables();
+        QTRY_COMPARE_WITH_TIMEOUT(variablesSpy.size(), 2, 5000);
+        QTest::qWait(300);
+        QCOMPARE(variablesSpy.size(), 2);
+        QCOMPARE(viewersSpy.size(), 1);
+
+        // Nach eigenem variable_set holt der Client von selbst neu
+        variablesSpy.clear();
+        QSignalSpy finished(client.get(), &CoreClient::changeFinished);
+        QVERIFY(client->sendActionsEdit({QString::fromLatin1(msg::kVariableSet),
+                                         {{QStringLiteral("scope"), QStringLiteral("global")},
+                                          {QStringLiteral("user_id"), QString()},
+                                          {QStringLiteral("name"), QStringLiteral("dsstest_wert")},
+                                          {QStringLiteral("persisted"), true},
+                                          {QStringLiteral("value"), 42}}})
+                > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(variablesSpy.size(), 1, 5000);
+        QCOMPARE(finished.size(), 1);
+        QVERIFY(finished.first().first().value<ChangeResult>().ok);
+        QCOMPARE(client->variables()->persisted.global.value(QStringLiteral("dsstest_wert")).value, QJsonValue(42));
+        // Abgewiesenes variable_remove: kein neues Holen
+        variablesSpy.clear();
+        QVERIFY(client->sendActionsEdit({QString::fromLatin1(msg::kVariableRemove),
+                                         {{QStringLiteral("scope"), QStringLiteral("global")},
+                                          {QStringLiteral("user_id"), QString()},
+                                          {QStringLiteral("name"), QStringLiteral("gibt_es_nicht")},
+                                          {QStringLiteral("persisted"), true}}})
+                > 0);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 2, 5000);
+        QVERIFY(!finished.last().first().value<ChangeResult>().ok);
+        QTest::qWait(300);
+        QCOMPARE(variablesSpy.size(), 0);
+
+        // Trennung: leer
+        variablesSpy.clear();
+        viewersSpy.clear();
+        stop(core);
+        QTRY_VERIFY_WITH_TIMEOUT(!client->isConnected(), 5000);
+        QVERIFY(!client->variables());
+        QVERIFY(client->viewers().viewers.isEmpty());
+        QCOMPARE(variablesSpy.size(), 1);
+        QCOMPARE(viewersSpy.size(), 1);
+        client.reset();
+        QVERIFY2(!core.log.contains(QStringLiteral("testzuschauer1")), qPrintable(core.log));
     }
 
     void protocolMessages()
