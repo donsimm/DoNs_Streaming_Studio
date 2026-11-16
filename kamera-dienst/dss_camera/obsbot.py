@@ -10,8 +10,8 @@
   Dienst danach noch `AFTER_WAKE_S`, bevor ein Bewegungsbefehl ans Gerät geht.
 - HDR: Befehl `01 01 00` (aus) / `01 01 01` (an) auf Selektor 0x06, Status 0x06 folgt.
 - Bildwinkel: Befehl `04 01 xx` auf Selektor 0x06, xx = 00, 01, 02; Status 0x11 folgt
-  (Prüfung mit Videostrom 2026-11-16). 00 = weit, 01 = mittel, 02 = eng ist eine Annahme:
-  Das Zoom-Byte zeigte bei 01 ≈ 5 % und bei 02 ≈ 15 %.
+  (Prüfung mit Videostrom 2026-11-16). 00 = weit, 01 = mittel, 02 = eng, am Gerät im OBS-Bild
+  bestätigt (Lotse, 2026-11-16).
 - KI-Modus «keine» vor Bewegung: `16 02 00 00` auf Selektor 0x06 schaltet die Verfolgung
   aus (Prüfung mit Videostrom 2026-11-16); der Status geht kurz auf 6/1 (wird ausgeschaltet)
   und nach ≈ 5 s auf 0/0. Der Dienst wartet nicht darauf. Ob die Kamera Bewegungsbefehle
@@ -103,7 +103,7 @@ WRITABLE = (KEY_HDR, KEY_FOV)
 GROUP = "OBSBOT"
 STATE_LABELS = {RUN_AWAKE: "Wach", RUN_ASLEEP: "Schlaf", RUN_PRIVACY: "Privatsphäre"}
 FOV_WIDE = 0
-# Annahme aus dem Zoom-Byte (siehe oben): 00 weit, 01 mittel, 02 eng.
+# Am Gerät bestätigt (siehe oben): 00 weit, 01 mittel, 02 eng.
 FOV_LABELS = {FOV_WIDE: "Weit", 1: "Mittel", 2: "Eng"}
 LABELS = {KEY_HDR: "HDR", KEY_FOV: "Bildwinkel"}
 

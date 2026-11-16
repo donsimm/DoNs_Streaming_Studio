@@ -81,7 +81,7 @@ curl -X PUT "$D/cameras/$CAM/controls" -d '{"brightness": null}'
 - `PUT` setzt zuerst die Automatik-Schalter, dann die Werte, und antwortet mit den zurückgelesenen Werten. Verstellte Werte merkt sich der Dienst und setzt sie beim Erscheinen der Kamera und beim Start neu.
 - Ein falscher Wert ändert nichts (`400 invalid`). Ein Wert, der wegen eingeschalteter Automatik inaktiv ist, wird nicht gesetzt (`400 invalid`, die übrigen sind gesetzt).
 - Pan, Tilt und Zoom stehen in der Liste, gesetzt werden sie nur über Bewegen.
-- Tiny 2: Gruppe «OBSBOT» mit HDR (`obsbot_hdr`) und Bildwinkel (`obsbot_fov`, Typ `menu`: 0 «Weit», 1 «Mittel», 2 «Eng», Standard «Weit»), beide nur bei wacher Kamera (sonst `409 camera_asleep`) und gemerkt, dazu Zustand und «Automatisch schlafen nach» (nur lesbar). Die Zuordnung der Stufen zu weit, mittel, eng ist eine Annahme aus dem Zoom-Byte des Statusblocks.
+- Tiny 2: Gruppe «OBSBOT» mit HDR (`obsbot_hdr`) und Bildwinkel (`obsbot_fov`, Typ `menu`: 0 «Weit», 1 «Mittel», 2 «Eng», Standard «Weit»), beide nur bei wacher Kamera (sonst `409 camera_asleep`) und gemerkt, dazu Zustand und «Automatisch schlafen nach» (nur lesbar). Die Zuordnung der Stufen zu weit, mittel, eng ist am Gerät bestätigt (2026-11-16).
 
 ### Bewegen
 
