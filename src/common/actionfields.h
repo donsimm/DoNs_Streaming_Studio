@@ -76,6 +76,11 @@ double toDisplay(const FieldRow &row, double stored);
 // Angezeigten Wert zurück in den gespeicherten; bei Art Int auf ganze Zahlen gerundet.
 double fromDisplay(const FieldRow &row, double shown);
 
+// Feld für einen Abstand der Zeitnachricht (interval_s, random_min_s, random_max_s), P14 e3-2:
+// gespeichert in Sekunden, angezeigt in Minuten (scale 60, suffix «min», 1 Nachkommastelle, Art Int),
+// kleinster Wert 1 min (= kMinTimerIntervalS). Beschriftung vom Aufrufer.
+FieldRow minutesRow(const QString &name, const QString &label);
+
 // Abschnitte zum Schritttyp; leer bei Typen ohne Felder (Dann, Sonst, Abbruch) und unbekannten.
 QList<FieldSection> stepForm(const QString &type);
 // Inhalt je Element des Overlay-Schritts (Felder source, text, image eines Eintrags in elements).

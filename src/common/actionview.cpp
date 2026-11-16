@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace dss {
@@ -1388,6 +1389,58 @@ Permissions permissionsFromChoice(const Permissions &before, const PermissionCho
     return p;
 }
 
+QList<UserGroupChoice> userGroupChoices(const ActionsConfig &config, const Permissions &current)
+{
+    QList<UserGroup> groups = config.groups;
+    std::stable_sort(groups.begin(), groups.end(),
+                     [](const UserGroup &a, const UserGroup &b) { return nameLess(a.name, b.name); });
+    QList<UserGroupChoice> choices;
+    for (const UserGroup &g : groups)
+        choices.append({g.id, g.name, false});
+    for (const QUuid &id : current.groups) {
+        if (!config.group(id))
+            choices.append({id, QStringLiteral("Gruppe fehlt"), true});
+    }
+    return choices;
+}
+
+bool commandTestAllowed(const ActionsConfig &config, const QUuid &commandId, const ActionsStatus &status)
+{
+    return config.command(commandId) && testState(status);
+}
+
+EditResult testCommand(const ActionsConfig &config, const QUuid &commandId, const TestUserChoice &user, bool real)
+{
+    const Command *command = config.command(commandId);
+    if (!command)
+        return {};
+    // Wie triggerdispatcher.cpp (handleChat): Argumente des Befehls ohne Zähler und ohne input0…
+    QJsonObject arguments{{QStringLiteral("command"), command->commands.value(0)},
+                          {QStringLiteral("commandId"), uuidText(command->id)},
+                          {QStringLiteral("commandName"), command->name},
+                          {QStringLiteral("rawInput"), QString()}};
+    arguments.insert(userArgument("user_name"), user.user);
+    arguments.insert(userArgument("user_login"), user.userName);
+    arguments.insert(userArgument("user_id"), user.userId);
+    EditResult r;
+    for (const Action &action : config.actions) {
+        if (!action.enabled)
+            continue;
+        const bool hit = std::any_of(action.triggers.cbegin(), action.triggers.cend(), [&](const Trigger &t) {
+            return t.enabled && t.type == QLatin1String(kTriggerCommand)
+                   && t.fields.value(QStringLiteral("command_id")).toString() == uuidText(commandId);
+        });
+        if (hit) {
+            r.edits.append(edit(msg::kActionTest, {{QStringLiteral("action_id"), uuidText(action.id)},
+                                                   {QStringLiteral("arguments"), arguments},
+                                                   {QStringLiteral("dry_run"), !real}}));
+        }
+    }
+    if (r.edits.isEmpty())
+        return problem(QStringLiteral("Keine aktive Aktion führt diesen Befehl aus."));
+    return r;
+}
+
 QString commandsText(const QStringList &commands)
 {
     return commands.join(QLatin1Char('\n'));
@@ -1485,10 +1538,9 @@ QList<TimerRow> timerRows(const ActionsConfig &config, const QList<ReferenceWarn
         row.id = t.id;
         row.enabled = t.enabled;
         row.name = t.name;
-        QString interval = t.random ? QStringLiteral("%1 bis %2, zufällig")
-                                          .arg(durationText(qint64(t.randomMinS) * 1000),
-                                               durationText(qint64(t.randomMaxS) * 1000))
-                                    : durationText(qint64(t.intervalS) * 1000);
+        QString interval = t.random ? QStringLiteral("%1 bis %2 min, zufällig")
+                                          .arg(minutesText(t.randomMinS), minutesText(t.randomMaxS))
+                                    : QStringLiteral("%1 min").arg(minutesText(t.intervalS));
         row.interval = t.repeat ? interval : QStringLiteral("einmal nach %1").arg(interval);
         row.lines = t.lines > 0 ? QString::number(t.lines) : kNone;
         row.onlyLive = t.onlyLive ? QStringLiteral("ja") : QStringLiteral("nein");
@@ -1502,6 +1554,26 @@ QList<TimerRow> timerRows(const ActionsConfig &config, const QList<ReferenceWarn
 QString timerTitle(const Timer &timer)
 {
     return QStringLiteral("Zeitnachricht %1").arg(quoted(timer.name));
+}
+
+QString minutesText(int seconds)
+{
+    QString text = QString::number(double(seconds) / 60.0, 'f', 1);
+    if (text.endsWith(QLatin1String(".0")))
+        text.chop(2);
+    return text.replace(QLatin1Char('.'), QLatin1Char(','));
+}
+
+std::optional<int> secondsFromMinutes(const QString &text)
+{
+    bool ok = false;
+    const double minutes = QString(text.trimmed()).replace(QLatin1Char(','), QLatin1Char('.')).toDouble(&ok);
+    if (!ok || !std::isfinite(minutes) || minutes < 0)
+        return std::nullopt;
+    const double seconds = std::round(minutes * 60.0);
+    if (seconds > double(std::numeric_limits<int>::max()))
+        return std::nullopt;
+    return int(seconds);
 }
 
 EditResult newTimer(const ActionsConfig &config)

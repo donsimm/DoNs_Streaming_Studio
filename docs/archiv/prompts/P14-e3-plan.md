@@ -78,7 +78,7 @@ Summe Agenten etwa 14,5 h (etwa 3 Sitzungen).
   - Tests: `tst_aktionsansicht` (Reihenfolge, «Standard», neuer Name mit Nummer, Umbenennen mit beiden Prüfmeldungen, Löschen, beide Rückfragen). `scripts/testen.sh -R '^tst_aktionsansicht$'`.
   - Handtest: H5, H4 (Rückfrage).
 
-- [ ] **e3-2 Befehle und Zeitnachrichten: Gruppen, «▶ Testen als …», Minuten** (`actionview.{h,cpp}`).
+- [x] **e3-2 Befehle und Zeitnachrichten: Gruppen, «▶ Testen als …», Minuten** (`actionview.{h,cpp}`).
   - `struct UserGroupChoice { QUuid id; QString label; bool missing; }`; `QList<UserGroupChoice> userGroupChoices(config, const actions::Permissions &current)`: Benutzergruppen nach Name; eine Gruppe aus `current.groups`, die es nicht mehr gibt, als «Gruppe fehlt» (wie `queueChoices`), damit sie beim Speichern nicht verloren geht.
   - **«▶ Testen als …», Weg:** über das vorhandene `action_test` (keine neue Nachricht). Neu `EditResult testCommand(config, commandId, const TestUserChoice &user, bool real)`: je aktive Aktion mit einem aktiven Auslöser `command` dieses Befehls ein `action_test` (Reihenfolge der Liste wie `TriggerDispatcher::handleChat`). Argumente wie im echten Auslöser (`triggerdispatcher.cpp:198–205`): `command` = erster Eintrag aus `commands`, `commandId`, `commandName`, `rawInput` leer, keine `input0…`; dazu `user`, `userName`, `userId`. Ohne Rechte und Abklingzeit, der Zähler zählt nicht (Testwerte, Plan 3.6). Ohne passende Aktion die Prüfmeldung «Keine aktive Aktion führt diesen Befehl aus.».
   - `bool commandTestAllowed(config, commandId, const ActionsStatus &)` wie `testAllowed`; `realTestAllowed` gilt entsprechend (stumm: nur Probelauf). Die Form im Fenster hängt an Frage 1.

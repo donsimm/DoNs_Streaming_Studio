@@ -911,7 +911,7 @@ private slots:
         QCOMPARE(rows.at(0).onlyLive, QStringLiteral("ja"));
         QCOMPARE(rows.at(0).actions, QStringLiteral("Alle Auslöser"));
         QVERIFY(!rows.at(1).enabled);
-        QCOMPARE(rows.at(1).interval, QStringLiteral("einmal nach 1 min bis 10 min, zufällig"));
+        QCOMPARE(rows.at(1).interval, QStringLiteral("einmal nach 1 bis 10 min, zufällig"));
         QCOMPARE(rows.at(1).lines, QStringLiteral("—"));
         QCOMPARE(rows.at(1).onlyLive, QStringLiteral("nein"));
         QCOMPARE(rows.at(1).actions, QStringLiteral("—"));
@@ -1220,6 +1220,135 @@ private slots:
 
         QCOMPARE(testStartedStatusText(QStringLiteral("Begrüssung"), false), QStringLiteral("Probelauf gestartet: Begrüssung"));
         QCOMPARE(testStartedStatusText(QStringLiteral("Begrüssung"), true), QStringLiteral("Gestartet: Begrüssung"));
+    }
+
+    // --- e3-2: «Wer darf», «▶ Testen als …», Minuten ---
+
+    void userGroups()
+    {
+        ActionsConfig config = loadConfig();
+        const QUuid regulars = id("a2000000-0000-4000-8000-000000000001");
+        UserGroup zeta;
+        zeta.id = QUuid::createUuid();
+        zeta.name = QStringLiteral("zeta");
+        UserGroup alpha;
+        alpha.id = QUuid::createUuid();
+        alpha.name = QStringLiteral("Alpha");
+        config.groups.append(zeta);
+        config.groups.append(alpha);
+        Permissions current = config.command(kCommandShoutout)->permissions;
+        QCOMPARE(userGroupChoices(config, current),
+                 (QList<UserGroupChoice>{{alpha.id, QStringLiteral("Alpha"), false},
+                                         {regulars, QStringLiteral("Stammgäste"), false},
+                                         {zeta.id, QStringLiteral("zeta"), false}}));
+        // Eine gelöschte Gruppe bleibt als «Gruppe fehlt», damit Speichern sie nicht entfernt
+        const QUuid gone = QUuid::createUuid();
+        current.groups.append(gone);
+        const QList<UserGroupChoice> choices = userGroupChoices(config, current);
+        QCOMPARE(choices.size(), 4);
+        QCOMPARE(choices.last(), (UserGroupChoice{gone, QStringLiteral("Gruppe fehlt"), true}));
+        QCOMPARE(userGroupChoices(ActionsConfig{}, Permissions{}).size(), 0);
+    }
+
+    void commandTest()
+    {
+        ActionsConfig config = loadConfig();
+        const TestUserChoice viewer{QStringLiteral("Testzuschauer"), QStringLiteral("Testzuschauer"),
+                                    QStringLiteral("testzuschauer"), QStringLiteral("0")};
+        const QString commandIdText = kCommandShoutout.toString(QUuid::WithoutBraces);
+        const QJsonObject arguments{{QStringLiteral("command"), QStringLiteral("!so")},
+                                    {QStringLiteral("commandId"), commandIdText},
+                                    {QStringLiteral("commandName"), QStringLiteral("Shoutout")},
+                                    {QStringLiteral("rawInput"), QString()},
+                                    {QStringLiteral("user"), QStringLiteral("Testzuschauer")},
+                                    {QStringLiteral("userName"), QStringLiteral("testzuschauer")},
+                                    {QStringLiteral("userId"), QStringLiteral("0")}};
+
+        // 1 Aktion: Probelauf mit den Argumenten des echten Befehls
+        EditResult r = testCommand(config, kCommandShoutout, viewer, false);
+        QVERIFY(r.problem.isEmpty());
+        QCOMPARE(r.edits,
+                 (QList<ActionsEdit>{{QStringLiteral("action_test"),
+                                      {{QStringLiteral("action_id"), kShoutoutCommand.toString(QUuid::WithoutBraces)},
+                                       {QStringLiteral("arguments"), arguments},
+                                       {QStringLiteral("dry_run"), true}}}}));
+        QString error;
+        ActionsRequest request;
+        QVERIFY2(parseActionsRequest(actionsEditMessage(r.edits.first(), 1), &request, &error), qPrintable(error));
+        QCOMPARE(testCommand(config, kCommandShoutout, viewer, true).edits.first().fields.value(QStringLiteral("dry_run")),
+                 QJsonValue(false));
+
+        // 0 Aktionen: Prüfmeldung; unbekannter Befehl: nichts
+        const QString none = QStringLiteral("Keine aktive Aktion führt diesen Befehl aus.");
+        r = testCommand(config, kCommandDiscord, viewer, false);
+        QVERIFY(r.edits.isEmpty());
+        QCOMPARE(r.problem, none);
+        r = testCommand(config, QUuid::createUuid(), viewer, false);
+        QVERIFY(r.edits.isEmpty() && r.problem.isEmpty());
+
+        // 2 Aktionen in der Reihenfolge der Datei, je ein action_test
+        const auto actionAt = [&config](const QUuid &actionId) -> Action & {
+            for (Action &a : config.actions) {
+                if (a.id == actionId)
+                    return a;
+            }
+            qFatal("Aktion fehlt");
+        };
+        Action &greeting = actionAt(kBegruessung);
+        Trigger trigger;
+        trigger.id = QUuid::createUuid();
+        trigger.type = QString::fromLatin1(kTriggerCommand);
+        trigger.fields.insert(QStringLiteral("command_id"), commandIdText);
+        greeting.triggers.append(trigger);
+        r = testCommand(config, kCommandShoutout, viewer, false);
+        QCOMPARE(r.edits.size(), 2);
+        QCOMPARE(r.edits.at(0).fields.value(QStringLiteral("action_id")).toString(),
+                 kBegruessung.toString(QUuid::WithoutBraces));
+        QCOMPARE(r.edits.at(1).fields.value(QStringLiteral("action_id")).toString(),
+                 kShoutoutCommand.toString(QUuid::WithoutBraces));
+
+        // Abgeschalteter Auslöser und abgeschaltete Aktion zählen nicht
+        greeting.triggers.last().enabled = false;
+        QCOMPARE(testCommand(config, kCommandShoutout, viewer, false).edits.size(), 1);
+        actionAt(kShoutoutCommand).enabled = false;
+        QCOMPARE(testCommand(config, kCommandShoutout, viewer, false).problem, none);
+
+        // Erlaubt wie testAllowed: Befehl gespeichert, Aktionssystem lesbar
+        ActionsStatus status;
+        status.state = QStringLiteral("muted");
+        QVERIFY(commandTestAllowed(config, kCommandShoutout, status));
+        status.state = QStringLiteral("file_error");
+        QVERIFY(!commandTestAllowed(config, kCommandShoutout, status));
+        status.state = QStringLiteral("on");
+        QVERIFY(!commandTestAllowed(config, QUuid::createUuid(), status));
+    }
+
+    void minutes()
+    {
+        QCOMPARE(minutesText(60), QStringLiteral("1"));
+        QCOMPARE(minutesText(450), QStringLiteral("7,5"));
+        QCOMPARE(minutesText(1200), QStringLiteral("20"));
+        QCOMPARE(minutesText(100), QStringLiteral("1,7")); // höchstens eine Nachkommastelle
+        for (const int s : {60, 450, 1200})
+            QCOMPARE(secondsFromMinutes(minutesText(s)), std::optional<int>(s));
+        QCOMPARE(secondsFromMinutes(QStringLiteral("7,5")), std::optional<int>(450));
+        QCOMPARE(secondsFromMinutes(QStringLiteral(" 7.5 ")), std::optional<int>(450));
+        QCOMPARE(secondsFromMinutes(QStringLiteral("0,5")), std::optional<int>(30)); // Grenze prüft putTimer
+        QCOMPARE(secondsFromMinutes(QStringLiteral("1,01")), std::optional<int>(61)); // gerundet
+        QCOMPARE(secondsFromMinutes(QStringLiteral("abc")), std::nullopt);
+        QCOMPARE(secondsFromMinutes(QString()), std::nullopt);
+        QCOMPARE(secondsFromMinutes(QStringLiteral("-1")), std::nullopt);
+        QCOMPARE(secondsFromMinutes(QStringLiteral("1e12")), std::nullopt);
+
+        // Tabelle «Zeitnachrichten» in derselben Schreibweise
+        ActionsConfig config = loadConfig();
+        config.timers[0].intervalS = 450;
+        config.timers[1].randomMinS = 300;
+        config.timers[1].randomMaxS = 450;
+        config.timers[1].repeat = true;
+        const QList<TimerRow> rows = timerRows(config, {});
+        QCOMPARE(rows.at(0).interval, QStringLiteral("7,5 min"));
+        QCOMPARE(rows.at(1).interval, QStringLiteral("5 bis 7,5 min, zufällig"));
     }
 };
 

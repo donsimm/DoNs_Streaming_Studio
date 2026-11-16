@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace dss {
 
@@ -273,6 +274,18 @@ double fromDisplay(const FieldRow &row, double shown)
     const double stored = shown * row.scale;
     // 8,5 s × 1000 ist in double nicht immer genau 8500; Int-Felder auf ganze ms runden
     return row.kind == FieldKind::Int ? std::round(stored) : stored;
+}
+
+FieldRow minutesRow(const QString &name, const QString &label)
+{
+    FieldRow r = row(name, label, {}, QStringLiteral("min"));
+    r.kind = FieldKind::Int;
+    r.scale = 60;
+    r.decimals = 1;
+    r.min = double(kMinTimerIntervalS) / r.scale;
+    // Obergrenze wie timerFromJson (int in Sekunden)
+    r.max = double(std::numeric_limits<int>::max()) / r.scale;
+    return r;
 }
 
 QList<FieldSection> stepForm(const QString &type)

@@ -14,6 +14,8 @@
 #include <QStringList>
 #include <QUuid>
 
+#include <optional>
+
 // Ansichtslogik des Editors im Reiter «Chat-Bot» (P14 e1, Plan 6 und 8): Unterreiter «Aktionen»,
 // «Befehle», «Zeitnachrichten» und «Variablen». Nur Qt Core (CLAUDE.md Regel 9): Das Fenster (e2,
 // e3) zeigt die Zeilen und Texte, die hier entstehen, und schickt die Änderungsbefehle an den Kern.
@@ -351,6 +353,31 @@ PermissionChoice permissionChoice(const actions::Permissions &permissions);
 // Neue Rechte aus der Auswahl; grant und users bleiben. «Alle» leert Rollen und Gruppen.
 actions::Permissions permissionsFromChoice(const actions::Permissions &before, const PermissionChoice &choice);
 
+// Benutzergruppe in «Wer darf» (P14 e3-2)
+struct UserGroupChoice
+{
+    QUuid id;
+    QString label;        // Name der Gruppe, «Gruppe fehlt»
+    bool missing = false; // aus current.groups, aber nicht mehr in config
+    bool operator==(const UserGroupChoice &) const = default;
+};
+// Die Benutzergruppen nach Name ohne Rücksicht auf Gross- und Kleinschreibung, danach je Gruppe aus
+// current.groups, die es nicht mehr gibt, «Gruppe fehlt» (wie queueChoices), damit Speichern sie
+// nicht still entfernt.
+QList<UserGroupChoice> userGroupChoices(const actions::ActionsConfig &config, const actions::Permissions &current);
+
+// «▶ Testen als …» eines Befehls (Entscheid des Nutzers, 2026-11-16: Menü «Testzuschauer» / «eigener
+// Kanal» aus testUserChoices, immer Probelauf). Bedienbar wie testAllowed: Befehl gespeichert und
+// Aktionssystem gebaut und lesbar.
+bool commandTestAllowed(const actions::ActionsConfig &config, const QUuid &commandId, const ActionsStatus &status);
+// Je aktive Aktion mit einem aktiven Auslöser «Befehl» auf commandId ein action_test, in der Reihenfolge
+// der Datei (wie TriggerDispatcher::handleChat). arguments wie beim echten Befehl: command (erster
+// Eintrag aus commands), commandId, commandName, rawInput leer, ohne input0…, dazu user, userName und
+// userId; ohne Rechte, Abklingzeit und Zähler (Plan 3.6). Ohne passende Aktion die Prüfmeldung
+// «Keine aktive Aktion führt diesen Befehl aus.». Prüft nicht, ob der Test erlaubt ist.
+EditResult testCommand(const actions::ActionsConfig &config, const QUuid &commandId, const TestUserChoice &user,
+                       bool real);
+
 // Feld «Auslöser»: ein Befehl je Zeile ↔ Liste (ohne Leerzeichen am Rand, ohne leere Zeilen)
 QString commandsText(const QStringList &commands);
 QStringList commandsFromText(const QString &text);
@@ -371,7 +398,7 @@ struct TimerRow
     QUuid id;
     bool enabled = true;
     QString name;
-    QString interval; // «20 min», «5 bis 10 min, zufällig», «einmal nach 20 min»
+    QString interval; // «20 min», «5 bis 7,5 min, zufällig», «einmal nach 20 min» (minutesText)
     QString lines;    // «5», «—» bei 0
     QString onlyLive; // «ja», «nein»
     QString actions;  // «—» ohne
@@ -379,6 +406,13 @@ struct TimerRow
 };
 QList<TimerRow> timerRows(const actions::ActionsConfig &config, const QList<actions::ReferenceWarning> &warnings);
 QString timerTitle(const actions::Timer &timer); // «Zeitnachricht «Info»»
+
+// Abstand in Minuten (Entscheid des Nutzers, 2026-11-16), intern Sekunden: «20», «7,5», höchstens eine
+// Nachkommastelle, mit Komma, ohne Einheit.
+QString minutesText(int seconds);
+// Eingabe in Minuten mit Komma oder Punkt («7,5», «7.5») auf ganze Sekunden gerundet; leer bei
+// keiner Zahl, negativ oder zu gross für int. Die Grenze von 60 s prüft putTimer.
+std::optional<int> secondsFromMinutes(const QString &text);
 
 EditResult newTimer(const actions::ActionsConfig &config);
 EditResult copyTimer(const actions::ActionsConfig &config, const QUuid &timerId);

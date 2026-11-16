@@ -12,6 +12,8 @@
 #include <QSet>
 #include <QTest>
 
+#include <limits>
+
 using namespace dss;
 using namespace dss::actions;
 
@@ -59,6 +61,7 @@ private slots:
     void triggerTitles();
     void triggerSectionOfField();
     void secondsForMilliseconds();
+    void minutesForTimerSeconds();
     void inactiveRows();
     void listenButton();
     void choicesFromData();
@@ -457,6 +460,26 @@ void TestActionFields::secondsForMilliseconds()
         }
     }
     QCOMPARE(msRows, 4); // Pause «Dauer», «bis»; Overlay «Dauer», «Dauer weich»
+}
+
+// Abstand der Zeitnachricht in Minuten, gespeichert in Sekunden (Entscheid des Nutzers, 2026-11-16)
+void TestActionFields::minutesForTimerSeconds()
+{
+    const FieldRow r = minutesRow(QStringLiteral("interval_s"), QStringLiteral("Abstand"));
+    QCOMPARE(r.name, QStringLiteral("interval_s"));
+    QCOMPARE(r.label, QStringLiteral("Abstand"));
+    QCOMPARE(r.kind, FieldKind::Int);
+    QCOMPARE(r.suffix, QStringLiteral("min"));
+    QCOMPARE(r.decimals, 1);
+    QCOMPARE(r.min, 1.0);
+    QCOMPARE(fromDisplay(r, r.min), double(kMinTimerIntervalS));
+    QVERIFY(fromDisplay(r, r.max) <= double(std::numeric_limits<int>::max()));
+    QCOMPARE(toDisplay(r, 450), 7.5);
+    QCOMPARE(toDisplay(r, 1200), 20.0);
+    QCOMPARE(fromDisplay(r, 7.5), 450.0);
+    for (const double s : {60.0, 450.0, 1200.0, 86400.0})
+        QCOMPARE(fromDisplay(r, toDisplay(r, s)), s);
+    QCOMPARE(fromDisplay(r, 0.1 + 0.2), 18.0); // ganze Sekunden trotz Rundungsfehler
 }
 
 // «weich» wirkt erst ab P14-2: nur der Abschnitt «Einblenden/Ausblenden» ist ausgegraut
