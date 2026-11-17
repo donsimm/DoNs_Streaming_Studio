@@ -97,6 +97,29 @@ Stream Deck: nicht Teil dieses Gerätetests (eigener Auftrag im Stream-Deck-Proj
 
 Testdaten danach gelöscht (Presets, Aktion lag nur im Test-Datenordner), Tiny 2 im Schlaf. **Nicht geprüft** (Nutzer oder Bild nötig): L4 im Fenster mit OBS-Bild, Dialog «Lampen» im Fenster, Bewegung nach «KI aus» (b7), Dienst während einer Fahrt beenden (b4), Studio verbindet nach Neustart des Dienstes neu (Fenster), N1–N8.
 
+## Gerätetest mit dem Nutzer (2026-11-17, 17:40–18:10)
+
+**Aufbau:** OBS am Streaming-PC offen, Testquelle «DSS Kameratest» (Tiny 2) in «test 2» über obs-websocket, Nutzer vor der Tiny 2. Studio aus `build/` (Commit dieses Branchs) mit eigenem `XDG_CONFIG_HOME`, `XDG_DATA_HOME` und `XDG_RUNTIME_DIR`, `kern.ini` `[kamera-dienst] aktiv=ja`. Kein Stream, keine Aufnahme.
+
+| Was | Ergebnis |
+|---|---|
+| KI an (e1b) | `PUT {"obsbot_ai": 1}` → `200`, zurückgelesen `1`; Kamera folgt (Nutzer). **Bestätigt.** Befund: Mit OBS-Quelle und Person im Bild schaltet die KI ein; am Nachmittag ohne beides blieb sie 0 |
+| KI aus | `0` → zurückgelesen 0 (nach 2–8 s weiter 0), Kamera steht (Nutzer). Nicht gemerkt: `remembered: false`, nicht in `kameras.json` |
+| Bewegung direkt nach «KI aus» (b7) | KI an, 4 s, aus, sofort `step {"pan": 1}` → `200`, kleiner Schritt, danach Stillstand (Nutzer). **Bestätigt.** Rückgabe `tilt -84.0` nach der KI-Fahrt (Treiberwert, nicht weiter geprüft) |
+| Dienst während einer Fahrt beenden (b4) | `move` Pan −1 Tempo 10 alle 200 ms, nach 2 s `systemctl --user stop dss-kamera`: Kamera hält sofort (Nutzer). **Bestätigt.** Danach Start, beide Kameras erscheinen |
+| Punkt 136 | `v4l2-ctl -d /dev/video0 -C zoom_continuous` → `245` (unverändert, Treiber) |
+| L4/N1 Steuerkreuz | Klick, Halten, Zoom, Tempo, Schritt, Richtungen, Positionen anlegen/abrufen/umbenennen/löschen: ok (Nutzer) |
+| N3 Aussehen | ok; **Wunsch Nutzer:** «Einrichten» aus dem Reiter in das Menü «Werkzeuge» als «Kamera einrichten» |
+| N2 Bildwerte | C922 50 Hz (gemerkt, `power_line_frequency 1`), Belichtung, Fokus, Weissabgleich; Tiny 2 HDR, Bildwinkel, KI im Reiter, danach Schritt → «Aus»: ok (Nutzer) |
+| N4 Schlafen/Wecken | ok, Position aus dem Schlaf ok (Nutzer) |
+| Lampen-Dialog, N5 | Verbindung prüfen richtig/falsch, Regler, Alle ein/aus, Presets «Stream» und «Abend», schnell ziehen: ok (Nutzer) |
+| N6 Aktion | eigene Aktion mit Kamera-Position und Licht-Preset echt: ok (Nutzer) |
+| N7 drittes Gerät | Gerät im WLAN: keine Antwort (Nutzer). Vom Streaming-PC selbst über die Heimnetz-Adresse `403`, Protokoll «abgewiesen (nicht in erlaubte-adressen)» |
+| L5 Neustart des Dienstes | `systemctl --user restart dss-kamera`: Studio nach 2 s wieder verbunden (Kernprotokoll), Licht-Presets, Kamera-Positionen und Lampen über `GET light-presets/…`, `camera-presets/…`, `status` je `200` wie vorher, Dateien unverändert |
+| N3 Umstecken | **nicht geprüft** (Kameras fest verkabelt) |
+
+Danach: Testquelle gelöscht, Programm auf «Szene», Testfenster und Testkern beendet. Die Positionen «test», «test 2» und die Licht-Presets «Stream», «Abend» des Nutzers bleiben.
+
 ## Prüfung am Gerät a bis c (2026-11-16, 07:20–07:50, Lotse, Nutzer am Streaming-PC)
 
 **Aufbau:** `kamera-dienst/installieren.sh <streaming-pc> --ziel ~/dss-kamera-test/opt --datenordner ~/dss-kamera-test/daten --ohne-einheit` (Exit 0, «Kamera-Dienst 0.1.0, Commit a94e73a»). Testinstanz per SSH mit `XDG_CONFIG_HOME` und `XDG_DATA_HOME` im Testordner, erst ohne `dienst.ini` (nur `127.0.0.1`), für L3 mit Test-`dienst.ini`. Kein installierter Dienst, keine Einheit. Kein Stream, keine Aufnahme (`GetStreamStatus`, `GetRecordStatus`). Kernel-Protokoll (`journalctl -k`) über die ganze Zeit: keine Meldung zu USB, UVC oder Video, kein `EPROTO`, keine Abmeldung.
