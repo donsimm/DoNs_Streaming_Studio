@@ -207,7 +207,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(c->isConnected(), 3000);
         QCOMPARE(c->coreHello().program, QStringLiteral("dss-core"));
         QCOMPARE(c->coreHello().version, version());
-        QCOMPARE(c->coreHello().protocolVersion, 18); // seit P14 e2-2 (chat_send)
+        QCOMPARE(c->coreHello().protocolVersion, 19); // seit P15 d2 (Kamera-Dienst)
         QTRY_COMPARE_WITH_TIMEOUT(c->overlays().size(), 2, 3000);
         // Seit P08 in der Reihenfolge der Liste (liste.json): angelegt «Überblick Start», dann
         // «Chat Ecke».
@@ -219,6 +219,10 @@ private slots:
         QCOMPARE(c->statusText(), QStringLiteral("Mit dem Kern verbunden (dss-core %1)").arg(version()));
         for (Connection con : kAllConnections)
             QCOMPARE(c->connectionStates().value(con), ConnectionState::Off);
+        // P15 d2: Kamera-Dienst nach hello, ohne [kamera-dienst] aus
+        QTRY_VERIFY_WITH_TIMEOUT(c->cameraService().has_value(), 3000);
+        QCOMPARE(c->cameraService()->state, QStringLiteral("off"));
+        QVERIFY(c->cameraService()->status.isEmpty());
     }
 
     void wholeOverlayOnRequest()

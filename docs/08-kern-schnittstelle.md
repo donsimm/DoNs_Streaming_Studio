@@ -1,8 +1,12 @@
 # 08 – Schnittstelle Kern–Fenster
 
-Stand: 2026-11-16 (P14 b3, t und d zusammengeführt, z1b, e2-2). Version der Schnittstelle: **18**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3), `tst_zuschauerimport` (Zuschauer-Import ohne Kern, seit P14 z1b auch über Kern, `dss-cli` und `scripts/zuschauer-import.sh`), `tst_laufzustand` (Laufzustand, Platzhalter, Profilbilder gegen einen Testserver auf `127.0.0.1`, Kern und `dss-cli live…`, seit P14 d); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
+Stand: 2026-11-17 (P14 b3, t und d zusammengeführt, z1b, e2-2; P15 d2). Version der Schnittstelle: **19**. Massgebend ist der Code: Nachrichten in `src/common/protocol.h/.cpp` (Aktionssystem in `src/common/actionprotocol.h/.cpp`, Kern-Seite in `src/core/actionservice.cpp`, seit P14 b3; Kamera-Dienst in `src/common/cameraprotocol.h/.cpp`, Verbindung in `src/camera/`, seit P15 d2), Kern in `src/core/coreservice.cpp`, Ereignisfluss und Typenliste in `src/events/` (seit P13), Fenster-Seite in `src/common/coreclient.cpp`, verzögertes Speichern in `src/common/savescheduler.h/.cpp`, Overlay-Server in `src/server/`, Seite der Browserquelle in `web/`, Anbindung an OBS in `src/obs/`, Ton der Videos in `src/core/videoaudio.cpp`, `src/audio/` und `src/media/audiodecoder.cpp` (seit P12b). Tests: `tst_protocol` und `tst_aenderungen` (alle Nachrichten lesen und schreiben, Abweisungen, Zusammenfassen, ohne Qt Gui), `tst_kernverbindung` und `tst_bearbeiten` (Kern als eigener Prozess, Zusammenspiel, zwei Fenster, Neustart), `tst_kerneinstellungen` (kern.ini ohne Kern), `tst_medienliste` (`medien.json` ohne Kern, seit P10b), `tst_medien` (Medienliste, Videoformate und `dss-cli` mit Kern als eigenem Prozess), `tst_uebernehmen` (Übernehmen von Dateien im eigenen Thread), `tst_overlayserver` (Overlay-Server ohne Fenster), `tst_browserquelle` (Seite in Qt WebEngine über die Adresse im Heimnetz, Stufe 1), `tst_obsprotokoll`, `tst_obsverbindung`, `tst_obspasswort`, `tst_obsquellen` (Anbindung an OBS gegen einen Testserver auf `127.0.0.1`, seit P10c), `tst_tondecoder`, `tst_tonmischer` (ohne Gerät), `tst_tonausgang` (PipeWire mit einer virtuellen Senke), `tst_kernton` (Kern als eigener Prozess mit Ersatzausgang, seit P12b), `tst_ereignisfluss` (Fluss ohne Kern, seit P13), `tst_kernaktionen` (Aktionssystem mit Kern und `dss-cli` als eigenen Prozessen, seit P14 b3), `tst_zuschauerimport` (Zuschauer-Import ohne Kern, seit P14 z1b auch über Kern, `dss-cli` und `scripts/zuschauer-import.sh`), `tst_laufzustand` (Laufzustand, Platzhalter, Profilbilder gegen einen Testserver auf `127.0.0.1`, Kern und `dss-cli live…`, seit P14 d), `tst_kameradienst` (Verbindung zum Kamera-Dienst ohne Kern) und `tst_kernkamera` (Nachrichten, feste Liste, Kern und `dss-cli kamera-…` gegen den Kamera-Dienst in der Attrappe auf `127.0.0.1`, seit P15 d2); dazu `scripts/tonpruefung.py` (ganzer Weg Seite → Kern → PipeWire, unhörbar, nicht in `ctest`).
 
 Seit P08 kann das Fenster über die Schnittstelle **ändern** (Abschnitt «Änderungen»). Jede Änderung geht als Nachricht an den Kern; nur der Kern schreibt Dateien (K-03). Der **Token** eines Overlays steht seit P10 nur in der Adresse der Browserquelle (`browser_source`), und die bekommt nur die Verbindung, die danach fragt; geändert wird er mit `new_token`. In Overlays, Listen und im Protokoll steht er nie (CLAUDE.md Regel 12).
+
+### Version 19 (P15 d2)
+
+Neu ist die Anbindung an den Kamera-Dienst auf dem Streaming-PC (Abschnitt «Kamera-Dienst»): nach `hello` und bei jeder Änderung `camera_service`, die Ereignisse des Dienstes als `camera_event`, die Anfrage `camera_call` mit der Antwort `camera_result`, in `settings` und `update_settings` die Felder `camera_enabled`, `camera_host`, `camera_port` (Abschnitt `[kamera-dienst]` in `kern.ini`) und auf dem Ereignisfluss `camera.state_changed` und `light.changed`. Ein Kern der Version 18 würde `camera_call` mit `unknown_type` beantworten, und `parseSettings` eines Fensters der Version 19 verlangt die neuen Pflichtfelder. Darum stieg die Version.
 
 ### Version 18 (P14 e2-2)
 
@@ -117,6 +121,7 @@ Fenster                                 Kern
    | <--- obs_status --------------------- |   seit Version 11 (P10c)
    | <--- obs_sources -------------------- |   seit Version 11 (P10c)
    | <--- audio_outputs ------------------ |   seit Version 12 (P12b)
+   | <--- camera_service ----------------- |   seit Version 19 (P15 d2)
    | <--- overlay_live ------------------- |   seit Version 16 (P14 d)
    | <--- stats (letzte Messung) --------- |
    | <--- stats ------------------------- |   einmal pro Sekunde
@@ -159,9 +164,9 @@ Fenster                                 Kern
 ```
 
 1. Beide Seiten schicken ihr `hello` sofort nach dem Verbinden, ohne auf die andere zu warten.
-2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 18 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 18».
+2. Das Fenster gilt als verbunden, sobald das `hello` des Kerns mit `protocol_version` = 19 da ist. Bei einer anderen Version trennt das Fenster und zeigt «Kern hat Schnittstelle Version X, das Fenster kennt Version 19».
 3. Der Kern prüft das `hello` des Fensters. Bei einer anderen Version schickt er `error` mit `protocol_version` und trennt. Andere Nachrichten vor dem `hello` beantwortet er mit `error` `hello_missing` und übergeht sie.
-4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12), `actions_config` und `actions_status` (seit Version 15, P14 b3), `overlay_live` (seit Version 16, P14 d) und, falls schon gemessen, die letzte `stats`.
+4. Nach dem `hello` schickt der Kern `overlay_list`, `media_list` (seit Version 10; hat sie sich seit der letzten geändert, zum Beispiel weil eine Datei in `media/` fehlt, an alle), `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources` (beide seit Version 11), `audio_outputs` (seit Version 12), `camera_service` (seit Version 19, P15 d2), `actions_config` und `actions_status` (seit Version 15, P14 b3), `overlay_live` (seit Version 16, P14 d) und, falls schon gemessen, die letzte `stats`.
 5. Danach schickt der Kern jede Sekunde `stats`, bei Änderungen `overlay_changed`, `overlay_removed`, `overlay_list`, `media_list` (wenn sich die Medienliste geändert hat, auch durch eine Änderung an einem Overlay: «verwendet in»), `import_progress` und (wenn eine neue Schriftdatei dazukam) `font_list` an **alle** begrüssten Verbindungen.
 6. Unbekannte Typen: Der Kern antwortet mit `error` `unknown_type`. Das Fenster übergeht unbekannte Typen (Protokollzeile).
 7. Verbindung getrennt: Der Kern vergisst die Verbindung. Das Fenster leert alle Daten vom Kern (Docks leer, Werte «–», Verbindungsknöpfe grau), zeigt «Kern-Dienst: nicht verbunden» und versucht es alle 2 s wieder.
@@ -508,7 +513,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 
 | Typ | Felder | Antwort des Kerns |
 |---|---|---|
-| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `16`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `overlay_live`, `actions_config`, `actions_status`, `stats` |
+| `hello` | `program` (Text, Fenster: `dss-app`, Werkzeug: `dss-cli`), `version` (Text), `protocol_version` (ganze Zahl, `19`) | `overlay_list`, `media_list`, `import_progress` (nur während einer Übernahme), `connections`, `server_status`, `obs_status`, `obs_sources`, `audio_outputs`, `camera_service`, `overlay_live`, `actions_config`, `actions_status`, `stats` |
 | `get_overlay_list` | – | `overlay_list` |
 | `get_overlay` | `id` (Text, Kennung) | `overlay` oder `error` `unknown_overlay` |
 | `get_fonts` | – | `font_list` |
@@ -522,6 +527,7 @@ Ein fehlender oder verschwundener Ausgang ergibt `missing`: Der Kern spielt dann
 | `obs_add_to_scene` | `request_id`, `overlay_id`, `scene_uuid` (seit Version 11) | fügt die vorhandene Quelle in eine weitere Szene ein, dann `change_result` |
 | `overlay_live_set` | `request_id`, `overlay_id`, `mode`, `elements`, `duration_ms`, `arguments` (seit Version 16, Abschnitt «Laufzustand») | `overlay_live` an alle (wenn geändert), dann `change_result`; mit Profilbild erst nach dem Laden |
 | `overlay_live_reset` | `request_id`, `overlay_id`, `sources` (seit Version 16) | `overlay_live` an alle (wenn geändert), dann `change_result` |
+| `camera_call` | `request_id`, `method`, `path`, `body` (seit Version 19, Abschnitt «Kamera-Dienst») | `camera_result` nur an diese Verbindung; die Antwort kommt über das Netz und kann bis 15 s dauern |
 | `subscribe_events` | `types` (Liste von Filtern, leer = abbestellen), `history` (true/false) (seit Version 14, Abschnitt «Ereignisfluss») | bei `history` `event_history` an diese Verbindung, danach `event` für jedes neue passende Ereignis; ungültiger Filter: `error` `invalid_message`, die bisherige Bestellung bleibt |
 | Änderungen | siehe Abschnitt «Änderungen» | Nachrichten an alle, dann `change_result` |
 
@@ -559,6 +565,8 @@ Seit Version 15 (P14 b3): `actions.run_started`, `actions.run_changed` und `acti
 Seit P14 c1a (Version unverändert, nur neue Typen): Ergebnis des Schritts «Chat senden» (Plan 4.1), Herkunft `twitch`, kein Auslöser. `twitch.chat_sent` mit `message_id`, `account` (`bot` oder `broadcaster`), `user_id` (Absender), `text` (wie gesendet, nach dem Kürzen auf 500), `reply_to` (`message_id` oder `null`), `truncated`; `twitch.chat_dropped` mit `account`, `user_id` (leer, wenn das Konto nicht angemeldet ist), `text`, `reply_to`, `truncated`, `code` (`unavailable`, `queue_full`, `expired`, `failed` oder `drop_reason.code` von Twitch) und `message` (Grund). Ins Journal kommt nur Konto und `code`, kein Text.
 
 Seit P14 Emotes (Version unverändert, nur Felder in den Fragmenten): Fragmente in `twitch.chat_message` und `twitch.first_message` tragen neben `type`, `text` und `emote_id` auch `emote_format` (Liste aus `emote.format` von Twitch, `static` und/oder `animated`; ohne Emote `null`), `gif_id` und `gif_url` (aus `gif.id`, sonst `gif_id`, und `gif.url` unverändert; ohne GIF `null`). Die Prüfung der Ereignisse prüft nur die Felder in `data`, nicht die in einem Fragment; ein älteres Fenster liest die neuen Felder nicht.
+
+Seit Version 19 (P15 d2): `camera.state_changed` (Herkunft `camera`, Feld `cameras`) und `light.changed` (Herkunft `light`, Feld `lights`), je die ganze Liste wie in `GET status` des Kamera-Dienstes (`docs/09-kamera-dienst.md`). Der Kern bildet sie aus den Ereignissen `status` und `lights` des Dienstes, aber nur, wenn sich die Liste gegenüber dem letzten Ereignis geändert hat; beim Verbinden (auch nach einem Neustart des Dienstes) schickt der Dienst seinen Stand, das gibt nur bei einem neuen Stand ein Ereignis. Kein Auslöser im Aktionssystem.
 
 **Bestellen:** Ohne `subscribe_events` schickt der Kern einer Verbindung keine Ereignisse. Filter sind genaue Typen oder Vorsilben mit Punkt am Ende (`twitch.`); ein Filter, zu dem es keinen Typ gibt, wird abgewiesen. Eine neue Bestellung ersetzt die alte. Mit `history: true` kommt zuerst `event_history` mit den passenden Ereignissen aus dem Verlauf (älteste zuerst); ein Ereignis aus diesem Verlauf kommt danach nicht noch einmal als `event`.
 
@@ -782,6 +790,10 @@ versatz_ms=0
 [twitch]
 aktiv=nein
 client-id=
+[kamera-dienst]
+aktiv=nein
+adresse=
+port=8093
 ```
 
 | Wert | Festlegung |
@@ -798,6 +810,9 @@ client-id=
 
 | `[ton-aktionen] ausgang` | seit P14 t: Ausgang für die Töne des Chat-Bots, Regeln wie `[ton-video] ausgang`, Standard leer. Eigener Strom (`dss_core_ton_aktionen` bzw. `dss_core_entwicklung_ton_aktionen`), nur offen, solange ein Ausgang gewählt ist |
 | `[ton-aktionen] versatz_ms` | wird gelesen und geschrieben wie bei `[ton-video]`, wirkt aber nicht (Töne ohne Bild) |
+| `[kamera-dienst] aktiv` | seit P15 d2: `ja` oder `nein`, Standard `nein`. Braucht eine Adresse |
+| `[kamera-dienst] adresse` | seit P15 d2: Adresse des Kamera-Dienstes auf dem Streaming-PC, Regeln wie `[obs] adresse` (Tests nutzen `127.0.0.1`) |
+| `[kamera-dienst] port` | seit P15 d2: 1 bis 65535 wie `[obs] port`, Standard 8093. Neue Werte wirken sofort (neuer Versuch der Verbindung) |
 
 Ein Abschnitt je Zweck: `[ton-video]` (Kennung des Zwecks in der Schnittstelle: `video`) und seit P14 t `[ton-aktionen]` (`aktionen`, Töne des Chat-Bots, Plan P14 Abschnitt 4.3). Weitere Zwecke (Musikplayer) kommen als eigene Abschnitte dazu (Antwort 2 des Nutzers vom 2026-11-09). Ein Kern vor P14 t liest eine `kern.ini` mit `[ton-aktionen]` nicht («unbekannter Abschnitt»). Programme vor P12b lesen eine `kern.ini` mit `[ton-video]` nicht («unbekannter Abschnitt»); das betrifft nur das Zurückgehen auf eine ältere Version.
 
@@ -822,14 +837,15 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `audio_offset_min_ms`, `audio_offset_max_ms` | ganze Zahlen | seit Version 12: gültiger Bereich des Versatzes (−500, 500); das Fenster stellt sein Feld «Versatz» danach ein |
 | `twitch_enabled`, `twitch_client_id` | wahr/falsch, Text | Abschnitt `[twitch]`, seit Version 14 |
 | `twitch_client_secret_set` | wahr/falsch | Ein Client Secret von Twitch ist gespeichert; der Wert geht nie an ein Fenster, seit Version 14 |
+| `camera_enabled`, `camera_host`, `camera_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[kamera-dienst]`, seit Version 19 |
 
 ```json
-{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"camera_enabled":false,"camera_host":"","camera_port":8093,"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
 
-Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen), seit Version 12 `audio_routes` (je Zweck ein Objekt mit `output` und/oder `offset_ms`, mindestens eines; unbekannter Zweck: `rejected` «Unbekannter Zweck des Tons «x».»), seit Version 14 `twitch_enabled`, `twitch_client_id` (Buchstaben und Ziffern, höchstens 64; eingeschaltet nicht leer) und `twitch_client_secret` (wie `obs_password`; verschlüsselt nach dem Passwort, vor `kern.ini`). Nur angegebene Werte ändern sich. Ein neuer Ausgang oder Versatz wirkt sofort, ohne Neustart. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
+Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ganze Zahl), `home_address` (Text, leer erlaubt) und seit Version 11 `obs_enabled`, `obs_host`, `obs_port` und `obs_password` (Text: fehlt = behalten, leer = löschen), seit Version 12 `audio_routes` (je Zweck ein Objekt mit `output` und/oder `offset_ms`, mindestens eines; unbekannter Zweck: `rejected` «Unbekannter Zweck des Tons «x».»), seit Version 14 `twitch_enabled`, `twitch_client_id` (Buchstaben und Ziffern, höchstens 64; eingeschaltet nicht leer) und `twitch_client_secret` (wie `obs_password`; verschlüsselt nach dem Passwort, vor `kern.ini`), seit Version 19 `camera_enabled`, `camera_host`, `camera_port` (eingeschaltet braucht es eine Adresse; gleiche Werte lassen die Verbindung unberührt, ein neuer Versuch kommt ohnehin alle 2 s). Nur angegebene Werte ändern sich. Ein neuer Ausgang oder Versatz wirkt sofort, ohne Neustart. Steht `obs_enabled` darin, versucht der Kern die Verbindung zu OBS auch bei gleichen Werten neu: Damit wirkt «OK» nach einem Abbruch durch OBS. Das Passwort wird zuerst verschlüsselt, danach erst `kern.ini` geschrieben; `change_result` kann also später kommen. Der Kern prüft alle Werte; ist einer ungültig, ändert sich nichts und `change_result` hat `ok: false`, `code: rejected` und die Meldung, zum Beispiel «Port 80 ungültig, erlaubt sind 1024 bis 32767.». Sonst schreibt er die Datei, schickt `settings` an alle (auch an den Absender) und dann `change_result` `ok: true`. Ohne Wert oder mit falschem Typ: `change_result` `invalid_message` (bzw. `error`, wenn `request_id` fehlt).
 
 ```json
 {"type":"update_settings","request_id":9,"port":8090}
@@ -866,6 +882,48 @@ Ergänzt mit dem Bericht P13 (`docs/archiv/berichte/P13-bericht.md`); Einzelheit
 - **EventSub (`EventSubConnection`, nur solange der Kanal angemeldet ist):** nach `session_welcome` die 10 Abos von P13 (`channel.chat.message`, `channel.follow`, `channel.subscribe`, `channel.subscription.message`, `channel.subscription.gift`, `channel.cheer`, `channel.raid`, `channel.channel_points_custom_reward_redemption.add`, `stream.online`, `stream.offline`) parallel; dazu einmal `GET /helix/streams` für den Stream-Zustand beim Start (`twitch.stream_online` mit `at_start: true`, nur einmal je Start des Kerns). Keepalive von Twitch plus 5 s, sonst neu verbinden; bei `session_reconnect` schliesst der Kern die alte Verbindung erst nach dem Welcome der neuen. `revocation` mit `authorization_revoked` setzt die Anmeldung des Kanals auf «abgelaufen». Doppelte `message_id` (die letzten 500) werden übergangen. Verlorene Ereignisse liefert Twitch nicht nach.
 - **Abzeichen «Chat Bot»:** aktiv nur mit App-Token (Client Credentials aus Client-ID und Secret, nur im Speicher, erneuert 10 min vor Ablauf und nach 401), `user:bot` beim Bot und `channel:bot` beim Kanal; sonst nennt `badge_problem` den Grund. Gesendet wird erst mit P14.
 - **Protokoll:** nie Token, Secret, `device_code` oder `user_code`, keine Chat-Texte; Meldungen nennen nur Typ, Feld oder Grund.
+
+## Kamera-Dienst (P15 d2, seit Version 19)
+
+Der Kern hält die Verbindung zum Kamera-Dienst auf dem Streaming-PC (`docs/09-kamera-dienst.md`, Plan `docs/archiv/prompts/P15-kamera.md` Abschnitt 7) in `CameraServiceClient` (`src/camera/`, `dss_camera`, ohne Qt Gui und ohne `protocol.h`); angebunden an einer Stelle, `CoreService::setCameraService`. Schalter `DSS_CORE_CAMERA` (Standard ON, Regel 8: steuert Geräte an einem anderen PC). Standardmässig aus (`kern.ini [kamera-dienst] aktiv=nein`). Ablauf: `GET status`, dann der Ereignisstrom `GET events`; endet er, Zustand `error` und neuer Versuch nach 2 s. `connecting` nur beim ersten Versuch nach neuen Einstellungen, danach `error`, bis es klappt (wie OBS). Zwei Versionen (Einsatz und Arbeit) dürfen gleichzeitig verbunden sein. Code der Nachrichten: `src/common/cameraprotocol.h/.cpp`.
+
+### `camera_service` (Kern → Fenster)
+
+Nach `hello` und bei jeder Änderung von Zustand, Meldung oder Stand an alle.
+
+| Feld | Typ | Inhalt |
+|---|---|---|
+| `state` | Text | `off` (aus), `connecting`, `connected`, `error`, `unavailable` (Kern ohne Kamera-Dienst gebaut, `DSS_CORE_CAMERA` aus) |
+| `message` | Text oder `null` | Meldung zum Zustand, zum Beispiel «Kamera-Dienst unter 192.168.1.30:8093 nicht erreichbar. Neuer Versuch läuft.», bei `off` «Nicht eingerichtet oder abgeschaltet»; `null`, wenn verbunden |
+| `status` | Objekt | letzter Stand von `GET status` des Dienstes, nachgeführt mit seinen Ereignissen `status`, `presets` (Listen nur mit `id` und `name`) und `lights`; bleibt bei `error` erhalten, leer bei `off`, nach neuen Einstellungen und bei `unavailable` |
+
+```json
+{"message":null,"state":"connected","status":{"api_version":1,"camera_presets":[{"id":"totale","name":"Totale"}],"cameras":[…],"fake":false,"light_presets":[],"lights":[…],"ok":true,"service_version":"…"},"type":"camera_service"}
+```
+
+### `camera_event` (Kern → Fenster)
+
+Jedes Ereignis des Dienstes an alle, unverändert: `name` (`status`, `config`, `controls`, `presets`, `lights`) und `data` (ganzer neuer Stand des Teils, Aufbau in `docs/09-kamera-dienst.md`, «Ereignisse»). Ein Fenster, das die Bildwerte oder die ganzen Presets braucht, nimmt sie von hier; `camera_service` hat nur die Listen.
+
+```json
+{"data":{"camera":"bbbb:0002:SERIE0001","controls":[…]},"name":"controls","type":"camera_event"}
+```
+
+### `camera_call` und `camera_result` (Fenster → Kern → Fenster)
+
+`camera_call`: `request_id`, `method` (`GET`, `PUT`, `POST`, `DELETE`), `path` (relativ zu `/api/v1/`, zum Beispiel `camera-presets/totale/recall`), `body` (Objekt oder `null`/fehlt = ohne Inhalt). Der Kern reicht die Anfrage nur weiter, wenn Methode und Pfad in der **festen Liste** stehen (`checkCameraCall` in `cameraprotocol.h`; Plan Abschnitt 4 und `docs/09-kamera-dienst.md`, «Anfragen»):
+
+`GET status`; `GET`, `PUT cameras/*/controls`; `GET`, `PUT cameras/*/config`; `POST cameras/*/move`, `…/stop`, `…/step`, `…/home`, `…/wake`, `…/sleep`; `POST camera-presets`; `GET`, `PUT`, `DELETE camera-presets/*`; `POST camera-presets/*/save-current`, `…/recall`; `PUT lights/*` (auch `lights/all`); `POST lights`; `PUT lights/*/config`; `DELETE lights/*`; dasselbe für `light-presets` wie für `camera-presets`; `GET export`. `*` ist genau ein Teil des Pfads aus Buchstaben, Ziffern und `. _ ~ : % -`, nicht `.` oder `..`. `GET events` fehlt absichtlich: Den Strom hält der Kern selbst. Den Inhalt prüft der Dienst; kommt dort ein Feld dazu, bleibt diese Schnittstelle gleich.
+
+`camera_result` nur an den Absender: `request_id`, `status` (HTTP-Status des Dienstes), `body` (Antwort des Dienstes, auch bei Fehlern mit `ok`, `code`, `message`), `error` (Text oder `null`). `status` 0 heisst «keine Antwort des Dienstes»: nicht erlaubte Anfrage (dann geht nichts an den Dienst, Warnung im Protokoll), nicht verbunden, Zeitgrenze (15 s, Wecken der Tiny 2 dauert bis 10 s), Kern ohne Kamera-Dienst gebaut; der Grund steht in `error`, `body` ist leer. Fehlt `request_id`, antwortet der Kern mit `error` `invalid_message`; sonst kommt ein ungültiges `camera_call` als `camera_result` mit `status` 0. Ins Protokoll kommen nur Methode, Pfad, Status und `code`, nie der Inhalt; Antworten 200 nicht (Bewegungen kommen alle 200 ms).
+
+```json
+{"body":null,"method":"POST","path":"camera-presets/totale/recall","request_id":4,"type":"camera_call"}
+{"body":{"ok":true},"error":null,"request_id":4,"status":200,"type":"camera_result"}
+{"body":{},"error":"Anfrage «GET events» an den Kamera-Dienst ist nicht erlaubt.","request_id":5,"status":0,"type":"camera_result"}
+```
+
+**Werkzeug:** `dss-cli kamera-status` (Zustand, Meldung, `status` als JSON), `kamera-preset ID` und `licht-preset ID` (`POST camera-presets/ID/recall` bzw. `light-presets/ID/recall`), `kamera-aufruf METHODE PFAD [JSON]` (Pfad mit oder ohne `/api/v1/`, Methode auch klein; dieselbe feste Liste, sonst Exit-Code 2). Ausgabe: `body` als JSON; Exit-Code 1 bei `status` 0 oder ausserhalb 200–299.
 
 ## Anbindung an OBS (P10c, T-05, E-29)
 

@@ -333,6 +333,98 @@ private slots:
         QVERIFY(!wrong.isEmpty());
     }
 
+    // P15 d2: Abschnitt [kamera-dienst]. Ohne Abschnitt bleibt der Dienst aus, Port 8093 (Dateien
+    // von vor P15).
+    void parseCamera()
+    {
+        const CoreSettings defaults{8081, QString()};
+        CoreSettings s;
+        QString error;
+        QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
+        QCOMPARE(s.cameraEnabled, false);
+        QCOMPARE(s.cameraHost, QString());
+        QCOMPARE(s.cameraPort, 8093);
+        // «aktiv», «adresse» und «port» gibt es auch in [obs]; doppelt gilt je Abschnitt.
+        QVERIFY2(parseCoreSettings("[obs]\naktiv=nein\nport=4455\n[kamera-dienst]\naktiv=ja\nadresse=studio-pc.local\nport=9000\n",
+                                   defaults, &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.obsEnabled, false);
+        QCOMPARE(s.cameraEnabled, true);
+        QCOMPARE(s.cameraHost, QStringLiteral("studio-pc.local"));
+        QCOMPARE(s.cameraPort, 9000);
+        // Hin und zurück, Standard wie im Plan
+        CoreSettings written{8090, QString()};
+        QVERIFY(serializeCoreSettings(written).contains("[kamera-dienst]\naktiv=nein\nadresse=\nport=8093\n"));
+        written.cameraEnabled = true;
+        written.cameraHost = QStringLiteral("192.168.1.30");
+        const QByteArray text = serializeCoreSettings(written);
+        QVERIFY(text.contains("[kamera-dienst]\naktiv=ja\nadresse=192.168.1.30\nport=8093\n"));
+        QVERIFY2(parseCoreSettings(text, defaults, &s, &error), qPrintable(error));
+        QCOMPARE(s, written);
+    }
+
+    void parseCameraInvalid_data()
+    {
+        QTest::addColumn<QByteArray>("text");
+        QTest::addColumn<QString>("message");
+        QTest::newRow("aktiv") << QByteArray("[kamera-dienst]\naktiv=1\n") << QStringLiteral("ja oder nein");
+        QTest::newRow("aktiv ohne Adresse") << QByteArray("[kamera-dienst]\naktiv=ja\n")
+                                            << QStringLiteral("braucht die Adresse des Kamera-Dienstes");
+        QTest::newRow("Adresse") << QByteArray("[kamera-dienst]\nadresse=http://x\n")
+                                 << QStringLiteral("Adresse des Kamera-Dienstes «http://x» ungültig");
+        QTest::newRow("Port Text") << QByteArray("[kamera-dienst]\nport=abc\n") << QStringLiteral("keine ganze Zahl");
+        QTest::newRow("Port 0") << QByteArray("[kamera-dienst]\nport=0\n") << QStringLiteral("erlaubt sind 1 bis 65535");
+        QTest::newRow("Port gross") << QByteArray("[kamera-dienst]\nport=65536\n") << QStringLiteral("erlaubt sind 1 bis 65535");
+        QTest::newRow("doppelt") << QByteArray("[kamera-dienst]\nport=1\nport=2\n") << QStringLiteral("«port» doppelt");
+        QTest::newRow("unbekannt") << QByteArray("[kamera-dienst]\npasswort=x\n") << QStringLiteral("unbekannte Angabe «passwort»");
+    }
+
+    void parseCameraInvalid()
+    {
+        QFETCH(QByteArray, text);
+        QFETCH(QString, message);
+        CoreSettings s;
+        QString error;
+        QVERIFY(!parseCoreSettings(text, {8081, QString()}, &s, &error));
+        QVERIFY2(error.contains(message), qPrintable(error));
+    }
+
+    void changeCamera()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QString(), QStringLiteral("keine Route"), &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QString error;
+        // Einschalten braucht eine Adresse
+        CoreSettingsChange change;
+        change.cameraEnabled = true;
+        QVERIFY(store.checkChange(change).contains(QStringLiteral("braucht die Adresse")));
+        QVERIFY(!store.change(change, &error));
+        QCOMPARE(store.settings().cameraEnabled, false);
+        change.cameraHost = QStringLiteral("127.0.0.1"); // nicht auf Adressen dieses PCs beschränkt
+        change.cameraPort = 8094;
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().cameraEnabled, true);
+        QCOMPARE(store.settings().cameraPort, 8094);
+        QVERIFY(readFile(path).contains("[kamera-dienst]\naktiv=ja\nadresse=127.0.0.1\nport=8094\n"));
+        // Adresse leeren geht nur, wenn der Dienst gleichzeitig aus ist
+        CoreSettingsChange clear;
+        clear.cameraHost = QString();
+        QVERIFY(!store.change(clear, &error));
+        clear.cameraEnabled = false;
+        QVERIFY2(store.change(clear, &error), qPrintable(error));
+        CoreSettingsChange wrong;
+        wrong.cameraPort = 70000;
+        QVERIFY(!wrong.isEmpty());
+        QVERIFY(!store.change(wrong, &error));
+        QVERIFY2(error.contains(QStringLiteral("Port des Kamera-Dienstes 70000 ungültig")), qPrintable(error));
+        QCOMPARE(store.settings().cameraPort, 8094);
+    }
+
     // P12b b3: Abschnitt [ton-video]. Ohne Abschnitt: kein Ausgang, Versatz 0 (Dateien von vor P12b).
     void parseAudio()
     {

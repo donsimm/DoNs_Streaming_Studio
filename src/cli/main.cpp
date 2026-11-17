@@ -7,6 +7,7 @@
 
 #include "actionprotocol.h"
 #include "browsersource.h"
+#include "cameraprotocol.h"
 #include "configpaths.h"
 #include "coresession.h"
 #include "coresettings.h"
@@ -64,6 +65,12 @@ const QList<std::pair<QString, int>> kActionCommands = {
     {QStringLiteral("aktion-loeschen"), 1}, {QStringLiteral("aktion-test"), -1},
     {QStringLiteral("laeufe"), 0},         {QStringLiteral("warteschlange"), 2},
     {QStringLiteral("variablen"), 0},      {QStringLiteral("zuschauer-import"), 1}};
+
+// Kamera-Dienst (P15 d2): gehen an den laufenden Kern, er reicht sie an den Dienst weiter.
+const QStringList kCameraCommands = {QStringLiteral("kamera-status"), QStringLiteral("kamera-preset"),
+                                     QStringLiteral("licht-preset"), QStringLiteral("kamera-aufruf")};
+// Anfragen an den Dienst dauern bis 15 s (Wecken der Tiny 2, CameraServiceClient::Timing).
+constexpr int kCameraTimeoutMs = 20000;
 
 bool isActionCommand(const QString &command)
 {
@@ -130,6 +137,10 @@ const char *const kUsageTemplate =
     "  warteschlange NAME anhalten|fortsetzen|leeren\n"
     "  variablen [--zaehlen]\n"
     "  zuschauer-import ORDNER [--endgueltig] [--ueberschreiben]\n"
+    "  kamera-status\n"
+    "  kamera-preset ID\n"
+    "  licht-preset ID\n"
+    "  kamera-aufruf METHODE PFAD [JSON]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -182,10 +193,16 @@ const char *const kUsageTemplate =
     "--endgueltig sichert die betroffenen Dateien zuerst nach <Datenordner>/import/sicherung-<zeit>.\n"
     "Im Studio geänderte Werte bleiben, ausser mit --ueberschreiben. Der Bericht nennt nur Anzahlen\n"
     "und Namen von Variablen.\n"
+    "Kamera-Dienst (P15, über den laufenden Kern; Schnittstelle in docs/09-kamera-dienst.md):\n"
+    "kamera-status: Zustand der Verbindung, Meldung und letzter Stand des Dienstes (JSON).\n"
+    "kamera-preset, licht-preset: Kamera- bzw. Licht-Preset ID abrufen.\n"
+    "kamera-aufruf: Anfrage wie POST camera-presets/totale/recall oder PUT lights/all '{\"on\":\"toggle\"}';\n"
+    "PFAD relativ zu /api/v1/ (oder mit /api/v1/ davor). Nur Anfragen aus der festen Liste des Kerns;\n"
+    "die Antwort des Dienstes kommt als JSON.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
     "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern, live,\n"
-    "ereignisse, Aktionssystem).\n";
+    "ereignisse, Aktionssystem, Kamera-Dienst).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -1478,6 +1495,95 @@ int runActions(const Arguments &args)
 
 } // namespace
 
+// --- Kamera-Dienst (P15 d2) ---
+
+int runCamera(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const auto usageError = [](const QString &message) {
+        err() << "Fehler: " << message << "\n\n" << usageText();
+        return kExitUsage;
+    };
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    const bool status = command == QLatin1String("kamera-status");
+    const bool generic = command == QLatin1String("kamera-aufruf");
+    if ((status && !a.isEmpty()) || (generic && (a.size() < 2 || a.size() > 3)) || (!status && !generic && a.size() != 1))
+        return usageError(QStringLiteral("%1: falsche Anzahl Argumente (%2).").arg(command).arg(a.size()));
+
+    // Anfrage zusammenstellen und mit derselben festen Liste prüfen wie der Kern
+    dss::CameraCall call;
+    if (command == QLatin1String("kamera-preset")) {
+        call.method = QStringLiteral("POST");
+        call.path = QStringLiteral("camera-presets/%1/recall").arg(a.at(0));
+    } else if (command == QLatin1String("licht-preset")) {
+        call.method = QStringLiteral("POST");
+        call.path = QStringLiteral("light-presets/%1/recall").arg(a.at(0));
+    } else if (generic) {
+        call.method = a.at(0).toUpper();
+        call.path = dss::cameraApiPath(a.at(1));
+        if (a.size() == 3) {
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(a.at(2).toUtf8(), &parseError);
+            if (parseError.error != QJsonParseError::NoError || !doc.isObject())
+                return usageError(QStringLiteral("JSON «%1» ist kein Objekt.").arg(a.at(2)));
+            call.body = doc.object();
+        }
+    }
+    if (!status) {
+        if (const QString problem = dss::checkCameraCall(call.method, call.path); !problem.isEmpty())
+            return usageError(problem);
+    }
+
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session(kCameraTimeoutMs);
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Den Kamera-Dienst erreicht dss-cli über den Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+
+    if (status) {
+        // Nach hello schickt der Kern camera_service
+        const std::optional<QJsonObject> message = session.waitForMessage(QString::fromLatin1(dss::msg::kCameraService), &error);
+        dss::CameraServiceInfo info;
+        if (!message || !dss::parseCameraService(*message, &info, &error))
+            return fail(error);
+        out() << "Zustand: " << info.state << '\n';
+        if (!info.message.isEmpty())
+            out() << "Meldung: " << info.message << '\n';
+        if (!info.status.isEmpty())
+            out() << QJsonDocument(info.status).toJson(QJsonDocument::Indented);
+        return kExitOk;
+    }
+
+    QJsonObject fields{{QStringLiteral("method"), call.method}, {QStringLiteral("path"), call.path}};
+    if (call.body)
+        fields.insert(QStringLiteral("body"), *call.body);
+    const std::optional<QJsonObject> reply = session.actionsRequest(QString::fromLatin1(dss::msg::kCameraCall), fields,
+                                                                    QString::fromLatin1(dss::msg::kCameraResult), &error);
+    dss::CameraResult result;
+    if (!reply || !dss::parseCameraResult(*reply, &result, &error))
+        return fail(error);
+    if (result.status == 0)
+        return fail(result.error);
+    out() << QJsonDocument(result.body).toJson(QJsonDocument::Indented);
+    if (result.status < 200 || result.status >= 300) {
+        err() << "Fehler: Kamera-Dienst antwortet " << result.status << ": "
+              << result.body.value(QStringLiteral("message")).toString() << '\n';
+        return kExitError;
+    }
+    return kExitOk;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
@@ -1532,6 +1638,17 @@ int main(int argc, char *argv[])
             return kExitUsage;
         }
         const int rc = runEvents(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
+    if (kCameraCommands.contains(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für den Kamera-Dienst (er geht über den Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runCamera(args);
         out().flush();
         err().flush();
         return rc;

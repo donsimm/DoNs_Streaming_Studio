@@ -29,6 +29,11 @@ constexpr char kObsPortKey[] = "port";
 constexpr char kTwitchSection[] = "twitch";
 constexpr char kTwitchEnabledKey[] = "aktiv";
 constexpr char kTwitchClientIdKey[] = "client-id";
+// P15 d2: Kamera-Dienst auf dem Streaming-PC
+constexpr char kCameraSection[] = "kamera-dienst";
+constexpr char kCameraEnabledKey[] = "aktiv";
+constexpr char kCameraHostKey[] = "adresse";
+constexpr char kCameraPortKey[] = "port";
 constexpr char kYes[] = "ja";
 constexpr char kNo[] = "nein";
 // P12b b3: Abschnitt je Zweck des Tons (kAudioPurposes)
@@ -104,10 +109,20 @@ QString validateHomeAddress(const QString &address)
     return {};
 }
 
-QString validateObsHost(const QString &host)
+namespace {
+
+// Rechnername oder IPv4-Adresse an einem anderen PC (OBS, Kamera-Dienst)
+bool isRemoteHostForm(const QString &host)
 {
     static const QRegularExpression form(QStringLiteral("\\A[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?\\z"));
-    if (!host.isEmpty() && !form.match(host).hasMatch())
+    return host.isEmpty() || form.match(host).hasMatch();
+}
+
+} // namespace
+
+QString validateObsHost(const QString &host)
+{
+    if (!isRemoteHostForm(host))
         return QStringLiteral("Adresse von OBS «%1» ungültig, erwartet ist eine Adresse wie 192.168.1.116.")
             .arg(host);
     return {};
@@ -118,6 +133,29 @@ QString validateObsPort(int port)
     if (port < kObsPortMin || port > kObsPortMax)
         return QStringLiteral("Port von OBS %1 ungültig, erlaubt sind %2 bis %3.")
             .arg(port).arg(kObsPortMin).arg(kObsPortMax);
+    return {};
+}
+
+QString validateCameraHost(const QString &host)
+{
+    if (!isRemoteHostForm(host))
+        return QStringLiteral("Adresse des Kamera-Dienstes «%1» ungültig, erwartet ist eine Adresse wie 192.168.1.30.")
+            .arg(host);
+    return {};
+}
+
+QString validateCameraPort(int port)
+{
+    if (port < kObsPortMin || port > kObsPortMax)
+        return QStringLiteral("Port des Kamera-Dienstes %1 ungültig, erlaubt sind %2 bis %3.")
+            .arg(port).arg(kObsPortMin).arg(kObsPortMax);
+    return {};
+}
+
+QString validateCameraCombination(bool enabled, const QString &host)
+{
+    if (enabled && host.isEmpty())
+        return QStringLiteral("«Mit dem Kamera-Dienst verbinden» braucht die Adresse des Kamera-Dienstes.");
     return {};
 }
 
@@ -182,7 +220,8 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']'))) {
             section = line.mid(1, line.size() - 2).trimmed();
             if (section != QLatin1String(kSection) && section != QLatin1String(kObsSection)
-                && section != QLatin1String(kTwitchSection) && audioPurposeOfSection(section).isEmpty())
+                && section != QLatin1String(kTwitchSection) && section != QLatin1String(kCameraSection)
+                && audioPurposeOfSection(section).isEmpty())
                 return fail(QStringLiteral("unbekannter Abschnitt [%1]").arg(section));
             continue;
         }
@@ -245,6 +284,26 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
             } else {
                 return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
             }
+        } else if (section == QLatin1String(kCameraSection)) {
+            if (key == QLatin1String(kCameraEnabledKey)) {
+                if (value != QLatin1String(kYes) && value != QLatin1String(kNo))
+                    return fail(QStringLiteral("«%1» muss ja oder nein sein, nicht «%2»").arg(key, value));
+                s.cameraEnabled = value == QLatin1String(kYes);
+            } else if (key == QLatin1String(kCameraHostKey)) {
+                if (const QString e = validateCameraHost(value); !e.isEmpty())
+                    return fail(e);
+                s.cameraHost = value;
+            } else if (key == QLatin1String(kCameraPortKey)) {
+                bool number = false;
+                const int port = value.toInt(&number);
+                if (!number)
+                    return fail(QStringLiteral("Port des Kamera-Dienstes «%1» ist keine ganze Zahl").arg(value));
+                if (const QString e = validateCameraPort(port); !e.isEmpty())
+                    return fail(e);
+                s.cameraPort = port;
+            } else {
+                return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
+            }
         } else if (key == QLatin1String(kPortKey)) {
             bool number = false;
             const int port = value.toInt(&number);
@@ -269,6 +328,10 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         *error = e;
         return false;
     }
+    if (const QString e = validateCameraCombination(s.cameraEnabled, s.cameraHost); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
     *settings = s;
     return true;
 }
@@ -290,7 +353,9 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# [ton-aktionen]: Ausgang für die Töne des Chat-Bots; versatz_ms wirkt dort nicht.\n"
             "# [twitch]: aktiv ja oder nein, Client-ID der App bei Twitch. Token und Client Secret stehen\n"
             "# nicht hier, sondern verschlüsselt in twitch-token.cred, twitch-bot-token.cred und\n"
-            "# twitch-client-secret.cred.\n";
+            "# twitch-client-secret.cred.\n"
+            "# [kamera-dienst]: aktiv ja oder nein, Adresse und Port des Kamera-Dienstes auf dem\n"
+            "# Streaming-PC (docs/09-kamera-dienst.md).\n";
     text += '[' + QByteArray(kSection) + "]\n";
     text += QByteArray(kPortKey) + '=' + QByteArray::number(settings.port) + '\n';
     text += QByteArray(kAddressKey) + '=' + settings.homeAddress.toUtf8() + '\n';
@@ -307,6 +372,10 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
     text += '[' + QByteArray(kTwitchSection) + "]\n";
     text += QByteArray(kTwitchEnabledKey) + '=' + (settings.twitchEnabled ? kYes : kNo) + '\n';
     text += QByteArray(kTwitchClientIdKey) + '=' + settings.twitchClientId.toUtf8() + '\n';
+    text += '[' + QByteArray(kCameraSection) + "]\n";
+    text += QByteArray(kCameraEnabledKey) + '=' + (settings.cameraEnabled ? kYes : kNo) + '\n';
+    text += QByteArray(kCameraHostKey) + '=' + settings.cameraHost.toUtf8() + '\n';
+    text += QByteArray(kCameraPortKey) + '=' + QByteArray::number(settings.cameraPort) + '\n';
     return text;
 }
 
@@ -493,6 +562,21 @@ std::optional<CoreSettings> CoreSettingsStore::applied(const CoreSettingsChange 
     if (change.twitchEnabled)
         next.twitchEnabled = *change.twitchEnabled;
     if (const QString e = validateTwitchCombination(next.twitchEnabled, next.twitchClientId); !e.isEmpty())
+        return fail(e);
+    // P15 d2
+    if (change.cameraHost) {
+        if (const QString e = validateCameraHost(*change.cameraHost); !e.isEmpty())
+            return fail(e);
+        next.cameraHost = *change.cameraHost;
+    }
+    if (change.cameraPort) {
+        if (const QString e = validateCameraPort(*change.cameraPort); !e.isEmpty())
+            return fail(e);
+        next.cameraPort = *change.cameraPort;
+    }
+    if (change.cameraEnabled)
+        next.cameraEnabled = *change.cameraEnabled;
+    if (const QString e = validateCameraCombination(next.cameraEnabled, next.cameraHost); !e.isEmpty())
         return fail(e);
     for (auto it = change.audioRoutes.constBegin(); it != change.audioRoutes.constEnd(); ++it) {
         if (!next.audioRoutes.contains(it.key()))

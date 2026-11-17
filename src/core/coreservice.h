@@ -36,6 +36,9 @@ class ObsSources;
 namespace dss::twitch {
 class TwitchService;
 }
+namespace dss::camera {
+class CameraServiceClient;
+}
 
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
 // Verbindungen von Fenstern über einen Unix-Socket an und verteilt Overlays, Leistungswerte
@@ -91,6 +94,13 @@ public:
     // twitch_status und connections.twitch an alle, Anfragen twitch_login_start, twitch_login_cancel,
     // twitch_logout, Client Secret über update_settings. Ohne Aufruf: twitch_status mit enabled false.
     void setTwitchService(dss::twitch::TwitchService *twitch);
+#endif
+#if DSS_CORE_CAMERA
+    // Anbindung an den Kamera-Dienst (P15 d2, Plan P15 7., Schalter DSS_CORE_CAMERA). Alle connect zu
+    // CameraServiceClient stehen hier: Werte aus kern.ini [kamera-dienst], camera_service und
+    // camera_event an alle, camera_call aus der festen Liste (cameraprotocol.h), Ereignisse
+    // camera.state_changed und light.changed auf den Fluss. Ohne Aufruf: camera_service «unavailable».
+    void setCameraService(dss::camera::CameraServiceClient *camera);
 #endif
 
 #if DSS_CORE_AUDIO
@@ -218,6 +228,12 @@ private:
     void onTwitchChanged();
     void handleTwitchRequest(QLocalSocket *socket, const QJsonObject &message);
     void handleSettingsReset(QLocalSocket *socket, const QJsonObject &message);
+    // P15 d2: Kamera-Dienst
+    void applyCameraSettings();
+    QJsonObject cameraServiceMessage() const;
+    void onCameraChanged();
+    void onCameraEvent(const QString &name, const QJsonObject &data);
+    void handleCameraCall(QLocalSocket *socket, const QJsonObject &message);
     // P10c: Werte aus den Einstellungen an die Verbindung zu OBS.
     void applyObsSettings(bool passwordChanged = false);
     QJsonObject obsStatusMessage() const;
@@ -258,6 +274,12 @@ private:
     dss::obs::ObsSources *m_obsSources = nullptr;
     dss::twitch::TwitchService *m_twitch = nullptr; // P13; nullptr ohne DSS_CORE_TWITCH
     QJsonObject m_lastTwitchStatus;
+    // P15 d2: nullptr ohne DSS_CORE_CAMERA; zuletzt verteilter Stand und zuletzt auf den Fluss
+    // gegebene Listen (nur bei einer Änderung ein neues Ereignis)
+    dss::camera::CameraServiceClient *m_camera = nullptr;
+    QJsonObject m_lastCameraService;
+    QJsonValue m_lastCameraList;
+    QJsonValue m_lastLightList;
     dss::AudioOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
     dss::Mixer *m_mixer = nullptr;
     // P14 t: Ausgang, Mischer und Töne des Chat-Bots; nullptr ohne DSS_CORE_AUDIO

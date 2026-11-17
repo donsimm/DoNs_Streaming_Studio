@@ -197,6 +197,15 @@ inline constexpr EventField kChatDropped[] = {
     {"truncated", "isTruncated"}, {"code", "dropCode"}, {"message", "dropMessage"},
 };
 
+// P15 d2: Kamera-Dienst (Plan P15, 7.), kein Auslöser in P15. Eigene Namen. cameras und lights wie
+// in GET status des Dienstes (docs/09-kamera-dienst.md), je der ganze neue Stand.
+inline constexpr EventField kCameraStateChanged[] = {
+    {"cameras", "cameras"},
+};
+inline constexpr EventField kLightChanged[] = {
+    {"lights", "lights"},
+};
+
 #undef DSS_EVENT_CHAT_FIELDS
 #undef DSS_EVENT_TIER_FIELDS
 #undef DSS_EVENT_USER_FIELDS
@@ -226,6 +235,8 @@ inline constexpr EventType kEventTypes[] = {
     {"actions.run_started", "actions", false, detail::kActionRun, {}},
     {"actions.run_changed", "actions", false, detail::kActionRun, {}},
     {"actions.run_finished", "actions", false, detail::kActionRun, {}},
+    {"camera.state_changed", "camera", false, detail::kCameraStateChanged, {}},
+    {"light.changed", "light", false, detail::kLightChanged, {}},
 };
 
 // P14 b3: Ereignisse der Herkunft «actions» bleiben nicht im Verlauf des Flusses (ein Lauf mit

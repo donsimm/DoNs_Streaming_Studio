@@ -1,6 +1,7 @@
 #pragma once
 
 #include "actionprotocol.h"
+#include "cameraprotocol.h"
 #include "overlaylive.h"
 #include "protocol.h"
 
@@ -109,6 +110,8 @@ public:
     qint64 sendObsAddToScene(const QUuid &overlayId, const QString &sceneUuid);
     // Anbindung an Twitch (P13), nach hello und bei jeder Änderung; ohne Verbindung leer.
     std::optional<TwitchStatusInfo> twitchStatus() const { return m_twitchStatus; }
+    // Kamera-Dienst (P15 d2), nach hello und bei jeder Änderung; ohne Verbindung leer.
+    std::optional<CameraServiceInfo> cameraService() const { return m_cameraService; }
     // Schickt twitch_login_start, twitch_login_cancel oder twitch_logout (type aus msg) für das Konto
     // «channel» oder «bot»; requestId wird hier vergeben. Antwort über twitchRequestFinished.
     // 0 = nicht verbunden.
@@ -209,6 +212,9 @@ signals:
     void obsRequestFinished(const dss::ChangeResult &result);
     // twitchStatus() hat sich geändert bzw. Antwort auf sendTwitchAccountRequest (P13), nur hier.
     void twitchStatusChanged();
+    // P15 d2: cameraService() hat sich geändert; Ereignis des Kamera-Dienstes (nicht gespeichert).
+    void cameraServiceChanged();
+    void cameraEventReceived(const dss::CameraEventInfo &event);
     // actionsStatus() hat sich geändert (P14 e2-11).
     void actionsStatusChanged();
     // actionsConfig() hat sich geändert (P14 e2-14).
@@ -281,6 +287,7 @@ private:
     QSet<qint64> m_obsRequests;
     std::optional<TwitchStatusInfo> m_twitchStatus;
     QSet<qint64> m_twitchRequests;
+    std::optional<CameraServiceInfo> m_cameraService; // P15 d2
     std::optional<ActionsStatus> m_actionsStatus;
     std::optional<ActionsConfigInfo> m_actionsConfig;
     std::optional<VariablesInfo> m_variables;

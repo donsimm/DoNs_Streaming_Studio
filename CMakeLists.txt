@@ -47,6 +47,10 @@ option(DSS_CORE_ACTIONS "Aktionssystem (Chat-Bot) im Kern (P14 b3)" ON)
 # P13 (Plan 2.7): Anbindung an Twitch im Kern (EventSub, Anmeldung, Helix; neue externe Verbindung
 # mit TLS und Token). Aus: Kern ohne Twitch, der Knopf bleibt grau, twitch_status mit enabled false.
 option(DSS_CORE_TWITCH "Anbindung an Twitch im Kern (P13)" ON)
+# P15 d2 (Plan P15, 7.): Anbindung an den Kamera-Dienst im Kern. Schalter, weil der Kern damit Geräte
+# an einem anderen PC steuert (Regel 8). Aus: Kern ohne dss_camera, camera_service «unavailable»,
+# camera_call wird ohne Anfrage an den Dienst abgewiesen.
+option(DSS_CORE_CAMERA "Anbindung an den Kamera-Dienst im Kern (P15)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html

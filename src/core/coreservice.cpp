@@ -3,6 +3,7 @@
 #include "actionprotocol.h"
 #include "actionservice.h"
 #include "browsersource.h"
+#include "cameraprotocol.h"
 #include "chatbotoverlay.h"
 #include "eventtypes.h"
 #include "obsconnection.h"
@@ -25,6 +26,9 @@
 #if DSS_CORE_TWITCH
 #include "eventsubconnection.h"
 #include "twitchservice.h"
+#endif
+#if DSS_CORE_CAMERA
+#include "cameraserviceclient.h"
 #endif
 
 #include <QDir>
@@ -439,6 +443,7 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, obsSourcesMessage());
         send(socket, twitchStatusMessage());
         send(socket, audioOutputsMessage());
+        send(socket, cameraServiceMessage()); // P15 d2
         send(socket, dss::overlayLiveMessage(m_live->all())); // P14 d
         // P14 b3: Aktionssystem (actions_config, actions_status)
         if (m_actions) {
@@ -488,6 +493,8 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleSubscribeEvents(socket, client, message);
     } else if (dss::isActionsRequestType(type)) {
         handleActionsRequest(socket, message);
+    } else if (type == QLatin1String(dss::msg::kCameraCall)) {
+        handleCameraCall(socket, message);
     } else if (type == QLatin1String(dss::msg::kTwitchLoginStart) || type == QLatin1String(dss::msg::kTwitchLoginCancel)
                || type == QLatin1String(dss::msg::kTwitchLogout)) {
         handleTwitchRequest(socket, message);
@@ -962,6 +969,132 @@ void CoreService::handleTwitchRequest(QLocalSocket *socket, const QJsonObject &m
     send(socket, dss::changeResultMessage({request.requestId, true, QUuid(), QString(), QString()}));
 }
 
+// --- Kamera-Dienst (P15 d2, Plan P15 7.) ----------------------------------------------------------
+
+#if DSS_CORE_CAMERA
+void CoreService::setCameraService(dss::camera::CameraServiceClient *camera)
+{
+    using dss::camera::CameraServiceClient;
+    m_camera = camera;
+    connect(camera, &CameraServiceClient::stateChanged, this, &CoreService::onCameraChanged);
+    connect(camera, &CameraServiceClient::statusChanged, this, &CoreService::onCameraChanged);
+    connect(camera, &CameraServiceClient::eventReceived, this, &CoreService::onCameraEvent);
+    applyCameraSettings();
+    onCameraChanged();
+}
+#endif
+
+void CoreService::applyCameraSettings()
+{
+#if DSS_CORE_CAMERA
+    if (!m_camera || !m_settings)
+        return;
+    const dss::CoreSettings s = m_settings->settings();
+    m_camera->configure({s.cameraEnabled, s.cameraHost, s.cameraPort});
+#endif
+}
+
+QJsonObject CoreService::cameraServiceMessage() const
+{
+    dss::CameraServiceInfo info;
+#if DSS_CORE_CAMERA
+    if (m_camera) {
+        using State = dss::camera::CameraServiceClient::State;
+        switch (m_camera->state()) {
+        case State::Off:
+            info.state = QString::fromLatin1(dss::kCameraStateOff);
+            break;
+        case State::Connecting:
+            info.state = QString::fromLatin1(dss::kCameraStateConnecting);
+            break;
+        case State::Connected:
+            info.state = QString::fromLatin1(dss::kCameraStateConnected);
+            break;
+        case State::Error:
+            info.state = QString::fromLatin1(dss::kCameraStateError);
+            break;
+        }
+        info.message = m_camera->message();
+        info.status = m_camera->status();
+        return dss::cameraServiceMessage(info);
+    }
+#endif
+    info.state = QString::fromLatin1(dss::kCameraStateUnavailable);
+    info.message = QStringLiteral("Kern ohne Kamera-Dienst gebaut");
+    return dss::cameraServiceMessage(info);
+}
+
+void CoreService::onCameraChanged()
+{
+    // Nur bei einer Änderung: Zustand und Stand kommen oft zusammen.
+    if (const QJsonObject message = cameraServiceMessage(); message != m_lastCameraService) {
+        m_lastCameraService = message;
+        broadcast(message);
+    }
+}
+
+void CoreService::onCameraEvent(const QString &name, const QJsonObject &data)
+{
+    broadcast(dss::cameraEventMessage({name, data}));
+    // Ereignisfluss (Regel 14): nur bei einem neuen Stand. Der Dienst schickt status und lights auch
+    // beim Anmelden (Neustart des Dienstes, neue Verbindung); gleicher Stand gibt kein Ereignis.
+    const auto publish = [this](const char *type, const QString &field, const QJsonValue &value, QJsonValue *last) {
+        if (!value.isArray() || value == *last)
+            return;
+        *last = value;
+        dss::events::Event event;
+        event.type = QString::fromLatin1(type);
+        event.data = QJsonObject{{field, value}};
+        m_events->publish(event);
+    };
+    if (name == QLatin1String("status"))
+        publish("camera.state_changed", QStringLiteral("cameras"), data.value(QStringLiteral("cameras")), &m_lastCameraList);
+    else if (name == QLatin1String("lights"))
+        publish("light.changed", QStringLiteral("lights"), data.value(QStringLiteral("lights")), &m_lastLightList);
+}
+
+void CoreService::handleCameraCall(QLocalSocket *socket, const QJsonObject &message)
+{
+    dss::CameraCall call;
+    QString error;
+    if (!dss::parseCameraCall(message, &call, &error)) {
+        const qint64 id = dss::messageRequestId(message);
+        if (id < 0)
+            sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        else
+            send(socket, dss::cameraResultMessage({id, 0, {}, error}));
+        return;
+    }
+    // Feste Liste zuerst: Nicht erlaubtes geht nie an den Dienst.
+    if (const QString problem = dss::checkCameraCall(call.method, call.path); !problem.isEmpty()) {
+        qWarning("Kamera-Dienst: %s", qPrintable(problem));
+        send(socket, dss::cameraResultMessage({call.requestId, 0, {}, problem}));
+        return;
+    }
+#if DSS_CORE_CAMERA
+    if (m_camera) {
+        const QPointer<QLocalSocket> target(socket);
+        const qint64 requestId = call.requestId;
+        const QString label = call.method + QLatin1Char(' ') + call.path;
+        const QJsonValue body = call.body ? QJsonValue(*call.body) : QJsonValue();
+        m_camera->request(call.method.toLatin1(), call.path, body,
+                          [this, target, requestId, label](const dss::camera::Reply &reply) {
+                              // Protokoll ohne Inhalt; Bewegungen (alle 200 ms) nur bei einem Fehler.
+                              if (reply.status == 0)
+                                  qInfo("Kamera-Dienst: %s ohne Antwort: %s", qPrintable(label), qPrintable(reply.error));
+                              else if (reply.status >= 400)
+                                  qInfo("Kamera-Dienst: %s: %d %s", qPrintable(label), reply.status,
+                                        qPrintable(reply.body.value(QStringLiteral("code")).toString()));
+                              if (target && m_clients.contains(target.data()))
+                                  send(target.data(),
+                                       dss::cameraResultMessage({requestId, reply.status, reply.body, reply.error}));
+                          });
+        return;
+    }
+#endif
+    send(socket, dss::cameraResultMessage({call.requestId, 0, {}, QStringLiteral("Kern ohne Kamera-Dienst gebaut.")}));
+}
+
 #if DSS_CORE_AUDIO
 void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
 {
@@ -1111,9 +1244,10 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
                                                QString::fromLatin1(dss::err::kRejected), text}));
     };
     // P10c: Das Passwort wird zuerst geschrieben; eine Abweisung muss also vorher feststehen.
-    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
-                                         update.obsHost,      update.obsPort,     update.audioRoutes,
-                                         update.twitchEnabled, update.twitchClientId};
+    const dss::CoreSettingsChange change{update.port,          update.homeAddress,    update.obsEnabled,
+                                         update.obsHost,       update.obsPort,        update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId, update.cameraEnabled,
+                                         update.cameraHost,    update.cameraPort};
     if (update.twitchClientSecret && !m_twitch) {
         reject(QStringLiteral("Der Kern kann das Client Secret nicht ablegen (ohne Twitch gebaut)."));
         return;
@@ -1204,9 +1338,10 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
         if (socket)
             send(socket, dss::changeResultMessage(result));
     };
-    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
-                                         update.obsHost,      update.obsPort,     update.audioRoutes,
-                                         update.twitchEnabled, update.twitchClientId};
+    const dss::CoreSettingsChange change{update.port,          update.homeAddress,    update.obsEnabled,
+                                         update.obsHost,       update.obsPort,        update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId, update.cameraEnabled,
+                                         update.cameraHost,    update.cameraPort};
     const dss::CoreSettings before = m_settings->settings();
     QString error;
     if (!change.isEmpty() && !m_settings->change(change, &error)) {
@@ -1221,6 +1356,7 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
     // Auch bei gleichen Werten: «OK» im Dialog versucht es nach 4009, 4010, 4011 wieder (Plan 1.7).
     applyObsSettings(passwordChanged);
     applyTwitchSettings();
+    applyCameraSettings();
     // P12b b3: ebenso ein durch eine fremde Verbindung gesperrter Ausgang
     if (!update.audioRoutes.isEmpty())
         applyAudioSettings();
@@ -1249,6 +1385,7 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
     settingsApplied();
     applyObsSettings();
     applyTwitchSettings();
+    applyCameraSettings();
     applyAudioSettings();
     send(socket, dss::changeResultMessage(
                      {requestId, true, QUuid(), QString(), QString(),
@@ -1267,6 +1404,8 @@ void CoreService::settingsApplied()
               it.value().output.isEmpty() ? "keiner" : qPrintable(it.value().output), it.value().offsetMs);
     qInfo("Einstellungen Twitch: %s, Client-ID %s", after.twitchEnabled ? "ein" : "aus",
           after.twitchClientId.isEmpty() ? "leer" : "gesetzt");
+    qInfo("Einstellungen Kamera-Dienst: %s",
+          after.cameraEnabled ? qPrintable(QStringLiteral("%1:%2").arg(after.cameraHost).arg(after.cameraPort)) : "aus");
     broadcast(settingsMessage());
     updateBrowserSources();
     updateObsSources();

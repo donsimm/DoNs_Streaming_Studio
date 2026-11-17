@@ -1105,6 +1105,10 @@ QJsonObject settingsMessage(const SettingsInfo &info)
     o.insert(QStringLiteral("twitch_enabled"), info.settings.twitchEnabled);
     o.insert(QStringLiteral("twitch_client_id"), info.settings.twitchClientId);
     o.insert(QStringLiteral("twitch_client_secret_set"), info.twitchClientSecretSet);
+    // P15 d2
+    o.insert(QStringLiteral("camera_enabled"), info.settings.cameraEnabled);
+    o.insert(QStringLiteral("camera_host"), info.settings.cameraHost);
+    o.insert(QStringLiteral("camera_port"), info.settings.cameraPort);
     return o;
 }
 
@@ -1123,7 +1127,10 @@ bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *erro
         || !requireBool(message, QStringLiteral("obs_password_set"), &i.obsPasswordSet, error)
         || !requireBool(message, QStringLiteral("twitch_enabled"), &i.settings.twitchEnabled, error)
         || !requireString(message, QStringLiteral("twitch_client_id"), &i.settings.twitchClientId, error)
-        || !requireBool(message, QStringLiteral("twitch_client_secret_set"), &i.twitchClientSecretSet, error))
+        || !requireBool(message, QStringLiteral("twitch_client_secret_set"), &i.twitchClientSecretSet, error)
+        || !requireBool(message, QStringLiteral("camera_enabled"), &i.settings.cameraEnabled, error)
+        || !requireString(message, QStringLiteral("camera_host"), &i.settings.cameraHost, error)
+        || !requireIntField(message, QStringLiteral("camera_port"), 0, maxPort, &i.settings.cameraPort, error))
         return false;
     const QJsonValue e = message.value(QStringLiteral("settings_error"));
     if (e.isString()) {
@@ -1191,6 +1198,12 @@ QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
         o.insert(QStringLiteral("twitch_client_id"), *update.twitchClientId);
     if (update.twitchClientSecret)
         o.insert(QStringLiteral("twitch_client_secret"), *update.twitchClientSecret);
+    if (update.cameraEnabled)
+        o.insert(QStringLiteral("camera_enabled"), *update.cameraEnabled);
+    if (update.cameraHost)
+        o.insert(QStringLiteral("camera_host"), *update.cameraHost);
+    if (update.cameraPort)
+        o.insert(QStringLiteral("camera_port"), *update.cameraPort);
     if (!update.audioRoutes.isEmpty()) {
         QJsonObject routes;
         for (auto it = update.audioRoutes.constBegin(); it != update.audioRoutes.constEnd(); ++it) {
@@ -1278,6 +1291,26 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
             return false;
         *target = value;
     }
+    // P15 d2
+    if (message.contains(QStringLiteral("camera_enabled"))) {
+        bool enabled = false;
+        if (!requireBool(message, QStringLiteral("camera_enabled"), &enabled, error))
+            return false;
+        u.cameraEnabled = enabled;
+    }
+    if (message.contains(QStringLiteral("camera_host"))) {
+        QString host;
+        if (!requireString(message, QStringLiteral("camera_host"), &host, error))
+            return false;
+        u.cameraHost = host;
+    }
+    if (message.contains(QStringLiteral("camera_port"))) {
+        int port = 0;
+        if (!requireIntField(message, QStringLiteral("camera_port"), std::numeric_limits<int>::min(),
+                             std::numeric_limits<int>::max(), &port, error))
+            return false;
+        u.cameraPort = port;
+    }
     // P12b b3: je Zweck ein Objekt mit output und/oder offset_ms (mindestens eines)
     if (message.contains(QStringLiteral("audio_routes"))) {
         const QJsonValue routes = message.value(QStringLiteral("audio_routes"));
@@ -1310,7 +1343,8 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
         }
     }
     if (!u.port && !u.homeAddress && !u.obsEnabled && !u.obsHost && !u.obsPort && !u.obsPassword
-        && u.audioRoutes.isEmpty() && !u.twitchEnabled && !u.twitchClientId && !u.twitchClientSecret) {
+        && u.audioRoutes.isEmpty() && !u.twitchEnabled && !u.twitchClientId && !u.twitchClientSecret
+        && !u.cameraEnabled && !u.cameraHost && !u.cameraPort) {
         *error = QStringLiteral("update_settings ohne Wert");
         return false;
     }

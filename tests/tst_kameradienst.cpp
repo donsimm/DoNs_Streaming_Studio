@@ -3,124 +3,27 @@
 // eigene XDG-Ordner im Testordner), dazu der Leser für Server-Sent Events ohne Netz.
 //
 // Quellen: docs/09-kamera-dienst.md; Start und Attrappe: kamera-dienst/LIESMICH.md,
-// kamera-dienst/tests/test_api.py (Service, free_port, ini).
+// kamera-dienst/tests/test_api.py (Service, free_port, ini; seit d2 in kameradiensthilfe.h).
 
 #include "cameraserviceclient.h"
+#include "kameradiensthilfe.h"
 #include "sseparser.h"
 
-#include <QDir>
-#include <QElapsedTimer>
-#include <QFile>
-#include <QHostAddress>
 #include <QJsonArray>
-#include <QProcess>
-#include <QRandomGenerator>
 #include <QSignalSpy>
-#include <QTcpServer>
 #include <QTemporaryDir>
 #include <QTest>
-
-#include <memory>
 
 using dss::camera::CameraServiceClient;
 using dss::camera::Config;
 using dss::camera::Reply;
 using dss::camera::SseEvent;
 using dss::camera::SseParser;
+using kameradienst::freePort;
+using kameradienst::kC922;
+using kameradienst::Service;
 
 namespace {
-
-constexpr int kStartTimeoutMs = 20000;
-// Kennung der C922 in der Attrappe (kamera-dienst/dss_camera/fake.py, C922_ID).
-const QString kC922 = QStringLiteral("bbbb:0002:SERIE0001");
-
-// Im Bereich, den dienst.ini erlaubt (1024 bis 32767), wie free_port() in test_api.py.
-int freePort()
-{
-    for (int i = 0; i < 200; ++i) {
-        const int port = QRandomGenerator::global()->bounded(20000, 32000);
-        QTcpServer probe;
-        if (probe.listen(QHostAddress::LocalHost, static_cast<quint16>(port)))
-            return port;
-    }
-    return 0;
-}
-
-// Ein Dienst-Prozess mit eigenem Testordner (wie Service in test_api.py).
-class Service
-{
-public:
-    Service(const QString &folder, int port)
-        : m_folder(folder)
-    {
-        QDir().mkpath(folder + QStringLiteral("/laufzeit"));
-        QFile ini(folder + QStringLiteral("/dienst.ini"));
-        if (ini.open(QIODevice::WriteOnly))
-            ini.write(QStringLiteral("[dienst]\nport=%1\nlauschadressen=127.0.0.1\nerlaubte-adressen=127.0.0.1\n")
-                          .arg(port)
-                          .toUtf8());
-    }
-
-    ~Service() { stop(); }
-
-    // Wartet auf «bereit» im Protokoll.
-    bool start()
-    {
-        m_process = std::make_unique<QProcess>();
-        m_process->setWorkingDirectory(QStringLiteral(DSS_CAMERA_SERVICE_DIR));
-        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-        env.insert(QStringLiteral("XDG_RUNTIME_DIR"), m_folder + QStringLiteral("/laufzeit"));
-        env.insert(QStringLiteral("XDG_CONFIG_HOME"), m_folder + QStringLiteral("/config"));
-        env.insert(QStringLiteral("XDG_DATA_HOME"), m_folder + QStringLiteral("/daten"));
-        env.insert(QStringLiteral("PYTHONDONTWRITEBYTECODE"), QStringLiteral("1"));
-        m_process->setProcessEnvironment(env);
-        m_process->setProcessChannelMode(QProcess::SeparateChannels);
-        m_process->setStandardOutputFile(QProcess::nullDevice());
-        m_process->setReadChannel(QProcess::StandardError); // für waitForReadyRead
-        m_process->start(QStringLiteral(DSS_PYTHON3),
-                         {QStringLiteral("-m"), QStringLiteral("dss_camera"), QStringLiteral("--konfig"),
-                          m_folder + QStringLiteral("/dienst.ini"), QStringLiteral("--attrappe"),
-                          QStringLiteral("--geraeteordner"), m_folder + QStringLiteral("/geraete")});
-        QElapsedTimer timer;
-        timer.start();
-        while (timer.elapsed() < kStartTimeoutMs) {
-            if (m_process->state() == QProcess::NotRunning)
-                break;
-            m_process->waitForReadyRead(200);
-            m_stderr += QString::fromUtf8(m_process->readAllStandardError());
-            if (m_stderr.contains(QStringLiteral("bereit")))
-                return true;
-        }
-        return false;
-    }
-
-    // Beendet mit SIGTERM; gibt den Exit-Code zurück (-1: lief nicht oder hing).
-    int stop()
-    {
-        if (!m_process)
-            return -1;
-        if (m_process->state() != QProcess::NotRunning) {
-            m_process->terminate();
-            if (!m_process->waitForFinished(kStartTimeoutMs)) {
-                m_process->kill();
-                m_process->waitForFinished();
-                m_process.reset();
-                return -1;
-            }
-        }
-        m_stderr += QString::fromUtf8(m_process->readAllStandardError());
-        const int code = m_process->exitStatus() == QProcess::NormalExit ? m_process->exitCode() : -1;
-        m_process.reset();
-        return code;
-    }
-
-    QString log() const { return m_stderr; }
-
-private:
-    QString m_folder;
-    std::unique_ptr<QProcess> m_process;
-    QString m_stderr;
-};
 
 // Antwort von request() abwarten.
 Reply call(CameraServiceClient &client, const QByteArray &method, const QString &path,
@@ -259,19 +162,8 @@ void TestCameraService::againstFakeService()
     QTemporaryDir tmp(QDir::tempPath() + QStringLiteral("/tst_kameradienst-XXXXXX"));
     QVERIFY(tmp.isValid());
     // Geräteordner der Attrappe mit Tiny 2 und C922 (FakeDeviceFolder.add_standard_cameras).
-    QProcess folder;
-    folder.setWorkingDirectory(QStringLiteral(DSS_CAMERA_SERVICE_DIR));
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("PYTHONDONTWRITEBYTECODE"), QStringLiteral("1"));
-    folder.setProcessEnvironment(env);
-    folder.start(QStringLiteral(DSS_PYTHON3),
-                 {QStringLiteral("-c"),
-                  QStringLiteral("import sys; from pathlib import Path; from dss_camera.fake import FakeDeviceFolder; "
-                                 "FakeDeviceFolder(Path(sys.argv[1])).add_standard_cameras()"),
-                  tmp.filePath(QStringLiteral("geraete"))});
-    QVERIFY(folder.waitForFinished(kStartTimeoutMs));
-    QVERIFY2(folder.exitStatus() == QProcess::NormalExit && folder.exitCode() == 0,
-             folder.readAllStandardError().constData());
+    const QString devices = kameradienst::createFakeDevices(tmp.filePath(QStringLiteral("geraete")));
+    QVERIFY2(devices.isEmpty(), qPrintable(devices));
 
     const int port = freePort();
     QVERIFY(port > 0);

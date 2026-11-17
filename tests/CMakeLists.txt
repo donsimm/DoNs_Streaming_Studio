@@ -448,6 +448,16 @@ target_compile_definitions(tst_kameradienst PRIVATE DSS_PYTHON3="${DSS_PYTHON3}"
   DSS_CAMERA_SERVICE_DIR="${PROJECT_SOURCE_DIR}/kamera-dienst")
 add_test(NAME tst_kameradienst COMMAND tst_kameradienst)
 set_tests_properties(tst_kameradienst PROPERTIES TIMEOUT 120)
+# P15 d2: Kern und dss-cli als eigene Prozesse gegen den Dienst in der Attrappe (camera_service,
+# camera_call, feste Liste, Ereignisfluss, Dienst beenden und neu starten), ohne Qt Gui.
+if(DSS_BUILD_CLI AND DSS_CORE_CAMERA)
+  dss_add_test(tst_kernkamera)
+  target_compile_definitions(tst_kernkamera PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_CLI_BIN="$<TARGET_FILE:dss-cli>" DSS_PYTHON3="${DSS_PYTHON3}"
+    DSS_CAMERA_SERVICE_DIR="${PROJECT_SOURCE_DIR}/kamera-dienst")
+  add_dependencies(tst_kernkamera dss-core dss-cli)
+  set_tests_properties(tst_kernkamera PROPERTIES TIMEOUT 180)
+endif()
 
 # P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
 qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)

@@ -138,7 +138,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 18); // seit P14 e2-2 (chat_send)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 19); // seit P15 d2 (Kamera-Dienst)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -627,7 +627,8 @@ private slots:
                                 QStringLiteral("/tmp/kern.ini"), QString()};
         const QJsonObject o = settingsMessage(info);
         QCOMPARE(QString::fromUtf8(encodeMessage(o)),
-                 QStringLiteral("{\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.20\","
+                 QStringLiteral("{\"camera_enabled\":false,\"camera_host\":\"\",\"camera_port\":8093," // P15 d2
+                                "\"file\":\"/tmp/kern.ini\",\"home_address\":\"192.168.1.20\","
                                 "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
                                 "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
@@ -704,6 +705,35 @@ private slots:
         twitchUpdate.twitchClientId.reset();
         QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(twitchUpdate), &twitchParsed, &error), qPrintable(error));
         QCOMPARE(twitchParsed, twitchUpdate);
+
+        // P15 d2: Kamera-Dienst
+        SettingsInfo camera = info;
+        camera.settings.cameraEnabled = true;
+        camera.settings.cameraHost = QStringLiteral("192.168.1.30");
+        camera.settings.cameraPort = 9000;
+        QVERIFY2(parseSettings(settingsMessage(camera), &back, &error), qPrintable(error));
+        QCOMPARE(back, camera);
+        for (const QString &field : {QStringLiteral("camera_enabled"), QStringLiteral("camera_host"),
+                                     QStringLiteral("camera_port")}) {
+            bad = o;
+            bad.remove(field);
+            QVERIFY2(!parseSettings(bad, &back, &error), qPrintable(field));
+        }
+        SettingsUpdate cameraUpdate;
+        cameraUpdate.requestId = 9;
+        cameraUpdate.cameraEnabled = true;
+        cameraUpdate.cameraHost = QStringLiteral("192.168.1.30");
+        cameraUpdate.cameraPort = 8093;
+        SettingsUpdate cameraParsed;
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(cameraUpdate), &cameraParsed, &error), qPrintable(error));
+        QCOMPARE(cameraParsed, cameraUpdate);
+        cameraUpdate.cameraEnabled.reset();
+        cameraUpdate.cameraHost.reset();
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(cameraUpdate), &cameraParsed, &error), qPrintable(error));
+        QCOMPARE(cameraParsed, cameraUpdate);
+        QJsonObject badUpdate = settingsUpdateMessage(cameraUpdate);
+        badUpdate.insert(QStringLiteral("camera_port"), QStringLiteral("8093"));
+        QVERIFY(!parseSettingsUpdate(badUpdate, &cameraParsed, &error));
 
         SettingsUpdate update;
         update.requestId = 7;

@@ -621,6 +621,21 @@ void CoreClient::handleMessage(const QJsonObject &message)
         }
         m_twitchStatus = info;
         emit twitchStatusChanged();
+    } else if (type == QLatin1String(msg::kCameraService)) {
+        CameraServiceInfo info;
+        if (!parseCameraService(message, &info, &error)) {
+            qWarning("Kern: camera_service ungültig: %s", qPrintable(error));
+            return;
+        }
+        m_cameraService = info;
+        emit cameraServiceChanged();
+    } else if (type == QLatin1String(msg::kCameraEvent)) {
+        CameraEventInfo event;
+        if (!parseCameraEvent(message, &event, &error)) {
+            qWarning("Kern: camera_event ungültig: %s", qPrintable(error));
+            return;
+        }
+        emit cameraEventReceived(event);
     } else if (type == QLatin1String(msg::kActionsStatus)) {
         ActionsStatus status;
         if (!parseActionsStatus(message, &status, &error)) {
@@ -840,6 +855,10 @@ void CoreClient::clearData()
     if (m_twitchStatus) {
         m_twitchStatus.reset();
         emit twitchStatusChanged();
+    }
+    if (m_cameraService) {
+        m_cameraService.reset();
+        emit cameraServiceChanged();
     }
     if (m_actionsStatus) {
         m_actionsStatus.reset();

@@ -55,8 +55,10 @@ namespace dss {
 //   overlay_live_set, overlay_live_reset (overlaylive.h)
 // 17 seit P14 z1b: Zuschauer-Import viewer_import und viewer_import_result (actionprotocol.h)
 // 18 seit P14 e2-2: Chat senden aus dem Fenster (chat_send, actionprotocol.h)
+// 19 seit P15 d2: Kamera-Dienst (camera_service, camera_event, camera_call, camera_result in
+//   cameraprotocol.h; settings und update_settings mit camera_*)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 18;
+inline constexpr int kProtocolVersion = 19;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -384,6 +386,11 @@ struct SettingsUpdate
     std::optional<bool> twitchEnabled = {};
     std::optional<QString> twitchClientId = {};
     std::optional<QString> twitchClientSecret = {};
+    // P15 d2: Kamera-Dienst (Abschnitt [kamera-dienst]). Ein neuer Versuch kommt ohnehin alle 2 s;
+    // gleiche Werte lassen die Verbindung darum unberührt (anders als obs_enabled).
+    std::optional<bool> cameraEnabled = {};
+    std::optional<QString> cameraHost = {};
+    std::optional<int> cameraPort = {};
 
     bool operator==(const SettingsUpdate &) const = default;
 };

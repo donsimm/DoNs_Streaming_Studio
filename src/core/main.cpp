@@ -31,6 +31,9 @@
 #include "twitchchat.h"
 #include "twitchservice.h"
 #endif
+#if DSS_CORE_CAMERA
+#include "cameraserviceclient.h"
+#endif
 #include "systemdnotify.h"
 #include "unixsignals.h"
 #include "version.h"
@@ -345,6 +348,13 @@ int main(int argc, char *argv[])
         twitchOptions.endpoints = dss::twitch::Endpoints::testServer(*twitchTestServer);
     dss::twitch::TwitchService twitch(service.eventBus(), twitchOptions);
     service.setTwitchService(&twitch);
+#endif
+
+#if DSS_CORE_CAMERA
+    // Kamera-Dienst auf dem Streaming-PC (P15 d2): standardmässig aus (kern.ini, Abschnitt
+    // [kamera-dienst]). Nach service angelegt, also vor ihm zerstört.
+    dss::camera::CameraServiceClient cameraService;
+    service.setCameraService(&cameraService);
 #endif
 
 #if DSS_CORE_ACTIONS
