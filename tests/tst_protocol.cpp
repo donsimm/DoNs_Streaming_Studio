@@ -1,6 +1,7 @@
 // Prüft Lesen und Schreiben aller Nachrichten der Schnittstelle Kern–Fenster ohne Qt Gui
 // (P07, Teil D; docs/08-kern-schnittstelle.md).
 
+#include "actionprotocol.h"
 #include "browsersource.h"
 #include "overlayjson.h"
 #include "protocol.h"
@@ -137,7 +138,7 @@ private slots:
         QString error;
         QVERIFY2(parseHello(o, &back, &error), qPrintable(error));
         QCOMPARE(back, h);
-        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 13); // seit P12b b5 (Format 5)
+        QCOMPARE(o.value(QStringLiteral("protocol_version")).toInt(), 18); // seit P14 e2-2 (chat_send)
         QVERIFY(!o.contains(QStringLiteral("data_dir")));
 
         // P09: Datenordner des Kerns für die Dateien der Quellen (nur vom Kern)
@@ -572,6 +573,53 @@ private slots:
         QVERIFY(!parseObsAddToScene(noScene, &parsed, &error));
     }
 
+    // P13: twitch_status und die Anfragen zu den Konten
+    void twitchMessages()
+    {
+        TwitchStatusInfo info;
+        info.enabled = true;
+        info.message = QStringLiteral("Rechte fehlen");
+        info.live = true;
+        info.subscriptions = {{QStringLiteral("channel.follow"), true, QString()},
+                              {QStringLiteral("channel.raid"), false, QStringLiteral("HTTP 403")}};
+        info.channel.state = QStringLiteral("ok");
+        info.channel.login = QStringLiteral("testkanal");
+        info.channel.userId = QStringLiteral("1");
+        info.channel.missingScopes = {QStringLiteral("bits:read")};
+        info.bot.state = QStringLiteral("off");
+        info.bot.loginPending = TwitchLoginPending{QStringLiteral("ABCD1234"), QStringLiteral("https://www.twitch.tv/activate"),
+                                                   QDateTime(QDate(2026, 11, 15), QTime(12, 0), QTimeZone::UTC)};
+        info.badgeProblem = QStringLiteral("Abzeichen nicht aktiv: Bot nicht angemeldet.");
+        const QJsonObject o = twitchStatusMessage(info);
+        QCOMPARE(messageType(o), QStringLiteral("twitch_status"));
+        TwitchStatusInfo back;
+        QString error;
+        QVERIFY2(parseTwitchStatus(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, info);
+        QCOMPARE(o.value(QStringLiteral("accounts")).toObject().value(QStringLiteral("channel")).toObject()
+                     .value(QStringLiteral("login_pending")), QJsonValue(QJsonValue::Null));
+        QVERIFY2(parseTwitchStatus(twitchStatusMessage({}), &back, &error), qPrintable(error));
+        QCOMPARE(back, TwitchStatusInfo());
+        QJsonObject bad = o;
+        QJsonObject accounts = bad.value(QStringLiteral("accounts")).toObject();
+        QJsonObject channel = accounts.value(QStringLiteral("channel")).toObject();
+        channel.insert(QStringLiteral("state"), QStringLiteral("gut"));
+        accounts.insert(QStringLiteral("channel"), channel);
+        bad.insert(QStringLiteral("accounts"), accounts);
+        QVERIFY(!parseTwitchStatus(bad, &back, &error));
+
+        const TwitchAccountRequest request{4, QStringLiteral("bot")};
+        TwitchAccountRequest parsed;
+        for (const char *type : {msg::kTwitchLoginStart, msg::kTwitchLoginCancel, msg::kTwitchLogout}) {
+            const QJsonObject m = twitchAccountRequestMessage(type, request);
+            QCOMPARE(messageType(m), QLatin1String(type));
+            QVERIFY2(parseTwitchAccountRequest(m, &parsed, &error), qPrintable(error));
+            QCOMPARE(parsed, request);
+        }
+        QVERIFY(!parseTwitchAccountRequest(twitchAccountRequestMessage(msg::kTwitchLogout, {4, QStringLiteral("kanal")}),
+                                           &parsed, &error));
+    }
+
     // P10-vor: Einstellungen des Kerns
     void settingsMessages()
     {
@@ -583,9 +631,12 @@ private slots:
                                 "\"obs_enabled\":false,\"obs_host\":\"\",\"obs_password_set\":false,"
                                 "\"obs_port\":4455,\"port\":8081,"
                                 "\"port_max\":32767,\"port_min\":1024,\"settings_error\":null,"
+                                // P13
+                                "\"twitch_client_id\":\"\",\"twitch_client_secret_set\":false,\"twitch_enabled\":false,"
                                 "\"type\":\"settings\"}\n")
                      .insert(1, QStringLiteral("\"audio_offset_max_ms\":500,\"audio_offset_min_ms\":-500,"
-                                               "\"audio_routes\":{\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
+                                               "\"audio_routes\":{\"aktionen\":{\"offset_ms\":0,\"output\":\"\"},"
+                                               "\"video\":{\"offset_ms\":0,\"output\":\"\"}},")));
         SettingsInfo back;
         QString error;
         QVERIFY2(parseSettings(o, &back, &error), qPrintable(error));
@@ -603,7 +654,9 @@ private slots:
         QVERIFY2(parseSettings(settingsMessage(audio), &back, &error), qPrintable(error));
         QCOMPARE(back, audio);
         QCOMPARE(settingsMessage(audio).value(QStringLiteral("audio_routes")).toObject(),
-                 (QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("test_ausgang")},
+                 (QJsonObject{{QStringLiteral("aktionen"), QJsonObject{{QStringLiteral("output"), QString()},
+                                                                       {QStringLiteral("offset_ms"), 0}}},
+                              {QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), QStringLiteral("test_ausgang")},
                                                                     {QStringLiteral("offset_ms"), -120}}}}));
         for (const QString &field : {QStringLiteral("audio_routes"), QStringLiteral("audio_offset_min_ms"),
                                      QStringLiteral("audio_offset_max_ms")}) {
@@ -625,6 +678,32 @@ private slots:
                    QJsonObject{{QStringLiteral("video"), QJsonObject{{QStringLiteral("output"), 1},
                                                                      {QStringLiteral("offset_ms"), 0}}}});
         QVERIFY(!parseSettings(bad, &back, &error));
+
+        // P13: Twitch; das Secret geht nur hinein, zurück kommt «gesetzt»
+        SettingsInfo twitch = info;
+        twitch.settings.twitchEnabled = true;
+        twitch.settings.twitchClientId = QStringLiteral("testclient");
+        twitch.twitchClientSecretSet = true;
+        QVERIFY2(parseSettings(settingsMessage(twitch), &back, &error), qPrintable(error));
+        QCOMPARE(back, twitch);
+        for (const QString &field : {QStringLiteral("twitch_enabled"), QStringLiteral("twitch_client_id"),
+                                     QStringLiteral("twitch_client_secret_set")}) {
+            bad = o;
+            bad.remove(field);
+            QVERIFY2(!parseSettings(bad, &back, &error), qPrintable(field));
+        }
+        SettingsUpdate twitchUpdate;
+        twitchUpdate.requestId = 8;
+        twitchUpdate.twitchEnabled = false;
+        twitchUpdate.twitchClientId = QStringLiteral("abc");
+        twitchUpdate.twitchClientSecret = QString();
+        SettingsUpdate twitchParsed;
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(twitchUpdate), &twitchParsed, &error), qPrintable(error));
+        QCOMPARE(twitchParsed, twitchUpdate);
+        twitchUpdate.twitchEnabled.reset();
+        twitchUpdate.twitchClientId.reset();
+        QVERIFY2(parseSettingsUpdate(settingsUpdateMessage(twitchUpdate), &twitchParsed, &error), qPrintable(error));
+        QCOMPARE(twitchParsed, twitchUpdate);
 
         SettingsUpdate update;
         update.requestId = 7;
@@ -792,6 +871,72 @@ private slots:
         QVERIFY(!parseGetBrowserSource(simpleMessage(msg::kGetBrowserSource), &parsed, &error));
     }
 
+    // P13: Ereignisfluss (subscribe_events, event_history, event, events_dropped)
+    void eventMessages()
+    {
+        const SubscribeEvents request{{QStringLiteral("twitch."), QStringLiteral("obs.scene_changed")}, true};
+        QJsonObject o = roundTrip(subscribeEventsMessage(request));
+        QCOMPARE(messageType(o), QStringLiteral("subscribe_events"));
+        SubscribeEvents backRequest;
+        QString error;
+        QVERIFY2(parseSubscribeEvents(o, &backRequest, &error), qPrintable(error));
+        QCOMPARE(backRequest, request);
+        // Leer = abbestellen
+        QVERIFY(parseSubscribeEvents(subscribeEventsMessage({}), &backRequest, &error));
+        QCOMPARE(backRequest, SubscribeEvents());
+        // Filter gegen die Typenliste
+        for (const QString &bad : {QStringLiteral("twitch"), QStringLiteral("twitch.gibtsnicht"),
+                                   QStringLiteral("youtube."), QString()}) {
+            QVERIFY2(!parseSubscribeEvents(subscribeEventsMessage({{bad}, false}), &backRequest, &error),
+                     qPrintable(bad));
+        }
+        QVERIFY(error.contains(QStringLiteral("Unbekannter Ereignistyp")));
+        o.remove(QStringLiteral("history"));
+        QVERIFY(!parseSubscribeEvents(o, &backRequest, &error));
+        o = subscribeEventsMessage(request);
+        o.insert(QStringLiteral("types"), QJsonArray{1});
+        QVERIFY(!parseSubscribeEvents(o, &backRequest, &error));
+
+        events::Event event;
+        event.id = QUuid::fromString(QStringLiteral("3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b"));
+        event.type = QStringLiteral("obs.scene_changed");
+        event.origin = QStringLiteral("obs");
+        event.time = QDateTime(QDate(2026, 11, 15), QTime(14, 3, 7, 125), QTimeZone::UTC);
+        event.data = QJsonObject{{QStringLiteral("scene_uuid"), QStringLiteral("u-1")},
+                                 {QStringLiteral("scene_name"), QStringLiteral("Szene «test 2»")}};
+        o = roundTrip(eventMessage(event));
+        QCOMPARE(messageType(o), QStringLiteral("event"));
+        QCOMPARE(QJsonDocument(o.value(QStringLiteral("event")).toObject()).toJson(QJsonDocument::Compact),
+                 QByteArray("{\"data\":{\"scene_name\":\"Szene «test 2»\",\"scene_uuid\":\"u-1\"},"
+                            "\"id\":\"3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b\",\"origin\":\"obs\","
+                            "\"origin_id\":\"\",\"time\":\"2026-11-15T14:03:07.125Z\",\"type\":\"obs.scene_changed\"}"));
+        events::Event back;
+        QVERIFY2(parseEventMessage(o, &back, &error), qPrintable(error));
+        QCOMPARE(back, event);
+        QVERIFY(!parseEventMessage(simpleMessage(msg::kEvent), &back, &error));
+
+        events::Event second = event;
+        second.id = QUuid::createUuid();
+        second.originId = QStringLiteral("abc");
+        o = roundTrip(eventHistoryMessage({event, second}));
+        QCOMPARE(messageType(o), QStringLiteral("event_history"));
+        QList<events::Event> history;
+        QVERIFY2(parseEventHistory(o, &history, &error), qPrintable(error));
+        QCOMPARE(history, (QList<events::Event>{event, second}));
+        QVERIFY(parseEventHistory(eventHistoryMessage({}), &history, &error));
+        QVERIFY(history.isEmpty());
+        o.insert(QStringLiteral("events"), QJsonArray{1});
+        QVERIFY(!parseEventHistory(o, &history, &error));
+
+        o = roundTrip(eventsDroppedMessage(17));
+        QCOMPARE(messageType(o), QStringLiteral("events_dropped"));
+        qint64 count = 0;
+        QVERIFY2(parseEventsDropped(o, &count, &error), qPrintable(error));
+        QCOMPARE(count, 17);
+        QVERIFY(!parseEventsDropped(eventsDroppedMessage(0), &count, &error));
+        QCOMPARE(kEventBacklogBytes, 1024 * 1024);
+    }
+
     // P10, Punkt 77
     void resetSettingsMessage()
     {
@@ -852,7 +997,14 @@ private slots:
         video.bytes = qint64(3) << 32; // über 4 GiB
         video.codec = QStringLiteral("hevc");
         video.browserProblem = QStringLiteral("zaehler.mp4 (HEVC) wird in der Browserquelle nicht angezeigt.");
-        d.files = {image, video};
+        // P14 t: Ton mit Länge
+        MediaFileData sound;
+        sound.entry = {QStringLiteral("media/") + QString(64, QLatin1Char('c')) + QStringLiteral(".mp3"),
+                       QStringLiteral("glocke.mp3"), QUuid()};
+        sound.kind = MediaKind::Audio;
+        sound.bytes = 4096;
+        sound.durationMs = 2450;
+        d.files = {image, video, sound};
         d.error = QStringLiteral("medien.json: kaputt");
         const QJsonObject o = roundTrip(mediaListMessage(d));
         QCOMPARE(messageType(o), QStringLiteral("media_list"));
@@ -867,16 +1019,31 @@ private slots:
         QVERIFY(files.at(0).toObject().value(QStringLiteral("codec")).isNull());
         QVERIFY(files.at(0).toObject().value(QStringLiteral("browser_problem")).isNull());
         QVERIFY(files.at(1).toObject().value(QStringLiteral("folder")).isNull());
+        QVERIFY(files.at(0).toObject().value(QStringLiteral("duration_ms")).isNull());
+        QCOMPARE(files.at(2).toObject().value(QStringLiteral("kind")).toString(), QStringLiteral("audio"));
+        QCOMPARE(files.at(2).toObject().value(QStringLiteral("duration_ms")).toInt(), 2450);
         d.error.clear();
         QVERIFY(mediaListMessage(d).value(QStringLiteral("error")).isNull());
         // Unbekannte Art
         QJsonObject bad = o;
         QJsonArray badFiles = files;
         QJsonObject f = badFiles.at(0).toObject();
-        f.insert(QStringLiteral("kind"), QStringLiteral("audio"));
+        f.insert(QStringLiteral("kind"), QStringLiteral("musik"));
         badFiles[0] = f;
         bad.insert(QStringLiteral("files"), badFiles);
         QVERIFY(!parseMediaList(bad, &back, &error));
+        // Länge fehlt oder ist 0
+        for (const QJsonValue &duration : {QJsonValue(QJsonValue::Undefined), QJsonValue(0)}) {
+            QJsonObject s = files.at(2).toObject();
+            if (duration.isUndefined())
+                s.remove(QStringLiteral("duration_ms"));
+            else
+                s.insert(QStringLiteral("duration_ms"), duration);
+            badFiles = files;
+            badFiles[2] = s;
+            bad.insert(QStringLiteral("files"), badFiles);
+            QVERIFY(!parseMediaList(bad, &back, &error));
+        }
 
         const QList<ImportProgressData> imports = {
             {1, QStringLiteral("gross.webm"), d.folders.first().id, 42},
@@ -893,6 +1060,23 @@ private slots:
         list[0] = entry;
         over.insert(QStringLiteral("imports"), list);
         QVERIFY(!parseImportProgress(over, &backImports, &error));
+    }
+
+    // e2-4b: actions_status meldet den Hauptschalter (enabled) in jedem Zustand, auch bei «stumm»
+    void actionsStatusEnabled()
+    {
+        for (const bool enabled : {true, false}) {
+            ActionsStatus status;
+            status.state = QStringLiteral("muted");
+            status.message = QStringLiteral("stumm: Version im Einsatz läuft");
+            status.enabled = enabled;
+            const QJsonObject message = roundTrip(actionsStatusMessage(status));
+            QCOMPARE(message.value(QStringLiteral("enabled")), QJsonValue(enabled));
+            ActionsStatus back;
+            QString error;
+            QVERIFY2(parseActionsStatus(message, &back, &error), qPrintable(error));
+            QCOMPARE(back, status);
+        }
     }
 };
 

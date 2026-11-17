@@ -1,0 +1,99 @@
+{
+ "id": "01TESTBENUTZER0000000000001",
+ "platform": "TWITCH",
+ "username": "testkanal",
+ "display_name": "testkanal",
+ "linked_at": 1700000000000,
+ "emote_capacity": 1000,
+ "emote_set_id": "01TESTSET000000000000000001",
+ "emote_set": {
+  "id": "01TESTSET000000000000000001",
+  "name": "testkanal's Emotes",
+  "flags": 0,
+  "tags": [],
+  "immutable": false,
+  "privileged": false,
+  "emotes": [
+   {
+    "id": "01TESTEMOTE0000000000000001",
+    "name": "testWinken",
+    "flags": 0,
+    "timestamp": 1700000000000,
+    "actor_id": "test-0001",
+    "data": {
+     "id": "01TESTEMOTE0000000000000001",
+     "name": "testWinken",
+     "flags": 0,
+     "animated": true,
+     "host": {
+      "url": "//cdn.7tv.app/emote/01TESTEMOTE0000000000000001",
+      "files": [
+       {"name": "1x.avif", "static_name": "1x_static.avif", "width": 32, "height": 32, "frame_count": 4, "size": 1000, "format": "AVIF"},
+       {"name": "2x.webp", "static_name": "2x_static.webp", "width": 64, "height": 64, "frame_count": 4, "size": 2000, "format": "WEBP"},
+       {"name": "1x.webp", "static_name": "1x_static.webp", "width": 32, "height": 32, "frame_count": 4, "size": 1000, "format": "WEBP"}
+      ]
+     }
+    }
+   },
+   {
+    "id": "01TESTEMOTE0000000000000002",
+    "name": "testHut",
+    "flags": 1,
+    "timestamp": 1700000000000,
+    "actor_id": "test-0001",
+    "data": {
+     "id": "01TESTEMOTE0000000000000002",
+     "name": "testHut",
+     "flags": 256,
+     "animated": false,
+     "host": {
+      "url": "//cdn.7tv.app/emote/01TESTEMOTE0000000000000002",
+      "files": [
+       {"name": "1x.webp", "static_name": "1x_static.webp", "width": 32, "height": 32, "frame_count": 1, "size": 500, "format": "WEBP"}
+      ]
+     }
+    }
+   },
+   {
+    "id": "01TESTEMOTE0000000000000003",
+    "name": "testUmbenannt",
+    "flags": 0,
+    "timestamp": 1700000000000,
+    "actor_id": "test-0001",
+    "data": {
+     "id": "01TESTEMOTE0000000000000003",
+     "name": "testOriginal",
+     "flags": 256,
+     "animated": false,
+     "host": {
+      "url": "//cdn.7tv.app/emote/01TESTEMOTE0000000000000003",
+      "files": [
+       {"name": "1x.webp", "static_name": "1x_static.webp", "width": 48, "height": 32, "frame_count": 1, "size": 600, "format": "WEBP"}
+      ]
+     }
+    }
+   },
+   {
+    "id": "01TESTEMOTE0000000000000004",
+    "name": "testNurAvif",
+    "flags": 0,
+    "timestamp": 1700000000000,
+    "actor_id": "test-0001",
+    "data": {
+     "id": "01TESTEMOTE0000000000000004",
+     "name": "testNurAvif",
+     "flags": 0,
+     "animated": false,
+     "host": {
+      "url": "//cdn.7tv.app/emote/01TESTEMOTE0000000000000004",
+      "files": [
+       {"name": "1x.avif", "static_name": "1x_static.avif", "width": 32, "height": 32, "frame_count": 1, "size": 400, "format": "AVIF"}
+      ]
+     }
+    }
+   }
+  ],
+  "emote_count": 4,
+  "capacity": 1000
+ }
+}

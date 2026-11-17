@@ -25,6 +25,10 @@ constexpr char kObsSection[] = "obs";
 constexpr char kObsEnabledKey[] = "aktiv";
 constexpr char kObsHostKey[] = "adresse";
 constexpr char kObsPortKey[] = "port";
+// P13: Anbindung an Twitch
+constexpr char kTwitchSection[] = "twitch";
+constexpr char kTwitchEnabledKey[] = "aktiv";
+constexpr char kTwitchClientIdKey[] = "client-id";
 constexpr char kYes[] = "ja";
 constexpr char kNo[] = "nein";
 // P12b b3: Abschnitt je Zweck des Tons (kAudioPurposes)
@@ -124,6 +128,22 @@ QString validateObsCombination(bool enabled, const QString &host)
     return {};
 }
 
+QString validateTwitchClientId(const QString &clientId)
+{
+    static const QRegularExpression form(QStringLiteral("\\A[A-Za-z0-9]*\\z"));
+    if (clientId.size() > kTwitchClientIdMaxLength || !form.match(clientId).hasMatch())
+        return QStringLiteral("Client-ID von Twitch ungültig: nur Buchstaben und Ziffern, höchstens %1 Zeichen.")
+            .arg(kTwitchClientIdMaxLength);
+    return {};
+}
+
+QString validateTwitchCombination(bool enabled, const QString &clientId)
+{
+    if (enabled && clientId.isEmpty())
+        return QStringLiteral("«Mit Twitch verbinden» braucht die Client-ID.");
+    return {};
+}
+
 QString validateAudioOutput(const QString &output)
 {
     if (output.size() > kAudioOutputMaxLength)
@@ -162,7 +182,7 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']'))) {
             section = line.mid(1, line.size() - 2).trimmed();
             if (section != QLatin1String(kSection) && section != QLatin1String(kObsSection)
-                && audioPurposeOfSection(section).isEmpty())
+                && section != QLatin1String(kTwitchSection) && audioPurposeOfSection(section).isEmpty())
                 return fail(QStringLiteral("unbekannter Abschnitt [%1]").arg(section));
             continue;
         }
@@ -213,6 +233,18 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
             } else {
                 return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
             }
+        } else if (section == QLatin1String(kTwitchSection)) {
+            if (key == QLatin1String(kTwitchEnabledKey)) {
+                if (value != QLatin1String(kYes) && value != QLatin1String(kNo))
+                    return fail(QStringLiteral("«%1» muss ja oder nein sein, nicht «%2»").arg(key, value));
+                s.twitchEnabled = value == QLatin1String(kYes);
+            } else if (key == QLatin1String(kTwitchClientIdKey)) {
+                if (const QString e = validateTwitchClientId(value); !e.isEmpty())
+                    return fail(e);
+                s.twitchClientId = value;
+            } else {
+                return fail(QStringLiteral("unbekannte Angabe «%1»").arg(key));
+            }
         } else if (key == QLatin1String(kPortKey)) {
             bool number = false;
             const int port = value.toInt(&number);
@@ -233,6 +265,10 @@ bool parseCoreSettings(const QByteArray &text, const CoreSettings &defaults, Cor
         *error = e;
         return false;
     }
+    if (const QString e = validateTwitchCombination(s.twitchEnabled, s.twitchClientId); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
     *settings = s;
     return true;
 }
@@ -250,7 +286,11 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
             "# Passwort steht nicht hier, sondern verschlüsselt in obs-passwort.cred.\n"
             "# [ton-video]: Ausgang für den Ton der Videos (Name in PipeWire, leer = kein Ton) und\n"
             "# versatz_ms (" + QByteArray::number(kAudioOffsetMinMs) + " bis "
-            + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n";
+            + QByteArray::number(kAudioOffsetMaxMs) + "): Weg des Tons hinter dem Ausgang, so viel früher spielt der Kern.\n"
+            "# [ton-aktionen]: Ausgang für die Töne des Chat-Bots; versatz_ms wirkt dort nicht.\n"
+            "# [twitch]: aktiv ja oder nein, Client-ID der App bei Twitch. Token und Client Secret stehen\n"
+            "# nicht hier, sondern verschlüsselt in twitch-token.cred, twitch-bot-token.cred und\n"
+            "# twitch-client-secret.cred.\n";
     text += '[' + QByteArray(kSection) + "]\n";
     text += QByteArray(kPortKey) + '=' + QByteArray::number(settings.port) + '\n';
     text += QByteArray(kAddressKey) + '=' + settings.homeAddress.toUtf8() + '\n';
@@ -264,6 +304,9 @@ QByteArray serializeCoreSettings(const CoreSettings &settings)
         text += QByteArray(kAudioOutputKey) + '=' + route.output.toUtf8() + '\n';
         text += QByteArray(kAudioOffsetKey) + '=' + QByteArray::number(route.offsetMs) + '\n';
     }
+    text += '[' + QByteArray(kTwitchSection) + "]\n";
+    text += QByteArray(kTwitchEnabledKey) + '=' + (settings.twitchEnabled ? kYes : kNo) + '\n';
+    text += QByteArray(kTwitchClientIdKey) + '=' + settings.twitchClientId.toUtf8() + '\n';
     return text;
 }
 
@@ -441,6 +484,15 @@ std::optional<CoreSettings> CoreSettingsStore::applied(const CoreSettingsChange 
     if (change.obsEnabled)
         next.obsEnabled = *change.obsEnabled;
     if (const QString e = validateObsCombination(next.obsEnabled, next.obsHost); !e.isEmpty())
+        return fail(e);
+    if (change.twitchClientId) {
+        if (const QString e = validateTwitchClientId(*change.twitchClientId); !e.isEmpty())
+            return fail(e);
+        next.twitchClientId = *change.twitchClientId;
+    }
+    if (change.twitchEnabled)
+        next.twitchEnabled = *change.twitchEnabled;
+    if (const QString e = validateTwitchCombination(next.twitchEnabled, next.twitchClientId); !e.isEmpty())
         return fail(e);
     for (auto it = change.audioRoutes.constBegin(); it != change.audioRoutes.constEnd(); ++it) {
         if (!next.audioRoutes.contains(it.key()))

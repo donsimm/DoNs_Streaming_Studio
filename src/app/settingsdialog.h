@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDateTime>
 #include <QDialog>
 
 class QCheckBox;
@@ -7,6 +8,8 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
+class QStackedWidget;
+class QTimer;
 
 namespace dss {
 class CoreClient;
@@ -27,6 +30,8 @@ public:
 
     // Fragt die Werte neu beim Kern an und zeigt den Dialog.
     void showFromCore();
+    // P13: Fokus auf den Bereich «Twitch» («Mit Twitch verbinden»), nach showFromCore.
+    void focusTwitchSection();
 
 private:
     void accept() override;
@@ -34,6 +39,26 @@ private:
     void onSettingsChanged();
     void onChangeFinished(const dss::ChangeResult &result);
     void updateState();
+    // P13: Bereich «Twitch»
+    struct TwitchAccountRow
+    {
+        QString account; // channel, bot
+        QStackedWidget *stack = nullptr; // Seite 0: Zustand, Seite 1: Anmeldung unterwegs
+        QLabel *state = nullptr;
+        QPushButton *login = nullptr;
+        QPushButton *logout = nullptr;
+        QLabel *code = nullptr;
+        QLabel *uri = nullptr;
+        QPushButton *open = nullptr;
+        QPushButton *copy = nullptr;
+        QLabel *remaining = nullptr;
+        QPushButton *cancel = nullptr;
+        QDateTime expiresAt;
+    };
+    QWidget *createTwitchAccountRow(TwitchAccountRow *row, const QString &account, const QString &objectPrefix);
+    void sendTwitchRequest(const char *type, const QString &account);
+    void onTwitchStatusChanged();
+    void updateTwitchRemaining();
 
     dss::CoreClient *m_client;
     QSpinBox *m_port = nullptr;
@@ -45,6 +70,17 @@ private:
     QSpinBox *m_obsPort = nullptr;
     QLineEdit *m_obsPassword = nullptr;
     QPushButton *m_obsDeletePassword = nullptr;
+    // P13: Anbindung an Twitch
+    QCheckBox *m_twitchEnabled = nullptr;
+    QLineEdit *m_twitchClientId = nullptr;
+    QLineEdit *m_twitchSecret = nullptr;
+    QPushButton *m_twitchDeleteSecret = nullptr;
+    TwitchAccountRow m_twitchChannel;
+    TwitchAccountRow m_twitchBot;
+    QLabel *m_twitchStatus = nullptr;
+    QTimer *m_twitchTimer = nullptr; // Restzeit des Codes, solange der Dialog offen ist
+    qint64 m_twitchRequest = 0;      // twitch_login_* oder twitch_logout unterwegs
+    bool m_deleteTwitchSecret = false; // «Secret löschen» gedrückt, gilt erst mit «OK»
     QLabel *m_problem = nullptr;
     QPushButton *m_ok = nullptr;
     QPushButton *m_reset = nullptr; // nur bei ungültiger kern.ini frei

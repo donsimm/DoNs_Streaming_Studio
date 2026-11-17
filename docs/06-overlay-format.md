@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-14 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-15 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5, Dateien des Chat-Bots P14 a). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -12,16 +12,27 @@ Ohne Angabe nimmt das Programm den Ordner, den `QStandardPaths::AppDataLocation`
 │   └── <Kennung>.json        ein Overlay je Datei, Name = Kennung des Overlays
 ├── media/
 │   └── <SHA-256>.<Endung>    Kopien der Dateien des Nutzers (Bild, Video, Schrift)
+├── live-bilder/
+│   └── <SHA-256>.<png|jpg>   Profilbilder des Laufzustands (P14 d), beim Start des Kerns geleert
 ├── liste.json                Reihenfolge und Ordner der Overlay-Liste (P08), siehe «Liste»
 ├── medien.json               Namen und Ordner der Mediendateien (P10b), siehe «Medienliste»
 ├── obs-quellen.json          Quellen in OBS je Overlay (P10c), siehe unten
+├── aktionen.json             Aktionen, Befehle, Zeitnachrichten des Chat-Bots (P14), siehe «Aktionen»
+├── variablen.json            dauerhafte Variablen und Zähler der Befehle (P14), siehe «Variablen»
+├── zuschauer.json            Login und Anzeigename je Twitch-ID (P14), siehe «Zuschauer, Zitate, Archiv»
+├── zitate.json               Zitate aus Streamer.bot (P14)
+├── streamerbot-archiv.json   übrige Daten aus Streamer.bot, unverändert aufbewahrt (P14)
+├── twitch-sitzung.json       Zuschauer, die im laufenden Stream schon geschrieben haben (P13), siehe unten
 └── tokens.json               Token pro Overlay, Dateirechte 0600
 ```
 
 - **overlays/**: Jede Datei ist JSON in UTF-8. Gespeichert wird atomar (`QSaveFile`: temporäre Datei, danach Umbenennen).
-- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`.
+- **media/**: Fügt der Nutzer eine Datei hinzu, legt die Software eine Kopie an. Der Dateiname ist der SHA-256 des Inhalts (64 Zeichen, Kleinbuchstaben) und die Endung der ursprünglichen Datei in Kleinbuchstaben. Gleicher Inhalt ergibt also nur eine Kopie. Seit P10b lassen sich ungenutzte Kopien löschen (Dock «Medien», `dss-cli medium-loeschen`); von selbst löscht der Kern nichts. Erlaubte Endungen: Bild `png`, `jpg`, `jpeg`; Video `webm`, `mp4`; Schrift `ttf`, `otf`; seit P14 t Ton `mp3`, `wav`, `ogg`, `m4a` (Töne für den Chat-Bot, ohne Quelle in einem Overlay; `medien.json` bleibt in Format 1).
+- **live-bilder/** (seit P14 d): Profilbilder, die der Kern für den Laufzustand eines Overlays lädt (`docs/08-kern-schnittstelle.md`, «Laufzustand»). Nur der Kern schreibt hier, höchstens 200 Dateien, die ältesten ungenutzten werden gelöscht; beim Start leert er den Ordner. Keine Overlay-Datei verweist darauf.
 - **tokens.json**: Die Token stehen nicht in den Overlay-Dateien, damit sich diese ohne Token weitergeben lassen. Inhalt: `{"format_version": 1, "tokens": {"<Kennung>": "<Token>"}}`. Ein Token sind 32 Byte aus der Zufallsquelle des Betriebssystems (`QRandomGenerator::system()`), geschrieben als Base64url ohne `=` (43 Zeichen). Der Token erscheint nie im Protokoll.
 - **obs-quellen.json** (seit P10c, E-29): Zuordnung Overlay zu Browserquelle in OBS, gespeichert atomar (`QSaveFile`), nur vom Kern. Inhalt: `{"format":1,"quellen":[{"overlay":"<Kennung>","input_uuid":"<Kennung in OBS>","input_name":"<Name in OBS>"}]}`. Die Zuordnung läuft über `input_uuid`, bleibt also beim Umbenennen in OBS gültig. Fehlt die Quelle in OBS, bleibt der Eintrag: Bei einer anderen Szenensammlung fehlt sie nur scheinbar. Ohne Token und ohne Adresse. Ungültige Datei: wird in `obs-quellen.json.ungueltig-<JJJJMMTT-hhmmss>` umbenannt, der Kern beginnt ohne Zuordnung (bestehende Quellen übernimmt der Abgleich, wenn die Adresse genau stimmt).
+- **twitch-sitzung.json** (seit P13): Damit «erste Nachricht im Stream» (`twitch.first_message`) nach einem Neustart des Kerns im selben Stream nicht doppelt kommt, schreibt der Kern die Twitch-Benutzer-IDs der Zuschauer, die seit dem Start des Streams geschrieben haben, verzögert und atomar (`QSaveFile`) hierher, nur vom Kern (`src/twitch/chatsession.h`). Inhalt: `{"started_at":"<Start des Streams laut Twitch>","user_ids":["<ID>", …]}`, ohne Namen und ohne Nachrichten. Beim Start übernimmt der Kern die Liste nur, wenn Twitch denselben `started_at` meldet, sonst verwirft er sie. Ohne laufenden Stream schreibt er nichts; beim Ende des Streams löscht er die Datei.
+- **Anmeldungen bei Twitch** liegen nicht im Datenordner, sondern verschlüsselt neben `kern.ini` (wie `obs-passwort.cred`, F1, Regel 12): `twitch-token.cred` (Kanal), `twitch-bot-token.cred` (Bot) und `twitch-client-secret.cred` (Client Secret der App), je mit `systemd-creds --user` (Namen `dss-twitch-token`, `dss-twitch-bot-token`, `dss-twitch-client-secret`). Eine Token-Datei enthält verschlüsselt Access- und Refresh-Token, Ablaufzeit, Benutzer-ID, Anmeldename und Rechte; «Abmelden» löscht sie. Das App-Token für das Abzeichen «Chat Bot» bleibt nur im Speicher. Einzelheiten: `docs/08-kern-schnittstelle.md`, «Anbindung an Twitch».
 
 ## Liste (`liste.json`)
 
@@ -225,6 +236,60 @@ Beispiel: ein Ordner «Logos» mit dem Unterordner «Alt», darin eine Datei; ei
 }
 ```
 <!-- medien-beispiel-ende -->
+
+## Aktionen (`aktionen.json`)
+
+Seit P14 (Abschnitt a). Aktionen mit Auslösern und Schritten, Befehle, Zeitnachrichten, Warteschlangen und Benutzergruppen des Chat-Bots, Aufbau wie Streamer.bot (Fassung 24) mit Namen in `snake_case`. Plan und Bedeutung der Felder: `docs/archiv/prompts/P14-chatbot.md`, Abschnitte 2.2 bis 2.8. Massgebend ist der Code in `src/actions/` (`actionmodel.h`, `actionjson.cpp`, Typtabellen `steptypes.cpp` und `triggertypes.cpp`); Testdaten `tests/daten/aktionen/`.
+
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `format_version` | ganze Zahl, genau `1` | Version des Formats |
+| `enabled` | true/false | Hauptschalter «Chat-Bot aktiv», beim ersten Start aus |
+| `queues` | Liste | Warteschlangen (`id`, `name`, `blocking`); «Standard» steht nicht in der Liste |
+| `groups` | Liste | Benutzergruppen (`id`, `name`, `users` mit `user_id` = Twitch-Benutzer-ID) |
+| `actions` | Liste | Aktionen (`id`, `name`, `group`, `enabled`, `queue`, `exclude_from_history`, `random_action`, `concurrent`, `always_run`, `template_id`, `triggers`, `steps`) |
+| `commands` | Liste | Befehle (`id`, `name`, `enabled`, `group`, `commands`, `mode`, `location`, `case_sensitive`, `ignore_bot_account`, `ignore_internal`, `sources`, `global_cooldown_s`, `user_cooldown_s`, `persist_counter`, `persist_user_counter`, `permissions` mit `grant`, `roles`, `groups`, `users`) |
+| `timers` | Liste | Zeitnachrichten (`id`, `name`, `enabled`, `repeat`, `interval_s` ab 60, `random`, `random_min_s`, `random_max_s`, `lines`, `only_live`) |
+
+- **Schritte:** gemeinsame Felder `id`, `type`, `enabled`, `weight` (Zahl ab 0, kein Pflichtfeld, Standard 0) und bei `group`, `if`, `if_true`, `if_false` die Liste `steps`. Dazu die Felder des Typs nach der Tabelle in `steptypes.cpp` (Plan 2.4). `if` hat genau die Kinder `if_true` und `if_false` in dieser Reihenfolge; diese stehen nur dort. Verschachtelt höchstens 32 Ebenen. `unsupported` ist immer aus; `script` wird gelesen und geschrieben, nie ausgeführt.
+- **Auslöser:** `id`, `type`, `enabled` und die Filter nach `triggertypes.cpp` (Plan 2.5).
+- **Kennungen:** UUID in Kleinbuchstaben ohne Klammern, je Art eindeutig in der ganzen Datei (Aktionen, Schritte, Auslöser, Befehle, Zeitnachrichten, Warteschlangen, Gruppen). `queue` und `template_id` dürfen `null` sein; bei `queue` heisst auch die UUID aus lauter Nullen «Standard» und wird als `null` geschrieben.
+- **Unbekannte Felder** sind erlaubt und bleiben auf jeder Ebene erhalten (beim Lesen gesammelt, beim Schreiben wieder ausgegeben). Alle übrigen Felder sind Pflicht; ein fehlendes oder ungültiges Feld macht die Datei ungültig, die Meldung nennt es (zum Beispiel `actions[0].steps[2].text`).
+- **Verweise** (Warteschlange, Befehl und Zeitnachricht eines Auslösers, Ziel von `run_action`, Benutzergruppen, Overlay und Elemente, Mediendateien) machen die Datei nicht ungültig. Ein fehlender Verweis ist eine Warnung (`src/actions/actionrefs.h`), ebenso doppelte Befehle unter den aktiven und gespeicherte, aber nicht ausgeführte Werte (`mode` `regex`, Vergleich `regex`).
+- Geschrieben wird eingerückt mit Feldern in alphabetischer Reihenfolge. Keine Zugangsdaten und keine Daten von Zuschauern ausser Twitch-Benutzer-IDs in `groups` und `permissions.users`.
+- **Platzhalter** in Textfeldern (`src/actions/placeholders.h`): `%name%` setzt ein Argument des Laufs ein, `~name~` eine dauerhafte globale Variable; Namen aus `A`–`Z`, `a`–`z`, Ziffern und `_`, Gross- und Kleinschreibung zählt. Unbekannte bleiben wörtlich stehen, eingesetzte Werte werden nicht nochmals durchsucht.
+- **Fehlt `aktionen.json`**, legt der Kern die mitgelieferten Aktionen aus der Vorlage `src/actions/vorlage/aktionen.json` an (P14 f1, Plan 7, Hauptschalter aus) und dazu das Overlay «Chat-Bot», wenn es noch nicht da ist (f2, `src/common/chatbotoverlay.h`): Kennung `d5580000-0000-4000-8000-000000000001`, 1920 × 1080, im Ordner «Chat-Bot» der Liste (ein vorhandener Ordner mit dem Namen wird benutzt), 9 unsichtbare Elemente mit den Kennungen aus `src/actions/actiontemplate.h` (fünf Alerts als Text, Begrüssung und Shoutout je Bild und Name). Die Schrift Be Vietnam Pro Regular und das Platzhalterbild `chatbot-platzhalter.png` (beim Bau gezeichnet) kommen in `media/`. Eine vorhandene `aktionen.json` (auch eine leere oder ungültige), ein vorhandenes Overlay und eine Overlay-Datei mit dieser Kennung (auch eine kaputte) bleiben unberührt.
+
+## Variablen (`variablen.json`)
+
+Seit P14 (Abschnitt a). Dauerhafte Variablen und Zähler der Befehle (Plan P14, Abschnitt 2.9); flüchtige stehen nur im Speicher. Massgebend ist `src/actions/variables.h/.cpp`. **Datenschutz:** Die Datei enthält Daten von Zuschauern; sie liegt nur im Datenordner, nie im Repo, im Protokoll, in Berichten oder Tests (Tests nutzen erfundene Werte).
+
+```
+{
+  "format_version": 1,
+  "global": { "<Name>": <Wert> },
+  "users": { "<Twitch-ID>": { "<Name>": <Wert> } },
+  "command_counters": { "<UUID des Befehls>": { "counter": <Wert> oder null, "user_counter": { "<Twitch-ID>": <Wert> } } }
+}
+<Wert> = { "value": Text oder Zahl, "origin": "studio" oder "streamerbot", "changed_at": "2026-11-15T12:00:00.000Z" }
+```
+
+- Je Zuschauer über die Twitch-Benutzer-ID, nie über den Namen. Namen der Variablen sind frei; Namen aus Streamer.bot bleiben beim Import unverändert.
+- `origin` und `changed_at` (UTC, ISO 8601 mit Millisekunden) je Wert: Jede Änderung im Studio setzt `studio` und den Zeitpunkt; so erkennt ein erneuter Import, was seither geändert wurde.
+- Zähler der Befehle sind ganze Zahlen ab 0. Erhöhen einer fehlenden Variable beginnt bei 0; ein Text, der ganz eine Zahl ist, zählt als Zahl.
+- Streng gelesen wie `liste.json`: unbekannte oder fehlende Felder machen die Datei ungültig (die Datei gehört nur dem Kern).
+
+## Zuschauer, Zitate, Archiv (`zuschauer.json`, `zitate.json`, `streamerbot-archiv.json`)
+
+Seit P14 (Abschnitt a), gefüllt vom Import aus Streamer.bot (Plan P14, Abschnitte 2.10 und 9). Massgebend ist `src/actions/viewerdata.h/.cpp`. Datenschutz wie bei `variablen.json`. Die Felder aus Streamer.bot stehen erst nach der Prüfung der Struktur (Abschnitt z0) fest; Pflicht sind darum nur die hier genannten, alle weiteren bleiben unverändert erhalten.
+
+| Datei | Inhalt |
+|---|---|
+| `zuschauer.json` | `{"format_version": 1, "viewers": {"<Twitch-ID>": {"login": …, "display_name": …, weitere Felder}}}`; `login` nicht leer. Im Betrieb nachgeführt (nur Login und Anzeigename) |
+| `zitate.json` | `{"format_version": 1, "quotes": [{…}, …]}`, jedes Zitat ein Objekt mit den Feldern aus `quotes.dat` |
+| `streamerbot-archiv.json` | `{"format_version": 1, "files": {"<Datei>": {"<Sammlung>": <JSON>}}}`, unverändert, nicht sichtbar |
+
+**Prüfen beim Installieren:** `dss-core --format-pruefen` liest alle fünf Dateien des Chat-Bots streng (`aktionen.json`, `variablen.json` und die drei oben). Eine ungültige Datei meldet es als «nicht lesbar, bleibt unverändert», eine `format_version` über 1 als neueres Format (Exit-Code 5). Ein älteres Format gibt es noch nicht.
 
 ## Versionen
 

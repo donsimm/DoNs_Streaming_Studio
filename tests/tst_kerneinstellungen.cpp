@@ -249,17 +249,108 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("Port von OBS 70000")), qPrintable(error));
     }
 
+    // P13: Abschnitt [twitch]. Ohne Abschnitt bleibt Twitch aus (Dateien von vor P13).
+    void parseTwitch()
+    {
+        const CoreSettings defaults{8081, QString()};
+        CoreSettings s;
+        QString error;
+        QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
+        QCOMPARE(s.twitchEnabled, false);
+        QCOMPARE(s.twitchClientId, QString());
+        // «aktiv» gibt es in [obs] und [twitch]; doppelt gilt je Abschnitt.
+        QVERIFY2(parseCoreSettings("[obs]\naktiv=nein\n[twitch]\naktiv=ja\nclient-id=abc123XYZ\n", defaults, &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.obsEnabled, false);
+        QCOMPARE(s.twitchEnabled, true);
+        QCOMPARE(s.twitchClientId, QStringLiteral("abc123XYZ"));
+        // Hin und zurück
+        CoreSettings written{8090, QString()};
+        written.twitchEnabled = true;
+        written.twitchClientId = QStringLiteral("testclient0123456789");
+        const QByteArray text = serializeCoreSettings(written);
+        QVERIFY(text.contains("[twitch]\naktiv=ja\nclient-id=testclient0123456789\n"));
+        QVERIFY2(parseCoreSettings(text, defaults, &s, &error), qPrintable(error));
+        QCOMPARE(s, written);
+        // Token und Secret stehen nie in der Datei: keine solche Angabe
+        QVERIFY(!parseCoreSettings("[twitch]\nclient-secret=x\n", defaults, &s, &error));
+        QVERIFY(!parseCoreSettings("[twitch]\ntoken=x\n", defaults, &s, &error));
+    }
+
+    void parseTwitchInvalid_data()
+    {
+        QTest::addColumn<QByteArray>("text");
+        QTest::addColumn<QString>("message");
+        QTest::newRow("aktiv") << QByteArray("[twitch]\naktiv=1\n") << QStringLiteral("ja oder nein");
+        QTest::newRow("aktiv ohne Client-ID") << QByteArray("[twitch]\naktiv=ja\n") << QStringLiteral("braucht die Client-ID");
+        QTest::newRow("Client-ID Zeichen") << QByteArray("[twitch]\nclient-id=ab-cd\n") << QStringLiteral("Client-ID von Twitch ungültig");
+        QTest::newRow("Client-ID lang") << QByteArray("[twitch]\nclient-id=" + QByteArray(65, 'a') + "\n")
+                                        << QStringLiteral("höchstens 64");
+        QTest::newRow("doppelt") << QByteArray("[twitch]\naktiv=nein\naktiv=nein\n") << QStringLiteral("«aktiv» doppelt");
+        QTest::newRow("unbekannt") << QByteArray("[twitch]\nkanal=x\n") << QStringLiteral("unbekannte Angabe «kanal»");
+    }
+
+    void parseTwitchInvalid()
+    {
+        QFETCH(QByteArray, text);
+        QFETCH(QString, message);
+        CoreSettings s;
+        QString error;
+        QVERIFY(!parseCoreSettings(text, {8081, QString()}, &s, &error));
+        QVERIFY2(error.contains(message), qPrintable(error));
+    }
+
+    void changeTwitch()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("kern.ini"));
+        int calls = 0;
+        CoreSettingsStore store(path, {8081, QString()}, FakeDetector{QString(), QStringLiteral("keine Route"), &calls});
+        QStringList log;
+        QStringList warnings;
+        store.load(&log, &warnings);
+        QString error;
+        // Einschalten braucht eine Client-ID
+        CoreSettingsChange change;
+        change.twitchEnabled = true;
+        QVERIFY(store.checkChange(change).contains(QStringLiteral("braucht die Client-ID")));
+        QVERIFY(!store.change(change, &error));
+        QCOMPARE(store.settings().twitchEnabled, false);
+        change.twitchClientId = QStringLiteral("testclient");
+        QVERIFY2(store.change(change, &error), qPrintable(error));
+        QCOMPARE(store.settings().twitchEnabled, true);
+        QVERIFY(readFile(path).contains("[twitch]\naktiv=ja\nclient-id=testclient\n"));
+        // Client-ID leeren geht nur, wenn Twitch gleichzeitig aus ist
+        CoreSettingsChange clear;
+        clear.twitchClientId = QString();
+        QVERIFY(!store.change(clear, &error));
+        clear.twitchEnabled = false;
+        QVERIFY2(store.change(clear, &error), qPrintable(error));
+        CoreSettingsChange wrong;
+        wrong.twitchClientId = QStringLiteral("a b");
+        QVERIFY(!store.change(wrong, &error));
+        QVERIFY2(error.contains(QStringLiteral("Client-ID von Twitch ungültig")), qPrintable(error));
+        QVERIFY(!wrong.isEmpty());
+    }
+
     // P12b b3: Abschnitt [ton-video]. Ohne Abschnitt: kein Ausgang, Versatz 0 (Dateien von vor P12b).
     void parseAudio()
     {
         const CoreSettings defaults{8081, QString()};
         const QString video = QString::fromLatin1(kAudioPurposeVideo);
+        const QString actions = QString::fromLatin1(kAudioPurposeActions);
         CoreSettings s;
         QString error;
-        QCOMPARE(audioPurposeIds(), QStringList{video});
+        QCOMPARE(audioPurposeIds(), (QStringList{video, actions}));
         QVERIFY(parseCoreSettings("[overlay-server]\nport=8090\n", defaults, &s, &error));
         QCOMPARE(s.audioRoutes, CoreSettings::defaultAudioRoutes());
-        QCOMPARE(s.audioRoutes.keys(), QStringList{video});
+        QCOMPARE(s.audioRoutes.keys(), (QStringList{actions, video})); // QMap sortiert
+        QCOMPARE(s.audioRoutes.value(video), AudioRoute());
+        QCOMPARE(s.audioRoutes.value(actions), AudioRoute());
+        // P14 t: [ton-aktionen] unabhängig von [ton-video]
+        QVERIFY2(parseCoreSettings("[ton-aktionen]\nausgang=test_bot.analog-stereo\n", defaults, &s, &error),
+                 qPrintable(error));
+        QCOMPARE(s.audioRoutes.value(actions), (AudioRoute{QStringLiteral("test_bot.analog-stereo"), 0}));
         QCOMPARE(s.audioRoutes.value(video), AudioRoute());
         QVERIFY2(parseCoreSettings("[ton-video]\nausgang = test_ausgang.analog-stereo \nversatz_ms=-120\n", defaults,
                                    &s, &error),
@@ -279,6 +370,7 @@ private slots:
             QCOMPARE(s, written);
         }
         QVERIFY(serializeCoreSettings({8090, QString()}).contains("\n[ton-video]\nausgang=\nversatz_ms=0\n"));
+        QVERIFY(serializeCoreSettings({8090, QString()}).contains("\n[ton-aktionen]\nausgang=\nversatz_ms=0\n"));
     }
 
     void parseAudioInvalid_data()

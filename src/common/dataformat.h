@@ -13,6 +13,9 @@
 // das Programm beim nächsten Speichern tut (docs/06-overlay-format.md, «Versionen»).
 // Seit P10b auch medien.json (kMediaLibraryFormatVersion): Fehlt sie und liegen Dateien in
 // media/, legt Umwandeln sie mit Ersatznamen an (als letzte Datei).
+// Seit P14 a auch die Dateien des Aktionssystems (aktionen.json, variablen.json, zuschauer.json,
+// zitate.json, streamerbot-archiv.json, src/actions/viewerdata.h): je nur Version 1, also nur
+// «neuer» oder «nicht lesbar», nie «älter».
 
 namespace dss {
 

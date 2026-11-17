@@ -117,14 +117,26 @@ QString checkTargetFolder(const MediaLibrary &library, const QUuid &folder)
 std::optional<MediaKind> mediaKindOf(const QString &reference)
 {
     const QString suffix = QFileInfo(reference).suffix().toLower();
-    for (MediaKind kind : {MediaKind::Image, MediaKind::Video, MediaKind::Font}) {
-        const MediaUse use = kind == MediaKind::Image   ? MediaUse::Image
-                             : kind == MediaKind::Video ? MediaUse::Video
-                                                        : MediaUse::Font;
-        if (allowedMediaSuffixes(use).contains(suffix))
+    for (MediaKind kind : kMediaKinds) {
+        if (allowedMediaSuffixes(mediaUseOf(kind)).contains(suffix))
             return kind;
     }
     return std::nullopt;
+}
+
+MediaUse mediaUseOf(MediaKind kind)
+{
+    switch (kind) {
+    case MediaKind::Image:
+        return MediaUse::Image;
+    case MediaKind::Video:
+        return MediaUse::Video;
+    case MediaKind::Font:
+        return MediaUse::Font;
+    case MediaKind::Audio:
+        return MediaUse::Audio;
+    }
+    return MediaUse::Image;
 }
 
 QString mediaKindName(MediaKind kind)
@@ -136,6 +148,8 @@ QString mediaKindName(MediaKind kind)
         return QStringLiteral("Video");
     case MediaKind::Font:
         return QStringLiteral("Schrift");
+    case MediaKind::Audio:
+        return QStringLiteral("Ton");
     }
     return {};
 }
@@ -149,13 +163,15 @@ QString mediaKindKey(MediaKind kind)
         return QStringLiteral("video");
     case MediaKind::Font:
         return QStringLiteral("font");
+    case MediaKind::Audio:
+        return QStringLiteral("audio");
     }
     return {};
 }
 
 std::optional<MediaKind> mediaKindFromKey(const QString &key)
 {
-    for (MediaKind kind : {MediaKind::Image, MediaKind::Video, MediaKind::Font}) {
+    for (MediaKind kind : kMediaKinds) {
         if (mediaKindKey(kind) == key)
             return kind;
     }

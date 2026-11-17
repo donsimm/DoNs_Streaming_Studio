@@ -7,10 +7,14 @@
 // Videos (tests/daten/video-drehung/) wie auf der Leinwand, PNG Byte für Byte lesbar zurück,
 // Name und Ordner. Daten wie in tst_leinwand und im Handtest (Regel 7).
 // Mit DSS_LEINWANDBILD_ORDNER=ORDNER wird das Bild für den Bericht dort gespeichert.
+// P14 f2: Overlay «Chat-Bot» mit allen Elementen sichtbar, Bild nach build/mitgeliefert-overlay.png.
 
+#include "actiontemplate.h"
 #include "canvasimage.h"
+#include "chatbotoverlay.h"
 #include "mediainfo.h"
 #include "overlayimage.h"
+#include "overlaylivestate.h"
 #include "overlaystore.h"
 #include "sourcegeometry.h"
 #include "sourcerenderer.h"
@@ -300,6 +304,79 @@ private slots:
             QCOMPARE(dir, xdgDir + QStringLiteral("/DoNs Streaming Studio"));
         else
             qWarning("xdg-user-dir nicht gefunden, Vergleich übersprungen");
+    }
+
+    // P14 f2: Overlay «Chat-Bot» mit allen Elementen sichtbar (Laufzustand mit Beispielwerten) wie im
+    // Lauf gezeichnet: weisse Schrift, Platzhalterbild, sonst durchsichtig. Bild für den Prüfer:
+    // build/mitgeliefert-overlay.png
+    void chatBotOverlay()
+    {
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        OverlayStore store(data.path());
+        QString error;
+        QString warning;
+        QVERIFY(store.load(&error));
+        QCOMPARE(ensureChatBotOverlay(&store, &error, &warning), ChatBotOverlayResult::Created);
+        const QUuid id = QUuid::fromString(QLatin1String(dss::actions::kChatBotOverlayId));
+        OverlayLiveState::Options options;
+        options.imageDir = data.filePath(QStringLiteral("live-bilder"));
+        OverlayLiveState live(&store, options);
+        LiveSetRequest request;
+        request.overlayId = id;
+        for (const dss::actions::ChatBotElement &e : dss::actions::kChatBotElements)
+            request.elements.append({QUuid::fromString(QLatin1String(e.id)), std::nullopt, QString()});
+        request.arguments = {{QStringLiteral("user"), QStringLiteral("Zuschauerin")},
+                             {QStringLiteral("gifts"), QStringLiteral("5")},
+                             {QStringLiteral("bits"), QStringLiteral("100")},
+                             {QStringLiteral("viewers"), QStringLiteral("12")},
+                             {QStringLiteral("targetUser"), QStringLiteral("Gast")}};
+        bool ok = false;
+        live.set(request, [&ok](const OverlayLiveState::Result &r) { ok = r.ok && r.warning.isEmpty(); });
+        QVERIFY(ok);
+        Overlay shown = applyLiveState(*store.overlay(id), live.elements(id));
+        SourceRenderer renderer;
+        renderer.setDataDir(data.path());
+        renderer.setOverlay(&shown);
+        QTRY_VERIFY_WITH_TIMEOUT(renderer.imagesLoaded(), 5000);
+        const QImage image = renderOverlayImage(renderer, shown);
+        QCOMPARE(image.size(), QSize(1920, 1080));
+        // Für den Prüfer auf dunklem Grund (weisse Schrift wäre auf durchsichtigem Grund nicht zu sehen)
+        QImage picture(image.size(), QImage::Format_ARGB32_Premultiplied);
+        picture.fill(QColor(0x20, 0x20, 0x20));
+        {
+            QPainter p(&picture);
+            p.drawImage(0, 0, image);
+        }
+        QVERIFY(picture.save(QCoreApplication::applicationDirPath() + QStringLiteral("/../mitgeliefert-overlay.png")));
+
+        // Ausserhalb der Elemente durchsichtig (keine Farbflächen, keine Rahmen)
+        QCOMPARE(image.pixelColor(960, 540).alpha(), 0);
+        QCOMPARE(image.pixelColor(5, 5).alpha(), 0);
+        // Text weiss: in jedem Textelement deckende Pixel, alle weiss (Kanten halb durchsichtig)
+        for (const Source &s : shown.sources) {
+            if (s.kind != SourceKind::Text)
+                continue;
+            int white = 0;
+            for (int y = s.y; y < s.y + s.height; ++y) {
+                for (int x = s.x; x < s.x + s.width; ++x) {
+                    const QColor c = image.pixelColor(x, y);
+                    if (c.alpha() == 255) {
+                        QVERIFY2(distance(c, Qt::white) <= 1, qPrintable(s.name));
+                        ++white;
+                    }
+                }
+            }
+            QVERIFY2(white > 100, qPrintable(s.name));
+        }
+        // Platzhalterbild: Ecke durchsichtig (Kreis), oben im Kreis grau, Kopf hell
+        for (const Source &s : shown.sources) {
+            if (s.kind != SourceKind::Image)
+                continue;
+            QCOMPARE(image.pixelColor(s.x + 2, s.y + 2).alpha(), 0);
+            QVERIFY(distance(image.pixelColor(s.x + s.width / 2, s.y + s.height / 10), QColor(0x5F, 0x66, 0x70)) <= 2);
+            QVERIFY(distance(image.pixelColor(s.x + s.width / 2, s.y + s.height * 100 / 256), QColor(0xC9, 0xCD, 0xD2)) <= 2);
+        }
     }
 
     // P10: Zeilenmasse aus den Tabellen der Schrift (dss_common, für die Webseite) gleich wie

@@ -40,6 +40,13 @@ option(DSS_CORE_OVERLAY_SERVER "Overlay-Server für die Browserquelle im Kern (P
 # P12b b3: Ton der Videos über PipeWire im Kern (libpipewire-0.3, Thread von PipeWire im Dienst).
 # Aus: Kern ohne Ton und ohne libpipewire (Stand P11).
 option(DSS_CORE_AUDIO "Ton der Videos über PipeWire im Kern (P12b)" ON)
+# P14 b3: Aktionssystem im Kern (Chat-Bot: Läufe aus Ereignissen, Befehlen, Zeitnachrichten).
+# Schalter, weil der Bot selbständig öffentlich handelt (Plan 5). Aus: Kern ohne ActionService,
+# actions_status «unavailable», Anfragen des Aktionssystems werden abgewiesen.
+option(DSS_CORE_ACTIONS "Aktionssystem (Chat-Bot) im Kern (P14 b3)" ON)
+# P13 (Plan 2.7): Anbindung an Twitch im Kern (EventSub, Anmeldung, Helix; neue externe Verbindung
+# mit TLS und Token). Aus: Kern ohne Twitch, der Knopf bleibt grau, twitch_status mit enabled false.
+option(DSS_CORE_TWITCH "Anbindung an Twitch im Kern (P13)" ON)
 
 # Orte der Installation (CMAKE_INSTALL_BINDIR, CMAKE_INSTALL_FULL_DATADIR):
 # https://cmake.org/cmake/help/v3.31/module/GNUInstallDirs.html
@@ -55,9 +62,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-set(DSS_QT_COMPONENTS Core Network WebSockets) # WebSockets: dss_obs (P10c)
+# WebSockets: dss_obs (P10c). Gui: dss_render (P10-vor) und seit P14 f2 immer das Bauwerkzeug
+# dss-platzhalterbild (src/common); Kern und dss_common bleiben ohne Qt Gui.
+set(DSS_QT_COMPONENTS Core Gui Network WebSockets)
 if(DSS_BUILD_APP)
-  list(APPEND DSS_QT_COMPONENTS Gui Widgets) # Gui: dss_render (P10-vor)
+  list(APPEND DSS_QT_COMPONENTS Widgets)
 endif()
 if(DSS_BUILD_TESTS)
   list(APPEND DSS_QT_COMPONENTS Test)
@@ -70,6 +79,8 @@ qt_standard_project_setup()
 add_library(dss_warnings INTERFACE)
 target_compile_options(dss_warnings INTERFACE -Wall -Wextra)
 
+add_subdirectory(src/events) # P13: Ereignisfluss (dss_events)
+add_subdirectory(src/actions) # P14 a: Modell des Aktionssystems, nur Qt Core
 add_subdirectory(src/common)
 if(DSS_MEDIA_SIZE OR (DSS_BUILD_APP AND DSS_APP_RENDERER) OR DSS_CORE_AUDIO)
   add_subdirectory(src/media)
@@ -78,7 +89,9 @@ endif()
 if(DSS_CORE_OVERLAY_SERVER)
   add_subdirectory(src/server)
 endif()
+add_subdirectory(src/secrets) # P13: Geheimnisse (systemd-creds), für dss_obs und dss_twitch
 add_subdirectory(src/obs)
+add_subdirectory(src/twitch) # P13: Anbindung an Twitch (dss_twitch)
 add_subdirectory(src/core)
 if(DSS_BUILD_CLI)
   add_subdirectory(src/cli)

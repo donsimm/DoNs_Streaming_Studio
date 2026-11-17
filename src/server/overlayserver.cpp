@@ -4,6 +4,7 @@
 #include "httpmessage.h"
 #include "imageorientation.h"
 #include "overlayjson.h"
+#include "overlaylivestate.h"
 #include "overlaystore.h"
 #include "portowner.h"
 #include "sourcegeometry.h"
@@ -63,6 +64,20 @@ QString peerText(const QTcpSocket *socket)
 
 const QList<std::pair<QByteArray, QByteArray>> kNoStore = {{"Cache-Control", "no-store"}};
 
+// P14 d: Pfad der Seite für ein Bild des Laufzustands («live-bilder/x» im Datenordner → «live/x»)
+QString livePagePath(const QString &reference)
+{
+    const QString dir = QString::fromLatin1(kLiveImageDir) + QLatin1Char('/');
+    return reference.startsWith(dir) ? QStringLiteral("live/") + reference.mid(dir.size()) : reference;
+}
+
+// Name eines geladenen Profilbilds (overlaylivestate.cpp): SHA-256 und Endung
+bool plausibleLiveImage(const QString &name)
+{
+    static const QRegularExpression pattern(QStringLiteral("^[0-9a-f]{64}\\.(png|jpg)$"));
+    return pattern.match(name).hasMatch();
+}
+
 } // namespace
 
 struct OverlayServer::Connection
@@ -84,6 +99,7 @@ struct OverlayServer::Connection
     QString token;
     QString page; // Kennung der Seite aus …/events/<page> (P12b b4), sonst leer
     QByteArray lastData;
+    QByteArray lastLive; // P14 d: zuletzt geschickter Laufzustand
 };
 
 OverlayServer::OverlayServer(const OverlayStore *store, const Options &options, QObject *parent)
@@ -391,13 +407,23 @@ void OverlayServer::handleOverlay(QTcpSocket *socket, Connection &c, const HttpR
         return;
     }
     if (rest.startsWith(QLatin1String("media/"))) {
-        // Nur Dateien, die dieses Overlay benutzt (kein Zugriff auf andere Dateien).
+        // Nur Dateien, die dieses Overlay benutzt (kein Zugriff auf andere Dateien), seit P14 d auch
+        // über seinen Laufzustand.
         const Overlay *o = m_store->overlay(overlayId);
-        bool used = false;
+        bool used = m_live && m_live->usesImage(overlayId, rest);
         for (const Source &s : o->sources)
             used = used || s.file == rest || (s.kind == SourceKind::Text && s.text.fontFile == rest);
         if (used && !rest.contains(QLatin1String(".."))) {
             sendFile(socket, c, request, mediaPath(rest), patchesOf(rest), true);
+            return;
+        }
+    }
+    if (rest.startsWith(QLatin1String("live/"))) {
+        // P14 d: geladene Profilbilder, nur solange der Laufzustand dieses Overlays sie zeigt
+        const QString name = rest.mid(5);
+        const QString reference = QString::fromLatin1(kLiveImageDir) + QLatin1Char('/') + name;
+        if (m_live && plausibleLiveImage(name) && m_live->usesImage(overlayId, reference)) {
+            sendFile(socket, c, request, mediaPath(reference), patchesOf(reference), true);
             return;
         }
     }
@@ -560,6 +586,11 @@ void OverlayServer::startEvents(QTcpSocket *socket, Connection &c, const QUuid &
     // Wiederverbinden nach 1 s (EventSource, «retry»)
     socket->write("retry: 1000\n\n");
     sendOverlayEvent(socket, c);
+    // P14 d: Laufzustand nur, wenn es einen gibt; die Seite beginnt jede Verbindung ohne (web/overlay.js).
+    c.lastLive = QJsonDocument(QJsonObject{{QStringLiteral("elements"), QJsonObject()},
+                                           {QStringLiteral("media"), QJsonObject()}})
+                     .toJson(QJsonDocument::Compact);
+    sendLiveEvent(socket, c);
     qInfo("Browserquelle verbunden: %s von %s", qPrintable(browserSourceLogPath(c.address)),
           qPrintable(c.peer));
     updateStatus();
@@ -579,6 +610,24 @@ void OverlayServer::sendOverlayEvent(QTcpSocket *socket, Connection &c)
         return;
     c.lastData = data;
     socket->write("event: overlay\ndata: " + data + "\n\n");
+}
+
+void OverlayServer::sendLiveEvent(QTcpSocket *socket, Connection &c)
+{
+    const QByteArray data = QJsonDocument(liveData(c.overlayId)).toJson(QJsonDocument::Compact);
+    if (data == c.lastLive)
+        return;
+    c.lastLive = data;
+    socket->write("event: live\ndata: " + data + "\n\n");
+}
+
+void OverlayServer::liveChanged(const QUuid &overlayId)
+{
+    for (auto it = m_connections.begin(); it != m_connections.end(); ++it) {
+        Connection &c = **it;
+        if (c.events && c.overlayId == overlayId)
+            sendLiveEvent(it.key(), c);
+    }
 }
 
 void OverlayServer::checkStreams(const QUuid &overlayId)
@@ -740,6 +789,29 @@ QJsonObject OverlayServer::pageData(const QUuid &overlayId)
     return {{QStringLiteral("overlay"), overlayToJson(*o)},
             {QStringLiteral("media"), media},
             {QStringLiteral("fonts"), fonts}};
+}
+
+QJsonObject OverlayServer::liveData(const QUuid &overlayId)
+{
+    QJsonObject elements;
+    QJsonObject media;
+    if (m_live && m_store->overlay(overlayId)) {
+        const LiveElements live = m_live->elements(overlayId);
+        for (auto it = live.cbegin(); it != live.cend(); ++it) {
+            QJsonObject e;
+            e.insert(QStringLiteral("visible"), it->visible ? QJsonValue(*it->visible) : QJsonValue(QJsonValue::Null));
+            e.insert(QStringLiteral("text"), it->text ? QJsonValue(*it->text) : QJsonValue(QJsonValue::Null));
+            if (it->image.isEmpty()) {
+                e.insert(QStringLiteral("image"), QJsonValue(QJsonValue::Null));
+            } else {
+                const QString path = livePagePath(it->image);
+                e.insert(QStringLiteral("image"), path);
+                media.insert(path, QJsonObject{{QStringLiteral("orientation"), orientationOf(it->image)}});
+            }
+            elements.insert(it.key().toString(QUuid::WithoutBraces), e);
+        }
+    }
+    return {{QStringLiteral("elements"), elements}, {QStringLiteral("media"), media}};
 }
 
 } // namespace dss

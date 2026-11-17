@@ -24,6 +24,7 @@ class QTimer;
 
 namespace dss {
 
+class OverlayLiveState;
 class OverlayStore;
 struct HttpRequest;
 
@@ -46,6 +47,8 @@ struct HttpRequest;
 // P12b b4: …/clock (POST, JSON, Lage der Videos für den Ton, Format in clockreport.h, Grenze je
 // Seite) und …/events/<page> (Ereignisse mit Kennung der Seite: pageOpened, pageClosed).
 // Rückfall nach M3: «obs_active» ({"active": true|false}) an eine Seite, sendPageEvent.
+// P14 d: Laufzustand (overlaylivestate.h) als «event: live» an die Seiten des Overlays und
+// …/live/<sha256>.<endung> (geladene Profilbilder, nur an Overlays, deren Laufzustand sie zeigt).
 // Server-Sent Events: https://html.spec.whatwg.org/multipage/server-sent-events.html
 class OverlayServer : public QObject
 {
@@ -95,12 +98,20 @@ public:
     bool sendPageEvent(const QUuid &overlayId, const QString &page, const QByteArray &event,
                        const QJsonObject &data);
 
+    // P14 d: Laufzustand der Overlays (nullptr = keiner); liveChanged nach jeder Änderung.
+    void setLiveState(const OverlayLiveState *live) { m_live = live; }
+    void liveChanged(const QUuid &overlayId);
+
     Status status() const { return m_status; }
     int port() const { return m_port; }
 
     // Daten für die Seite: Overlay im Format der Datei, Ausrichtung der Bilder und Videos,
     // Zeilenmasse der Schriften (für Tests öffentlich).
     QJsonObject pageData(const QUuid &overlayId);
+    // P14 d: Laufzustand für die Seite (event: live): {"elements": {"<Quelle>": {"visible",
+    // "text", "image"}}, "media": {"<Pfad>": {"orientation"}}}; Bilder als Pfad der Seite
+    // (media/… bzw. live/…).
+    QJsonObject liveData(const QUuid &overlayId);
 
 signals:
     void statusChanged();
@@ -138,6 +149,7 @@ private:
     void startEvents(QTcpSocket *socket, Connection &c, const QUuid &overlayId, const QString &page);
     void sendGone(QTcpSocket *socket);
     void sendOverlayEvent(QTcpSocket *socket, Connection &c);
+    void sendLiveEvent(QTcpSocket *socket, Connection &c);
     void checkStreams(const QUuid &overlayId);
     void heartbeat();
     void noteInvalid(const QTcpSocket *socket, const QString &address);
@@ -146,6 +158,7 @@ private:
     const BytePatches &patchesOf(const QString &reference);
 
     const OverlayStore *m_store;
+    const OverlayLiveState *m_live = nullptr;
     Options m_options;
     int m_port = 0;
     QString m_homeAddress;

@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "stream-0001",
+      "user_id": "100000001",
+      "user_login": "testkanal",
+      "user_name": "TestKanal",
+      "game_id": "509658",
+      "game_name": "Just Chatting",
+      "type": "live",
+      "title": "Testtitel",
+      "tags": ["Deutsch"],
+      "viewer_count": 3,
+      "started_at": "2026-11-15T17:58:00Z",
+      "language": "de",
+      "thumbnail_url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_testkanal-{width}x{height}.jpg",
+      "tag_ids": [],
+      "is_mature": false
+    }
+  ],
+  "pagination": {}
+}

@@ -269,8 +269,34 @@ private slots:
                  QStringLiteral("x\nBild · 0 Byte\nmedia/x.png\nVerwendet in Overlay «Szene» (Quelle «Logo»)"));
         QCOMPARE(importProgressText(imports.first()), QStringLiteral("übernehme … 37 %"));
         QCOMPARE(mediaLibraryFileFilter(),
-                 QStringLiteral("Mediendateien (*.png *.jpg *.jpeg *.webm *.mp4 *.ttf *.otf);;Bilder (*.png *.jpg *.jpeg);;"
-                                "Videos (*.webm *.mp4);;Schriften (*.ttf *.otf)"));
+                 QStringLiteral("Mediendateien (*.png *.jpg *.jpeg *.webm *.mp4 *.ttf *.otf *.mp3 *.wav *.ogg *.m4a);;"
+                                "Bilder (*.png *.jpg *.jpeg);;Videos (*.webm *.mp4);;Schriften (*.ttf *.otf);;"
+                                "Töne (*.mp3 *.wav *.ogg *.m4a)"));
+
+        // P14 t: Töne mit Länge in der Spalte «Art» und im Hinweis
+        MediaFileData sound;
+        sound.entry = {QStringLiteral("media/z.mp3"), QStringLiteral("Glocke"), QUuid()};
+        sound.kind = MediaKind::Audio;
+        sound.bytes = 512;
+        QCOMPARE(mediaKindText(sound), QStringLiteral("Ton"));
+        sound.durationMs = 2450;
+        QCOMPARE(mediaKindText(sound), QStringLiteral("Ton · 2,5 s"));
+        QCOMPARE(mediaFileToolTip(sound), QStringLiteral("Glocke\nTon · 2,5 s · 512 Byte\nmedia/z.mp3\nUngenutzt"));
+        QCOMPARE(mediaKindText(m.files[0]), QStringLiteral("Bild"));
+    }
+
+    void durationText()
+    {
+        QCOMPARE(mediaDurationText(0), QString());
+        QCOMPARE(mediaDurationText(-5), QString());
+        QCOMPARE(mediaDurationText(1), QStringLiteral("0,0 s"));
+        QCOMPARE(mediaDurationText(400), QStringLiteral("0,4 s"));
+        QCOMPARE(mediaDurationText(2'500), QStringLiteral("2,5 s"));
+        QCOMPARE(mediaDurationText(59'940), QStringLiteral("59,9 s"));
+        QCOMPARE(mediaDurationText(60'000), QStringLiteral("1:00"));
+        QCOMPARE(mediaDurationText(187'400), QStringLiteral("3:07"));
+        QCOMPARE(mediaDurationText(3'599'400), QStringLiteral("59:59"));
+        QCOMPARE(mediaDurationText(3'723'000), QStringLiteral("1:02:03"));
     }
 
     void renameAddress()
@@ -348,6 +374,7 @@ private slots:
         QCOMPARE(mediaFileFilter(MediaUse::Image), QStringLiteral("Bilder (*.png *.jpg *.jpeg)"));
         QCOMPARE(mediaFileFilter(MediaUse::Video), QStringLiteral("Videos (*.webm *.mp4)"));
         QCOMPARE(mediaFileFilter(MediaUse::Font), QStringLiteral("Schriften (*.ttf *.otf)"));
+        QCOMPARE(mediaFileFilter(MediaUse::Audio), QStringLiteral("Töne (*.mp3 *.wav *.ogg *.m4a)"));
         QCOMPARE(newOverlayName(), QStringLiteral("Neues Overlay"));
         QCOMPARE(newFolderName(), QStringLiteral("Neuer Ordner"));
     }

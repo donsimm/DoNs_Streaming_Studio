@@ -14,6 +14,10 @@ class QLabel;
 class QToolButton;
 struct Theme;
 
+// Knopf eines Modul-Reiters (auch die Unterreiter im Reiter «Chat-Bot», P13): ankreuzbar, ohne
+// Fokus; das Aussehen kommt aus dem Theme (#moduleTabs).
+QToolButton *moduleButton(const QString &text, QWidget *parent);
+
 // Kopfbereich: Modul-Reiter, Verbindungsknöpfe und Anzeigen für CPU, RAM, LAN.
 // Werte und Zustände kommen vom Kern (P07); ohne Verbindung alle Werte «–», alle grau.
 class HeaderBar : public QFrame
@@ -39,6 +43,8 @@ signals:
     void moduleSelected(int module);
     // P10c: Klick auf den OBS-Knopf
     void obsClicked();
+    // P13: Klick auf den Twitch-Knopf
+    void twitchClicked();
 
 private:
     QButtonGroup *m_modules = nullptr;

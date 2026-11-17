@@ -1,0 +1,350 @@
+{
+ "id": "6796af9bf25df0c2d4882160",
+ "bots": [
+  "testbot"
+ ],
+ "avatar": "",
+ "channelEmotes": [],
+ "sharedEmotes": [
+  {
+   "id": "5590b223b344e2c42a9e28e3",
+   "code": "EZ",
+   "imageType": "png",
+   "animated": false,
+   "user": {
+    "id": "558f7862b344e2c42a9e2822",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "55b6f480e66682f576dd94f5",
+   "code": "Clap",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "550d9f3e62e6bd0027aedb53",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "57850b9df1bf2c1003a88644",
+   "code": "FeelsRainMan",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5784feedf1bf2c1003a885eb",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "58ae8407ff7b7276f8e594f2",
+   "code": "POGGERS",
+   "imageType": "png",
+   "animated": false,
+   "user": {
+    "id": "57ea01a4665bcff56f0b64da",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "58e5abdaf3ef4c75c9c6f0f9",
+   "code": "monkaX",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "56ba7cd07d1fac4e4aa5e6ad",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "59f27b3f4ebd8047f54dee29",
+   "code": "PepeHands",
+   "imageType": "png",
+   "animated": false,
+   "user": {
+    "id": "55ec44da2538a92d53dca61a",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5a311dd16405a95e4b0d4967",
+   "code": "WeSmart",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "55fb1c8fb4ccd58c2f985b82",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5a6edb51f730010d194bdd46",
+   "code": "PepoDance",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5584dbe1bf56f8196a1b33e5",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5aa16eb65d4a424654d7e3e5",
+   "code": "monkaHmm",
+   "imageType": "png",
+   "animated": false,
+   "user": {
+    "id": "562036ca3bf5907e56e39d8b",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5b77ac3af7bddc567b1d5fb2",
+   "code": "pepeJAM",
+   "imageType": "gif",
+   "animated": true,
+   "width": 28,
+   "height": 27,
+   "user": {
+    "id": "56eb3c0a77941b541a7f491b",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5c0e1a3c6c146e7be4ff5c0c",
+   "code": "peepoHey",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "57c748fa956188cb0948271e",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5c548025009a2e73916b3a37",
+   "code": "PepeLaugh",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5b44591b6b9160327d125398",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5d324913ff6ed36801311fd2",
+   "code": "peepoLeave",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5c5354a3009a2e73916b2803",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5d38aaa592fc550c2d5996b8",
+   "code": "peepoClap",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "561f9e50c6e4202e06dd0c08",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5d922afbc0652668c9e52ead",
+   "code": "peepoArrive",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "591e66a42f456546af55144d",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5e0fa9d40550d42106b8a489",
+   "code": "Sadge",
+   "imageType": "png",
+   "animated": false,
+   "user": {
+    "id": "59712324eaab4f3320e6ccc9",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5eaa12a074046462f768344b",
+   "code": "peepoShy",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5b4a5ef4cf46791f8492082b",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5f1b0186cf6d2144653d2970",
+   "code": "catJAM",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5f17a10cfe85fb4472d107b4",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5f455410b2efd65d77e8cb14",
+   "code": "catKISS",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "568c182801ea6722348aaeaa",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5f65052c29c50203e0137f8e",
+   "code": "monkaChrist",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5e98c55e7e090362f8b07543",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5fa8f232eca18f6455c2b2e1",
+   "code": "popCat",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5b458a6b9733463289f1408e",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "5ff8f48a94ed120c66d3bf3e",
+   "code": "PepoG",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5dffecae8608fb0da412193a",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "608ff83839b5010444d0ad0d",
+   "code": "CATATTACK",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "604987c9f8d5342a71e2b832",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "60a072de67644f1d67e86ee1",
+   "code": "Sadge",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5f8df1e21b017902db146528",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "60c5d2fdf8b3f62601c3d25b",
+   "code": "CATJAM",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "5f7493afccde1f4a870bd62f",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "61483cccb63cc97ee6d26817",
+   "code": "PepoG",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "609677c4cb4a8803e9cab624",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "65eb56841061568fccac9e01",
+   "code": "catTime",
+   "imageType": "gif",
+   "animated": true,
+   "user": {
+    "id": "65b824e7f867e4b149cec559",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  },
+  {
+   "id": "67bafa560a31d43aa9bc008a",
+   "code": "susAnne",
+   "imageType": "gif",
+   "animated": true,
+   "width": 26,
+   "height": 28,
+   "user": {
+    "id": "56995f31500567341d7b90b3",
+    "name": "testnutzer",
+    "displayName": "testnutzer",
+    "providerId": "test-0001"
+   }
+  }
+ ]
+}

@@ -2,6 +2,7 @@
 
 #include "connectionstate.h"
 #include "coresettings.h"
+#include "event.h"
 #include "fontcatalog.h"
 #include "medialibrary.h"
 #include "overlay.h"
@@ -47,8 +48,15 @@ namespace dss {
 //   audio_offset_max_ms; update_settings mit audio_routes)
 // 13 seit P12b b5: Overlays im Format 5 (video.volume, video.muted), changes.video.volume und
 //   changes.video.muted
+// 14 seit P13: Ereignisfluss (subscribe_events, event_history, event, events_dropped)
+// 15 seit P14 b3: Aktionssystem (actions_config, actions_status, Änderungen und Läufe;
+//   Nachrichten in actionprotocol.h), Ereignisse actions.run_*
+// 16 seit P14 t: media_list mit kind "audio" und duration_ms; seit P14 d overlay_live,
+//   overlay_live_set, overlay_live_reset (overlaylive.h)
+// 17 seit P14 z1b: Zuschauer-Import viewer_import und viewer_import_result (actionprotocol.h)
+// 18 seit P14 e2-2: Chat senden aus dem Fenster (chat_send, actionprotocol.h)
 // (Begründung: docs/08-kern-schnittstelle.md, «Version»).
-inline constexpr int kProtocolVersion = 13;
+inline constexpr int kProtocolVersion = 18;
 // Längste erlaubte Zeile (ohne Zeilenende). Längere Zeilen beenden die Verbindung.
 inline constexpr qsizetype kMaxMessageBytes = 16 * 1024 * 1024;
 
@@ -123,6 +131,16 @@ inline constexpr char kObsCreateSource[] = "obs_create_source";
 inline constexpr char kObsAddToScene[] = "obs_add_to_scene";
 // P12b b3: Ausgänge für den Ton und ihr Zustand
 inline constexpr char kAudioOutputs[] = "audio_outputs";
+// P13: Ereignisfluss, nur auf Bestellung
+inline constexpr char kSubscribeEvents[] = "subscribe_events";
+inline constexpr char kEventHistory[] = "event_history";
+inline constexpr char kEvent[] = "event";
+inline constexpr char kEventsDropped[] = "events_dropped";
+// P13: Anbindung an Twitch
+inline constexpr char kTwitchStatus[] = "twitch_status";
+inline constexpr char kTwitchLoginStart[] = "twitch_login_start";
+inline constexpr char kTwitchLoginCancel[] = "twitch_login_cancel";
+inline constexpr char kTwitchLogout[] = "twitch_logout";
 } // namespace msg
 
 // Alle Typen von Änderungen (Fenster → Kern), in der Reihenfolge von docs/08.
@@ -338,6 +356,8 @@ struct SettingsInfo
     // P12b b3: gültiger Bereich des Versatzes (settings.audioRoutes)
     int audioOffsetMinMs = kAudioOffsetMinMs;
     int audioOffsetMaxMs = kAudioOffsetMaxMs;
+    // P13: nur, ob ein Client Secret von Twitch gespeichert ist, nie das Secret (Regel 12).
+    bool twitchClientSecretSet = false;
 
     bool operator==(const SettingsInfo &) const = default;
 };
@@ -359,6 +379,11 @@ struct SettingsUpdate
     std::optional<QString> obsPassword;
     // P12b b3: je Zweck (audioPurposeIds) Ausgang und/oder Versatz; Zweck und Bereich prüft der Kern.
     QMap<QString, AudioRouteChange> audioRoutes = {};
+    // P13: Anbindung an Twitch. twitchClientSecret wie obsPassword: fehlt = behalten, leer =
+    // löschen, sonst neu; nie zurück, nie ins Protokoll.
+    std::optional<bool> twitchEnabled = {};
+    std::optional<QString> twitchClientId = {};
+    std::optional<QString> twitchClientSecret = {};
 
     bool operator==(const SettingsUpdate &) const = default;
 };
@@ -451,6 +476,65 @@ struct ObsStatusInfo
 QJsonObject obsStatusMessage(const ObsStatusInfo &info);
 bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *error);
 
+// twitch_status (P13, Plan 2.7): Einzelheiten der Anbindung an Twitch, nach hello und nach jeder
+// Änderung an alle. Der Zustand des Kanals (Farbe des Knopfes) steht in connections. Ohne Token und
+// ohne device_code; user_code nur während einer Anmeldung (das Fenster zeigt ihn an).
+struct TwitchLoginPending
+{
+    QString userCode;
+    QString verificationUri;
+    QDateTime expiresAt; // UTC
+
+    bool operator==(const TwitchLoginPending &) const = default;
+};
+// Zustand eines Kontos
+QStringList twitchAccountStates(); // off, checking, ok, expired, error
+struct TwitchAccountInfo
+{
+    QString state = QStringLiteral("off");
+    QString message; // auf Deutsch; leer, wenn alles gut
+    QString login;
+    QString userId;
+    QStringList missingScopes;
+    std::optional<TwitchLoginPending> loginPending;
+
+    bool operator==(const TwitchAccountInfo &) const = default;
+};
+struct TwitchSubscriptionInfo
+{
+    QString type;
+    bool ok = false;
+    QString problem; // leer, wenn aktiv
+
+    bool operator==(const TwitchSubscriptionInfo &) const = default;
+};
+struct TwitchStatusInfo
+{
+    bool enabled = false;  // false: Kern ohne Twitch gebaut (Schalter DSS_CORE_TWITCH)
+    QString message;       // Zustand des Kanals und von EventSub auf Deutsch; leer, wenn verbunden
+    bool live = false;
+    QList<TwitchSubscriptionInfo> subscriptions;
+    TwitchAccountInfo channel;
+    TwitchAccountInfo bot;
+    QString badgeProblem;  // «Abzeichen nicht aktiv: …»; leer, wenn der Bot mit Abzeichen sendet
+
+    bool operator==(const TwitchStatusInfo &) const = default;
+};
+QJsonObject twitchStatusMessage(const TwitchStatusInfo &info);
+bool parseTwitchStatus(const QJsonObject &message, TwitchStatusInfo *info, QString *error);
+
+// twitch_login_start, twitch_login_cancel, twitch_logout (P13): Konto «channel» oder «bot». Antwort
+// change_result (ok false, code rejected: Twitch aus oder nicht gebaut).
+struct TwitchAccountRequest
+{
+    qint64 requestId = 0;
+    QString account; // channel, bot
+
+    bool operator==(const TwitchAccountRequest &) const = default;
+};
+QJsonObject twitchAccountRequestMessage(const char *type, const TwitchAccountRequest &request);
+bool parseTwitchAccountRequest(const QJsonObject &message, TwitchAccountRequest *request, QString *error);
+
 // obs_sources (P10c, E-29): Quelle in OBS je Overlay, nach hello und nach jeder Änderung an alle.
 // Ohne URL und ohne Token. none: keine Zuordnung, present: Quelle da, missing: Zuordnung da, Quelle
 // in OBS nicht (F7).
@@ -490,6 +574,7 @@ struct MediaFileData
     MediaKind kind = MediaKind::Image;
     qint64 bytes = 0;
     QString codec;              // Video: Name in FFmpeg ("vp9", "hevc", …); leer = unbekannt
+    qint64 durationMs = 0;      // P14 t: Länge eines Tons in ms; 0 = unbekannt oder kein Ton
     QString browserProblem;     // Hinweis, wenn die Browserquelle die Datei nicht abspielt
     QList<MediaUsage> usedIn;   // leer = ungenutzt, darf gelöscht werden
 
@@ -525,5 +610,30 @@ bool parseImportProgress(const QJsonObject &message, QList<ImportProgressData> *
 // get_browser_source: Kennung des Overlays; null = keine Adresse mehr schicken.
 QJsonObject getBrowserSourceMessage(const QUuid &overlayId);
 bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString *error);
+
+// subscribe_events (P13, Plan 1.5): Ereignisse für diese Verbindung bestellen. types: Filter
+// (genaue Typen oder Vorsilben mit Punkt, src/events/eventtypes.h); leer = abbestellen. history:
+// zuerst event_history mit dem Verlauf zu diesen Filtern. Ohne Bestellung kommt nichts.
+struct SubscribeEvents
+{
+    QStringList types;
+    bool history = false;
+
+    bool operator==(const SubscribeEvents &) const = default;
+};
+QJsonObject subscribeEventsMessage(const SubscribeEvents &request);
+// Prüft auch die Filter gegen die Typenliste.
+bool parseSubscribeEvents(const QJsonObject &message, SubscribeEvents *request, QString *error);
+// event_history: Verlauf (höchstens 200, älteste zuerst), nur an die bestellende Verbindung.
+QJsonObject eventHistoryMessage(const QList<events::Event> &events);
+bool parseEventHistory(const QJsonObject &message, QList<events::Event> *events, QString *error);
+// event: ein neues Ereignis, nur an Verbindungen, deren Bestellung passt.
+QJsonObject eventMessage(const events::Event &event);
+bool parseEventMessage(const QJsonObject &message, events::Event *event, QString *error);
+// events_dropped (Gegendruck): count Ereignisse für diese Verbindung verworfen, weil mehr als
+// kEventBacklogBytes ungesendet lagen.
+inline constexpr qint64 kEventBacklogBytes = 1024 * 1024;
+QJsonObject eventsDroppedMessage(qint64 count);
+bool parseEventsDropped(const QJsonObject &message, qint64 *count, QString *error);
 
 } // namespace dss

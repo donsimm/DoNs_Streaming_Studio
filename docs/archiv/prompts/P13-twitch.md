@@ -28,6 +28,8 @@ Ausführung in drei bis vier Sitzungen des Agenten, danach Handtest. P14 (Aktion
   - Der Bot läuft nur, solange das Studio offen ist (Kern wie heute). Das reicht.
   - Oberfläche nach dem Entwurf (`lotse/entwurf-chatbot`): Reiter «Chat-Bot» mit Unterreitern, die Docks des Overlay-Editors sind dort ausgeblendet.
   - Zuschauer-Daten aus Streamer.bot werden übernommen (P14), zugeordnet über die Twitch-Benutzer-ID.
+  - **Abzeichen «Chat Bot»: ja (Frage 2 B).** Die App wird vertraulich registriert (mit Client Secret); der Bot sendet mit App-Token und trägt das Abzeichen. Das Secret gibt der Nutzer direkt im Studio ein, abgelegt wie F1. Das ersetzt «öffentliche App, kein Secret» vom 2026-11-09.
+  - Bot-Konto: das bisherige aus der Zeit mit Streamer.bot, es steht bereit (Frage 2, Zusatz).
   - Nicht für die ersten Streams: Kanalpunkte-Effekte, Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe. Die Rechte dafür holt P13 trotzdem schon (Entscheid «alles lesen und schreiben»), damit später keine neue Anmeldung nötig ist.
 
 ## Was sich gegenüber dem Plan vom 2026-11-09 ändert
@@ -37,8 +39,8 @@ Ausführung in drei bis vier Sitzungen des Agenten, danach Handtest. P14 (Aktion
 | Konten | nur das Kanal-Konto | zwei Anmeldungen: Kanal (lesen, Ereignisse, schreiben) und Bot (schreiben in den Chat), 2.1 |
 | Rechte | nur lesend | lesen und schreiben, alles ausser einer kurzen Liste gefährlicher Rechte (2.4, Frage 1) |
 | Ereignisse | 10 Typen, eigene Felder | dazu «erste Nachricht eines Zuschauers», Geschenk einzeln und als Bündel getrennt, Rollen und Bot-Kennzeichen in der Chat-Nachricht, Stream-Zustand beim Start; je Feld der Name des Arguments für P14 (1.3, 1.4) |
-| Abzeichen «Chat Bot» | offen | geprüft, Empfehlung: vorerst ohne Abzeichen (2.4, Frage 2) |
-| Fragen | Anmeldung, Ereignisse, Anzeige, Go | beantwortet; neu nur noch Rechte, Abzeichen und Go für den angepassten Plan |
+| Abzeichen «Chat Bot» | offen | entschieden 2026-11-15: mit Abzeichen, vertrauliche App mit Secret, Senden des Bots mit App-Token (2.4) |
+| Fragen | Anmeldung, Ereignisse, Anzeige, Go | beantwortet; Abzeichen entschieden; offen nur noch Rechte und Go für den angepassten Plan |
 
 ## Wichtigste Befunde
 
@@ -185,7 +187,8 @@ Die Version der Schnittstelle steigt um 1 auf 14.
   - Hinweis im Fenster beim Bot: «Im Browser zuerst vom Kanal-Konto abmelden oder ein privates Fenster nutzen.» Sonst bestätigt der Nutzer den Code versehentlich mit dem Kanal-Konto.
 - **Prüfung nach der Anmeldung:** Ist das Bot-Konto dasselbe wie das Kanal-Konto (`user_id` gleich), weist der Kern die Anmeldung ab: «Das Bot-Konto ist das Kanal-Konto. Im Browser mit dem Bot-Konto anmelden.»
 - **Ohne Bot-Konto** läuft alles; Schritte «als Bot» senden dann als Kanal und schreiben einen Hinweis in den Verlauf (P14).
-- **Kein Client Secret, kein offener Port, keine Rückrufadresse.** Bei der Registrierung ist die Rückrufadresse Pflicht, dort steht `http://localhost`. Sie wird beim Gerätecode nicht benutzt.
+- **Kein offener Port, keine Rückrufadresse.** Bei der Registrierung ist die Rückrufadresse Pflicht, dort steht `http://localhost`. Sie wird beim Gerätecode nicht benutzt.
+- **Client Secret (Entscheid 2026-11-15, Abzeichen):** Die App ist vertraulich. Das Secret braucht der Kern für das App-Token (2.4). Ob der Gerätefluss einer vertraulichen App das Secret bei `…/oauth2/device` oder `…/oauth2/token` zusätzlich verlangt, klärt Schritt 0; der Kern schickt es dann mit, nie in Protokoll oder Nachrichten.
 - **Der `device_code` verlässt den Kern nie.** `user_code` geht nur an das Fenster, nicht ins Protokoll.
 
 ### 2.2 Token sicher ablegen (Regel 12)
@@ -197,6 +200,7 @@ Die Version der Schnittstelle steigt um 1 auf 14.
   - `twitch-token.cred` (`--name=dss-twitch-token`) für den Kanal;
   - `twitch-bot-token.cred` (`--name=dss-twitch-bot-token`) für den Bot.
   - Inhalt je als JSON: `access_token`, `refresh_token`, `expires_at`, `user_id`, `login`, `scopes`.
+- **Client Secret:** `twitch-client-secret.cred` (`--name=dss-twitch-client-secret`), Inhalt nur das Secret. Eingabe im Bereich «Twitch» der Einstellungen (Feld mit verdeckter Eingabe, «Secret speichern», «Secret löschen»); das Fenster schickt es einmal über den Socket, der Kern legt es ab und gibt es nie zurück (nur «gesetzt ja/nein»).
 - **Client-ID:** Sie ist kein Geheimnis und steht in `kern.ini` unter `[twitch] client-id`. Dazu kommt `[twitch] aktiv=ja|nein`, Standard `nein`.
 - **Protokoll und Nachrichten:** Token, Refresh-Token und `device_code` stehen nie in Protokoll, Nachrichten oder Tests im Klartext. `tst_kerntwitch` sucht die Testtoken im Protokoll und im Socket-Verkehr.
 - **Grenze wie F1:** Andere Programme desselben Benutzers könnten die Dateien entschlüsseln.
@@ -230,22 +234,24 @@ Die Namen stammen aus der Recherche vom 2026-11-09 (https://dev.twitch.tv/docs/a
 | P14 | `user:write:chat` (Chat als Kanal), `moderator:manage:shoutouts` (Shoutout), `moderator:manage:announcements` (Ansage) |
 | später (Entscheid 2026-11-15: nicht für die ersten Streams) | `channel:manage:broadcast` (Titel, Kategorie, Marker), `channel:manage:polls`, `channel:manage:predictions`, `channel:manage:redemptions`, `channel:edit:commercial`, `channel:manage:ads`, `channel:manage:raids`, `clips:edit`, `moderator:manage:banned_users` (Timeout, Bann), `moderator:manage:chat_messages`, `moderator:manage:chat_settings`, `channel:manage:vips`, `user:manage:whispers` |
 
-**Bot-Konto:** `user:write:chat` und `moderator:manage:announcements` (Ansage als Bot, wirkt nur, wenn der Bot Moderator ist). Lesen geht immer über den Kanal.
+**Bot-Konto:** `user:write:chat`, `user:bot` (Abzeichen) und `moderator:manage:announcements` (Ansage als Bot, wirkt nur, wenn der Bot Moderator ist). Lesen geht immer über den Kanal.
 
-**Weggelassen (Empfehlung, Frage 1):** `channel:read:stream_key` (Streamschlüssel), `user:read:email`, `user:edit`, `channel:manage:videos` (Videos löschen), `channel:manage:moderators`, `channel:manage:extensions`, `channel:bot` und `user:bot` (nur für das Abzeichen, unten).
+**Kanal-Konto, für das Abzeichen:** zusätzlich `channel:bot` (erlaubt dem Bot das Schreiben mit App-Token; als Moderator ginge es auch ohne, `channel:bot` macht es unabhängig davon).
+
+**Frage 1 entschieden 2026-11-15: B, wirklich alles.** Der Kanal holt auch `channel:read:stream_key` (Streamschlüssel), `user:read:email`, `user:edit`, `channel:manage:videos` (Videos löschen), `channel:manage:moderators`, `channel:manage:extensions` und alle übrigen Rechte, die Twitch anbietet (vollständige Liste in Schritt 0 aus der Doku). Folge: Ein gestohlenes Token des Kanals wiegt schwerer; Ablage wie F1 bleibt, Token nie im Protokoll.
 
 - Fehlt ein Recht, zeigt der Kern «Rechte fehlen: … Neu anmelden.». Die Neuanmeldung verlangt die nötigen Rechte neu, die vorhandenen Ereignisse laufen bis dahin weiter.
 - Raid, Stream online und offline brauchen kein Recht (Schritt 0).
 
-**Abzeichen «Chat Bot» (Frage 2):**
+**Abzeichen «Chat Bot» (Frage 2, entschieden 2026-11-15: ja):**
 
 - **Was es braucht:** ein App-Token (Client-Credentials-Fluss) mit Client-ID **und Client Secret**; `user:bot` vom Bot-Konto; `channel:bot` vom Kanal oder den Bot als Moderator; Bot-Konto ≠ Kanal-Konto. Gesendet wird dann mit dem App-Token statt mit dem Token des Bots.
-- **Folge für das Studio:**
-  - Die App müsste vertraulich (mit Secret) registriert sein. Ob sich eine öffentliche App umstellen lässt, ist nicht dokumentiert (`[OFFEN]`, Schritt 0). Sonst: zweite App registrieren und beide Konten bei ihr neu anmelden.
-  - Das Secret wäre ein zweites Geheimnis (Ablage wie F1).
-  - Aufwand etwa ½ Sitzung (Client-Credentials, Ablage, Senden mit App-Token, Test).
-- **Empfehlung: vorerst ohne Abzeichen.** Der Bot schreibt unter seinem Namen, ohne Abzeichen. Das bleibt beim Entscheid vom 2026-11-09 (öffentliche App, kein Secret). Als Moderator hat der Bot dieselbe Grenze (100 je 30 s) wie mit Abzeichen.
-- **Gegenargument:** Mit Abzeichen erkennen Zuschauer den Bot sofort als Bot, und Twitch empfiehlt diesen Weg für Bots. Wer es später will, registriert eine zweite App und meldet beide Konten neu an (Nutzer etwa 15 min).
+- **Umsetzung im Studio:**
+  - Die App wird von Anfang an vertraulich registriert (Abschnitt 3), es gibt keine öffentliche App.
+  - Der Kern holt das App-Token mit Client-Credentials (`POST …/oauth2/token`, `grant_type=client_credentials`), legt es nur im Speicher ab und erneuert es vor Ablauf; bei 401 einmal neu holen.
+  - Senden «als Bot»: `POST /helix/chat/messages` mit App-Token, `sender_id` = Bot. Ohne Secret oder ohne `user:bot`/`channel:bot` sendet der Bot mit seinem User-Token (ohne Abzeichen) und der Kern meldet «Abzeichen nicht aktiv: …» im Bereich «Twitch».
+  - Aufwand etwa ½ Sitzung (Client-Credentials, Ablage des Secrets, Senden mit App-Token, Rückfall, Test).
+- **Grund für den Entscheid:** Zuschauer erkennen den Bot sofort als Bot, und Twitch empfiehlt diesen Weg für Bots. Preis: ein zweites Geheimnis (Secret) und etwa ½ Sitzung mehr.
 
 ### 2.5 EventSub über WebSocket
 
@@ -313,11 +319,12 @@ Die Schritte stehen im Skript `scripts/twitch-einrichten.sh`, Aufruf aus jedem O
    - Name eindeutig, zum Beispiel «DoNs Streaming Studio <Kanalname>»;
    - OAuth Redirect URL `http://localhost`;
    - Category nach der Liste dort (`[OFFEN]`, Schritt 0);
-   - Client-Typ «Public», falls das Feld erscheint.
-   Ein Secret wird nicht gebraucht.
+   - Client-Typ «Confidential» (vertraulich, für das Abzeichen).
+   Das Secret gibt der Nutzer **nicht** im Skript ein, sondern danach im Studio (Einstellungen → Twitch), wenn er es auf der Seite der App erzeugt hat. Das Skript sagt dazu: «Das Secret ist ein Passwort. Nicht in den Chat und nicht in eine Datei kopieren.»
 3. Es fragt nach der **Client-ID**. Das Skript sagt dazu ausdrücklich: «Das ist kein Passwort und kein Token.» Es prüft die Form (nur Kleinbuchstaben und Ziffern, nicht leer) und trägt die ID mit `dss-cli einstellung-twitch-client-id` in die Version in Arbeit ein (`--einsatz` erst bei der Installation). Läuft der Kern nicht, steht dort: «Zuerst das Studio öffnen.»
 4. Zum Schluss nennt es die nächsten Schritte:
-   - im Studio auf den Twitch-Knopf klicken, bei «Kanal» «Anmelden …», den Code im Browser bestätigen;
+   - im Studio auf den Twitch-Knopf klicken, unter «App» das Client Secret eingeben und speichern;
+   - bei «Kanal» «Anmelden …», den Code im Browser bestätigen;
    - danach bei «Bot» «Anmelden …», den Code in einem privaten Browserfenster mit dem Bot-Konto bestätigen;
    - im eigenen Chat das Bot-Konto zum Moderator machen (`/mod <Botname>`).
 
@@ -326,7 +333,7 @@ Eine neue Claude-Code-Sitzung ist dafür nicht nötig.
 ## 4. Commits, Prüfung, Handtest
 
 **Schritt 0 (Agent, nur lesen):**
-- Die Quellen unten lesen und bestätigen: Felder in 1.3, Argumentnamen in 1.4 (Seiten der Twitch-Auslöser bei Streamer.bot), jeden Namen der Rechte in 2.4, Kategorie bei der Registrierung, `GET /helix/streams`, ob `channel.subscribe` bei Geschenken den Schenkenden nennt, ob eine öffentliche App sich in eine vertrauliche umstellen lässt.
+- Die Quellen unten lesen und bestätigen: Felder in 1.3, Argumentnamen in 1.4 (Seiten der Twitch-Auslöser bei Streamer.bot), jeden Namen der Rechte in 2.4, Kategorie bei der Registrierung, `GET /helix/streams`, ob `channel.subscribe` bei Geschenken den Schenkenden nennt, ob der Gerätefluss einer vertraulichen App das Secret verlangt, Client-Credentials-Fluss und Senden mit App-Token (`user:bot`, `channel:bot`) samt Bedingungen für das Abzeichen.
 - Ausserdem `https://dev.twitch.tv/docs/chat/irc-migration/` lesen.
 - Weicht etwas ab, das den Gerätefluss, die zwei Konten oder die Abos trägt: Halt und Meldung an Lotse.
 
@@ -355,13 +362,13 @@ Eine neue Claude-Code-Sitzung ist dafür nicht nötig.
    - Close-Codes, `revocation`, doppelte `message_id`, Wartezeiten;
    - Stream-Zustand beim Start (`at_start`);
    - `QSslSocket::supportsSsl()`.
-7. Kern: `TwitchService`, `kern.ini [twitch]`, zwei `.cred`-Dateien, `twitch_status` und die Anfragen, `connections.twitch`, Schalter `DSS_CORE_TWITCH`, Option `--twitch-testserver`.
+7. Kern: `TwitchService`, `kern.ini [twitch]`, drei `.cred`-Dateien (Kanal, Bot, Client Secret), App-Token mit Client-Credentials für das Abzeichen, `twitch_status` und die Anfragen, `connections.twitch`, Schalter `DSS_CORE_TWITCH`, Option `--twitch-testserver`.
    - Tests: `tst_kerneinstellungen` (`[twitch]`), neu `tst_kerntwitch` mit dem Kern als eigenem Prozess gegen den Testserver:
      - Anmeldung beider Konten über den Socket, Ereignisse bis zum Fenster;
      - Neustart behält beide Anmeldungen, Abmelden löscht die Datei des Kontos;
      - **kein Testtoken in Protokoll oder Socket**;
      - `--twitch-testserver` mit einer anderen Adresse als `127.0.0.1` wird abgewiesen.
-8. Fenster: Bereich «Twitch» mit zwei Konten, Knopf, Reiter «Chat-Bot» mit Kopfzeile und Unterreiter «Live» (Bereich «Ereignisse»); die fünf Docks des Overlay-Editors sind im Reiter «Chat-Bot» ausgeblendet (Entscheid 2026-11-15). Test `tst_fensterbearbeiten`.
+8. Fenster: Bereich «Twitch» mit Client Secret (verdeckt) und zwei Konten, Knopf, Reiter «Chat-Bot» mit Kopfzeile und Unterreiter «Live» (Bereich «Ereignisse»); die fünf Docks des Overlay-Editors sind im Reiter «Chat-Bot» ausgeblendet (Entscheid 2026-11-15). Test `tst_fensterbearbeiten`.
 9. `scripts/twitch-einrichten.sh`, geprüft mit eigenem `XDG_CONFIG_HOME` und Kern mit eigenem Datenordner.
 10. Dokumente:
     - `01` (Twitch, zwei Konten, F-Entscheide), `02` (TLS, Adressen von Twitch), `03`, `04` (Punkt 92 ins Archiv, neue Punkte), `05`, `06` (`twitch-token.cred`, `twitch-bot-token.cred`, `twitch-sitzung.json`), `08` (Version 14, Abschnitte «Ereignisfluss» und «Anbindung an Twitch»);
@@ -457,22 +464,14 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 
 | Teil | Agent | Lotse | Nutzer |
 |---|---|---|---|
-| Bau | 3 Sitzungen à ~4–5 h (Commits 1–3, 4–6, 7–10), dazu ~½ Sitzung für das zweite Konto, die erste Nachricht und den Stream-Zustand; 50er-Läufe nachts ~2 h | nach jeder Sitzung ~15 min (Bau, `ctest`) | – |
+| Bau | 3 Sitzungen à ~4–5 h (Commits 1–3, 4–6, 7–10), dazu ~½ Sitzung für das zweite Konto, die erste Nachricht und den Stream-Zustand und ~½ Sitzung für das Abzeichen; 50er-Läufe nachts ~2 h | nach jeder Sitzung ~15 min (Bau, `ctest`) | – |
 | Handtest | – | ~1 h (L1, L2, L4), dazu L3 über Nacht (nur lesen) | ~30 min (N1 ~10 min, N2 bis N4 ~20 min), dazu N3 im nächsten Stream |
 
 ## 7. Fragen an den Nutzer (gebündelt)
 
-1. **Welche Rechte holt die Anmeldung des Kanals?** (Konto, sichtbar beim Bestätigen)
-   - **A) Empfohlen:** alles aus 2.4 lesen und schreiben, **ohne** Streamschlüssel, E-Mail, Konto ändern, Videos löschen, Moderatoren und Erweiterungen verwalten. Grund: Eine Zustimmung reicht für P14 und alles Spätere; die weggelassenen Rechte braucht kein geplanter Baustein und sie wären bei einem gestohlenen Token besonders schädlich.
-   - B) Wirklich alles, was Twitch anbietet. Gegenargument zu A: Wer später eines der weggelassenen Rechte braucht, muss sich einmal neu anmelden (1 min).
-   - C) Nur, was P14 braucht. Gegenargument: Jeder spätere Baustein (Kategorie, Umfrage, Moderation) verlangt dann eine neue Anmeldung.
-2. **Abzeichen «Chat Bot»?** (sichtbar im Chat)
-   - **A) Empfohlen:** ohne Abzeichen. Der Bot schreibt mit eigenem Namen, als Moderator mit derselben Grenze. Kein Secret, die App bleibt öffentlich wie am 2026-11-09 entschieden.
-   - B) Mit Abzeichen schon in P13: App vertraulich registrieren, Secret verschlüsselt ablegen, +½ Sitzung. Gegenargument zu A: Später nachrüsten heisst zweite App und beide Konten neu anmelden (etwa 15 min).
-   - Dazu: Das Bot-Konto aus der Zeit mit Streamer.bot weiterverwenden? Empfehlung ja (Name und Mod-Status bleiben, die Zuschauer kennen es).
-3. **Go für den angepassten Plan P13.**
-   - **A) Go wie geplant (empfohlen):** Der Agent baut die Commits 1–10. Die Registrierung der App mit dem Skript ist erst vor dem Handtest nötig.
-   - B) Änderungen am Plan, bitte nennen.
+1. ~~Rechte~~ **Entschieden 2026-11-15: B, wirklich alles.**
+2. ~~Abzeichen «Chat Bot»?~~ **Entschieden 2026-11-15: B, mit Abzeichen schon in P13** (vertrauliche App, Secret im Studio, App-Token, +½ Sitzung). Bot-Konto: das bisherige aus der Zeit mit Streamer.bot.
+3. ~~Go~~ **Go 2026-11-15** (zusammen mit P14-1, parallele Spuren nach P14 10.2).
 
 ## 8. Risiken und `[OFFEN]`
 
@@ -485,7 +484,7 @@ Was Lotse oder der Agent schon geprüft haben, wiederholt der Nutzer nicht.
 | Für `channel.raid` laut Zusammenfassung kein Recht nötig; Kanal als eigener Moderator bei `channel.follow` | Schritt 0, `[OFFEN]` bis L2 bzw. zum ersten echten Raid |
 | Feld «Client Type» und die Kategorien bei der Registrierung nicht dokumentiert | Skript sagt «falls vorhanden». N1 zeigt es |
 | Bot im Browser versehentlich mit dem Kanal-Konto bestätigt | Prüfung «Bot ≠ Kanal» (2.1), Hinweis auf privates Fenster |
-| Abzeichen nur mit vertraulicher App; Umstellen einer öffentlichen App nicht dokumentiert | Frage 2, Schritt 0 |
+| Abzeichen: Gerätefluss mit vertraulicher App und Client-Credentials gegen aktuelle Doku bestätigen | Schritt 0; Rückfall: Bot sendet mit User-Token ohne Abzeichen, Meldung im Bereich «Twitch» |
 | Kein Nachliefern verlorener Ereignisse (Twitch) | Reconnect früh erkennen (Keepalive 10 s). Ein Verlust steht im Protokoll |
 | Der Kern läuft nur mit dem Fenster. Ohne Studio keine Ereignisse und kein Bot | vom Nutzer so entschieden (2026-11-15) |
 | «Letzter Follower» (TX-16) über einen Neustart hinweg braucht einen gespeicherten Verlauf | nicht in P13, Verlauf nur im Speicher |

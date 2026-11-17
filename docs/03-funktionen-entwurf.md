@@ -70,6 +70,7 @@ Umfang entschieden (2026-11-02, vom Nutzer bestätigt). Stufen wie beim Editor. 
 ## Chat-Bot (nochmals zu prüfen)
 
 - Zuerst: Twitch-Anmeldung, Chat ansehen, Nachrichten senden, Commands verwalten und ausführen (Name, Befehl, Berechtigung, Cooldown, Antwort), Protokoll (altes Repo).
+- Gebaut mit P13 (2026-11-15, Handtest steht aus): Anmeldung von Kanal und Bot (Bereich «Twitch» im Dialog «Einstellungen»), Ereignisse von Twitch auf dem Ereignisfluss (Chat-Nachricht, erste Nachricht im Stream, Follow, Sub, Resub, Geschenk einzeln und als Bündel, Cheer, Raid, Kanalpunkte, Stream online und offline, dazu `obs.scene_changed`), Reiter «Chat-Bot» mit Kopfzeile und Unterreiter «Live» mit der Liste «Ereignisse» (höchstens 200). Nachrichten senden, Befehle und Aktionen kommen mit P14 (Aktionssystem, `docs/archiv/prompts/P14-chatbot.md`).
 - Danach: Actions, Queues, Variablen, Timer, Trigger (Streamer.bot-Stil) und Import einer früheren Streamer.bot-Installation (altes Repo; der Nutzer hatte den Import als wichtig bezeichnet).
 - Chat-Spiele mit Anzeige im Overlay (du). Ablauf: Chat-Ereignis, Spiellogik, Anzeige per Browserquelle.
 

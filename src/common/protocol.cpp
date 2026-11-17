@@ -1,5 +1,6 @@
 #include "protocol.h"
 
+#include "eventtypes.h"
 #include "overlayjson.h"
 
 #include <QJsonArray>
@@ -1100,6 +1101,10 @@ QJsonObject settingsMessage(const SettingsInfo &info)
     o.insert(QStringLiteral("audio_routes"), routes);
     o.insert(QStringLiteral("audio_offset_min_ms"), info.audioOffsetMinMs);
     o.insert(QStringLiteral("audio_offset_max_ms"), info.audioOffsetMaxMs);
+    // P13
+    o.insert(QStringLiteral("twitch_enabled"), info.settings.twitchEnabled);
+    o.insert(QStringLiteral("twitch_client_id"), info.settings.twitchClientId);
+    o.insert(QStringLiteral("twitch_client_secret_set"), info.twitchClientSecretSet);
     return o;
 }
 
@@ -1115,7 +1120,10 @@ bool parseSettings(const QJsonObject &message, SettingsInfo *info, QString *erro
         || !requireBool(message, QStringLiteral("obs_enabled"), &i.settings.obsEnabled, error)
         || !requireString(message, QStringLiteral("obs_host"), &i.settings.obsHost, error)
         || !requireIntField(message, QStringLiteral("obs_port"), 0, maxPort, &i.settings.obsPort, error)
-        || !requireBool(message, QStringLiteral("obs_password_set"), &i.obsPasswordSet, error))
+        || !requireBool(message, QStringLiteral("obs_password_set"), &i.obsPasswordSet, error)
+        || !requireBool(message, QStringLiteral("twitch_enabled"), &i.settings.twitchEnabled, error)
+        || !requireString(message, QStringLiteral("twitch_client_id"), &i.settings.twitchClientId, error)
+        || !requireBool(message, QStringLiteral("twitch_client_secret_set"), &i.twitchClientSecretSet, error))
         return false;
     const QJsonValue e = message.value(QStringLiteral("settings_error"));
     if (e.isString()) {
@@ -1177,6 +1185,12 @@ QJsonObject settingsUpdateMessage(const SettingsUpdate &update)
         o.insert(QStringLiteral("obs_port"), *update.obsPort);
     if (update.obsPassword)
         o.insert(QStringLiteral("obs_password"), *update.obsPassword);
+    if (update.twitchEnabled)
+        o.insert(QStringLiteral("twitch_enabled"), *update.twitchEnabled);
+    if (update.twitchClientId)
+        o.insert(QStringLiteral("twitch_client_id"), *update.twitchClientId);
+    if (update.twitchClientSecret)
+        o.insert(QStringLiteral("twitch_client_secret"), *update.twitchClientSecret);
     if (!update.audioRoutes.isEmpty()) {
         QJsonObject routes;
         for (auto it = update.audioRoutes.constBegin(); it != update.audioRoutes.constEnd(); ++it) {
@@ -1248,6 +1262,22 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
             return false;
         u.obsPassword = password;
     }
+    // P13
+    if (message.contains(QStringLiteral("twitch_enabled"))) {
+        bool enabled = false;
+        if (!requireBool(message, QStringLiteral("twitch_enabled"), &enabled, error))
+            return false;
+        u.twitchEnabled = enabled;
+    }
+    for (const auto &[key, target] : {std::pair{QStringLiteral("twitch_client_id"), &u.twitchClientId},
+                                      std::pair{QStringLiteral("twitch_client_secret"), &u.twitchClientSecret}}) {
+        if (!message.contains(key))
+            continue;
+        QString value;
+        if (!requireString(message, key, &value, error))
+            return false;
+        *target = value;
+    }
     // P12b b3: je Zweck ein Objekt mit output und/oder offset_ms (mindestens eines)
     if (message.contains(QStringLiteral("audio_routes"))) {
         const QJsonValue routes = message.value(QStringLiteral("audio_routes"));
@@ -1280,7 +1310,7 @@ bool parseSettingsUpdate(const QJsonObject &message, SettingsUpdate *update, QSt
         }
     }
     if (!u.port && !u.homeAddress && !u.obsEnabled && !u.obsHost && !u.obsPort && !u.obsPassword
-        && u.audioRoutes.isEmpty()) {
+        && u.audioRoutes.isEmpty() && !u.twitchEnabled && !u.twitchClientId && !u.twitchClientSecret) {
         *error = QStringLiteral("update_settings ohne Wert");
         return false;
     }
@@ -1348,6 +1378,169 @@ bool parseObsStatus(const QJsonObject &message, ObsStatusInfo *info, QString *er
         i.scenes.append(scene);
     }
     *info = i;
+    return true;
+}
+
+QStringList twitchAccountStates()
+{
+    return {QStringLiteral("off"), QStringLiteral("checking"), QStringLiteral("ok"), QStringLiteral("expired"),
+            QStringLiteral("error")};
+}
+
+namespace {
+
+QJsonValue optionalText(const QString &text)
+{
+    return text.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(text);
+}
+
+// Text oder null (leer)
+bool optionalTextField(const QJsonObject &o, const QString &key, QString *value, QString *error)
+{
+    const QJsonValue v = o.value(key);
+    if (v.isString()) {
+        *value = v.toString();
+        return true;
+    }
+    if (v.isNull()) {
+        value->clear();
+        return true;
+    }
+    *error = QStringLiteral("Feld %1 fehlt oder ist weder Text noch null").arg(key);
+    return false;
+}
+
+QJsonObject twitchAccountObject(const TwitchAccountInfo &a)
+{
+    QJsonObject o{{QStringLiteral("state"), a.state},
+                  {QStringLiteral("message"), optionalText(a.message)},
+                  {QStringLiteral("login"), optionalText(a.login)},
+                  {QStringLiteral("user_id"), optionalText(a.userId)},
+                  {QStringLiteral("missing_scopes"), QJsonArray::fromStringList(a.missingScopes)}};
+    if (a.loginPending) {
+        o.insert(QStringLiteral("login_pending"),
+                 QJsonObject{{QStringLiteral("user_code"), a.loginPending->userCode},
+                             {QStringLiteral("verification_uri"), a.loginPending->verificationUri},
+                             {QStringLiteral("expires_at"), a.loginPending->expiresAt.toUTC().toString(Qt::ISODate)}});
+    } else {
+        o.insert(QStringLiteral("login_pending"), QJsonValue(QJsonValue::Null));
+    }
+    return o;
+}
+
+bool parseTwitchAccount(const QJsonValue &value, const QString &name, TwitchAccountInfo *account, QString *error)
+{
+    if (!value.isObject()) {
+        *error = QStringLiteral("accounts.%1 fehlt oder ist kein Objekt").arg(name);
+        return false;
+    }
+    const QJsonObject o = value.toObject();
+    TwitchAccountInfo a;
+    if (!requireString(o, QStringLiteral("state"), &a.state, error)
+        || !optionalTextField(o, QStringLiteral("message"), &a.message, error)
+        || !optionalTextField(o, QStringLiteral("login"), &a.login, error)
+        || !optionalTextField(o, QStringLiteral("user_id"), &a.userId, error))
+        return false;
+    if (!twitchAccountStates().contains(a.state)) {
+        *error = QStringLiteral("accounts.%1.state «%2» unbekannt").arg(name, a.state);
+        return false;
+    }
+    if (!o.value(QStringLiteral("missing_scopes")).isArray()) {
+        *error = QStringLiteral("accounts.%1.missing_scopes fehlt oder ist keine Liste").arg(name);
+        return false;
+    }
+    for (const QJsonValue &v : o.value(QStringLiteral("missing_scopes")).toArray())
+        a.missingScopes.append(v.toString());
+    const QJsonValue pending = o.value(QStringLiteral("login_pending"));
+    if (pending.isObject()) {
+        TwitchLoginPending p;
+        QString expires;
+        if (!requireString(pending.toObject(), QStringLiteral("user_code"), &p.userCode, error)
+            || !requireString(pending.toObject(), QStringLiteral("verification_uri"), &p.verificationUri, error)
+            || !requireString(pending.toObject(), QStringLiteral("expires_at"), &expires, error))
+            return false;
+        p.expiresAt = QDateTime::fromString(expires, Qt::ISODate);
+        if (!p.expiresAt.isValid()) {
+            *error = QStringLiteral("accounts.%1.login_pending.expires_at ungültig").arg(name);
+            return false;
+        }
+        p.expiresAt = p.expiresAt.toUTC();
+        a.loginPending = p;
+    } else if (!pending.isNull()) {
+        *error = QStringLiteral("accounts.%1.login_pending fehlt oder ist weder Objekt noch null").arg(name);
+        return false;
+    }
+    *account = a;
+    return true;
+}
+
+} // namespace
+
+QJsonObject twitchStatusMessage(const TwitchStatusInfo &info)
+{
+    QJsonObject o = typed(msg::kTwitchStatus);
+    o.insert(QStringLiteral("enabled"), info.enabled);
+    o.insert(QStringLiteral("message"), optionalText(info.message));
+    o.insert(QStringLiteral("live"), info.live);
+    QJsonArray subscriptions;
+    for (const TwitchSubscriptionInfo &s : info.subscriptions)
+        subscriptions.append(QJsonObject{{QStringLiteral("type"), s.type},
+                                         {QStringLiteral("ok"), s.ok},
+                                         {QStringLiteral("problem"), optionalText(s.problem)}});
+    o.insert(QStringLiteral("subscriptions"), subscriptions);
+    o.insert(QStringLiteral("accounts"), QJsonObject{{QStringLiteral("channel"), twitchAccountObject(info.channel)},
+                                                     {QStringLiteral("bot"), twitchAccountObject(info.bot)}});
+    o.insert(QStringLiteral("badge_problem"), optionalText(info.badgeProblem));
+    return o;
+}
+
+bool parseTwitchStatus(const QJsonObject &message, TwitchStatusInfo *info, QString *error)
+{
+    TwitchStatusInfo i;
+    if (!requireBool(message, QStringLiteral("enabled"), &i.enabled, error)
+        || !optionalTextField(message, QStringLiteral("message"), &i.message, error)
+        || !requireBool(message, QStringLiteral("live"), &i.live, error)
+        || !optionalTextField(message, QStringLiteral("badge_problem"), &i.badgeProblem, error))
+        return false;
+    if (!message.value(QStringLiteral("subscriptions")).isArray()) {
+        *error = QStringLiteral("Feld subscriptions fehlt oder ist keine Liste");
+        return false;
+    }
+    for (const QJsonValue &v : message.value(QStringLiteral("subscriptions")).toArray()) {
+        TwitchSubscriptionInfo s;
+        if (!requireString(v.toObject(), QStringLiteral("type"), &s.type, error)
+            || !requireBool(v.toObject(), QStringLiteral("ok"), &s.ok, error)
+            || !optionalTextField(v.toObject(), QStringLiteral("problem"), &s.problem, error))
+            return false;
+        i.subscriptions.append(s);
+    }
+    const QJsonObject accounts = message.value(QStringLiteral("accounts")).toObject();
+    if (!parseTwitchAccount(accounts.value(QStringLiteral("channel")), QStringLiteral("channel"), &i.channel, error)
+        || !parseTwitchAccount(accounts.value(QStringLiteral("bot")), QStringLiteral("bot"), &i.bot, error))
+        return false;
+    *info = i;
+    return true;
+}
+
+QJsonObject twitchAccountRequestMessage(const char *type, const TwitchAccountRequest &request)
+{
+    QJsonObject o = typed(type);
+    o.insert(QStringLiteral("request_id"), double(request.requestId));
+    o.insert(QStringLiteral("account"), request.account);
+    return o;
+}
+
+bool parseTwitchAccountRequest(const QJsonObject &message, TwitchAccountRequest *request, QString *error)
+{
+    TwitchAccountRequest r;
+    if (!requireInt(message, QStringLiteral("request_id"), 0, qint64(1) << 53, &r.requestId, error)
+        || !requireString(message, QStringLiteral("account"), &r.account, error))
+        return false;
+    if (r.account != QLatin1String("channel") && r.account != QLatin1String("bot")) {
+        *error = QStringLiteral("account muss channel oder bot sein, nicht «%1»").arg(r.account);
+        return false;
+    }
+    *request = r;
     return true;
 }
 
@@ -1623,6 +1816,8 @@ QJsonObject mediaListMessage(const MediaListData &data)
                                  {QStringLiteral("kind"), mediaKindKey(f.kind)},
                                  {QStringLiteral("bytes"), double(f.bytes)},
                                  {QStringLiteral("codec"), textOrNull(f.codec)},
+                                 {QStringLiteral("duration_ms"), f.durationMs > 0 ? QJsonValue(double(f.durationMs))
+                                                                                  : QJsonValue(QJsonValue::Null)},
                                  {QStringLiteral("browser_problem"), textOrNull(f.browserProblem)},
                                  {QStringLiteral("used_in"), used}});
     }
@@ -1679,6 +1874,10 @@ bool parseMediaList(const QJsonObject &message, MediaListData *data, QString *er
         }
         file.kind = *k;
         file.bytes = bytes;
+        // P14 t: Länge eines Tons oder null
+        if (!f.value(QStringLiteral("duration_ms")).isNull()
+            && !requireInt(f, QStringLiteral("duration_ms"), 1, qint64(1) << 53, &file.durationMs, error))
+            return false;
         const QJsonValue used = f.value(QStringLiteral("used_in"));
         if (!used.isArray()) {
             *error = QStringLiteral("Feld used_in muss eine Liste sein");
@@ -1754,6 +1953,100 @@ bool parseGetBrowserSource(const QJsonObject &message, QUuid *overlayId, QString
         return false;
     *overlayId = id;
     return true;
+}
+
+QJsonObject subscribeEventsMessage(const SubscribeEvents &request)
+{
+    QJsonObject o = typed(msg::kSubscribeEvents);
+    o.insert(QStringLiteral("types"), QJsonArray::fromStringList(request.types));
+    o.insert(QStringLiteral("history"), request.history);
+    return o;
+}
+
+bool parseSubscribeEvents(const QJsonObject &message, SubscribeEvents *request, QString *error)
+{
+    SubscribeEvents r;
+    const QJsonValue types = message.value(QStringLiteral("types"));
+    if (!types.isArray()) {
+        *error = QStringLiteral("Feld types fehlt oder ist keine Liste");
+        return false;
+    }
+    for (const QJsonValue &v : types.toArray()) {
+        if (!v.isString()) {
+            *error = QStringLiteral("Feld types enthält etwas anderes als Text");
+            return false;
+        }
+        if (!events::isValidFilter(v.toString())) {
+            *error = QStringLiteral("Unbekannter Ereignistyp «%1» (genauer Typ oder Vorsilbe mit Punkt, "
+                                    "zum Beispiel «twitch.»)").arg(v.toString());
+            return false;
+        }
+        r.types.append(v.toString());
+    }
+    if (!requireBool(message, QStringLiteral("history"), &r.history, error))
+        return false;
+    *request = r;
+    return true;
+}
+
+QJsonObject eventHistoryMessage(const QList<events::Event> &events)
+{
+    QJsonArray list;
+    for (const events::Event &e : events)
+        list.append(events::eventToJson(e));
+    QJsonObject o = typed(msg::kEventHistory);
+    o.insert(QStringLiteral("events"), list);
+    return o;
+}
+
+bool parseEventHistory(const QJsonObject &message, QList<events::Event> *events, QString *error)
+{
+    const QJsonValue list = message.value(QStringLiteral("events"));
+    if (!list.isArray()) {
+        *error = QStringLiteral("Feld events fehlt oder ist keine Liste");
+        return false;
+    }
+    QList<events::Event> result;
+    for (const QJsonValue &v : list.toArray()) {
+        events::Event e;
+        if (!v.isObject() || !events::eventFromJson(v.toObject(), &e, error)) {
+            if (!v.isObject())
+                *error = QStringLiteral("Feld events enthält etwas anderes als Objekte");
+            return false;
+        }
+        result.append(e);
+    }
+    *events = result;
+    return true;
+}
+
+QJsonObject eventMessage(const events::Event &event)
+{
+    QJsonObject o = typed(msg::kEvent);
+    o.insert(QStringLiteral("event"), events::eventToJson(event));
+    return o;
+}
+
+bool parseEventMessage(const QJsonObject &message, events::Event *event, QString *error)
+{
+    const QJsonValue v = message.value(QStringLiteral("event"));
+    if (!v.isObject()) {
+        *error = QStringLiteral("Feld event fehlt oder ist kein Objekt");
+        return false;
+    }
+    return events::eventFromJson(v.toObject(), event, error);
+}
+
+QJsonObject eventsDroppedMessage(qint64 count)
+{
+    QJsonObject o = typed(msg::kEventsDropped);
+    o.insert(QStringLiteral("count"), double(count));
+    return o;
+}
+
+bool parseEventsDropped(const QJsonObject &message, qint64 *count, QString *error)
+{
+    return requireInt(message, QStringLiteral("count"), 1, qint64(1) << 53, count, error);
 }
 
 QJsonObject serverStatusMessage(const ServerStatusInfo &info)

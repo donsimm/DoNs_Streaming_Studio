@@ -1,5 +1,10 @@
 #include "theme.h"
 
+#include "fonts.h"
+#include "symbols.h"
+
+#include <QApplication>
+#include <QFont>
 #include <QRegularExpression>
 
 // Werte aus Yami.obt (OBS Studio, Commit 65c320b46e1af5c7a555161aea6182cdf7a8c524, GPL Version 2),
@@ -16,6 +21,8 @@ Theme darkTheme()
     t.fontFamily = QStringLiteral("Open Sans");
     t.fontSize = 10;
     t.fontSizeSmall = 8;
+    t.fontSizeLarge = 16;
+    t.fontSizeChat = 15;
     t.window = QColor(0x1d, 0x1f, 0x26);
     t.base = QColor(0x27, 0x2a, 0x33);
     t.text = QColor(0xff, 0xff, 0xff);
@@ -58,6 +65,10 @@ Theme darkTheme()
     t.graphCpu = QColor(0x47, 0x6b, 0xd7);
     t.graphRam = QColor(0x99, 0x7f, 0xdc);
     t.graphLan = QColor(0x59, 0xd9, 0x66);
+    t.badgeBot = QColor(0x99, 0x7f, 0xdc);
+    t.badgeChannel = QColor(0x28, 0x4c, 0xb8);
+    t.badgeMod = QColor(0x25, 0xa2, 0x31);
+    t.chatEventRow = QColor(0x32, 0x35, 0x40);
     return t;
 }
 
@@ -111,6 +122,9 @@ QWidget:disabled { color: @textDisabled@; }
 QDialog, QMainWindow, QMenuBar, QMenu { background-color: @window@; }
 QMainWindow::separator { background: transparent; width: 4px; height: 4px; margin: 0px; }
 QMainWindow::separator:hover { border: 1px solid @text@; margin: 1px; }
+/* P14 e2: Teiler zwischen Bereichen wie ein Dock, Werte von QMainWindow::separator. */
+QSplitter::handle { background: transparent; width: 4px; height: 4px; margin: 0px; }
+QSplitter::handle:hover { border: 1px solid @text@; margin: 1px; }
 
 QLabel, QCheckBox { background: transparent; }
 QComboBox, QCheckBox, QPushButton, QSpinBox, QDoubleSpinBox { margin-top: 2px; margin-bottom: 2px; }
@@ -265,17 +279,27 @@ QCheckBox::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
 QCheckBox::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
 QCheckBox::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
 QCheckBox::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
+/* P14: Kästchen in Bäumen (Aktionen im Chat-Bot) mit denselben Symbolen; nur Zeilen mit
+   Qt::ItemIsUserCheckable zeichnen eines, die übrigen Bäume bleiben unverändert. */
+QTreeView::indicator { width: 16px; height: 16px; }
+QTreeView::indicator:unchecked { image: url("@symbols@/kaestchen-aus.svg"); }
+QTreeView::indicator:unchecked:hover { image: url("@symbols@/kaestchen-aus-fokus.svg"); }
+QTreeView::indicator:checked { image: url("@symbols@/kaestchen-an.svg"); }
+QTreeView::indicator:checked:hover { image: url("@symbols@/kaestchen-an-fokus.svg"); }
+QTreeView::indicator:checked:disabled { image: url("@symbols@/kaestchen-an-ausgegraut.svg"); }
+QTreeView::indicator:unchecked:disabled { image: url("@symbols@/kaestchen-aus-ausgegraut.svg"); }
 
 /* Eigene Bereiche (in OBS nicht vorhanden), mit den Werten von Yami gestaltet. */
 #headerBar { background: @base@; border: 1px solid @border@; border-radius: 4px; }
-#moduleTabs { background: transparent; border: none; }
-/* Modul-Reiter wie QTabBar::tab in Yami.obt (--tab_bg = --button_bg_disabled). */
-#moduleTabs QToolButton { background: @buttonDisabled@; color: @textMuted@;
+#moduleTabs, #chatBotTabs { background: transparent; border: none; }
+/* Modul-Reiter wie QTabBar::tab in Yami.obt (--tab_bg = --button_bg_disabled); die Unterreiter
+   im Reiter «Chat-Bot» (P13) ebenso. */
+#moduleTabs QToolButton, #chatBotTabs QToolButton { background: @buttonDisabled@; color: @textMuted@;
     border: 1px solid @buttonDisabled@; padding: 4px 16px; min-width: 50px; border-radius: 4px; }
-#moduleTabs QToolButton:hover { background: @buttonHover@; border-color: @inputBorderHover@;
-                                color: @text@; }
-#moduleTabs QToolButton:checked { background: @primary@; color: @text@;
-                                  border: 1px solid @primaryLight@; }
+#moduleTabs QToolButton:hover, #chatBotTabs QToolButton:hover { background: @buttonHover@;
+    border-color: @inputBorderHover@; color: @text@; }
+#moduleTabs QToolButton:checked, #chatBotTabs QToolButton:checked { background: @primary@;
+    color: @text@; border: 1px solid @primaryLight@; }
 
 QToolButton#connectionButton { border: 2px solid @stateOff@; border-radius: 4px;
                                background: @input@; color: @text@; font-weight: bold; }
@@ -290,8 +314,20 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #gaugeValue { color: @text@; font-weight: bold; }
 #gaugeGraph { background: @base@; border: 1px solid @graph@; }
 
-#chatBotPage { background: @preview@; }
-#chatBotPage QLabel { color: @textMuted@; }
+#chatBotPage { background: @window@; }
+/* P13: Zustand rechts in der Kopfzeile, Farben wie die Verbindungsknöpfe (state aus
+   windowdata.h, chatBotHeaderView). */
+#chatBotState { color: @textMuted@; }
+#chatBotState[state="ok"] { color: @stateConnected@; font-weight: bold; }
+#chatBotState[state="warning"] { color: @stateConnecting@; font-weight: bold; }
+#chatBotState[state="error"] { color: @stateError@; font-weight: bold; }
+/* Bereiche im Unterreiter «Live» wie ein Dock: Titel wie QDockWidget::title, Inhalt wie
+   QDockWidget > QWidget. */
+#chatBotPanelTitle { background-color: @dockTitle@; border: 1px solid @border@; color: @text@;
+    padding: 2px 4px; font-size: @fontSizeSmall@pt; font-weight: bold;
+    border-top-left-radius: 4px; border-top-right-radius: 4px; }
+#chatBotPanelBody { background: @base@; border: 1px solid @border@; border-top: none;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
 
 /* P08: Baum der Overlays wie die Listen, mehrzeiliges Textfeld wie QLineEdit. */
 /* P09, Punkt 48: Den Einzug links vom gewählten Eintrag füllt OverlayTree::drawBranches
@@ -312,7 +348,17 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 /* P10b: Dock «Medien» mit Spalten wie im Dateimanager: Zeilen ohne Rundung je Zelle (sonst
    jede Spalte ein eigenes Kästchen), Spaltenkopf wie die Dock-Titel, Zeile zur Auswahl gedämpft. */
 #mediaTree::item, #mediaTree::item:hover, #mediaTree::item:selected,
-#mediaTree::item:selected:hover { border-radius: 0px; border: none; padding: 2px 2px; }
+#mediaTree::item:selected:hover, #chatBotEvents::item, #chatBotEvents::item:hover,
+#chatBotEvents::item:selected, #chatBotEvents::item:selected:hover, #chatBotRuns::item,
+#chatBotRuns::item:hover, #chatBotRuns::item:selected, #chatBotRuns::item:selected:hover, #chatBotChat::item,
+#chatBotChat::item:hover, #chatBotChat::item:selected, #chatBotChat::item:selected:hover, #commandsTable::item,
+#commandsTable::item:hover, #commandsTable::item:selected, #commandsTable::item:selected:hover, #timersTable::item,
+#timersTable::item:hover, #timersTable::item:selected, #timersTable::item:selected:hover, #globalVariables::item,
+#globalVariables::item:hover, #globalVariables::item:selected, #globalVariables::item:selected:hover,
+#userVariables::item, #userVariables::item:hover, #userVariables::item:selected,
+#userVariables::item:selected:hover, #queuesList::item, #queuesList::item:hover, #queuesList::item:selected,
+#queuesList::item:selected:hover { border-radius: 0px;
+    border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
                        border-right: 1px solid @border@; padding: 3px 6px; }
@@ -329,7 +375,16 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
 #serverMessage { font-weight: bold; color: @coreDisconnected@; }
 /* P10c: Zeile «OBS» im Dock «Steuerung», bei einem Problem wie #serverMessage; P12b b5: Zeile
    «Ton Videos» ebenso. */
-#obsSourceState[state="problem"], #audioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+#obsSourceState[state="problem"], #audioOutputState[state="problem"], #actionsAudioOutputState[state="problem"] { font-weight: bold; color: @coreDisconnected@; }
+/* P13: Code der Anmeldung bei Twitch, gross zum Abtippen im Browser. */
+#settingsTwitchChannelCode, #settingsTwitchBotCode { font-size: @fontSizeLarge@pt; font-weight: bold; }
+/* P14 e2: Prüfmeldung am Feld, eine Zeile unter dem Abschnitt (Entscheid des Nutzers 2026-11-16). */
+#fieldProblem { color: @stateError@; }
+/* P14 Emotes em-6: Chat-Zeilen in der Schrift, deren Zeile so hoch ist wie ein Emote (28 px). */
+#chatBotChat { font-size: @fontSizeChat@pt; }
+/* P14 e2-13: Zähler der Eingabezeile «Chat», zu lang wie eine Prüfmeldung. */
+#chatBotChatCounter { color: @textMuted@; }
+#chatBotChatCounter[state="error"] { color: @stateError@; }
 )");
     const QList<std::pair<const char *, QColor>> colors = {
         {"window", t.window},
@@ -360,6 +415,10 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
         {"coreDisconnected", t.coreDisconnected},
         {"preview", t.preview},
         {"graph", t.graph},
+        {"badgeBot", t.badgeBot},
+        {"badgeChannel", t.badgeChannel},
+        {"badgeMod", t.badgeMod},
+        {"chatEventRow", t.chatEventRow},
     };
     for (const auto &[name, color] : colors)
         css.replace(QLatin1Char('@') + QLatin1String(name) + QLatin1Char('@'), color.name());
@@ -370,5 +429,22 @@ QHeaderView::section { background-color: @dockTitle@; color: @text@; border: non
     css.replace(QStringLiteral("@fontFamily@"), t.fontFamily);
     css.replace(QStringLiteral("@fontSize@"), QString::number(t.fontSize));
     css.replace(QStringLiteral("@fontSizeSmall@"), QString::number(t.fontSizeSmall));
+    css.replace(QStringLiteral("@fontSizeLarge@"), QString::number(t.fontSizeLarge));
+    css.replace(QStringLiteral("@fontSizeChat@"), QString::number(t.fontSizeChat));
     return css;
+}
+
+QStringList applyAppearance(const Theme &t, const QString &fontDir)
+{
+    // Fusion: derselbe Grundstil unabhängig von der Desktop-Umgebung.
+    // https://doc.qt.io/qt-6.8/qstylefactory.html
+    QApplication::setStyle(QStringLiteral("Fusion"));
+    // Schrift aus src/app/schriften/, nicht aus einer Installation (Auftrag P06).
+    const QStringList families = loadWindowFonts(fontDir);
+    if (!families.contains(t.fontFamily))
+        qWarning("Schrift «%s» nicht geladen, Qt wählt einen Ersatz", qPrintable(t.fontFamily));
+    QApplication::setFont(QFont(t.fontFamily, t.fontSize));
+    QApplication::setPalette(palette(t));
+    qApp->setStyleSheet(styleSheet(t, symbolPath));
+    return families;
 }

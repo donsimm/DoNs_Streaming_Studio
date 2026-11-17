@@ -126,7 +126,10 @@ QImage mediaPreview(const QString &path, MediaKind kind, const QSize &box, const
         return videoPreview(path, box, error, timeoutMs);
     case MediaKind::Font:
         return fontPreview(path, box, textColor, error);
+    case MediaKind::Audio:
+        break; // P14 t: Töne ohne Vorschaubild (das Dock zeigt ein Symbol)
     }
+    *error = QStringLiteral("keine Vorschau für %1").arg(path);
     return {};
 }
 

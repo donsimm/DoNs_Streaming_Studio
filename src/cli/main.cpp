@@ -5,11 +5,14 @@
 // Befehle lesen dann nur (nichts wird geschrieben); Änderungs-Befehle nehmen die Sperre im
 // Datenordner und brechen ab, wenn sie belegt ist.
 
+#include "actionprotocol.h"
 #include "browsersource.h"
 #include "configpaths.h"
 #include "coresession.h"
 #include "coresettings.h"
 #include "datalock.h"
+#include "eventtypes.h"
+#include "overlaylive.h"
 #include "overlaystore.h"
 #if DSS_MEDIA_SIZE
 #include "mediainfo.h"
@@ -17,9 +20,13 @@
 #include "version.h"
 
 #include <QCoreApplication>
+#include <QDeadlineTimer>
 #include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
 #include <QRegularExpression>
 #include <QTextStream>
+#include <QThread>
 
 #include <functional>
 
@@ -36,7 +43,8 @@ const QStringList kReadOnlyCommands = {QStringLiteral("overlay-liste"), QStringL
                                        QStringLiteral("medien-liste")};
 // Befehle für die Einstellungen des Kerns (P10-vor): ohne Datenordner und ohne Sperre.
 const QStringList kSettingsCommands = {QStringLiteral("einstellungen"), QStringLiteral("einstellung-port"),
-                                       QStringLiteral("einstellung-adresse")};
+                                       QStringLiteral("einstellung-adresse"),
+                                       QStringLiteral("einstellung-twitch-client-id")}; // P13
 // Befehle für die Medienliste (P10b, Teil A 6): Nur der Kern schreibt medien.json; dss-cli
 // schickt die Änderung an den laufenden Kern. Name → Anzahl Argumente.
 const QList<std::pair<QString, int>> kMediaCommands = {
@@ -44,6 +52,24 @@ const QList<std::pair<QString, int>> kMediaCommands = {
     {QStringLiteral("medium-loeschen"), 1},         {QStringLiteral("medien-ordner-anlegen"), 1},
     {QStringLiteral("medien-ordner-umbenennen"), 2}, {QStringLiteral("medien-ordner-verschieben"), 2},
     {QStringLiteral("medien-ordner-loeschen"), 1}};
+
+// Laufzustand der Overlays (P14 d): gehen an den laufenden Kern, er hält ihn nur im Speicher.
+const QStringList kLiveCommands = {QStringLiteral("live"), QStringLiteral("live-zeigen"),
+                                   QStringLiteral("live-ausblenden")};
+
+// Befehle des Aktionssystems (P14 b3): gehen an den laufenden Kern. Name → Anzahl Argumente
+// (-1 = mindestens eines).
+const QList<std::pair<QString, int>> kActionCommands = {
+    {QStringLiteral("aktionen"), 0},       {QStringLiteral("aktion-setzen"), 1},
+    {QStringLiteral("aktion-loeschen"), 1}, {QStringLiteral("aktion-test"), -1},
+    {QStringLiteral("laeufe"), 0},         {QStringLiteral("warteschlange"), 2},
+    {QStringLiteral("variablen"), 0},      {QStringLiteral("zuschauer-import"), 1}};
+
+bool isActionCommand(const QString &command)
+{
+    return std::any_of(kActionCommands.begin(), kActionCommands.end(),
+                       [&command](const auto &c) { return c.first == command; });
+}
 
 bool isMediaCommand(const QString &command)
 {
@@ -90,6 +116,20 @@ const char *const kUsageTemplate =
     "  einstellungen\n"
     "  einstellung-port PORT\n"
     "  einstellung-adresse ADRESSE\n"
+    "  einstellung-twitch-client-id ID\n"
+    "  live ADRESSE\n"
+    "  live-zeigen ADRESSE NR[,NR…] [--verstecken|--umschalten] [--dauer MS] [--text TEXT]\n"
+    "              [--bild BILD] [NAME=WERT …]\n"
+    "  live-ausblenden ADRESSE [NR …]\n"
+    "  ereignisse [--folgen] [--typ FILTER]\n"
+    "  aktionen\n"
+    "  aktion-setzen DATEI.json\n"
+    "  aktion-loeschen AKTION\n"
+    "  aktion-test AKTION [--echt] [ARG=WERT ...]\n"
+    "  laeufe [--folgen]\n"
+    "  warteschlange NAME anhalten|fortsetzen|leeren\n"
+    "  variablen [--zaehlen]\n"
+    "  zuschauer-import ORDNER [--endgueltig] [--ueberschreiben]\n"
     "\n"
     "--wiederholen: Video am Ende wieder von vorne (ohne: nicht wiederholen).\n"
     "--am-ende-anhalten: letztes Bild am Ende stehen lassen (ohne beides: Quelle wird leer).\n"
@@ -110,15 +150,42 @@ const char *const kUsageTemplate =
     "innerhalb von 2 s die Adresse der Standardroute ein, sobald es eine gibt); nur Adressen\n"
     "dieses PCs. Beides wirkt sofort (der Overlay-Server startet neu; in OBS dann die neue\n"
     "Adresse der Browserquelle eintragen).\n"
+    "einstellung-twitch-client-id: Client-ID der App bei Twitch (Buchstaben und Ziffern, \"\" = leer,\n"
+    "nur solange Twitch aus ist), über den laufenden Kern.\n"
     "medien-liste: alle Mediendateien mit Name, Ordner, Typ, Grösse und «verwendet in» (geht immer).\n"
     "Die übrigen medien- und medium-Befehle ändern die Medienliste über den laufenden Kern (nur er\n"
     "schreibt medien.json). DATEI: Nr aus medien-liste, Verweis media/… oder Name (eindeutig).\n"
     "ORDNER, ZIELORDNER: Pfad wie in medien-liste, zum Beispiel «Logos/Alt»; \"/\" = oberste Ebene.\n"
     "medien-ordner-anlegen legt den letzten Teil des Pfads an. Löschen eines Ordners: Inhalt kommt\n"
     "eine Ebene höher. medium-loeschen löscht nur Dateien, die keine Quelle verwendet.\n"
+    "live, live-zeigen, live-ausblenden: Laufzustand eines Overlays über den laufenden Kern (wie\n"
+    "ein Schritt des Chat-Bots, nur «jetzt», nie in der Overlay-Datei, nach einem Neustart weg).\n"
+    "live zeigt ihn je Element. live-zeigen zeigt die Elemente NR (aus quelle-liste), mit\n"
+    "--verstecken versteckt, mit --umschalten schaltet es um; --dauer: danach fällt der Laufzustand\n"
+    "weg (ohne: bis live-ausblenden); --text ersetzt den Text der Textelemente, --bild das Bild der\n"
+    "Bildelemente (media/… oder Adresse eines Profilbilds); NAME=WERT sind Argumente für die\n"
+    "Platzhalter %NAME% im Text. live-ausblenden setzt die Elemente NR zurück (ohne NR: alle).\n"
+    "ereignisse: Verlauf des Ereignisflusses im laufenden Kern (höchstens 200, nur im Speicher), eine\n"
+    "JSON-Zeile je Ereignis. --folgen: danach neue Ereignisse, bis der Kern trennt (Ctrl+C beendet).\n"
+    "--typ: genauer Typ wie twitch.chat_message oder Vorsilbe mit Punkt wie twitch.; mehrmals\n"
+    "möglich; ohne: alle Typen. Verworfene Ereignisse (Ausgabe zu langsam) meldet dss-cli auf stderr.\n"
+    "Aktionssystem (P14, über den laufenden Kern; nur er schreibt aktionen.json):\n"
+    "aktionen: Hauptschalter, Zustand und alle Aktionen. aktion-setzen: Aktion aus einer JSON-Datei\n"
+    "(Aufbau wie ein Eintrag in actions von aktionen.json) anlegen oder ersetzen. AKTION: Kennung oder\n"
+    "Name (eindeutig). aktion-test: Probelauf (Twitch und OBS nur gemeldet), --echt wie ein echter\n"
+    "Auslöser; ARG=WERT setzt Argumente wie user=Testname; zeigt danach die Schritte des Laufs.\n"
+    "laeufe: letzte 200 Läufe (nur im Speicher); --folgen: danach neue, bis der Kern trennt.\n"
+    "warteschlange: NAME «Standard» oder Name aus aktionen.json. variablen: Variablen für alle und je\n"
+    "Zuschauer (Twitch-ID); --zaehlen: nur Anzahl Werte je Name.\n"
+    "zuschauer-import: Zuschauer-Daten aus dem Export von Streamer.bot (ORDNER, meist\n"
+    "<Datenordner>/import/export) übernehmen. Ohne --endgueltig nur Probelauf (schreibt nichts);\n"
+    "--endgueltig sichert die betroffenen Dateien zuerst nach <Datenordner>/import/sicherung-<zeit>.\n"
+    "Im Studio geänderte Werte bleiben, ausser mit --ueberschreiben. Der Bericht nennt nur Anzahlen\n"
+    "und Namen von Variablen.\n"
     "Ohne --verbindung: Verbindung des Kerns dieser Version ($XDG_RUNTIME_DIR/%1/kern.sock).\n"
     "Exit-Code: 0 = erfolgreich, 1 = Fehler, 2 = falscher Aufruf, 3 = Kern läuft (Datenordner\n"
-    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern).\n";
+    "gesperrt), 4 = Kern läuft nicht (einstellung-port, einstellung-adresse, Medien ändern, live,\n"
+    "ereignisse, Aktionssystem).\n";
 
 // Hilfe mit Datenordner und Einheit dieser Version (P10a, Teil B)
 QString usageText()
@@ -136,6 +203,18 @@ struct Arguments
     bool flipHorizontal = false; // P09b
     bool flipVertical = false;   // P09b
     bool yes = false;            // P10: neuer-token ohne Rückfrage
+    // P14 d: live-zeigen
+    bool liveHide = false;
+    bool liveToggle = false;
+    std::optional<int> liveDurationMs;
+    std::optional<QString> liveText;
+    std::optional<QString> liveImage;
+    bool follow = false;         // P13: ereignisse --folgen; P14 b3: laeufe --folgen
+    QStringList eventTypes;      // P13: ereignisse --typ (mehrmals möglich)
+    bool real = false;           // P14 b3: aktion-test --echt
+    bool count = false;          // P14 b3: variablen --zaehlen
+    bool importFinal = false;    // P14 z1b: zuschauer-import --endgueltig
+    bool importOverwrite = false; // P14 z1b: zuschauer-import --ueberschreiben
     QStringList positional; // Befehl und seine Argumente
 };
 
@@ -169,6 +248,44 @@ bool parseArguments(const QStringList &args, Arguments *result, QString *error)
             result->flipVertical = true;
         } else if (a == QLatin1String("--ja")) {
             result->yes = true;
+        } else if (a == QLatin1String("--verstecken")) {
+            result->liveHide = true;
+        } else if (a == QLatin1String("--umschalten")) {
+            result->liveToggle = true;
+        } else if (a == QLatin1String("--dauer") || a == QLatin1String("--text") || a == QLatin1String("--bild")) {
+            if (i + 1 >= args.size()) {
+                *error = QStringLiteral("%1 braucht einen Wert.").arg(a);
+                return false;
+            }
+            const QString value = args.at(++i);
+            if (a == QLatin1String("--text")) {
+                result->liveText = value;
+            } else if (a == QLatin1String("--bild")) {
+                result->liveImage = value;
+            } else {
+                bool ok = false;
+                result->liveDurationMs = value.toInt(&ok);
+                if (!ok) {
+                    *error = QStringLiteral("--dauer «%1» ist keine ganze Zahl.").arg(value);
+                    return false;
+                }
+            }
+        } else if (a == QLatin1String("--folgen")) {
+            result->follow = true;
+        } else if (a == QLatin1String("--echt")) {
+            result->real = true;
+        } else if (a == QLatin1String("--zaehlen")) {
+            result->count = true;
+        } else if (a == QLatin1String("--endgueltig")) {
+            result->importFinal = true;
+        } else if (a == QLatin1String("--ueberschreiben")) {
+            result->importOverwrite = true;
+        } else if (a == QLatin1String("--typ")) {
+            if (i + 1 >= args.size()) {
+                *error = QStringLiteral("--typ braucht einen Filter.");
+                return false;
+            }
+            result->eventTypes.append(args.at(++i));
         } else if (a.startsWith(QLatin1String("--"))) {
             *error = QStringLiteral("Unbekannte Option %1.").arg(a);
             return false;
@@ -263,6 +380,9 @@ public:
         if (command != QLatin1String("quelle-geometrie") && (m_args.flipHorizontal || m_args.flipVertical))
             return usage(QStringLiteral("--waagrecht-gespiegelt und --senkrecht-gespiegelt gelten nur für "
                                         "quelle-geometrie."));
+        if (m_args.liveHide || m_args.liveToggle || m_args.liveDurationMs || m_args.liveText || m_args.liveImage)
+            return usage(QStringLiteral("--verstecken, --umschalten, --dauer, --text und --bild gelten nur für "
+                                        "live-zeigen."));
 
         struct Command
         {
@@ -615,6 +735,8 @@ void printSettings(const dss::CoreSettings &s, const QString &file, const QStrin
                                              .arg(s.port).arg(dss::kPortMin).arg(dss::kPortMax)},
                 {QStringLiteral("Adresse im Heimnetz"),
                  s.homeAddress.isEmpty() ? QStringLiteral("leer") : s.homeAddress},
+                {QStringLiteral("Twitch-Client-ID"), // P13
+                 s.twitchClientId.isEmpty() ? QStringLiteral("leer") : s.twitchClientId},
                 {QStringLiteral("Datei"), file},
                 {QStringLiteral("Quelle"), origin}});
 }
@@ -643,6 +765,8 @@ int runSettings(const Arguments &args)
         update.port = port;
     } else if (command == QLatin1String("einstellung-adresse")) {
         update.homeAddress = a.at(0);
+    } else if (command == QLatin1String("einstellung-twitch-client-id")) {
+        update.twitchClientId = a.at(0);
     }
 
     const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
@@ -708,6 +832,13 @@ int runSettings(const Arguments &args)
     if (!info) {
         err() << "Fehler: " << error << '\n';
         return kExitError;
+    }
+    if (update.twitchClientId) { // P13
+        out() << QStringLiteral("Twitch-Client-ID: %1\n")
+                     .arg(info->settings.twitchClientId.isEmpty() ? QStringLiteral("leer")
+                                                                  : info->settings.twitchClientId)
+              << "Gespeichert in " << info->file << ".\n";
+        return kExitOk;
     }
     if (update.port)
         out() << QStringLiteral("Port: %1\n").arg(info->settings.port);
@@ -825,6 +956,526 @@ int runMedia(const Arguments &args)
     return kExitOk;
 }
 
+// P14 d: Laufzustand über den laufenden Kern (live, live-zeigen, live-ausblenden).
+int runLive(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const auto usageError = [](const QString &message) {
+        err() << "Fehler: " << message << "\n\n" << usageText();
+        return kExitUsage;
+    };
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    const bool show = command == QLatin1String("live-zeigen");
+    if (!show && (args.liveHide || args.liveToggle || args.liveDurationMs || args.liveText || args.liveImage))
+        return usageError(QStringLiteral("--verstecken, --umschalten, --dauer, --text und --bild gelten nur für "
+                                         "live-zeigen."));
+    if (args.liveHide && args.liveToggle)
+        return usageError(QStringLiteral("--verstecken und --umschalten schliessen sich aus."));
+    if (a.isEmpty() || (command == QLatin1String("live") && a.size() != 1) || (show && a.size() < 2))
+        return usageError(QStringLiteral("%1: falsche Anzahl Argumente.").arg(command));
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Den Laufzustand hält nur der Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    // Laufzustand kommt nach hello (vor den Antworten auf die Anfragen unten)
+    const std::optional<QJsonObject> liveMessage = session.waitFor(QString::fromLatin1(dss::msg::kOverlayLive), &error);
+    QList<dss::OverlayLiveInfo> live;
+    if (!liveMessage || !dss::parseOverlayLive(*liveMessage, &live, &error))
+        return fail(error);
+    const std::optional<dss::OverlayListData> list = session.getOverlayList(&error);
+    if (!list)
+        return fail(error);
+    const auto summary = std::find_if(list->overlays.cbegin(), list->overlays.cend(),
+                                      [&a](const dss::OverlaySummary &s) { return s.address == a.at(0); });
+    if (summary == list->overlays.cend())
+        return fail(QStringLiteral("Kein Overlay mit der Adresse «%1» (overlay-liste zeigt die Adressen).").arg(a.at(0)));
+    const std::optional<dss::Overlay> overlay = session.getOverlay(summary->id, &error);
+    if (!overlay)
+        return fail(error);
+    // NR wie quelle-liste: 1 = ganz hinten
+    const auto sourceOf = [&overlay](const QString &text, QUuid *id, QString *problem) {
+        bool ok = false;
+        const int nr = text.toInt(&ok);
+        if (!ok || nr < 1 || nr > overlay->sources.size()) {
+            *problem = QStringLiteral("NR «%1» ungültig, das Overlay hat %2 Quellen.").arg(text).arg(overlay->sources.size());
+            return false;
+        }
+        *id = overlay->sources.at(nr - 1).id;
+        return true;
+    };
+
+    if (command == QLatin1String("live")) {
+        dss::LiveElements elements;
+        for (const dss::OverlayLiveInfo &info : std::as_const(live)) {
+            if (info.overlayId == overlay->id)
+                elements = info.elements;
+        }
+        if (elements.isEmpty()) {
+            out() << "Kein Laufzustand in «" << overlay->name << "».\n";
+            return kExitOk;
+        }
+        QList<QStringList> rows = {{QStringLiteral("Nr"), QStringLiteral("Name"), QStringLiteral("Jetzt"),
+                                    QStringLiteral("Text"), QStringLiteral("Bild")}};
+        for (qsizetype i = 0; i < overlay->sources.size(); ++i) {
+            const dss::Source &s = overlay->sources.at(i);
+            const auto e = elements.constFind(s.id);
+            if (e == elements.constEnd())
+                continue;
+            QString text = e->text ? *e->text : QStringLiteral("–");
+            text.replace(QLatin1Char('\n'), QLatin1Char(' '));
+            rows.append({QString::number(i + 1), s.name, dss::liveStateText(*e, e->remainingMs), text,
+                         e->image.isEmpty() ? QStringLiteral("–") : e->image});
+        }
+        printTable(rows);
+        return kExitOk;
+    }
+
+    std::optional<dss::ChangeResult> result;
+    if (show) {
+        dss::LiveSetRequest r;
+        r.overlayId = overlay->id;
+        r.mode = args.liveHide ? dss::LiveMode::Hide : args.liveToggle ? dss::LiveMode::Toggle : dss::LiveMode::Show;
+        r.durationMs = args.liveDurationMs.value_or(0);
+        for (const QString &nr : a.at(1).split(QLatin1Char(','))) {
+            dss::LiveElementRequest e;
+            if (!sourceOf(nr.trimmed(), &e.source, &error))
+                return fail(error);
+            const dss::Source &s = overlay->sources.at(dss::sourceIndex(*overlay, e.source));
+            if (args.liveText && s.kind == dss::SourceKind::Text)
+                e.text = *args.liveText;
+            if (args.liveImage && s.kind == dss::SourceKind::Image)
+                e.image = *args.liveImage;
+            r.elements.append(e);
+        }
+        for (const QString &pair : a.mid(2)) {
+            const qsizetype eq = pair.indexOf(QLatin1Char('='));
+            if (eq <= 0)
+                return usageError(QStringLiteral("Argument «%1» hat nicht die Form NAME=WERT.").arg(pair));
+            r.arguments.insert(pair.left(eq), pair.mid(eq + 1));
+        }
+        result = session.request(dss::liveSetMessage(r), &error);
+    } else {
+        dss::LiveResetRequest r;
+        r.overlayId = overlay->id;
+        for (const QString &nr : a.mid(1)) {
+            QUuid id;
+            if (!sourceOf(nr, &id, &error))
+                return fail(error);
+            r.sources.append(id);
+        }
+        result = session.request(dss::liveResetMessage(r), &error);
+    }
+    if (!result)
+        return fail(error);
+    if (!result->ok)
+        return fail(result->message);
+    if (!result->warning.isEmpty())
+        err() << "Hinweis: " << result->warning << '\n';
+    out() << (show ? QStringLiteral("Laufzustand gesetzt in «%1».") : QStringLiteral("Laufzustand zurückgesetzt in «%1»."))
+                         .arg(overlay->name)
+          << '\n';
+    return kExitOk;
+}
+
+// Ereignisse aus dem laufenden Kern (P13, Plan 1.5): Werkzeug für den Handtest ohne Bildschirmfoto.
+int runEvents(const Arguments &args)
+{
+    if (args.positional.size() != 1) {
+        err() << "Fehler: ereignisse erwartet keine Argumente.\n\n" << usageText();
+        return kExitUsage;
+    }
+    QStringList filters = args.eventTypes;
+    for (const QString &filter : std::as_const(filters)) {
+        if (!dss::events::isValidFilter(filter)) {
+            err() << "Fehler: Unbekannter Ereignistyp «" << filter
+                  << "» (genauer Typ oder Vorsilbe mit Punkt, zum Beispiel «twitch.»).\n\n" << usageText();
+            return kExitUsage;
+        }
+    }
+    if (filters.isEmpty())
+        filters = dss::events::eventTypeNames();
+
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    dss::CoreSession session;
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Die Ereignisse kennt nur der laufende Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    const std::optional<QList<dss::events::Event>> history = session.subscribeEvents(filters, &error);
+    if (!history) {
+        err() << "Fehler: " << error << '\n';
+        return kExitError;
+    }
+    const auto print = [](const dss::events::Event &event) {
+        out() << QJsonDocument(dss::events::eventToJson(event)).toJson(QJsonDocument::Compact) << '\n';
+        out().flush();
+    };
+    for (const dss::events::Event &event : *history)
+        print(event);
+    if (!args.follow)
+        return kExitOk;
+    for (;;) {
+        const std::optional<QJsonObject> message = session.nextEventMessage(&error);
+        if (!message) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        if (dss::messageType(*message) == QLatin1String(dss::msg::kEventsDropped)) {
+            qint64 count = 0;
+            if (dss::parseEventsDropped(*message, &count, &error))
+                err() << "Hinweis: " << count << " Ereignisse verworfen (Ausgabe zu langsam).\n";
+            err().flush();
+            continue;
+        }
+        dss::events::Event event;
+        if (!dss::parseEventMessage(*message, &event, &error)) {
+            err() << "Fehler: " << error << '\n';
+            return kExitError;
+        }
+        print(event);
+    }
+}
+
+// --- Aktionssystem (P14 b3) ---
+
+QString runLine(const dss::actions::RunRecord &r)
+{
+    const QDateTime when = (r.startedAt.isValid() ? r.startedAt : r.queuedAt).toLocalTime();
+    QString state = dss::actions::runStateKey(r.state);
+    if (r.state == dss::actions::RunState::Running)
+        state += QStringLiteral(" %1 von %2").arg(r.stepIndex).arg(r.stepCount);
+    return QStringLiteral("%1  %2%3  %4  %5%6")
+        .arg(when.toString(QStringLiteral("HH:mm:ss")), r.actionName, r.dryRun ? QStringLiteral(" (Probelauf)") : QString(),
+             r.triggerType, state, r.message.isEmpty() ? QString() : QStringLiteral(": ") + r.message);
+}
+
+int runActions(const Arguments &args)
+{
+    const QString command = args.positional.first();
+    const QStringList a = args.positional.mid(1);
+    const int expected = std::find_if(kActionCommands.begin(), kActionCommands.end(),
+                                      [&command](const auto &c) { return c.first == command; })->second;
+    if ((expected >= 0 && a.size() != expected) || (expected < 0 && a.isEmpty())) {
+        err() << "Fehler: " << QStringLiteral("%1: falsche Anzahl Argumente (%2).").arg(command).arg(a.size())
+              << "\n\n" << usageText();
+        return kExitUsage;
+    }
+    if ((args.real && command != QLatin1String("aktion-test")) || (args.count && command != QLatin1String("variablen"))
+        || (args.follow && command != QLatin1String("laeufe"))
+        || ((args.importFinal || args.importOverwrite) && command != QLatin1String("zuschauer-import"))) {
+        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen, --folgen für laeufe "
+                 "und ereignisse, --endgueltig und --ueberschreiben nur für zuschauer-import.\n\n" << usageText();
+        return kExitUsage;
+    }
+    const auto fail = [](const QString &message) {
+        err() << "Fehler: " << message << '\n';
+        return kExitError;
+    };
+    const QString socketPath = args.connection.isEmpty() ? dss::defaultConnectionPath() : args.connection;
+    // Der Import liest und schreibt alle Zuschauer-Daten auf einmal: längere Zeitgrenze
+    dss::CoreSession session(command == QLatin1String("zuschauer-import") ? 30000 : 3000);
+    QString error;
+    bool notRunning = false;
+    if (!session.open(socketPath, QStringLiteral("dss-cli"), &error, &notRunning)) {
+        err() << "Fehler: " << error << ".\n";
+        if (!notRunning)
+            return kExitError;
+        err() << "Das Aktionssystem läuft im Kern. Kern starten:  systemctl --user start "
+              << dss::coreUnitName() << '\n';
+        return kExitCoreNotRunning;
+    }
+    // Nach hello schickt der Kern actions_config und actions_status
+    const std::optional<QJsonObject> configMessage = session.waitForMessage(QString::fromLatin1(dss::msg::kActionsConfig), &error);
+    if (!configMessage)
+        return fail(error);
+    dss::ActionsConfigInfo info;
+    if (!dss::parseActionsConfig(*configMessage, &info, &error))
+        return fail(error);
+    const dss::actions::ActionsConfig config = info.config.value_or(dss::actions::ActionsConfig());
+
+    // Antwort change_result auswerten; true = ok
+    const auto changeOk = [&](const std::optional<QJsonObject> &reply, dss::ChangeResult *r) {
+        if (!reply)
+            return false;
+        if (!dss::parseChangeResult(*reply, r, &error))
+            return false;
+        if (!r->ok)
+            error = r->message;
+        return r->ok;
+    };
+    const auto findAction = [&](const QString &text) -> const dss::actions::Action * {
+        const QUuid id = QUuid::fromString(text);
+        const dss::actions::Action *found = nullptr;
+        for (const dss::actions::Action &action : config.actions) {
+            if ((!id.isNull() && action.id == id) || action.name == text) {
+                if (found) {
+                    error = QStringLiteral("Name «%1» ist nicht eindeutig, Kennung angeben").arg(text);
+                    return nullptr;
+                }
+                found = &action;
+            }
+        }
+        if (!found)
+            error = QStringLiteral("Keine Aktion «%1»").arg(text);
+        return found;
+    };
+    const QString changeResult = QString::fromLatin1(dss::msg::kChangeResult);
+
+    if (command == QLatin1String("aktionen")) {
+        if (!info.fileError.isEmpty())
+            return fail(info.fileError);
+        const std::optional<QJsonObject> statusMessage = session.waitForMessage(QString::fromLatin1(dss::msg::kActionsStatus), &error);
+        dss::ActionsStatus status;
+        if (!statusMessage || !dss::parseActionsStatus(*statusMessage, &status, &error))
+            return fail(error);
+        out() << "Chat-Bot: " << (config.enabled ? "an" : "aus") << " (" << status.message << ")\n";
+        QList<QStringList> rows{{QStringLiteral("Nr"), QStringLiteral("Name"), QStringLiteral("Gruppe"), QStringLiteral("Aktiv"),
+                                 QStringLiteral("Auslöser"), QStringLiteral("Schritte"), QStringLiteral("Kennung")}};
+        int nr = 0;
+        for (const dss::actions::Action &action : config.actions) {
+            int steps = 0;
+            dss::actions::forEachStep(action.steps, [&steps](const dss::actions::Step &, const QList<int> &) { ++steps; });
+            QStringList triggers;
+            for (const dss::actions::Trigger &t : action.triggers)
+                triggers.append(t.type);
+            rows.append({QString::number(++nr), action.name, action.group, yesNo(action.enabled),
+                         triggers.isEmpty() ? QStringLiteral("—") : triggers.join(QStringLiteral(", ")),
+                         QString::number(steps), action.id.toString(QUuid::WithoutBraces)});
+        }
+        printTable(rows);
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-setzen")) {
+        QFile file(a.at(0));
+        if (!file.open(QIODevice::ReadOnly))
+            return fail(QStringLiteral("%1 nicht lesbar (%2)").arg(a.at(0), file.errorString()));
+        QJsonParseError parseError;
+        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (!doc.isObject())
+            return fail(QStringLiteral("%1 ist kein JSON-Objekt (%2)").arg(a.at(0), parseError.errorString()));
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionPut),
+                                             {{QStringLiteral("action"), doc.object()}}, changeResult, &error), &r))
+            return fail(error);
+        out() << dss::savedStatusText(doc.object().value(QStringLiteral("name")).toString()) << '\n';
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-loeschen")) {
+        const dss::actions::Action *action = findAction(a.at(0));
+        if (!action)
+            return fail(error);
+        const QString name = action->name;
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionRemove),
+                                             {{QStringLiteral("action_id"), action->id.toString(QUuid::WithoutBraces)}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        out() << "«" << name << "» gelöscht.\n";
+        return kExitOk;
+    }
+    if (command == QLatin1String("aktion-test")) {
+        const dss::actions::Action *action = findAction(a.at(0));
+        if (!action)
+            return fail(error);
+        QJsonObject arguments;
+        for (const QString &pair : a.mid(1)) {
+            const qsizetype eq = pair.indexOf(QLatin1Char('='));
+            if (eq <= 0) {
+                err() << "Fehler: Argument «" << pair << "» hat nicht die Form ARG=WERT.\n\n" << usageText();
+                return kExitUsage;
+            }
+            arguments.insert(pair.left(eq), pair.mid(eq + 1));
+        }
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kActionTest),
+                                             {{QStringLiteral("action_id"), action->id.toString(QUuid::WithoutBraces)},
+                                              {QStringLiteral("arguments"), arguments},
+                                              {QStringLiteral("dry_run"), !args.real}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        // Auf das Ende des Laufs warten (Abfrage alle 100 ms, höchstens bis zur Grenze von 15 min)
+        const QDeadlineTimer deadline(dss::actions::kMaxRunDurationMs + 5000);
+        dss::actions::RunRecord run;
+        for (;;) {
+            const std::optional<QJsonObject> reply = session.actionsRequest(
+                QString::fromLatin1(dss::msg::kActionRunDetails), {{QStringLiteral("run_id"), r.id.toString(QUuid::WithoutBraces)}},
+                QString::fromLatin1(dss::msg::kActionRun), &error);
+            if (!reply)
+                return fail(error);
+            if (dss::messageType(*reply) == changeResult) {
+                dss::ChangeResult missing;
+                changeOk(reply, &missing);
+                return fail(error);
+            }
+            if (!dss::parseActionRun(*reply, &run, &error))
+                return fail(error);
+            if (dss::actions::isFinished(run.state) || deadline.hasExpired())
+                break;
+            QThread::msleep(100);
+        }
+        out() << runLine(run) << '\n';
+        for (const dss::actions::StepLogEntry &e : run.log) {
+            QStringList path;
+            for (int n : e.path)
+                path.append(QString::number(n));
+            out() << "  " << (path.isEmpty() ? QStringLiteral("–") : path.join(QLatin1Char('.'))) << ' '
+                  << (e.type.isEmpty() ? QStringLiteral("Lauf") : e.type) << ": " << dss::actions::stepResultKey(e.result)
+                  << (e.message.isEmpty() ? QString() : QStringLiteral(", ") + e.message) << '\n';
+        }
+        return run.state == dss::actions::RunState::Ok ? kExitOk : kExitError;
+    }
+    if (command == QLatin1String("laeufe")) {
+        if (args.follow && !session.subscribeEvents({QStringLiteral("actions.")}, &error))
+            return fail(error);
+        const std::optional<QJsonObject> reply = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kGetActionRuns), {}, QString::fromLatin1(dss::msg::kActionRuns), &error);
+        QList<dss::actions::RunRecord> runs;
+        if (!reply || !dss::parseActionRuns(*reply, &runs, &error))
+            return fail(error);
+        for (const dss::actions::RunRecord &r : runs)
+            out() << runLine(r) << '\n';
+        out().flush();
+        if (!args.follow)
+            return kExitOk;
+        for (;;) {
+            const std::optional<QJsonObject> message = session.nextEventMessage(&error);
+            if (!message)
+                return fail(error);
+            dss::events::Event event;
+            if (dss::messageType(*message) != QLatin1String(dss::msg::kEvent)
+                || !dss::parseEventMessage(*message, &event, &error)
+                || event.type == QLatin1String("actions.run_changed"))
+                continue;
+            dss::actions::RunRecord r;
+            QJsonObject data = event.data;
+            if (event.type == QLatin1String("actions.run_started"))
+                data.insert(QStringLiteral("queued_at"), event.time.toString(Qt::ISODateWithMs));
+            else
+                data.insert(QStringLiteral("finished_at"), event.time.toString(Qt::ISODateWithMs));
+            if (!dss::runFromJson(data, &r, &error))
+                continue;
+            if (!r.startedAt.isValid())
+                r.startedAt = event.time;
+            out() << runLine(r) << '\n';
+            out().flush();
+        }
+    }
+    if (command == QLatin1String("warteschlange")) {
+        static const QHash<QString, QString> controls{{QStringLiteral("anhalten"), QStringLiteral("pause")},
+                                                      {QStringLiteral("fortsetzen"), QStringLiteral("resume")},
+                                                      {QStringLiteral("leeren"), QStringLiteral("clear")}};
+        if (!controls.contains(a.at(1))) {
+            err() << "Fehler: «" << a.at(1) << "»: anhalten, fortsetzen oder leeren.\n\n" << usageText();
+            return kExitUsage;
+        }
+        QJsonValue queueId = QJsonValue::Null;
+        if (a.at(0) != QLatin1String("Standard")) {
+            const auto q = std::find_if(config.queues.cbegin(), config.queues.cend(),
+                                        [&](const dss::actions::Queue &queue) { return queue.name == a.at(0); });
+            if (q == config.queues.cend())
+                return fail(QStringLiteral("Keine Warteschlange «%1»").arg(a.at(0)));
+            queueId = q->id.toString(QUuid::WithoutBraces);
+        }
+        dss::ChangeResult r;
+        if (!changeOk(session.actionsRequest(QString::fromLatin1(dss::msg::kQueueControl),
+                                             {{QStringLiteral("queue_id"), queueId}, {QStringLiteral("control"), controls.value(a.at(1))}},
+                                             changeResult, &error), &r))
+            return fail(error);
+        out() << "Warteschlange «" << a.at(0) << "»: " << a.at(1) << ".\n";
+        return kExitOk;
+    }
+    if (command == QLatin1String("zuschauer-import")) {
+        // Der Kern liest den Export und schreibt (K-03); der Pfad gilt für ihn, darum absolut
+        const QString exportDir = QFileInfo(a.at(0)).absoluteFilePath();
+        const std::optional<QJsonObject> reply = session.actionsRequest(
+            QString::fromLatin1(dss::msg::kViewerImport),
+            {{QStringLiteral("path"), exportDir}, {QStringLiteral("dry_run"), !args.importFinal},
+             {QStringLiteral("overwrite"), args.importOverwrite}},
+            QString::fromLatin1(dss::msg::kViewerImportResult), &error);
+        if (!reply)
+            return fail(error);
+        dss::ChangeResult r;
+        if (dss::messageType(*reply) == QLatin1String(dss::msg::kChangeResult)) {
+            changeOk(reply, &r);
+            return fail(error);
+        }
+        dss::ViewerImportResult imported;
+        if (!dss::parseViewerImportResult(*reply, &imported, &error))
+            return fail(error);
+        out() << "Export: " << exportDir << '\n' << imported.report;
+        if (!imported.report.endsWith(QLatin1Char('\n')))
+            out() << '\n';
+        if (!imported.dryRun) {
+            if (imported.written.isEmpty())
+                out() << "Nichts geändert, nichts geschrieben.\n";
+            else
+                out() << "Geschrieben: " << imported.written.join(QStringLiteral(", ")) << "\nSicherung: "
+                      << imported.backup << '\n';
+        }
+        return kExitOk;
+    }
+    // variablen
+    const std::optional<QJsonObject> reply = session.actionsRequest(
+        QString::fromLatin1(dss::msg::kGetVariables), {}, QString::fromLatin1(dss::msg::kVariables), &error);
+    dss::VariablesInfo vars;
+    if (!reply || !dss::parseVariablesMessage(*reply, &vars, &error))
+        return fail(error);
+    if (!vars.fileError.isEmpty())
+        err() << "Fehler in der Datei: " << vars.fileError << '\n';
+    if (args.count) {
+        // Nur Anzahlen je Name (zum Beispiel nach dem Import), ohne Werte und ohne Zuschauer
+        QMap<QString, std::pair<int, int>> counts; // Name → (für alle, je Zuschauer)
+        for (auto it = vars.persisted.global.cbegin(); it != vars.persisted.global.cend(); ++it)
+            ++counts[it.key()].first;
+        for (const dss::actions::VariableMap &user : std::as_const(vars.persisted.users)) {
+            for (auto it = user.cbegin(); it != user.cend(); ++it)
+                ++counts[it.key()].second;
+        }
+        QList<QStringList> rows{{QStringLiteral("Name"), QStringLiteral("Für alle"), QStringLiteral("Zuschauer")}};
+        for (auto it = counts.cbegin(); it != counts.cend(); ++it)
+            rows.append({it.key(), QString::number(it->first), QString::number(it->second)});
+        printTable(rows);
+        out() << vars.persisted.users.size() << " Zuschauer mit dauerhaften Variablen\n";
+        return kExitOk;
+    }
+    QList<QStringList> rows{{QStringLiteral("Für"), QStringLiteral("Name"), QStringLiteral("Wert"), QStringLiteral("Art"),
+                             QStringLiteral("Herkunft")}};
+    for (auto it = vars.persisted.global.cbegin(); it != vars.persisted.global.cend(); ++it)
+        rows.append({QStringLiteral("alle"), it.key(), dss::variableValueText(it->value), QStringLiteral("dauerhaft"),
+                     dss::actions::variableOriginKey(it->origin)});
+    for (auto it = vars.volatileGlobal.cbegin(); it != vars.volatileGlobal.cend(); ++it)
+        rows.append({QStringLiteral("alle"), it.key(), dss::variableValueText(*it), QStringLiteral("flüchtig"), QStringLiteral("—")});
+    for (auto u = vars.persisted.users.cbegin(); u != vars.persisted.users.cend(); ++u) {
+        for (auto it = u->cbegin(); it != u->cend(); ++it)
+            rows.append({u.key(), it.key(), dss::variableValueText(it->value), QStringLiteral("dauerhaft"),
+                         dss::actions::variableOriginKey(it->origin)});
+    }
+    for (auto u = vars.volatileUsers.cbegin(); u != vars.volatileUsers.cend(); ++u) {
+        for (auto it = u->cbegin(); it != u->cend(); ++it)
+            rows.append({u.key(), it.key(), dss::variableValueText(*it), QStringLiteral("flüchtig"), QStringLiteral("—")});
+    }
+    printTable(rows);
+    return kExitOk;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -853,6 +1504,38 @@ int main(int argc, char *argv[])
         return kExitUsage;
     }
 
+    if (isActionCommand(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für das Aktionssystem (es läuft im Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runActions(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
+    if (args.real || args.count || args.importFinal || args.importOverwrite) {
+        err() << "Fehler: --echt gilt nur für aktion-test, --zaehlen nur für variablen, --endgueltig und "
+                 "--ueberschreiben nur für zuschauer-import.\n\n" << usageText();
+        return kExitUsage;
+    }
+    const bool events = args.positional.first() == QLatin1String("ereignisse");
+    if (!events && (args.follow || !args.eventTypes.isEmpty())) {
+        err() << "Fehler: --folgen und --typ gelten nur für ereignisse.\n\n" << usageText();
+        return kExitUsage;
+    }
+    if (events) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für ereignisse (sie kommen vom Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runEvents(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
     if (kSettingsCommands.contains(args.positional.first())) {
         const int rc = runSettings(args);
         out().flush();
@@ -870,9 +1553,21 @@ int main(int argc, char *argv[])
         err().flush();
         return rc;
     }
+    if (kLiveCommands.contains(args.positional.first())) {
+        if (!args.dataDir.isEmpty()) {
+            err() << "Fehler: --datenordner gilt nicht für live-Befehle (sie gehen an den Kern; "
+                     "--verbindung wählt ihn).\n\n" << usageText();
+            return kExitUsage;
+        }
+        const int rc = runLive(args);
+        out().flush();
+        err().flush();
+        return rc;
+    }
     if (!args.connection.isEmpty()) {
         err() << "Fehler: --verbindung gilt nur für einstellungen, einstellung-port, "
-                 "einstellung-adresse und die Änderungen der Medienliste.\n\n" << usageText();
+                 "einstellung-adresse, einstellung-twitch-client-id, ereignisse, die Änderungen der "
+                 "Medienliste und live.\n\n" << usageText();
         return kExitUsage;
     }
 

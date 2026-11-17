@@ -32,8 +32,9 @@
 
 namespace dss {
 
-// Wofür eine Datei des Nutzers verwendet wird; bestimmt die erlaubten Endungen.
-enum class MediaUse { Image, Video, Font };
+// Wofür eine Datei des Nutzers verwendet wird; bestimmt die erlaubten Endungen. P14 t: Audio für
+// Töne des Chat-Bots (Schritt «Ton abspielen»).
+enum class MediaUse { Image, Video, Font, Audio };
 
 // Erlaubte Endungen (Kleinbuchstaben), siehe docs/06-overlay-format.md
 QStringList allowedMediaSuffixes(MediaUse use);

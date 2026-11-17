@@ -144,6 +144,7 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 - **H1 Start und Stopp in OBS** (Szene 5× wechseln, Protokoll und Zähler bei 0). Warum: Nur OBS meldet «aktiv».
 - **H2 Versatz** (Aufnahme 60 s in «test 2», 30 Blitze, erster Lauf mit Versatz 0 gibt den Startwert, zweiter mit eingestelltem Versatz). Warum: genaue Zahl statt Hörurteil; ersetzt M4, misst auch `delay` am echten Ausgang.
 - **H3 Dauerlauf** 60 min nachts. Warum: Gang zwischen zwei Rechnern, Ruhe des Glättens.
+  Ergebnis 2026-11-15 22:43–23:43 (Lotse, echtes OBS, RØDECaster): 59 Wiederholungen, 0 Aussetzer, 0 Warnungen; Lage während des Videos höchstens 5,6 ms (358 Werte, Median 0,6 ms); am Wiederholpunkt 8-mal über 20 ms (−29 bis +44 ms, Pause von OBS 9–67 ms), 81 Sprünge, 48 weich. Bestanden mit Einschränkung (Entscheid Nutzer), offener Punkt 121.
 - **H4 Bildschirmfotos** der Zeile «Ton Videos» und des Bereichs «Video». Warum: Aussehen (Punkt 104).
 
 ### Prüft der Nutzer
@@ -156,7 +157,7 @@ Kein neuer Handtest aus b6 (Skript, `dss-cli`, Dokumente). Der Handtest von P12 
 
 - Prüfstufe «Baustein»: gelaufen 2026-11-14 (Abschnitt oben), alles bestanden, die Leistung mit 3 Videos mit Ton als Nachtrag mit `scripts/leistung.py --ton`.
 - Handtest H1 bis H4, N1 bis N3.
-- `[OFFEN]` Nutzer: Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
+- Entschieden (Nutzer, 2026-11-14, bestätigt 2026-11-15): Ausgang und Versatz auch in «nur Anzeige» bedienbar (Punkt 103).
 - Offene Punkte 103 bis 112 in `docs/04-offene-punkte.md`: Regler ohne eigenen Stil, OBS-Start mit Szene im Programm, «Abweichung zuletzt», Neustart von PipeWire, `dss-cli einstellungen` ohne Ausgang und Versatz, Lautstärke linear, `delay` und `versatz_ms` am echten Ausgang, OBS-Fälle (verschachtelte Szenen, «shutdown», 60 min), Klick 197.
 - Vor dem Push: Heimnetz-Adresse in `prototypes/ton/LIESMICH.md` bereinigen (aus der Übergabe, nicht Teil von b6).
 

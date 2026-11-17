@@ -1,19 +1,30 @@
 #include "coreservice.h"
 
+#include "actionprotocol.h"
+#include "actionservice.h"
 #include "browsersource.h"
+#include "chatbotoverlay.h"
+#include "eventtypes.h"
 #include "obsconnection.h"
+#include "obsevents.h"
 #include "obssecretstore.h"
 #include "obssources.h"
+#include "overlaylivestate.h"
 #include "version.h"
 #if DSS_CORE_OVERLAY_SERVER
 #include "overlayserver.h"
 #endif
 #if DSS_CORE_AUDIO
+#include "actionsound.h"
 #include "audiooutput.h"
 #include "mixer.h"
 #endif
 #if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
 #include "videoaudio.h"
+#endif
+#if DSS_CORE_TWITCH
+#include "eventsubconnection.h"
+#include "twitchservice.h"
 #endif
 
 #include <QDir>
@@ -62,6 +73,11 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
 #endif
     // Namen und Ordner der Medien schreibt nur der Kern (P10b, Teil A 1).
     m_store->setWritesMediaLibrary(true);
+    // P14 d: Laufzustand der Overlays, Profilbilder unter <Datenordner>/live-bilder
+    dss::OverlayLiveState::Options liveOptions;
+    liveOptions.imageDir = m_store->dataDir() + QLatin1Char('/') + QLatin1String(dss::kLiveImageDir);
+    m_live = new dss::OverlayLiveState(m_store, liveOptions, this);
+    connect(m_live, &dss::OverlayLiveState::changed, this, &CoreService::onLiveChanged);
     m_progressTimer = new QTimer(this);
     m_progressTimer->setInterval(kProgressIntervalMs);
     connect(m_progressTimer, &QTimer::timeout, this, &CoreService::broadcastImportProgress);
@@ -83,6 +99,10 @@ CoreService::CoreService(dss::OverlayStore *store, const QString &socketPath,
     connect(m_server, &QLocalServer::newConnection, this, &CoreService::onNewConnection);
     m_statsTimer->setInterval(kStatsIntervalMs);
     connect(m_statsTimer, &QTimer::timeout, this, &CoreService::sampleStats);
+    // P13: Ereignisfluss. Der Kern hört auf alle Typen und schickt jedem Fenster, was es bestellt hat.
+    m_events = new dss::events::EventBus(this);
+    m_windowEvents = m_events->subscribe(this, dss::events::eventTypeNames(),
+                                         [this](const dss::events::Event &event) { onEvent(event); });
 }
 
 CoreService::~CoreService()
@@ -138,6 +158,9 @@ CoreService::ListenResult CoreService::listen(QString *error)
         return ListenResult::Failed;
     }
     qInfo("Verbindung offen: %s", qPrintable(m_server->fullServerName()));
+    // P14 d: Profilbilder der letzten Sitzung weg (Laufzustand beginnt leer)
+    if (const int removed = m_live->clearImages(); removed > 0)
+        qInfo("Laufzustand: %d alte Profilbilder gelöscht", removed);
     m_sinceLastSample.start();
     sampleStats();
     m_statsTimer->start();
@@ -172,9 +195,33 @@ int CoreService::stopImports()
 
 bool CoreService::savePending(QString *error)
 {
+    // P14 b3: Variablen und Zuschauer des Aktionssystems
+    if (m_actions && !m_actions->savePending(error))
+        return false;
     if (!m_store->hasPendingWrites())
         return true;
     return m_store->flushPendingWrites(error);
+}
+
+void CoreService::setActionService(ActionService *actions)
+{
+    m_actions = actions;
+    connect(actions, &ActionService::broadcastRequested, this, &CoreService::broadcast);
+}
+
+void CoreService::handleActionsRequest(QLocalSocket *socket, const QJsonObject &message)
+{
+    if (!m_actions) {
+        send(socket, dss::changeResultMessage({std::max<qint64>(dss::messageRequestId(message), 0), false, QUuid(),
+                                               QString::fromLatin1(dss::err::kActionsUnavailable),
+                                               QStringLiteral("Aktionssystem nicht gebaut (DSS_CORE_ACTIONS aus)")}));
+        return;
+    }
+    QPointer<QLocalSocket> target(socket);
+    m_actions->handleRequest(message, [this, target](const QJsonObject &reply) {
+        if (target)
+            send(target, reply);
+    });
 }
 
 void CoreService::onSaveRequested()
@@ -219,6 +266,9 @@ std::pair<int, int> CoreService::broadcastDifferences(const QList<dss::Overlay> 
     const QJsonObject listAfter = listMessage();
     if (listAfter != listBefore)
         broadcast(listAfter);
+    // P14 d: Laufzustand gelöschter Overlays und Quellen fällt weg
+    if (changed > 0 || removed > 0)
+        m_live->overlaysChanged();
 #if DSS_CORE_AUDIO && DSS_CORE_OVERLAY_SERVER
     // P12b b4: Stopp-Regeln (Ausgabe aus, Quelle verborgen, gelöscht oder geändert)
     if (m_videoAudio && (changed > 0 || removed > 0))
@@ -255,6 +305,8 @@ void CoreService::reload()
 #endif
     qInfo("Neu geladen: %lld Overlays, %d geändert oder neu, %d entfernt",
           static_cast<long long>(m_store->overlays().size()), changed, removed);
+    if (m_actions)
+        m_actions->load(); // P14 b3: aktionen.json und die Dateien der Zuschauer
     // Schriftdateien im Datenordner können sich geändert haben.
     if (m_fontsLoaded) {
         m_fontsLoaded = false;
@@ -263,12 +315,38 @@ void CoreService::reload()
     }
 }
 
+void CoreService::createChatBotOverlay()
+{
+    const QList<dss::Overlay> before = m_store->overlays();
+    const QJsonObject listBefore = listMessage();
+    QString error;
+    QString warning;
+    switch (dss::ensureChatBotOverlay(m_store, &error, &warning)) {
+    case dss::ChatBotOverlayResult::Exists:
+        qInfo("Overlay «Chat-Bot» gibt es schon, nicht angelegt");
+        return;
+    case dss::ChatBotOverlayResult::Failed:
+        qCritical("Overlay «Chat-Bot» nicht angelegt: %s", qPrintable(error));
+        break; // Schrift oder Bild können schon in der Mediathek sein
+    case dss::ChatBotOverlayResult::Created:
+        qInfo("Overlay «Chat-Bot» angelegt");
+        if (!warning.isEmpty())
+            qWarning("%s", qPrintable(warning));
+        break;
+    }
+    broadcastDifferences(before, listBefore);
+    broadcastMediaListIfChanged();
+    updateBrowserSources();
+    updateObsSources();
+}
+
 void CoreService::onNewConnection()
 {
     while (QLocalSocket *socket = m_server->nextPendingConnection()) {
         m_clients.insert(socket, Client());
         connect(socket, &QLocalSocket::readyRead, this, [this, socket] { onReadyRead(socket); });
         connect(socket, &QLocalSocket::disconnected, this, [this, socket] { onDisconnected(socket); });
+        connect(socket, &QLocalSocket::bytesWritten, this, [this, socket] { reportDroppedEvents(socket); });
         // Der Kern grüsst zuerst (docs/08-kern-schnittstelle.md, «Ablauf»).
         // Datenordner im hello (P09): Das Fenster liest Bilder, Videos und Schriften von dort.
         send(socket, dss::helloMessage({QStringLiteral("dss-core"), dss::version(),
@@ -359,7 +437,17 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         send(socket, serverStatusMessage());
         send(socket, obsStatusMessage());
         send(socket, obsSourcesMessage());
+        send(socket, twitchStatusMessage());
         send(socket, audioOutputsMessage());
+        send(socket, dss::overlayLiveMessage(m_live->all())); // P14 d
+        // P14 b3: Aktionssystem (actions_config, actions_status)
+        if (m_actions) {
+            for (const QJsonObject &m : m_actions->helloMessages())
+                send(socket, m);
+        } else {
+            send(socket, dss::actionsStatusMessage({QStringLiteral("unavailable"),
+                                                    QStringLiteral("Aktionssystem nicht gebaut"), 0, {}, {}}));
+        }
         if (m_lastStats)
             send(socket, dss::statsMessage(*m_lastStats));
         return;
@@ -383,6 +471,10 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         handleObsSourceRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kObsAddToScene)) {
         handleObsSourceRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveSet)) {
+        handleLiveRequest(socket, message, false);
+    } else if (type == QLatin1String(dss::msg::kOverlayLiveReset)) {
+        handleLiveRequest(socket, message, true);
     } else if (type == QLatin1String(dss::msg::kGetBrowserSource)) {
         QUuid id;
         if (!dss::parseGetBrowserSource(message, &id, &error)) {
@@ -392,6 +484,13 @@ void CoreService::handleMessage(QLocalSocket *socket, Client &client, const QJso
         client.browserSource = id;
         client.browserSourceSent = {};
         updateBrowserSources();
+    } else if (type == QLatin1String(dss::msg::kSubscribeEvents)) {
+        handleSubscribeEvents(socket, client, message);
+    } else if (dss::isActionsRequestType(type)) {
+        handleActionsRequest(socket, message);
+    } else if (type == QLatin1String(dss::msg::kTwitchLoginStart) || type == QLatin1String(dss::msg::kTwitchLoginCancel)
+               || type == QLatin1String(dss::msg::kTwitchLogout)) {
+        handleTwitchRequest(socket, message);
     } else if (type == QLatin1String(dss::msg::kGetOverlayList)) {
         send(socket, listMessage());
     } else if (type == QLatin1String(dss::msg::kGetMediaList)) {
@@ -471,6 +570,7 @@ void CoreService::setOverlayServer(dss::OverlayServer *server)
 {
 #if DSS_CORE_OVERLAY_SERVER
     m_overlayServer = server;
+    server->setLiveState(m_live); // P14 d
     connect(server, &dss::OverlayServer::statusChanged, this,
             [this] { broadcast(serverStatusMessage()); });
     connect(server, &dss::OverlayServer::pageOpened, this, &CoreService::onPageOpened);
@@ -517,6 +617,48 @@ void CoreService::onPageOpened(const QUuid &overlayId, const QString &page)
 #endif
 }
 
+void CoreService::handleLiveRequest(QLocalSocket *socket, const QJsonObject &message, bool reset)
+{
+    const QString type = dss::messageType(message);
+    QString error;
+    const QPointer<QLocalSocket> target(socket);
+    const auto answer = [this, target](const dss::ChangeResult &result) {
+        if (target && m_clients.contains(target))
+            send(target, dss::changeResultMessage(result));
+    };
+    if (reset) {
+        dss::LiveResetRequest r;
+        if (!dss::parseLiveReset(message, &r, &error)) {
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+            return;
+        }
+        error = m_live->reset(r);
+        answer({r.requestId, error.isEmpty(), QUuid(),
+                error.isEmpty() ? QString() : QString::fromLatin1(dss::err::kUnknownOverlay), error});
+        return;
+    }
+    dss::LiveSetRequest r;
+    if (!dss::parseLiveSet(message, &r, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, type);
+        return;
+    }
+    const qint64 requestId = r.requestId;
+    m_live->set(r, [answer, requestId](const dss::OverlayLiveState::Result &result) {
+        answer({requestId, result.ok, QUuid(), result.code, result.message, result.warning});
+    });
+}
+
+void CoreService::onLiveChanged(const QUuid &overlayId)
+{
+    broadcast(dss::overlayLiveMessage(m_live->all()));
+#if DSS_CORE_OVERLAY_SERVER
+    if (m_overlayServer)
+        m_overlayServer->liveChanged(overlayId);
+#else
+    Q_UNUSED(overlayId);
+#endif
+}
+
 QJsonObject CoreService::serverStatusMessage() const
 {
     dss::ServerStatusInfo info;
@@ -545,6 +687,7 @@ void CoreService::setObsConnection(dss::obs::ObsConnection *connection, dss::obs
     connect(connection, &ObsConnection::currentSceneChanged, this, &CoreService::onObsChanged);
     connect(sources, &ObsSources::scenesChanged, this, &CoreService::onObsChanged);
     connect(sources, &ObsSources::entriesChanged, this, [this] { broadcast(obsSourcesMessage()); });
+    new ObsEvents(connection, m_events, this); // P13: obs.scene_changed auf dem Ereignisfluss
     // Zuerst der Sollzustand: Der Abgleich beim Verbinden braucht ihn.
     updateObsSources();
     applyObsSettings();
@@ -687,6 +830,138 @@ QJsonObject CoreService::obsStatusMessage() const
     return dss::obsStatusMessage(info);
 }
 
+// --- Twitch (P13, Plan 2.7) ----------------------------------------------------------------------
+
+#if DSS_CORE_TWITCH
+void CoreService::setTwitchService(dss::twitch::TwitchService *twitch)
+{
+    m_twitch = twitch;
+    connect(twitch, &dss::twitch::TwitchService::stateChanged, this, &CoreService::onTwitchChanged);
+    applyTwitchSettings();
+    onTwitchChanged();
+}
+#endif
+
+void CoreService::applyTwitchSettings()
+{
+#if DSS_CORE_TWITCH
+    if (!m_twitch || !m_settings)
+        return;
+    const dss::CoreSettings s = m_settings->settings();
+    m_twitch->configure(s.twitchEnabled, s.twitchClientId);
+#endif
+}
+
+void CoreService::onTwitchChanged()
+{
+#if DSS_CORE_TWITCH
+    using State = dss::twitch::TwitchService::State;
+    const State state = m_twitch->state();
+    const dss::ConnectionState shown = state == State::Connected    ? dss::ConnectionState::Connected
+                                       : state == State::Connecting ? dss::ConnectionState::Connecting
+                                       : state == State::Error      ? dss::ConnectionState::Error
+                                                                    : dss::ConnectionState::Off;
+    if (m_connectionStates.value(dss::Connection::Twitch) != shown) {
+        m_connectionStates.insert(dss::Connection::Twitch, shown);
+        broadcast(dss::connectionsMessage(m_connectionStates));
+    }
+#endif
+    // Nur bei einer Änderung: Der Dienst meldet mehrmals hintereinander.
+    if (const QJsonObject status = twitchStatusMessage(); status != m_lastTwitchStatus) {
+        m_lastTwitchStatus = status;
+        broadcast(status);
+    }
+}
+
+QJsonObject CoreService::twitchStatusMessage() const
+{
+    dss::TwitchStatusInfo info;
+#if DSS_CORE_TWITCH
+    if (m_twitch) {
+        using dss::twitch::TwitchAuth;
+        const auto account = [](const TwitchAuth *auth) {
+            dss::TwitchAccountInfo a;
+            switch (auth->state()) {
+            case TwitchAuth::State::Off:
+                a.state = QStringLiteral("off");
+                break;
+            case TwitchAuth::State::Checking:
+                a.state = QStringLiteral("checking");
+                break;
+            case TwitchAuth::State::Ok:
+                a.state = QStringLiteral("ok");
+                break;
+            case TwitchAuth::State::Expired:
+                a.state = QStringLiteral("expired");
+                break;
+            case TwitchAuth::State::Error:
+                a.state = QStringLiteral("error");
+                break;
+            }
+            a.message = auth->message();
+            a.login = auth->login();
+            a.userId = auth->userId();
+            if (!a.userId.isEmpty())
+                a.missingScopes = auth->missingScopes();
+            if (const auto pending = auth->pending())
+                a.loginPending = dss::TwitchLoginPending{pending->userCode, pending->verificationUri.toString(),
+                                                         pending->expiresAt};
+            return a;
+        };
+        info.enabled = true;
+        info.message = m_twitch->message();
+        info.live = m_twitch->connection()->isLive();
+        const QList<dss::twitch::EventSubConnection::Subscription> subscriptions = m_twitch->connection()->subscriptions();
+        for (const auto &s : subscriptions)
+            info.subscriptions.append({s.type, s.ok, s.problem});
+        info.channel = account(m_twitch->channel());
+        info.bot = account(m_twitch->bot());
+        info.badgeProblem = m_twitch->badgeProblem();
+        return dss::twitchStatusMessage(info);
+    }
+#endif
+    info.message = QStringLiteral("Kern ohne Anbindung an Twitch gebaut");
+    return dss::twitchStatusMessage(info);
+}
+
+void CoreService::handleTwitchRequest(QLocalSocket *socket, const QJsonObject &message)
+{
+    const QString type = dss::messageType(message);
+    dss::TwitchAccountRequest request;
+    QString error;
+    if (!dss::parseTwitchAccountRequest(message, &request, &error)) {
+        const qint64 id = dss::messageRequestId(message);
+        if (id < 0)
+            sendError(socket, dss::err::kInvalidMessage, error, type);
+        else
+            send(socket, dss::changeResultMessage(
+                             {id, false, QUuid(), QString::fromLatin1(dss::err::kInvalidMessage), error}));
+        return;
+    }
+#if DSS_CORE_TWITCH
+    if (m_twitch) {
+        using Account = dss::twitch::TwitchAuth::Account;
+        const Account account = request.account == QLatin1String("bot") ? Account::Bot : Account::Channel;
+        if (type == QLatin1String(dss::msg::kTwitchLoginStart))
+            error = m_twitch->startLogin(account);
+        else if (type == QLatin1String(dss::msg::kTwitchLoginCancel))
+            error = m_twitch->cancelLogin(account);
+        else
+            error = m_twitch->logout(account);
+    } else
+#endif
+    {
+        error = QStringLiteral("Kern ohne Anbindung an Twitch gebaut.");
+    }
+    if (!error.isEmpty()) {
+        qWarning("Twitch: %s abgelehnt: %s", qPrintable(type), qPrintable(error));
+        send(socket, dss::changeResultMessage(
+                         {request.requestId, false, QUuid(), QString::fromLatin1(dss::err::kRejected), error}));
+        return;
+    }
+    send(socket, dss::changeResultMessage({request.requestId, true, QUuid(), QString(), QString()}));
+}
+
 #if DSS_CORE_AUDIO
 void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
 {
@@ -702,6 +977,21 @@ void CoreService::setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
     };
     output->onLog = [this](const QString &line) {
         QMetaObject::invokeMethod(this, [line] { qInfo("Ton: %s", qPrintable(line)); }, Qt::QueuedConnection);
+    };
+    applyAudioSettings();
+}
+
+void CoreService::setActionAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer)
+{
+    m_actionOutput = output;
+    m_actionMixer = mixer;
+    m_actionSound = new dss::ActionSound(m_store->dataDir(), mixer, output, this);
+    // Wie setAudioOutput: Rückrufe im Thread des Ausgangs, nur weiterreichen.
+    output->onChange = [this] {
+        QMetaObject::invokeMethod(this, &CoreService::onAudioChanged, Qt::QueuedConnection);
+    };
+    output->onLog = [this](const QString &line) {
+        QMetaObject::invokeMethod(this, [line] { qInfo("Ton Chat-Bot: %s", qPrintable(line)); }, Qt::QueuedConnection);
     };
     applyAudioSettings();
 }
@@ -725,19 +1015,29 @@ void CoreService::stopAudio()
     if (m_videoAudio)
         m_videoAudio->shutdown();
 #endif
+#if DSS_CORE_AUDIO
+    if (m_actionSound)
+        m_actionSound->shutdown();
+#endif
 }
 
 void CoreService::applyAudioSettings()
 {
 #if DSS_CORE_AUDIO
-    if (!m_audioOutput || !m_settings)
+    if (!m_settings)
         return;
-    const dss::AudioRoute route =
-        m_settings->settings().audioRoutes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
-    m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
-    // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
-    // (neu gewählt, pwoutput.h).
-    m_audioOutput->setTarget(route.output);
+    const QMap<QString, dss::AudioRoute> routes = m_settings->settings().audioRoutes;
+    if (m_audioOutput) {
+        const dss::AudioRoute route = routes.value(QString::fromLatin1(dss::kAudioPurposeVideo));
+        m_mixer->setExtraDelayNs(int64_t(route.offsetMs) * 1000000);
+        // Gleicher Ausgang: nichts zu tun, ausser er war wegen einer fremden Verbindung gesperrt
+        // (neu gewählt, pwoutput.h).
+        m_audioOutput->setTarget(route.output);
+    }
+    // P14 t: Ohne gewählten Ausgang legt PwOutput keinen Strom an (Plan P14, 4.3: «nur offen,
+    // solange ein Ausgang gewählt ist»). Der Versatz wirkt bei freien Stimmen nicht.
+    if (m_actionOutput)
+        m_actionOutput->setTarget(routes.value(QString::fromLatin1(dss::kAudioPurposeActions)).output);
 #endif
 }
 
@@ -753,6 +1053,18 @@ QJsonObject CoreService::audioOutputsMessage() const
         info.routes.insert(QString::fromLatin1(dss::kAudioPurposeVideo),
                            {QString::fromLatin1(dss::AudioOutput::stateName(m_audioOutput->state())),
                             m_audioOutput->stateDetail()});
+    }
+    // P14 t: Die Liste der Ausgänge kommt vom Ausgang der Videos (dieselbe Registry von PipeWire).
+    if (m_actionOutput) {
+        info.enabled = true;
+        if (!m_audioOutput) {
+            const QList<dss::AudioDevice> devices = m_actionOutput->devices();
+            for (const dss::AudioDevice &d : devices)
+                info.devices.append({d.name, d.description, d.isDefault});
+        }
+        info.routes.insert(QString::fromLatin1(dss::kAudioPurposeActions),
+                           {QString::fromLatin1(dss::AudioOutput::stateName(m_actionOutput->state())),
+                            m_actionOutput->stateDetail()});
     }
 #endif
     return dss::audioOutputsMessage(info);
@@ -772,6 +1084,9 @@ QJsonObject CoreService::settingsMessage() const
     dss::SettingsInfo info{m_settings->settings(), dss::kPortMin, dss::kPortMax, m_settings->path(),
                            m_settings->fileError()};
     info.obsPasswordSet = m_obsSecrets && m_obsSecrets->isSet();
+#if DSS_CORE_TWITCH
+    info.twitchClientSecretSet = m_twitch && m_twitch->clientSecretSet();
+#endif
     return dss::settingsMessage(info);
 }
 
@@ -796,8 +1111,13 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
                                                QString::fromLatin1(dss::err::kRejected), text}));
     };
     // P10c: Das Passwort wird zuerst geschrieben; eine Abweisung muss also vorher feststehen.
-    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
-                                         update.obsHost, update.obsPort,     update.audioRoutes};
+    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
+                                         update.obsHost,      update.obsPort,     update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId};
+    if (update.twitchClientSecret && !m_twitch) {
+        reject(QStringLiteral("Der Kern kann das Client Secret nicht ablegen (ohne Twitch gebaut)."));
+        return;
+    }
     if (!change.isEmpty()) {
         if (const QString e = m_settings->checkChange(change); !e.isEmpty()) {
             reject(e);
@@ -808,7 +1128,7 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
         return;
     }
     if (!update.obsPassword) {
-        finishSettingsUpdate(socket, update, false);
+        writeTwitchSecret(socket, update, false);
         return;
     }
     if (!m_obsSecrets) {
@@ -821,7 +1141,7 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
             return;
         }
         qInfo("OBS: Passwort gelöscht");
-        finishSettingsUpdate(socket, update, true);
+        writeTwitchSecret(socket, update, true);
         return;
     }
     // systemd-creds läuft als eigener Prozess: Die Antwort kommt später (Abschnitt «Einstellungen»).
@@ -836,19 +1156,57 @@ void CoreService::handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &
             return;
         }
         qInfo("OBS: Passwort verschlüsselt gespeichert");
-        finishSettingsUpdate(connected, update, true);
+        writeTwitchSecret(connected, update, true);
     });
 }
 
+void CoreService::writeTwitchSecret(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged)
+{
+#if DSS_CORE_TWITCH
+    if (update.twitchClientSecret && m_twitch) {
+        const auto reject = [this](QLocalSocket *target, qint64 requestId, const QString &text) {
+            qWarning("Einstellungen abgelehnt: %s", qPrintable(text));
+            if (target)
+                send(target, dss::changeResultMessage({requestId, false, QUuid(),
+                                                       QString::fromLatin1(dss::err::kRejected), text}));
+        };
+        if (update.twitchClientSecret->isEmpty()) {
+            QString error;
+            if (!m_twitch->removeClientSecret(&error)) {
+                reject(socket, update.requestId, error);
+                return;
+            }
+            finishSettingsUpdate(socket, update, passwordChanged, true);
+            return;
+        }
+        // systemd-creds läuft als eigener Prozess: Die Antwort kommt später.
+        QPointer<QLocalSocket> target(socket);
+        m_twitch->writeClientSecret(*update.twitchClientSecret,
+                                    [this, target, update, passwordChanged, reject](const QString &failure) {
+                                        QLocalSocket *connected =
+                                            target && m_clients.contains(target.data()) ? target.data() : nullptr;
+                                        if (!failure.isEmpty()) {
+                                            reject(connected, update.requestId, failure);
+                                            return;
+                                        }
+                                        finishSettingsUpdate(connected, update, passwordChanged, true);
+                                    });
+        return;
+    }
+#endif
+    finishSettingsUpdate(socket, update, passwordChanged);
+}
+
 void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update,
-                                       bool passwordChanged)
+                                       bool passwordChanged, bool secretChanged)
 {
     const auto reply = [this, socket](const dss::ChangeResult &result) {
         if (socket)
             send(socket, dss::changeResultMessage(result));
     };
-    const dss::CoreSettingsChange change{update.port,    update.homeAddress, update.obsEnabled,
-                                         update.obsHost, update.obsPort,     update.audioRoutes};
+    const dss::CoreSettingsChange change{update.port,         update.homeAddress, update.obsEnabled,
+                                         update.obsHost,      update.obsPort,     update.audioRoutes,
+                                         update.twitchEnabled, update.twitchClientId};
     const dss::CoreSettings before = m_settings->settings();
     QString error;
     if (!change.isEmpty() && !m_settings->change(change, &error)) {
@@ -858,10 +1216,11 @@ void CoreService::finishSettingsUpdate(QLocalSocket *socket, const dss::Settings
     }
     if (!(m_settings->settings() == before))
         settingsApplied();
-    else if (passwordChanged)
-        broadcast(settingsMessage()); // obs_password_set
+    else if (passwordChanged || secretChanged)
+        broadcast(settingsMessage()); // obs_password_set, twitch_client_secret_set
     // Auch bei gleichen Werten: «OK» im Dialog versucht es nach 4009, 4010, 4011 wieder (Plan 1.7).
     applyObsSettings(passwordChanged);
+    applyTwitchSettings();
     // P12b b3: ebenso ein durch eine fremde Verbindung gesperrter Ausgang
     if (!update.audioRoutes.isEmpty())
         applyAudioSettings();
@@ -889,6 +1248,7 @@ void CoreService::handleSettingsReset(QLocalSocket *socket, const QJsonObject &m
         qInfo("%s", qPrintable(line));
     settingsApplied();
     applyObsSettings();
+    applyTwitchSettings();
     applyAudioSettings();
     send(socket, dss::changeResultMessage(
                      {requestId, true, QUuid(), QString(), QString(),
@@ -905,6 +1265,8 @@ void CoreService::settingsApplied()
     for (auto it = after.audioRoutes.constBegin(); it != after.audioRoutes.constEnd(); ++it)
         qInfo("Einstellungen Ton %s: Ausgang %s, Versatz %d ms", qPrintable(it.key()),
               it.value().output.isEmpty() ? "keiner" : qPrintable(it.value().output), it.value().offsetMs);
+    qInfo("Einstellungen Twitch: %s, Client-ID %s", after.twitchEnabled ? "ein" : "aus",
+          after.twitchClientId.isEmpty() ? "leer" : "gesetzt");
     broadcast(settingsMessage());
     updateBrowserSources();
     updateObsSources();
@@ -934,6 +1296,71 @@ void CoreService::broadcast(const QJsonObject &message)
         if (it->greeted)
             it.key()->write(line);
     }
+}
+
+void CoreService::handleSubscribeEvents(QLocalSocket *socket, Client &client, const QJsonObject &message)
+{
+    dss::SubscribeEvents request;
+    QString error;
+    if (!dss::parseSubscribeEvents(message, &request, &error)) {
+        sendError(socket, dss::err::kInvalidMessage, error, dss::messageType(message));
+        return;
+    }
+    client.eventTypes = request.types;
+    client.eventsInHistory.clear();
+    qInfo("Ereignisse: %s bestellt %s%s", qPrintable(client.hello.program),
+          request.types.isEmpty() ? "nichts" : qPrintable(request.types.join(QLatin1Char(' '))),
+          request.history ? " mit Verlauf" : "");
+    if (!request.history)
+        return;
+    // Ereignisse, die schon im Verlauf stehen, aber noch nicht verteilt sind (Zustellung verzögert),
+    // kommen nicht noch einmal als event.
+    const QList<dss::events::Event> all = m_events->history(dss::events::eventTypeNames());
+    qsizetype first = 0;
+    for (qsizetype i = all.size() - 1; i >= 0; --i) {
+        if (all.at(i).id == m_lastDeliveredEvent) {
+            first = i + 1;
+            break;
+        }
+    }
+    for (qsizetype i = first; i < all.size(); ++i)
+        client.eventsInHistory.insert(all.at(i).id);
+    send(socket, dss::eventHistoryMessage(m_events->history(request.types)));
+}
+
+void CoreService::onEvent(const dss::events::Event &event)
+{
+    m_lastDeliveredEvent = event.id;
+    QByteArray line;
+    for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
+        if (it->eventsInHistory.remove(event.id) || !it->greeted
+            || !dss::events::matchesFilters(event.type, it->eventTypes))
+            continue;
+        QLocalSocket *socket = it.key();
+        // Gegendruck (Plan 1.5): Ein Fenster, das nicht liest, bremst den Kern nicht.
+        if (socket->bytesToWrite() > dss::kEventBacklogBytes) {
+            if (it->droppedEvents++ == 0)
+                qWarning("Ereignisse: %s liest nicht (mehr als %lld Byte ungesendet), verwerfe Ereignisse",
+                         qPrintable(it->hello.program), static_cast<long long>(dss::kEventBacklogBytes));
+            continue;
+        }
+        reportDroppedEvents(socket);
+        if (line.isEmpty())
+            line = dss::encodeMessage(dss::eventMessage(event));
+        socket->write(line);
+    }
+}
+
+void CoreService::reportDroppedEvents(QLocalSocket *socket)
+{
+    const auto it = m_clients.find(socket);
+    if (it == m_clients.end() || it->droppedEvents == 0 || socket->bytesToWrite() > dss::kEventBacklogBytes)
+        return;
+    const qint64 count = it->droppedEvents;
+    it->droppedEvents = 0;
+    qInfo("Ereignisse: %s liest wieder, verworfen: %lld", qPrintable(it->hello.program),
+          static_cast<long long>(count));
+    send(socket, dss::eventsDroppedMessage(count));
 }
 
 void CoreService::sampleStats()
@@ -1036,9 +1463,7 @@ QString CoreService::fileToImport(const dss::ChangeRequest &r, dss::MediaUse *us
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind)
             return {};
-        *use = *kind == MediaKind::Image ? MediaUse::Image
-               : *kind == MediaKind::Video ? MediaUse::Video
-                                           : MediaUse::Font;
+        *use = mediaUseOf(*kind);
         return r.file;
     }
     if (type == QLatin1String(msg::kAddTextSource)) {
@@ -1128,6 +1553,7 @@ dss::MediaListData CoreService::mediaListData() const
         f.kind = dss::mediaKindOf(e.file).value_or(dss::MediaKind::Image);
         f.bytes = std::max<qint64>(m_store->mediaBytes(e.file), 0);
         f.codec = m_store->videoCodec(e.file);
+        f.durationMs = m_store->mediaDurationMs(e.file);
         f.browserProblem = m_store->browserProblem(e.file);
         f.usedIn = usages.value(e.file);
         data.files.append(f);
@@ -1345,15 +1771,12 @@ dss::ChangeResult CoreService::applyChange(const dss::ChangeRequest &r, const Im
         const std::optional<MediaKind> kind = mediaKindOf(r.file);
         if (!kind) {
             QStringList all;
-            for (MediaUse use : {MediaUse::Image, MediaUse::Video, MediaUse::Font})
-                all.append(allowedMediaSuffixes(use));
+            for (MediaKind k : kMediaKinds)
+                all.append(allowedMediaSuffixes(mediaUseOf(k)));
             return fail(err::kRejected, QStringLiteral("Endung «%1» nicht erlaubt, erlaubt sind: %2.")
                                             .arg(QFileInfo(r.file).suffix(), all.join(QStringLiteral(", "))));
         }
-        const MediaUse use = *kind == MediaKind::Image   ? MediaUse::Image
-                             : *kind == MediaKind::Video ? MediaUse::Video
-                                                         : MediaUse::Font;
-        const QString reference = m_store->importMedia(r.file, use, &error, r.folderId);
+        const QString reference = m_store->importMedia(r.file, mediaUseOf(*kind), &error, r.folderId);
         if (reference.isEmpty())
             return fail(err::kRejected, error);
         ChangeResult result = done(true, QString());

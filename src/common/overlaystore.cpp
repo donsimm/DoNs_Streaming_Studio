@@ -275,6 +275,21 @@ QString OverlayStore::videoCodec(const QString &reference) const
     return *it;
 }
 
+qint64 OverlayStore::mediaDurationMs(const QString &reference) const
+{
+    if (!m_mediaDurationReader || mediaKindOf(reference) != MediaKind::Audio)
+        return 0;
+    auto it = m_mediaDurationCache.constFind(reference);
+    if (it == m_mediaDurationCache.constEnd()) {
+        qint64 ms = 0;
+        QString ignored;
+        if (!m_mediaDurationReader(mediaFilePath(reference), &ms, &ignored))
+            ms = 0;
+        it = m_mediaDurationCache.insert(reference, ms);
+    }
+    return *it;
+}
+
 QString OverlayStore::browserProblem(const QString &reference, const QString &name) const
 {
     const std::optional<QString> unsupported = browserUnsupportedVideoCodec(videoCodec(reference));
@@ -375,6 +390,7 @@ bool OverlayStore::removeMedia(const QString &reference, QString *error)
     }
     m_mediaSizeCache.remove(reference);
     m_videoCodecCache.remove(reference);
+    m_mediaDurationCache.remove(reference);
     m_mediaBytes.remove(reference);
     QString writeError;
     if (!changeMedia([&](MediaLibrary *l) { return removeMediaFromLibrary(l, reference); }, false,
@@ -586,6 +602,31 @@ QUuid OverlayStore::createOverlay(const QString &name, int width, int height, QS
                       QStringLiteral("Overlay angelegt"), error))
         return {};
     return overlay.id;
+}
+
+bool OverlayStore::addOverlay(const Overlay &overlay, QString *error)
+{
+    if (overlay.id.isNull() || indexOf(overlay.id) >= 0 || QFileInfo::exists(overlayFilePath(overlay.id))) {
+        *error = QStringLiteral("Overlay %1 gibt es schon.").arg(overlay.id.toString(QUuid::WithoutBraces));
+        return false;
+    }
+    Overlay added = overlay;
+    added.address = uniqueAddress(addressFromName(overlay.name), takenAddresses());
+    if (const QString e = validateOverlay(added); !e.isEmpty()) {
+        *error = e;
+        return false;
+    }
+    for (const Source &source : std::as_const(added.sources)) {
+        const QString file = source.kind == SourceKind::Text ? source.text.fontFile : source.file;
+        if (!QFileInfo(mediaFilePath(file)).isFile()) {
+            *error = QStringLiteral("Datei %1 fehlt im Datenordner.").arg(file);
+            return false;
+        }
+    }
+    if (!addNewOverlay(added, error))
+        return false;
+    return followLayout([&](OverlayLayout *l) { return addOverlayToLayout(l, added.id); },
+                        QStringLiteral("Overlay angelegt"), error);
 }
 
 bool OverlayStore::renameOverlay(const QUuid &overlayId, const QString &newName,

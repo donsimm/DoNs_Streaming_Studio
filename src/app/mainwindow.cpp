@@ -1,13 +1,19 @@
 #include "mainwindow.h"
 
+#include "actionfieldspanel.h"
+#include "actionfields.h"
+#include "actionspage.h"
 #include "canvasimage.h"
 #include "canvaswidget.h"
+#include "chatbotpage.h"
 #include "configpaths.h"
 #include "coreclient.h"
+#include "dialogs.h"
 #include "dockviews.h"
 #include "docks.h"
 #include "headerbar.h"
 #include "obssourcedialog.h"
+#include "queuesdialog.h"
 #include "symbols.h"
 #if DSS_APP_SETTINGS_DIALOG
 #include "settingsdialog.h"
@@ -66,6 +72,38 @@ constexpr int kLayoutVersion = 1;
 QString layoutFile()
 {
     return dss::configDir() + QStringLiteral("/fenster.ini");
+}
+
+// Liste und Zustand einer Zeile «Ton …» im Dock «Steuerung» (P12b b5, P14 t)
+void showAudioRouteRow(const dss::AudioRouteRow &row, QComboBox *box, QLabel *state, const QString &boxToolTip,
+                       bool coreConnected)
+{
+    {
+        const QSignalBlocker block(box);
+        // Neu füllen nur, wenn sich die Liste geändert hat (offene Liste bleibt offen).
+        bool same = box->count() == row.choices.size();
+        for (int i = 0; same && i < box->count(); ++i)
+            same = box->itemData(i).toString() == row.choices.at(i).name && box->itemText(i) == row.choices.at(i).label;
+        if (!same) {
+            box->clear();
+            for (const dss::AudioOutputChoice &c : row.choices)
+                box->addItem(c.label, c.name);
+        }
+        box->setCurrentIndex(row.current);
+    }
+    box->setToolTip(QStringLiteral("%1: %2").arg(boxToolTip, box->currentText()));
+    box->setEnabled(row.canEdit);
+    // Ohne Kern ausgegraut wie die Zeilen «Ausgabe» und «OBS».
+    state->setEnabled(coreConnected);
+    state->setText(row.text);
+    state->setToolTip(row.toolTip);
+    const QString stateKey = row.problem ? QStringLiteral("problem") : QStringLiteral("normal");
+    if (state->property("state").toString() != stateKey) {
+        state->setProperty("state", stateKey);
+        // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
+        state->style()->unpolish(state);
+        state->style()->polish(state);
+    }
 }
 
 } // namespace
@@ -180,17 +218,43 @@ void MainWindow::createCentralArea()
     m_canvas->setRenderer(m_renderer);
 #endif
 
-    auto *chatBotPage = new QWidget(m_modules);
-    chatBotPage->setObjectName(QStringLiteral("chatBotPage"));
-    chatBotPage->setAttribute(Qt::WA_StyledBackground);
-    auto *chatBotLayout = new QVBoxLayout(chatBotPage);
-    chatBotLayout->addWidget(new QLabel(QStringLiteral("Noch nicht vorhanden"), chatBotPage), 0,
-                             Qt::AlignCenter);
-    m_modules->addWidget(chatBotPage);
+    // P13: Reiter «Chat-Bot» (chatbotpage.h); ohne Kern zeigt die Kopfzeile «Twitch: –».
+    m_chatBot = new ChatBotPage(m_theme, m_modules);
+    m_chatBot->setHeader(dss::chatBotHeaderView(dss::ConnectionState::Off, std::nullopt));
+    m_modules->addWidget(m_chatBot);
     column->addWidget(m_modules, 1);
 
-    connect(m_header, &HeaderBar::moduleSelected, m_modules, &QStackedWidget::setCurrentIndex);
+    connect(m_header, &HeaderBar::moduleSelected, this, &MainWindow::onModuleSelected);
     setCentralWidget(central);
+}
+
+void MainWindow::onModuleSelected(int module)
+{
+    m_modules->setCurrentIndex(module);
+    // P13 (Entscheid 2026-11-15): Docks des Editors nur im Reiter «Overlays». Die Anordnung beim
+    // Verlassen gilt fürs Speichern, solange die Docks ausgeblendet sind.
+    const bool editor = module == HeaderBar::Overlays;
+    const QList<QDockWidget *> docks = editorDocks();
+    QList<bool> visible;
+    for (QDockWidget *d : docks)
+        visible.append(!d->isHidden()); // isVisible wäre vor show() immer false
+    if (!editor && !m_moduleDocks.docksHidden())
+        m_editorLayout = saveState(kLayoutVersion);
+    const QList<bool> next = m_moduleDocks.switchTo(editor, visible);
+    for (qsizetype i = 0; i < next.size(); ++i)
+        docks.at(i)->setVisible(next.at(i));
+    // Im Reiter «Chat-Bot» kein Dock über das Menü einblenden.
+    m_docksMenu->setEnabled(editor);
+    requestShownVariables();
+}
+
+QList<QDockWidget *> MainWindow::editorDocks() const
+{
+    QList<QDockWidget *> docks = {m_overlaysDock.dock, m_sourcesDock.dock, m_propertiesDock.dock,
+                                  m_controlDock.dock};
+    if (m_mediaDock.dock)
+        docks.append(m_mediaDock.dock);
+    return docks;
 }
 
 void MainWindow::setConnectionState(dss::Connection connection, dss::ConnectionState state)
@@ -283,7 +347,9 @@ void MainWindow::saveLayout()
     QDir().mkpath(QFileInfo(layoutFile()).absolutePath());
     QSettings settings(layoutFile(), QSettings::IniFormat);
     settings.setValue(QStringLiteral("fenster/geometrie"), saveGeometry());
-    settings.setValue(QStringLiteral("fenster/anordnung"), saveState(kLayoutVersion));
+    // P13: Im Reiter «Chat-Bot» sind die Docks ausgeblendet; gespeichert wird die Anordnung von «Overlays».
+    settings.setValue(QStringLiteral("fenster/anordnung"),
+                      m_moduleDocks.docksHidden() ? m_editorLayout : saveState(kLayoutVersion));
     // P10b: Enthält die Anordnung das Dock «Medien»? (restoreLayout)
     settings.setValue(QStringLiteral("fenster/medien"), m_mediaDock.dock != nullptr);
     settings.sync();
@@ -323,12 +389,19 @@ void MainWindow::connectCore()
         if (m_settingsAction)
             m_settingsAction->trigger();
     });
+    connectChatBot();
     connect(m_client, &dss::CoreClient::overlayListChanged, this, &MainWindow::refreshOverlayList);
     connect(m_client, &dss::CoreClient::overlayChanged, this, [this](const QUuid &id) {
         if (id == m_selectedOverlay)
             refreshOverlay();
     });
     connect(m_client, &dss::CoreClient::errorReceived, this, &MainWindow::onCoreError);
+    // P14 d: Laufzustand (Markierung «live», Leinwand, Bereich «Chat-Bot»)
+    m_liveTimer = new QTimer(this);
+    m_liveTimer->setSingleShot(true);
+    connect(m_liveTimer, &QTimer::timeout, this, &MainWindow::refreshLiveRow);
+    connect(m_client, &dss::CoreClient::liveChanged, this, &MainWindow::refreshOverlay);
+    connect(m_propertiesDock.hideLive, &QPushButton::clicked, this, &MainWindow::hideLive);
     connect(m_client, &dss::CoreClient::pendingImportsChanged, this, [this] {
         m_importStatus->setText(dss::importStatusText(m_client->pendingImports()));
     });
@@ -360,12 +433,18 @@ void MainWindow::connectCore()
     connect(m_controlDock.audioOutput, &QComboBox::activated, this, [this](int index) {
         dss::AudioRouteChange change;
         change.output = m_controlDock.audioOutput->itemData(index).toString();
-        sendAudioRoute(change);
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeVideo), change);
     });
     connect(m_controlDock.audioOffset, &QSpinBox::valueChanged, this, [this](int value) {
         dss::AudioRouteChange change;
         change.offsetMs = value;
-        sendAudioRoute(change);
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeVideo), change);
+    });
+    // P14 t: Zeile «Ton Chat-Bot»
+    connect(m_controlDock.actionsAudioOutput, &QComboBox::activated, this, [this](int index) {
+        dss::AudioRouteChange change;
+        change.output = m_controlDock.actionsAudioOutput->itemData(index).toString();
+        sendAudioRoute(QString::fromLatin1(dss::kAudioPurposeActions), change);
     });
     connect(m_overlaysDock.tree, &QTreeWidget::currentItemChanged, this,
             &MainWindow::onOverlayItemChanged);
@@ -414,10 +493,627 @@ void MainWindow::showSettings()
 #endif
 }
 
+void MainWindow::showTwitchSettings()
+{
+#if DSS_APP_SETTINGS_DIALOG
+    // Wie der OBS-Knopf: ohne Verbindung zum Kern gesperrt.
+    if (!m_settingsAction || !m_settingsAction->isEnabled())
+        return;
+    showSettings();
+    m_settingsDialog->focusTwitchSection();
+#endif
+}
+
+void MainWindow::connectChatBot()
+{
+    // P13: Twitch-Knopf, Kopfzeile des Reiters «Chat-Bot» und Bereich «Ereignisse» (Plan 1.5, 2.7)
+    connect(m_header, &HeaderBar::twitchClicked, this, &MainWindow::showTwitchSettings);
+    connect(m_client, &dss::CoreClient::twitchStatusChanged, this, &MainWindow::refreshConnections);
+    connect(m_client, &dss::CoreClient::connectedChanged, this, &MainWindow::refreshChatBotHeader);
+    connect(m_client, &dss::CoreClient::eventHistoryReceived, this, [this](const QList<dss::events::Event> &events) {
+        m_eventRows.reset(events);
+        m_chatBot->resetEvents(m_eventRows.visibleRows());
+        m_chatRows.reset(events, m_client->twitchStatus());
+        m_chatBot->resetChat(m_chatRows.rows());
+        requestEmoteImages(m_chatRows.rows());
+    });
+    connect(m_client, &dss::CoreClient::eventReceived, this, [this](const dss::events::Event &event) {
+        // P14 e2-12: Meldungen der Läufe (actions.run_*) nur in «Läufe der Aktionen»; ein gestarteter
+        // Lauf bekommt dazu eine graue Zeile im «Chat» (e2-13).
+        if (event.type.startsWith(QLatin1String("actions."))) {
+            if (event.type == QLatin1String("actions.run_started"))
+                showChatChange(m_chatRows.add(event, m_client->twitchStatus()));
+            dss::actions::RunRecord record;
+            QString error;
+            if (!dss::runFromJson(event.data, &record, &error)) {
+                qWarning("Kern: %s ungültig: %s", qPrintable(event.type), qPrintable(error));
+                return;
+            }
+            const dss::RunRows::Change change = m_runRows.apply(record);
+            m_chatBot->applyRun(change, change.index >= 0 ? m_runRows.row(record.runId) : nullptr);
+            return;
+        }
+        // P14 e2-13: jedes Ereignis in «Chat» und «Ereignisse», sofern der Typ dort eine Zeile hat
+        showChatChange(m_chatRows.add(event, m_client->twitchStatus()));
+        const dss::RowsAppend row = m_eventRows.add(event);
+        m_chatBot->appendEvent(row, row.appended ? m_eventRows.rows().last() : dss::EventRow());
+    });
+    connect(m_client, &dss::CoreClient::eventsDropped, this,
+            [this](qint64 count) { showStatus(dss::eventsDroppedText(count)); });
+    // P14 e2-11: Schalter «Chat-Bot aktiv». Den Stand zeigt erst actions_status; bei Ablehnung
+    // (Meldung über onChangeFinished) wieder den Stand des Kerns.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshChatBotHeader);
+    connect(m_chatBot, &ChatBotPage::enabledClicked, this, [this](bool enabled) {
+        m_actionsEnabledRequest = m_client->sendActionsEdit(dss::actionsSetEnabledEdit(enabled));
+        if (m_actionsEnabledRequest == 0)
+            refreshChatBotHeader();
+    });
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionsEnabledRequest == 0 || result.requestId != m_actionsEnabledRequest)
+            return;
+        m_actionsEnabledRequest = 0;
+        if (!result.ok)
+            refreshChatBotHeader();
+    });
+    // P14 e2-12: «Läufe der Aktionen». Verlauf mit get_action_runs, danach der Fluss actions.;
+    // Ablehnungen von «Lauf abbrechen» zeigt onChangeFinished in der Statuszeile.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::requestActionRuns);
+    connect(m_client, &dss::CoreClient::actionRunsReceived, this,
+            [this](const QList<dss::actions::RunRecord> &runs) {
+                m_runRows.reset(runs);
+                m_chatBot->resetRuns(m_runRows.visibleRows());
+            });
+    connect(m_chatBot, &ChatBotPage::onlyErrorsToggled, this, [this](bool onlyErrors) {
+        m_runRows.setOnlyErrors(onlyErrors);
+        m_chatBot->resetRuns(m_runRows.visibleRows());
+    });
+    connect(m_chatBot, &ChatBotPage::cancelRunClicked, this, [this](const QUuid &runId) {
+        m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kActionRunCancel),
+                                   QJsonObject{{QStringLiteral("run_id"), runId.toString(QUuid::WithoutBraces)}}});
+    });
+    // «Im Editor öffnen»: Unterreiter «Aktionen», die Aktion im Baum gewählt
+    connect(m_chatBot, &ChatBotPage::openActionClicked, this, &MainWindow::openAction);
+    // P14 e2-13: «Chat-Nachrichten ausblenden» füllt nur die Liste «Ereignisse» neu.
+    connect(m_chatBot, &ChatBotPage::hideChatToggled, this, [this](bool hideChat) {
+        m_eventRows.setHideChat(hideChat);
+        m_chatBot->resetEvents(m_eventRows.visibleRows());
+    });
+    // Senden: Prüfung wie im Kern (chatSendEdit), ein Grund in die Statuszeile; Ablehnungen des
+    // Kerns zeigt onChangeFinished. Der Text bleibt bis zur Bestätigung stehen.
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshChatSend);
+    connect(m_chatBot, &ChatBotPage::chatInputChanged, this, &MainWindow::refreshChatSend);
+    connect(m_chatBot, &ChatBotPage::chatSendClicked, this, [this](const QString &text, const QString &account) {
+        const dss::EditResult result = dss::chatSendEdit(text, account, m_client->actionsStatus());
+        if (!result.problem.isEmpty()) {
+            showStatus(result.problem);
+            return;
+        }
+        for (const dss::ActionsEdit &edit : result.edits)
+            m_chatSendRequest = m_client->sendActionsEdit(edit);
+    });
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_chatSendRequest == 0 || result.requestId != m_chatSendRequest)
+            return;
+        m_chatSendRequest = 0;
+        if (result.ok)
+            m_chatBot->clearChatText();
+    });
+    refreshChatSend();
+    m_client->subscribeEvents(dss::chatBotLiveFilters());
+    connectActions();
+    connectCommands();
+    connectTimers();
+    connectVariables();
+}
+
+void MainWindow::openAction(const QUuid &actionId)
+{
+    m_chatBot->setCurrentSubTab(ChatBotPage::Actions);
+    if (!m_chatBot->actionsPage()->selectAction(actionId) && !m_chatBot->actionsPage()->searchText().isEmpty())
+        m_chatBot->actionsPage()->clearSearch();
+}
+
+void MainWindow::connectActions()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    connect(m_client, &dss::CoreClient::actionsConfigChanged, this, &MainWindow::refreshActionList);
+    connect(page, &ActionsPage::searchChanged, this, &MainWindow::refreshActionList);
+    connect(page, &ActionsPage::actionSelected, this, &MainWindow::refreshActionButtons);
+    connect(page, &ActionsPage::actionEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const dss::actions::Action *before = info && info->config ? info->config->action(id) : nullptr;
+        if (!before)
+            return;
+        dss::actions::Action after = *before;
+        after.enabled = enabled;
+        runActionEdits(dss::putAction(*info->config, *before, after), before->name);
+    });
+    connect(page, &ActionsPage::addClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::newAction(*info->config, m_chatBot->actionsPage()->selectedGroup()), QString());
+    });
+    connect(page, &ActionsPage::newGroupClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::newActionGroup(*info->config), QString());
+    });
+    connect(page, &ActionsPage::copyClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (info && info->config)
+            runActionEdits(dss::copyAction(*info->config, m_chatBot->actionsPage()->selectedAction()), QString());
+    });
+    connect(page, &ActionsPage::removeClicked, this, [this] {
+        // Kopie: Während die Rückfrage offen ist, kann eine neue Liste kommen.
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedAction();
+        const dss::actions::Action *action = info && info->config ? info->config->action(id) : nullptr;
+        if (!action)
+            return;
+        const QString question = dss::removeActionQuestion(*info->config, id);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Aktion löschen?"), question, QStringLiteral("Löschen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        runActionEdits(dss::removeAction(*info->config, id), action->name, ActionsPage::NoSection, true);
+    });
+    connect(page, &ActionsPage::resetClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedAction();
+        const dss::actions::Action *action = info && info->config ? info->config->action(id) : nullptr;
+        if (!action)
+            return;
+        const QString question = dss::resetActionQuestion(*action);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Aktion zurücksetzen?"), question, QStringLiteral("Zurücksetzen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        runActionEdits(dss::resetAction(*info->config, id), action->name);
+    });
+    // P14 f1: gelöschte mitgelieferte Aktionen wieder anlegen (Plan 7), nach Rückfrage
+    connect(page, &ActionsPage::restoreTemplatesRequested, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        if (!info || !info->config)
+            return;
+        const QString question = dss::restoreTemplatesQuestion(*info->config);
+        if (question.isEmpty()
+            || !confirm(this, QStringLiteral("Mitgelieferte Aktionen wiederherstellen?"), question,
+                        QStringLiteral("Wiederherstellen"), QStringLiteral("Abbrechen")))
+            return;
+        const QStringList names = dss::missingTemplateNames(*info->config);
+        runActionEdits(dss::restoreTemplateActions(*info->config), names.size() == 1 ? names.first()
+                                                                                       : QStringLiteral("%1 Aktionen").arg(names.size()));
+    });
+    connect(page, &ActionsPage::renameGroupRequested, this, &MainWindow::askRenameActionGroup);
+    connect(page, &ActionsPage::removeGroupRequested, this, &MainWindow::askRemoveActionGroup);
+    // Antworten: beim ersten Fehler aufhören (die Meldung zeigt onChangeFinished, aus der Mitte
+    // dazu am Feld) und die Liste wieder aus dem Stand des Kerns zeigen; nach der letzten
+    // «Gespeichert: <Name>» bzw. «Gelöscht: <Name>».
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionEditRequest == 0 || result.requestId != m_actionEditRequest)
+            return;
+        m_actionEditRequest = 0;
+        ActionsPage *page = m_chatBot->actionsPage();
+        if (!result.ok) {
+            m_actionEdits.clear();
+            page->setSectionProblem(m_actionEditSection, result.message);
+            refreshActionList();
+            refreshActionDetail(true);
+            return;
+        }
+        if (!m_actionEdits.isEmpty()) {
+            sendNextActionEdit();
+            return;
+        }
+        if (!m_actionEditCreated.isNull()) {
+            if (m_actionEditSection == ActionsPage::StepSection)
+                page->selectStep(m_actionEditCreated);
+            else if (m_actionEditSection == ActionsPage::TriggerSection)
+                page->selectTrigger(m_actionEditCreated);
+            else
+                page->selectAction(m_actionEditCreated);
+        }
+        if (!m_actionEditSaved.isEmpty())
+            showStatus(m_actionEditDeleted ? dss::deletedStatusText(m_actionEditSaved)
+                                           : dss::savedStatusText(m_actionEditSaved));
+    });
+    connectActionDetail();
+    refreshActionList();
+}
+
+void MainWindow::connectActionDetail()
+{
+    // P14 e2-15, Mitte: jede Bearbeitung über dss::actionview, die ganze Aktion als action_put
+    using dss::actions::Action;
+    using dss::actions::ActionsConfig;
+    ActionsPage *page = m_chatBot->actionsPage();
+    connect(page, &ActionsPage::nameEdited, this, [this](const QString &name) {
+        editDetailAction(ActionsPage::ActionSection, [name](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.name = name;
+            return dss::putAction(config, before, after);
+        });
+    });
+    connect(page, &ActionsPage::groupEdited, this, [this](const QString &group) {
+        editDetailAction(ActionsPage::ActionSection, [group](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.group = group;
+            return dss::putAction(config, before, after);
+        });
+    });
+    // P14 e3-8: Dialog «Warteschlangen», modal und geöffnet wie «Einstellungen»
+    connect(page, &ActionsPage::manageQueuesClicked, this, [this] {
+        if (!m_queuesDialog)
+            m_queuesDialog = new QueuesDialog(m_client, this);
+        m_queuesDialog->showFromCore();
+    });
+    connect(page, &ActionsPage::queueChosen, this, [this](const QUuid &queue) {
+        editDetailAction(ActionsPage::ActionSection, [queue](const ActionsConfig &config, const Action &before) {
+            Action after = before;
+            after.queue = queue;
+            return dss::putAction(config, before, after);
+        });
+    });
+    connect(page, &ActionsPage::triggerAddChosen, this, [this](const QString &type) {
+        editDetailAction(ActionsPage::TriggerSection, [type](const ActionsConfig &, const Action &action) {
+            return dss::addTrigger(action, type);
+        });
+    });
+    connect(page, &ActionsPage::triggerRemoveClicked, this, [this] {
+        const QUuid id = m_chatBot->actionsPage()->selectedTrigger();
+        editDetailAction(ActionsPage::TriggerSection, [id](const ActionsConfig &, const Action &action) {
+            return dss::removeTrigger(action, id);
+        });
+    });
+    connect(page, &ActionsPage::triggerEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        editDetailAction(ActionsPage::TriggerSection, [id, enabled](const ActionsConfig &, const Action &action) {
+            return dss::setTriggerEnabled(action, id, enabled);
+        });
+    });
+    connect(page, &ActionsPage::stepAddChosen, this, [this](const QString &type) {
+        const QUuid selected = m_chatBot->actionsPage()->selectedStep();
+        editDetailAction(ActionsPage::StepSection, [selected, type](const ActionsConfig &, const Action &action) {
+            return dss::addStep(action, selected, type);
+        });
+    });
+    connect(page, &ActionsPage::stepRemoveClicked, this, [this] {
+        const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+        const QUuid id = m_chatBot->actionsPage()->selectedStep();
+        const Action *action = info && info->config ? info->config->action(m_chatBot->actionsPage()->detailAction())
+                                                    : nullptr;
+        if (!action || id.isNull())
+            return;
+        const QString question = dss::removeStepQuestion(*action, id);
+        if (!question.isEmpty()
+            && !confirm(this, QStringLiteral("Schritt löschen?"), question, QStringLiteral("Löschen"),
+                        QStringLiteral("Abbrechen")))
+            return;
+        // Stand nach der Rückfrage: Während sie offen war, kann eine neue Liste gekommen sein.
+        editDetailAction(ActionsPage::StepSection, [id](const ActionsConfig &, const Action &a) {
+            return dss::removeStep(a, id);
+        });
+    });
+    connect(page, &ActionsPage::stepMoveClicked, this, [this](int direction) {
+        const QUuid id = m_chatBot->actionsPage()->selectedStep();
+        editDetailAction(ActionsPage::StepSection, [id, direction](const ActionsConfig &, const Action &action) {
+            return dss::moveStep(action, id, direction);
+        });
+    });
+    connect(page, &ActionsPage::stepEnabledToggled, this, [this](const QUuid &id, bool enabled) {
+        editDetailAction(ActionsPage::StepSection, [id, enabled](const ActionsConfig &, const Action &action) {
+            return dss::setStepEnabled(action, id, enabled);
+        });
+    });
+    connect(page, &ActionsPage::stepSelected, this, &MainWindow::refreshStepButtons);
+    connect(page, &ActionsPage::triggerSelected, this, &MainWindow::refreshStepButtons);
+    // P14 e2-16, rechts: Auswahl schaltet die Seite um; Felder speichern über setStepField bzw.
+    // setTriggerField, die Prüfmeldung steht unter dem Abschnitt des Felds.
+    connect(page, &ActionsPage::stepSelected, this, [this] { refreshActionFields(); });
+    connect(page, &ActionsPage::triggerSelected, this, [this] { refreshActionFields(); });
+    connect(page->fieldsPanel(), &ActionFieldsPanel::fieldEdited, this,
+            [this](ActionFieldsPanel::Target target, const QUuid &id, const QString &field, const QJsonValue &value) {
+                editDetailAction(ActionsPage::DetailSection,
+                                 [target, id, field, value](const ActionsConfig &, const Action &action) {
+                                     return target == ActionFieldsPanel::Target::Step
+                                         ? dss::setStepField(action, id, field, value)
+                                         : dss::setTriggerField(action, id, field, value);
+                                 });
+            });
+    // «▶ Testen»: action_test an den Kern; «Probelauf gestartet: <Name>» nach der Antwort,
+    // Ablehnungen zeigt onChangeFinished.
+    connect(page, &ActionsPage::testClicked, this, &MainWindow::startActionTest);
+    connect(m_client, &dss::CoreClient::actionsStatusChanged, this, &MainWindow::refreshActionTest);
+    connect(m_client, &dss::CoreClient::twitchStatusChanged, this, &MainWindow::refreshActionTest);
+    connect(m_client, &dss::CoreClient::changeFinished, this, [this](const dss::ChangeResult &result) {
+        if (m_actionTestRequest == 0 || result.requestId != m_actionTestRequest)
+            return;
+        m_actionTestRequest = 0;
+        if (result.ok)
+            showStatus(dss::testStartedStatusText(m_actionTestName, m_actionTestReal));
+    });
+}
+
+void MainWindow::editDetailAction(ActionsPage::Section section,
+                                  const std::function<dss::EditResult(const dss::actions::ActionsConfig &,
+                                                                      const dss::actions::Action &)> &fn)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    const dss::actions::Action *action = info->config->action(m_chatBot->actionsPage()->detailAction());
+    if (!action)
+        return;
+    const dss::EditResult result = fn(*info->config, *action);
+    // Nach dem Umbenennen steht der neue Name in der Statuszeile
+    const QString name = result.edits.isEmpty() || result.edits.first().type != QLatin1String("action_put")
+        ? action->name
+        : result.edits.first().fields.value(QStringLiteral("action")).toObject().value(QStringLiteral("name")).toString();
+    runActionEdits(result, name, section);
+}
+
+void MainWindow::refreshActionDetail(bool resetFields)
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->selectedAction()) : nullptr;
+    ActionsPage::ActionDetail detail;
+    if (action) {
+        const dss::actions::ActionsConfig &config = *info->config;
+        const dss::ActionViewNames names = actionViewNames();
+        detail.actionId = action->id;
+        detail.name = action->name;
+        detail.group = action->group;
+        detail.groups = dss::actionGroupChoices(config);
+        detail.queues = dss::queueChoices(config, action->queue);
+        detail.queue = action->queue;
+        detail.enabled = action->enabled;
+        // [OFFEN] Fassung der Vorlage (templateAction) kommt mit f; bis dahin nur «mitgeliefert»
+        detail.hint = dss::templateHint(*action, nullptr);
+        // [OFFEN] e2-14: Prüfmeldungen (checkReferences) wie in refreshActionList
+        detail.triggers = dss::triggerRows(*action, config, {});
+        detail.steps = dss::stepRows(*action, config, names, {});
+        detail.editable = true;
+        page->setAreaTitle(ActionsPage::Action, dss::actionTitle(*action));
+    } else {
+        detail.hint = QStringLiteral("Keine Aktion gewählt");
+        page->setAreaTitle(ActionsPage::Action, QStringLiteral("Aktion"));
+    }
+    page->setActionDetail(detail, resetFields);
+    refreshStepButtons();
+    refreshActionTest();
+    refreshActionFields(resetFields);
+}
+
+dss::ActionViewNames MainWindow::actionViewNames() const
+{
+    // Namen der Kurzinhalte und der Auswahl rechts: Overlays aus der Liste, Quellen der Overlays,
+    // die das Fenster schon geladen hat
+    dss::ActionViewNames names;
+    for (const dss::OverlaySummary &summary : m_client->overlays()) {
+        names.overlays.insert(summary.id, summary.name);
+        if (const std::optional<dss::Overlay> overlay = m_client->overlay(summary.id)) {
+            for (const dss::Source &source : overlay->sources)
+                names.sources.insert(source.id, source.name);
+        }
+    }
+    return names;
+}
+
+void MainWindow::refreshActionFields(bool resetFields)
+{
+    // P14 e2-16, rechts: Felder des gewählten Schritts oder Auslösers der gezeigten Aktion
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    ActionFieldsPanel::State state;
+    QString title = QStringLiteral("Schritt");
+    if (action) {
+        const QUuid stepId = page->selectedStep();
+        const QUuid triggerId = page->selectedTrigger();
+        if (!stepId.isNull()) {
+            dss::actions::forEachStep(action->steps, [&](const dss::actions::Step &step, const QList<int> &) {
+                if (step.id != stepId)
+                    return;
+                state.target = ActionFieldsPanel::Target::Step;
+                state.type = step.type;
+                state.fields = step.fields;
+                title = dss::stepTitle(step);
+            });
+        } else if (!triggerId.isNull()) {
+            for (const dss::actions::Trigger &trigger : action->triggers) {
+                if (trigger.id != triggerId)
+                    continue;
+                state.target = ActionFieldsPanel::Target::Trigger;
+                state.type = trigger.type;
+                state.fields = trigger.fields;
+                title = dss::triggerTitle(trigger);
+            }
+        }
+        if (state.target != ActionFieldsPanel::Target::None) {
+            state.id = state.target == ActionFieldsPanel::Target::Step ? stepId : triggerId;
+            state.editable = true;
+            state.config = *info->config;
+            state.names = actionViewNames();
+        }
+    }
+    page->setAreaTitle(ActionsPage::Detail, title);
+    page->fieldsPanel()->setState(state, resetFields);
+}
+
+void MainWindow::refreshStepButtons()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    page->setStepButtons(action != nullptr, action ? dss::stepButtons(*action, page->selectedStep()) : dss::StepButtons(),
+                         action && !page->selectedTrigger().isNull());
+}
+
+void MainWindow::refreshActionTest()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    const bool editable = m_client->isConnected() && info && info->config && status;
+    const dss::actions::Action *action = editable ? info->config->action(page->detailAction()) : nullptr;
+    page->setTestState(dss::testUserChoices(m_client->twitchStatus().value_or(dss::TwitchStatusInfo())),
+                       action && dss::testAllowed(*action, *status),
+                       action && dss::realTestAllowed(*action, *status));
+}
+
+void MainWindow::startActionTest()
+{
+    ActionsPage *page = m_chatBot->actionsPage();
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    const dss::actions::Action *action =
+        m_client->isConnected() && info && info->config && status ? info->config->action(page->detailAction()) : nullptr;
+    if (!action || !dss::testAllowed(*action, *status) || m_actionTestRequest != 0)
+        return;
+    const QList<dss::TestUserChoice> users =
+        dss::testUserChoices(m_client->twitchStatus().value_or(dss::TwitchStatusInfo()));
+    const int index = page->testUserIndex();
+    if (index < 0 || index >= users.size())
+        return;
+    const bool real = page->realTest() && dss::realTestAllowed(*action, *status);
+    const dss::EditResult result = dss::testAction(*action, users.at(index), real);
+    if (!result.problem.isEmpty()) {
+        showStatus(result.problem);
+        return;
+    }
+    if (result.edits.isEmpty())
+        return;
+    m_actionTestRequest = m_client->sendActionsEdit(result.edits.first());
+    m_actionTestName = action->name;
+    m_actionTestReal = real;
+}
+
+void MainWindow::refreshActionList()
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    // [OFFEN] e2-14: Prüfmeldungen (checkReferences) fehlen noch, dafür braucht das Fenster den
+    // ReferenceContext aus dem Stand des Kerns.
+    m_chatBot->actionsPage()->setActionRows(
+        info && info->config ? dss::actionListRows(*info->config, m_chatBot->actionsPage()->searchText(), {})
+                             : QList<dss::ActionListRow>());
+    refreshActionButtons();
+}
+
+void MainWindow::refreshActionButtons()
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    const bool editable = m_client->isConnected() && info && info->config;
+    const dss::actions::Action *action =
+        editable ? info->config->action(m_chatBot->actionsPage()->selectedAction()) : nullptr;
+    m_chatBot->actionsPage()->setListButtons(editable, action != nullptr,
+                                             action && dss::actionResettable(*action));
+    m_chatBot->actionsPage()->setRestoreAvailable(editable && !dss::missingTemplateNames(*info->config).isEmpty());
+    refreshActionDetail();
+}
+
+void MainWindow::runActionEdits(const dss::EditResult &result, const QString &savedName,
+                                ActionsPage::Section section, bool deleted)
+{
+    // Aus der Mitte: Prüfmeldung am Feld (Entscheid des Nutzers, 2026-11-16), eine neue
+    // Bearbeitung löscht die alte Meldung des Abschnitts.
+    m_chatBot->actionsPage()->setSectionProblem(section, result.problem);
+    if (!result.problem.isEmpty()) {
+        if (section == ActionsPage::NoSection)
+            showStatus(result.problem);
+        refreshActionList();
+        refreshActionDetail(true);
+        return;
+    }
+    if (result.edits.isEmpty() || m_actionEditRequest != 0) {
+        // Nichts zu tun oder eine Bearbeitung noch unterwegs: Kästchen und Felder wieder wie im Kern
+        refreshActionList();
+        refreshActionDetail(true);
+        return;
+    }
+    m_actionEdits = result.edits;
+    m_actionEditCreated = result.created;
+    m_actionEditSection = section;
+    m_actionEditDeleted = deleted;
+    // Ohne Namen (neue oder kopierte Aktion): der Name aus action_put
+    m_actionEditSaved = savedName.isEmpty()
+        ? result.edits.first().fields.value(QStringLiteral("action")).toObject().value(QStringLiteral("name")).toString()
+        : savedName;
+    sendNextActionEdit();
+}
+
+void MainWindow::sendNextActionEdit()
+{
+    m_actionEditRequest = m_client->sendActionsEdit(m_actionEdits.takeFirst());
+    if (m_actionEditRequest == 0)
+        m_actionEdits.clear();
+}
+
+void MainWindow::askRenameActionGroup(const QString &group)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    QString name = group;
+    if (!askText(this, QStringLiteral("Gruppe umbenennen"), QStringLiteral("Neuer Name"), &name) || name == group)
+        return;
+    // Stand nach dem Dialog: Während er offen war, kann eine neue Liste gekommen sein.
+    const std::optional<dss::ActionsConfigInfo> now = m_client->actionsConfig();
+    if (now && now->config)
+        runActionEdits(dss::renameActionGroup(*now->config, group, name), name.trimmed());
+}
+
+void MainWindow::askRemoveActionGroup(const QString &group)
+{
+    const std::optional<dss::ActionsConfigInfo> info = m_client->actionsConfig();
+    if (!m_client->isConnected() || !info || !info->config)
+        return;
+    const QString question = dss::removeActionGroupQuestion(*info->config, group);
+    if (!question.isEmpty()
+        && !confirm(this, QStringLiteral("Gruppe löschen?"), question, QStringLiteral("Löschen"),
+                    QStringLiteral("Abbrechen")))
+        return;
+    const std::optional<dss::ActionsConfigInfo> now = m_client->actionsConfig();
+    if (now && now->config)
+        runActionEdits(dss::removeActionGroup(*now->config, group), group, ActionsPage::NoSection, true);
+}
+
+void MainWindow::refreshChatSend()
+{
+    m_chatBot->setChatSend(dss::chatSendView(m_chatBot->chatText(), m_chatBot->chatAccount(),
+                                             m_client->actionsStatus()));
+}
+
+void MainWindow::requestActionRuns()
+{
+    // Einmal je Verbindung, sobald das Aktionssystem antwortet (nicht bei abgeschaltetem Schalter,
+    // sonst stünde bei jeder Verbindung ein Fehler in der Statuszeile).
+    const std::optional<dss::ActionsStatus> status = m_client->actionsStatus();
+    if (!m_client->isConnected() || !status) {
+        m_runsRequested = false;
+        return;
+    }
+    if (m_runsRequested || status->state == QLatin1String("unavailable"))
+        return;
+    m_runsRequested = m_client->sendActionsEdit({QString::fromLatin1(dss::msg::kGetActionRuns), QJsonObject()}) != 0;
+}
+
+void MainWindow::refreshChatBotHeader()
+{
+    const bool connected = m_client->isConnected();
+    const dss::ConnectionState channel = connected
+        ? m_client->connectionStates().value(dss::Connection::Twitch, dss::ConnectionState::Off)
+        : dss::ConnectionState::Off;
+    m_chatBot->setHeader(dss::chatBotHeaderView(channel, connected ? m_client->twitchStatus() : std::nullopt,
+                                                 m_client->actionsStatus()));
+}
+
 void MainWindow::saveCanvasImage()
 {
 #if DSS_APP_CANVAS_IMAGE
-    const std::optional<dss::Overlay> overlay = selectedOverlay();
+    const std::optional<dss::Overlay> overlay = canvasOverlay(); // wie die Leinwand, mit Laufzustand
     if (!overlay)
         return;
     QString path;
@@ -504,6 +1200,11 @@ void MainWindow::refreshConnections()
     m_header->setConnectionToolTip(dss::Connection::Obs,
                                    dss::obsToolTip(states.value(dss::Connection::Obs, dss::ConnectionState::Off),
                                                    m_client->obsStatus()));
+    // P13: Problem des Bots im Tooltip, Zustand von Kanal und Bot in der Kopfzeile «Chat-Bot»
+    m_header->setConnectionToolTip(dss::Connection::Twitch,
+                                   dss::twitchToolTip(states.value(dss::Connection::Twitch, dss::ConnectionState::Off),
+                                                      m_client->twitchStatus()));
+    refreshChatBotHeader();
 }
 
 void MainWindow::refreshOverlayList()
@@ -615,10 +1316,15 @@ void MainWindow::refreshOverlay()
     if (overlay) {
         const QIcon shown = loadSymbol(QStringLiteral("auge.svg"), QSize(16, 16));
         const QIcon hidden = loadSymbol(QStringLiteral("auge-zu.svg"), QSize(16, 16));
+        const dss::LiveElements live = m_client ? m_client->live(m_selectedOverlay) : dss::LiveElements();
         for (const dss::SourceRow &row : dss::sourceRows(*overlay)) {
+            // Auge wie in der Datei; der Laufzustand ändert sie nicht und zeigt sich als «live»
             auto *item = new QListWidgetItem(row.visible ? shown : hidden, row.name, list);
             item->setData(SourceList::kIdRole, row.id);
-            item->setToolTip(dss::visibilityToolTip(row.visible));
+            item->setData(SourceList::kLiveRole, live.contains(row.id));
+            item->setToolTip(live.contains(row.id)
+                                 ? dss::visibilityToolTip(row.visible) + QStringLiteral(", live durch den Chat-Bot")
+                                 : dss::visibilityToolTip(row.visible));
             if (row.id == m_selectedSource)
                 selected = item;
         }
@@ -629,11 +1335,13 @@ void MainWindow::refreshOverlay()
         m_selectedSource = QUuid();
     m_filling = false;
     m_canvas->setCanvasSize(overlay ? QSize(overlay->width, overlay->height) : QSize());
-    m_canvas->setOverlay(overlay);
+    // P14 d: Leinwand und Zeichner zeigen den Laufzustand wie die Seite (K-07)
+    const std::optional<dss::Overlay> drawn = canvasOverlay();
+    m_canvas->setOverlay(drawn);
     m_canvas->setMediaSizes(m_client ? m_client->mediaSizes() : dss::MediaSizes());
     m_canvas->setSelectedSource(m_selectedSource);
 #if DSS_APP_RENDERER
-    m_renderer->setOverlay(overlay ? &*overlay : nullptr);
+    m_renderer->setOverlay(drawn ? &*drawn : nullptr);
 #endif
     if (m_canvasImageAction)
         m_canvasImageAction->setEnabled(overlay.has_value()); // ohne Overlay ausgegraut
@@ -651,6 +1359,37 @@ void MainWindow::refreshOverlay()
     refreshBrowserSource();
 #endif
     refreshProperties();
+}
+
+std::optional<dss::Overlay> MainWindow::canvasOverlay() const
+{
+    std::optional<dss::Overlay> overlay = selectedOverlay();
+    if (overlay && m_client)
+        overlay = dss::applyLiveState(*overlay, m_client->live(overlay->id));
+    return overlay;
+}
+
+void MainWindow::refreshLiveRow()
+{
+    const dss::LiveElements live = m_client ? m_client->live(m_selectedOverlay) : dss::LiveElements();
+    const dss::LiveRow row = dss::liveRow(live, m_selectedSource, m_client && m_client->isConnected());
+    m_propertiesDock.liveState->setText(row.text);
+    m_propertiesDock.hideLive->setEnabled(row.canHide);
+    if (!m_liveTimer)
+        return;
+    const int next = dss::liveRefreshMs(live);
+    if (next < 0)
+        m_liveTimer->stop();
+    else
+        m_liveTimer->start(next);
+}
+
+void MainWindow::hideLive()
+{
+    if (!m_client || m_selectedOverlay.isNull() || m_selectedSource.isNull())
+        return;
+    if (m_client->sendLiveReset(m_selectedOverlay, {m_selectedSource}) == 0)
+        showStatus(QStringLiteral("Keine Verbindung zum Kern, Änderung nicht geschickt"));
 }
 
 void MainWindow::refreshBrowserSource()
@@ -702,24 +1441,12 @@ void MainWindow::refreshObsSource()
 
 void MainWindow::refreshAudioRoute()
 {
-    const dss::AudioRouteRow row =
-        dss::audioRouteRow(m_client ? m_client->settings() : std::nullopt,
-                           m_client ? m_client->audioOutputs() : std::nullopt, QString::fromLatin1(dss::kAudioPurposeVideo));
-    QComboBox *box = m_controlDock.audioOutput;
-    {
-        const QSignalBlocker block(box);
-        // Neu füllen nur, wenn sich die Liste geändert hat (offene Liste bleibt offen).
-        bool same = box->count() == row.choices.size();
-        for (int i = 0; same && i < box->count(); ++i)
-            same = box->itemData(i).toString() == row.choices.at(i).name && box->itemText(i) == row.choices.at(i).label;
-        if (!same) {
-            box->clear();
-            for (const dss::AudioOutputChoice &c : row.choices)
-                box->addItem(c.label, c.name);
-        }
-        box->setCurrentIndex(row.current);
-    }
-    box->setToolTip(QStringLiteral("Ausgang für den Ton der Videos: %1").arg(box->currentText()));
+    const std::optional<dss::SettingsInfo> settings = m_client ? m_client->settings() : std::nullopt;
+    const std::optional<dss::AudioOutputsInfo> outputs = m_client ? m_client->audioOutputs() : std::nullopt;
+    const bool connected = m_client && m_client->isConnected();
+    const dss::AudioRouteRow row = dss::audioRouteRow(settings, outputs, QString::fromLatin1(dss::kAudioPurposeVideo));
+    showAudioRouteRow(row, m_controlDock.audioOutput, m_controlDock.audioOutputState,
+                      QStringLiteral("Ausgang für den Ton der Videos"), connected);
     QSpinBox *offset = m_controlDock.audioOffset;
     {
         const QSignalBlocker block(offset);
@@ -728,26 +1455,17 @@ void MainWindow::refreshAudioRoute()
         if (m_audioRouteRequests.isEmpty() && offset->value() != row.offsetMs)
             offset->setValue(row.offsetMs);
     }
-    box->setEnabled(row.canEdit);
     offset->setEnabled(row.canEdit);
-    QLabel *state = m_controlDock.audioOutputState;
-    // Ohne Kern ausgegraut wie die Zeilen «Ausgabe» und «OBS».
-    state->setEnabled(m_client && m_client->isConnected());
-    state->setText(row.text);
-    state->setToolTip(row.toolTip);
-    const QString stateKey = row.problem ? QStringLiteral("problem") : QStringLiteral("normal");
-    if (state->property("state").toString() != stateKey) {
-        state->setProperty("state", stateKey);
-        // Das Stylesheet wertet [state="…"] nur beim Polieren aus.
-        state->style()->unpolish(state);
-        state->style()->polish(state);
-    }
+    // P14 t: Zeile «Ton Chat-Bot», ohne Versatz
+    showAudioRouteRow(dss::audioRouteRow(settings, outputs, QString::fromLatin1(dss::kAudioPurposeActions)),
+                      m_controlDock.actionsAudioOutput, m_controlDock.actionsAudioOutputState,
+                      QStringLiteral("Ausgang für den Ton des Chat-Bots"), connected);
 }
 
-void MainWindow::sendAudioRoute(const dss::AudioRouteChange &change)
+void MainWindow::sendAudioRoute(const QString &purpose, const dss::AudioRouteChange &change)
 {
     dss::SettingsUpdate update;
-    update.audioRoutes.insert(QString::fromLatin1(dss::kAudioPurposeVideo), change);
+    update.audioRoutes.insert(purpose, change);
     if (const qint64 id = m_client->sendSettingsUpdate(update); id > 0)
         m_audioRouteRequests.append(id);
     else
@@ -856,6 +1574,7 @@ void MainWindow::refreshProperties()
     }
     d.hint->setText(hint);
     d.kindPages->setCurrentIndex(page);
+    refreshLiveRow();
     if (source && source->kind == dss::SourceKind::Video) {
         const QSignalBlocker block(d.loop);
         d.loop->setChecked(source->loop);

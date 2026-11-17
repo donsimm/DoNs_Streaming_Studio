@@ -20,7 +20,7 @@ Stand: 2026-11-14 (Ton von Videos, P12). «Entschieden» heisst: vom Nutzer best
 | Musikplayer | später (denkbar) | Audio über die Standard-Audiokarte und ein externes Mischpult, die Audiokarte muss in der Software wählbar sein. Audio per NDI zum Streaming-PC ist als Option vorgesehen (laut obs-ndi möglich, nicht geprüft). |
 
 - Module sind fest eingebaut. Jedes Modul bekommt dieselbe Schnittstelle zum Ereignisfluss, damit sich später ein weiteres Modul ohne Umbau ergänzen lässt. Es gibt kein Plugin-System, auch nicht für Dritte. (entschieden)
-- Alle Module teilen sich dieselben Verbindungen (Twitch, OBS) und denselben Ereignisfluss. (Vorschlag)
+- Alle Module teilen sich dieselben Verbindungen (Twitch, OBS) und denselben Ereignisfluss. (Vorschlag; der Ereignisfluss ist seit P13 gebaut, `src/events/`)
 
 ## Oberfläche
 
@@ -52,6 +52,20 @@ Stand: 2026-11-14 (Ton von Videos, P12). «Entschieden» heisst: vom Nutzer best
   - F10 Von Hand angelegte Quellen mit genau der richtigen Adresse werden automatisch übernommen.
   - F11 Die Grösse der Quelle in OBS folgt der Auflösung des Overlays; die Lage in der Szene bleibt unberührt.
   - F12 Aktuelle Szene: nur im Tooltip des OBS-Knopfes.
+
+## Twitch (P13)
+
+Entscheide des Nutzers vom 2026-11-09 und 2026-11-15 (Plan `docs/archiv/prompts/P13-twitch.md`, «Entscheide des Nutzers»; Bericht `docs/archiv/berichte/P13-bericht.md`):
+
+- Der Kern ist an Twitch angebunden über EventSub (WebSocket) und die API von Twitch (Helix), nicht über IRC. Die Ereignisse gehen auf den Ereignisfluss des Kerns (Regel 14, `docs/08-kern-schnittstelle.md`, «Ereignisfluss»); sie sind die Auslöser des Aktionssystems (P14). (entschieden)
+- Zwei Konten, je mit Anmeldung per Code im Browser (Gerätecode): **Kanal** (lesen, Ereignisse, schreiben) und **Bot** (schreibt in den Chat). Das Bot-Konto ist das bisherige aus der Zeit mit Streamer.bot; ein Bot gleich dem Kanal wird abgewiesen. Der Kanal ist Affiliate. (entschieden)
+- Rechte: alles lesen und schreiben, was Twitch erlaubt, auch für Funktionen, die erst später kommen (Kanalpunkte-Effekte, Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe), damit später keine neue Anmeldung nötig ist. (entschieden 2026-11-15, Frage 1 B)
+- Abzeichen «Chat Bot»: ja. Die App wird vertraulich registriert (mit Client Secret); der Bot sendet mit App-Token. Das Secret gibt der Nutzer im Dialog «Einstellungen» ein, abgelegt wie F1. Das ersetzt «öffentliche App, kein Secret» vom 2026-11-09. (entschieden 2026-11-15, Frage 2 B)
+- Zugangsdaten wie F1: Token beider Konten und Client Secret verschlüsselt mit `systemd-creds --user`, ohne Nachfrage, nie im Klartext (Regel 12). Die Client-ID steht in `kern.ini` (`[twitch]`), eine App für beide Konten. Die App registriert der Nutzer selbst mit `scripts/twitch-einrichten.sh`. (entschieden)
+- Anzeige: Bereich «Twitch» im Dialog «Einstellungen» (Klick auf den Twitch-Knopf öffnet ihn), Liste «Ereignisse» im Reiter «Chat-Bot», Unterreiter «Live». Die Farbe des Twitch-Knopfes folgt nur dem Kanal. (entschieden)
+- Reiter «Chat-Bot» mit Unterreitern nach dem Entwurf (`lotse/entwurf-chatbot`); die fünf Docks des Overlay-Editors sind dort ausgeblendet. (entschieden 2026-11-15)
+- Der Bot läuft nur, solange das Studio offen ist (Kern wie heute). (entschieden 2026-11-15)
+- Follows kommen als Ereignis direkt von Twitch. «Erste Nachricht im Stream» leitet der Kern selbst ab, Twitch liefert nur «erste Nachricht überhaupt». (entschieden 2026-11-09, Interna)
 
 ## Betrieb im Netz
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "eventbus.h"
 #include "fontcatalog.h"
 #include "mediaimport.h"
 #include "overlaystore.h"
@@ -17,10 +18,13 @@
 class QLocalServer;
 class QLocalSocket;
 class QTimer;
+class ActionService;
 
 namespace dss {
+class ActionSound;
 class AudioOutput;
 class Mixer;
+class OverlayLiveState;
 class OverlayServer;
 class VideoAudio;
 }
@@ -28,6 +32,9 @@ namespace dss::obs {
 class ObsConnection;
 class ObsSecretStore;
 class ObsSources;
+}
+namespace dss::twitch {
+class TwitchService;
 }
 
 // Dienst des Kerns (P07, Teile C bis E): hält die Overlays aus dem Datenordner, nimmt
@@ -60,6 +67,10 @@ public:
 
     int clientCount() const { return int(m_clients.size()); }
 
+    // Ereignisfluss des Kerns (P13, Plan 1.1, Regel 14): Module veröffentlichen und abonnieren hier.
+    // Fenster bekommen Ereignisse nur auf Bestellung (subscribe_events).
+    dss::events::EventBus *eventBus() const { return m_events; }
+
     // Overlay-Server für die Browserquelle (P10, Schalter DSS_CORE_OVERLAY_SERVER): startet ihn
     // mit Port und Adresse aus den Einstellungen und hält ihn danach auf dem Stand (Änderungen,
     // neuer Token, neue Einstellungen). Ohne Aufruf: kein Server (server_status enabled false).
@@ -71,6 +82,17 @@ public:
     void setObsConnection(dss::obs::ObsConnection *connection, dss::obs::ObsSecretStore *secrets,
                           dss::obs::ObsSources *sources);
 
+    // Aktionssystem (P14 b3, Schalter DSS_CORE_ACTIONS): Anfragen der Fenster gehen an actions,
+    // seine Meldungen an alle Fenster. Ohne Aufruf: actions_status «unavailable», Anfragen werden
+    // mit actions_unavailable beantwortet.
+    void setActionService(ActionService *actions);
+#if DSS_CORE_TWITCH
+    // Anbindung an Twitch (P13, Plan 2.7, Schalter DSS_CORE_TWITCH): Werte aus kern.ini [twitch],
+    // twitch_status und connections.twitch an alle, Anfragen twitch_login_start, twitch_login_cancel,
+    // twitch_logout, Client Secret über update_settings. Ohne Aufruf: twitch_status mit enabled false.
+    void setTwitchService(dss::twitch::TwitchService *twitch);
+#endif
+
 #if DSS_CORE_AUDIO
     // Ton der Videos (P12b b3, Schalter DSS_CORE_AUDIO): Ausgang und Versatz aus den Einstellungen
     // ([ton-video]) an output und mixer, Liste der Ausgänge und Zustand als audio_outputs an alle.
@@ -78,10 +100,24 @@ public:
     // audio_outputs mit enabled false. P12b b4: Mit Overlay-Server gehen die Meldungen der Seiten
     // (…/clock) über VideoAudio an den Mischer; vor dem Ende von mixer stopAudio() aufrufen.
     void setAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer);
+    // P14 t: Töne des Chat-Bots über einen eigenen Ausgang (Zweck «aktionen», [ton-aktionen]) mit
+    // eigenem Mischer; Zustand in audio_outputs.routes.aktionen. Wie setAudioOutput vor
+    // output->start() aufrufen. Den Schritt «Ton abspielen» bindet Abschnitt c2 an actionSound().
+    void setActionAudioOutput(dss::AudioOutput *output, dss::Mixer *mixer);
+    dss::ActionSound *actionSound() const { return m_actionSound; }
 #endif
     // P12b b4: Ton der Videos beenden (Decoder, Stellen im Mischer), solange Mischer und Ausgang
-    // noch leben; nach der Hauptschleife. Ohne Ton nichts.
+    // noch leben; nach der Hauptschleife. Ohne Ton nichts. P14 t: ebenso die Töne des Chat-Bots.
     void stopAudio();
+
+    // P14 d: Laufzustand der Overlays (nur im Speicher). Den Schritt «Overlay-Element zeigen»
+    // bindet Abschnitt c2 hier an.
+    dss::OverlayLiveState *overlayLive() const { return m_live; }
+
+    // P14 f2: mitgeliefertes Overlay «Chat-Bot» anlegen, wenn es fehlt (chatbotoverlay.h), und den
+    // neuen Stand an alle Fenster schicken. Ruft das Aktionssystem nach dem Anlegen der
+    // mitgelieferten Aktionen.
+    void createChatBotOverlay();
 
     // Bricht laufende Übernahmen ab und wartet auf ihre Threads (P10-vor, Punkt 67; beim
     // Beenden). Rückgabe: Anzahl abgebrochener Übernahmen. Ohne Thread (Schalter
@@ -105,6 +141,11 @@ private:
         // Browserquelle (P10): Overlay aus get_browser_source und zuletzt geschickte Adresse
         QUuid browserSource;
         dss::BrowserSourceInfo browserSourceSent;
+        // P13: bestellte Ereignisse (leer = keine), verworfene seit der letzten Meldung
+        // (Gegendruck) und Ereignisse, die schon im geschickten Verlauf standen.
+        QStringList eventTypes;
+        qint64 droppedEvents = 0;
+        QSet<QUuid> eventsInHistory;
     };
 
     void onNewConnection();
@@ -159,11 +200,23 @@ private:
     // P12b: Seite mit Kennung verbunden: OBS fragen, ob ihre Quelle im Programm ist, und der Seite
     // «obs_active» schicken (Rückfall beim Laden einer schon aktiven Quelle, M3).
     void onPageOpened(const QUuid &overlayId, const QString &page);
+    // P14 d: overlay_live_set bzw. overlay_live_reset, Antwort change_result
+    void handleLiveRequest(QLocalSocket *socket, const QJsonObject &message, bool reset);
+    void onLiveChanged(const QUuid &overlayId);
     // Einstellungen (P10-vor)
     QJsonObject settingsMessage() const;
     void handleSettingsUpdate(QLocalSocket *socket, const QJsonObject &message);
-    // P10c: zweiter Teil von handleSettingsUpdate, wenn das Passwort geschrieben ist.
-    void finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged);
+    // P13: nach dem Passwort von OBS das Client Secret von Twitch ablegen, dann finishSettingsUpdate.
+    void writeTwitchSecret(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged);
+    // P10c: zweiter Teil von handleSettingsUpdate, wenn das Passwort geschrieben ist. secretChanged
+    // (P13): Client Secret von Twitch gespeichert oder gelöscht.
+    void finishSettingsUpdate(QLocalSocket *socket, const dss::SettingsUpdate &update, bool passwordChanged,
+                              bool secretChanged = false);
+    // P13: Twitch
+    void applyTwitchSettings();
+    QJsonObject twitchStatusMessage() const;
+    void onTwitchChanged();
+    void handleTwitchRequest(QLocalSocket *socket, const QJsonObject &message);
     void handleSettingsReset(QLocalSocket *socket, const QJsonObject &message);
     // P10c: Werte aus den Einstellungen an die Verbindung zu OBS.
     void applyObsSettings(bool passwordChanged = false);
@@ -189,16 +242,28 @@ private:
     // Nach dem Kopieren einer Schriftdatei: Schnitt der neuen Kopie in die Liste aufnehmen und
     // die Liste an alle schicken.
     void addMediaFont(const QString &reference);
+    // P13: Ereignisse an die Fenster (nur auf Bestellung, Gegendruck kEventBacklogBytes)
+    void handleSubscribeEvents(QLocalSocket *socket, Client &client, const QJsonObject &message);
+    void onEvent(const dss::events::Event &event);
+    // Meldet verworfene Ereignisse, sobald die Verbindung wieder liest.
+    void reportDroppedEvents(QLocalSocket *socket);
 
     dss::OverlayStore *m_store;
     QString m_socketPath;
     dss::CoreSettingsStore *m_settings = nullptr;
     dss::OverlayServer *m_overlayServer = nullptr;
+    dss::OverlayLiveState *m_live = nullptr; // P14 d
     dss::obs::ObsConnection *m_obs = nullptr;
     dss::obs::ObsSecretStore *m_obsSecrets = nullptr;
     dss::obs::ObsSources *m_obsSources = nullptr;
+    dss::twitch::TwitchService *m_twitch = nullptr; // P13; nullptr ohne DSS_CORE_TWITCH
+    QJsonObject m_lastTwitchStatus;
     dss::AudioOutput *m_audioOutput = nullptr; // P12b b3; nullptr ohne DSS_CORE_AUDIO
     dss::Mixer *m_mixer = nullptr;
+    // P14 t: Ausgang, Mischer und Töne des Chat-Bots; nullptr ohne DSS_CORE_AUDIO
+    dss::AudioOutput *m_actionOutput = nullptr;
+    dss::Mixer *m_actionMixer = nullptr;
+    dss::ActionSound *m_actionSound = nullptr;
     // P12b b4: Meldungen der Seiten an den Mischer; nullptr ohne Ton oder ohne Overlay-Server
     dss::VideoAudio *m_videoAudio = nullptr;
     void connectVideoAudio();
@@ -234,4 +299,12 @@ private:
     QSet<QString> m_canceledCopies;
     // P10b, Punkt 85: leere Adresse im Heimnetz alle 2 s aus der Standardroute
     dss::HomeAddressWatcher *m_addressWatcher = nullptr;
+    // P13: Ereignisfluss; Abo des Kerns für die Fenster; zuletzt an die Fenster verteiltes
+    // Ereignis (Verlauf ohne Doppel, handleSubscribeEvents)
+    dss::events::EventBus *m_events = nullptr;
+    dss::events::Subscription m_windowEvents;
+    QUuid m_lastDeliveredEvent;
+    // P14 b3: Aktionssystem; lebt in main.cpp kürzer als dieser Dienst
+    QPointer<ActionService> m_actions;
+    void handleActionsRequest(QLocalSocket *socket, const QJsonObject &message);
 };

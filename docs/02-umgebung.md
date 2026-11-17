@@ -58,6 +58,29 @@ Gemessen für P12b am 2026-11-12 in `/var/lib/dpkg/status` (Kommentar in `script
 
 Ebenfalls vorhanden, aber nicht in der Liste: `qt6-base-dev-tools` 6.8.2+dfsg-9+deb13u2 und `libqt6test6` 6.8.2+dfsg-9+deb13u2 (Abhängigkeiten von `qt6-base-dev`), `pkgconf` 1.8.1-4, `x11-utils` 7.7+7 (`xwininfo`, genutzt von der Startprüfung). Nicht weiterverfolgt, aber weiterhin installiert: `qt6-webengine-dev`, `qt6-multimedia-dev`, PyQt6. Nicht installiert: `xdotool`, `wmctrl`, `shellcheck`.
 
+## Twitch: TLS und Adressen (P13)
+
+Die Anbindung an Twitch ist die erste Verbindung des Kerns mit TLS (OBS läuft über `ws://` im Heimnetz). Kein neues Paket; benutzt werden, gelesen am 2026-11-09 in `/var/lib/dpkg/status` und `/usr/lib/x86_64-linux-gnu/qt6/plugins/tls/` (Plan `docs/archiv/prompts/P13-twitch.md`, Abschnitt 5):
+
+| Paket oder Datei | Version |
+|---|---|
+| Qt Network (`qt6-base-dev`) mit `libqopensslbackend.so` | 6.8.2+dfsg-9+deb13u2 |
+| `libssl3t64` | 3.5.7-1~deb13u3 |
+| `ca-certificates` | 20250419+deb13u1 |
+| `qt6-websockets-dev`, `libqt6websockets6` | 6.8.2-3 (seit P10c in `scripts/pakete.txt`) |
+
+Nicht genommen: `qt6-networkauth-dev` 6.8.2-4 (der Gerätefluss `QOAuth2DeviceAuthorizationFlow` kommt erst mit Qt 6.9), Schlüsselbund (`libsecret`, F1 gilt), Twitch CLI (nicht in Debian). Ob TLS verfügbar ist, prüft der Kern beim Verbinden mit `QSslSocket::supportsSsl()` (`src/twitch/eventsubconnection.h`).
+
+Adressen (ausgehend vom Studio-PC, nur HTTPS bzw. WSS, `src/twitch/twitchendpoints.h`):
+
+| Zweck | Adresse |
+|---|---|
+| Anmeldung (Gerätecode, Token, Prüfen, Abmelden) | `https://id.twitch.tv/oauth2/…` |
+| API (Helix: Abos, Streams, Senden in den Chat) | `https://api.twitch.tv/helix/…` |
+| EventSub über WebSocket | `wss://eventsub.wss.twitch.tv/ws` (bei `session_reconnect` die `reconnect_url` von Twitch) |
+
+Tests sprechen nie mit Twitch: `dss-core --twitch-testserver http://127.0.0.1:PORT` ersetzt alle drei Adressen; eine andere Adresse als `127.0.0.1` bricht den Start ab. Die echte Verbindung über TLS ist nicht geprüft (Handtest L2 in `docs/archiv/berichte/P13-bericht.md`).
+
 ## Netzwerk
 
 Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf dem Studio-PC, 19:55):

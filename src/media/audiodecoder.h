@@ -14,6 +14,8 @@
 // Ton einer Videodatei für den Mischer (P12b b2). Dekodiert mit libavcodec in einem eigenen Thread
 // und wandelt mit libswresample in float, 48 kHz, Stereo (Mono und 5.1 mit der Standardmatrix von
 // libswresample). Ohne Qt Gui (CLAUDE.md Regel 9).
+// P14 t: Tondateien ohne Bildspur (mp3, wav, ogg, m4a) gehen ohne Änderung denselben Weg
+// (av_find_best_stream sucht nur den Tonstrom); geprüft in tst_tondecoder («audioOnly»).
 //
 // Der Thread schreibt in den Ring der Stelle des Mischers (audioring.h) und füllt ihn als Vorrat,
 // so weit Platz ist; ist der Ring voll, wartet er. Jeder Durchgang beginnt mit einer Marke und

@@ -1,5 +1,6 @@
 #include "coresession.h"
 
+#include "actionprotocol.h"
 #include "coreclient.h"
 #include "version.h"
 
@@ -98,6 +99,51 @@ std::optional<ChangeResult> CoreSession::change(ChangeRequest request, QString *
     return result;
 }
 
+std::optional<OverlayListData> CoreSession::getOverlayList(QString *error)
+{
+    if (!send(simpleMessage(msg::kGetOverlayList), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlayList), error);
+    if (!reply)
+        return std::nullopt;
+    OverlayListData data;
+    if (!parseOverlayList(*reply, &data, error))
+        return std::nullopt;
+    return data;
+}
+
+std::optional<Overlay> CoreSession::getOverlay(const QUuid &id, QString *error)
+{
+    if (!send(overlayIdMessage(msg::kGetOverlay, id), error))
+        return std::nullopt;
+    for (;;) {
+        const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kOverlay), error);
+        if (!reply)
+            return std::nullopt;
+        Overlay overlay;
+        MediaSizes sizes;
+        if (!parseOverlayMessage(*reply, &overlay, &sizes, error))
+            return std::nullopt;
+        if (overlay.id == id)
+            return overlay;
+    }
+}
+
+std::optional<ChangeResult> CoreSession::request(QJsonObject message, QString *error)
+{
+    const qint64 requestId = m_nextRequestId++;
+    message.insert(QStringLiteral("request_id"), double(requestId));
+    if (!send(message, error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kChangeResult), error, requestId);
+    if (!reply)
+        return std::nullopt;
+    ChangeResult result;
+    if (!parseChangeResult(*reply, &result, error))
+        return std::nullopt;
+    return result;
+}
+
 bool CoreSession::send(const QJsonObject &message, QString *error)
 {
     m_socket.write(encodeMessage(message));
@@ -108,9 +154,49 @@ bool CoreSession::send(const QJsonObject &message, QString *error)
     return true;
 }
 
+std::optional<QList<events::Event>> CoreSession::subscribeEvents(const QStringList &filters, QString *error)
+{
+    if (!send(subscribeEventsMessage({filters, true}), error))
+        return std::nullopt;
+    const std::optional<QJsonObject> reply = waitFor(QString::fromLatin1(msg::kEventHistory), error);
+    if (!reply)
+        return std::nullopt;
+    QList<events::Event> history;
+    if (!parseEventHistory(*reply, &history, error))
+        return std::nullopt;
+    return history;
+}
+
+std::optional<QJsonObject> CoreSession::nextEventMessage(QString *error)
+{
+    return waitForAny({QString::fromLatin1(msg::kEvent), QString::fromLatin1(msg::kEventsDropped)}, error,
+                      -1, -1);
+}
+
+std::optional<QJsonObject> CoreSession::actionsRequest(const QString &type, const QJsonObject &fields,
+                                                       const QString &replyType, QString *error)
+{
+    const qint64 id = m_nextRequestId++;
+    if (!send(actionsRequestMessage({id, type, fields}), error))
+        return std::nullopt;
+    return waitForAny({replyType, QString::fromLatin1(msg::kChangeResult)}, error, id, m_timeoutMs);
+}
+
+std::optional<QJsonObject> CoreSession::waitForMessage(const QString &type, QString *error)
+{
+    return waitFor(type, error);
+}
+
 std::optional<QJsonObject> CoreSession::waitFor(const QString &type, QString *error, qint64 requestId)
 {
-    const QDeadlineTimer deadline(m_timeoutMs);
+    return waitForAny({type}, error, requestId, m_timeoutMs);
+}
+
+std::optional<QJsonObject> CoreSession::waitForAny(const QStringList &types, QString *error, qint64 requestId,
+                                                   int timeoutMs)
+{
+    const QDeadlineTimer deadline = timeoutMs < 0 ? QDeadlineTimer(QDeadlineTimer::Forever)
+                                                  : QDeadlineTimer(timeoutMs);
     for (;;) {
         QByteArray line;
         while (m_lines.next(&line) == LineSplitter::Result::Line) {
@@ -126,7 +212,7 @@ std::optional<QJsonObject> CoreSession::waitFor(const QString &type, QString *er
                              : parseText;
                 return std::nullopt;
             }
-            if (t == type && (requestId < 0 || messageRequestId(o) == requestId))
+            if (types.contains(t) && (requestId < 0 || messageRequestId(o) == requestId))
                 return o;
         }
         if (m_socket.state() != QLocalSocket::ConnectedState) {
@@ -134,7 +220,8 @@ std::optional<QJsonObject> CoreSession::waitFor(const QString &type, QString *er
             return std::nullopt;
         }
         if (deadline.hasExpired()) {
-            *error = QStringLiteral("Keine Antwort «%1» vom Kern nach %2 ms").arg(type).arg(m_timeoutMs);
+            *error = QStringLiteral("Keine Antwort «%1» vom Kern nach %2 ms")
+                         .arg(types.join(QStringLiteral("» oder «"))).arg(timeoutMs);
             return std::nullopt;
         }
         if (m_socket.waitForReadyRead(int(deadline.remainingTime())) || m_socket.bytesAvailable() > 0)

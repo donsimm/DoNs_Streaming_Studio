@@ -1,0 +1,34 @@
+{
+  "format_version": 1,
+  "enabled": false,
+  "queues": [ { "id": "b1000000-0000-4000-8000-000000000001", "name": "Alerts", "blocking": true } ],
+  "groups": [ { "id": "b2000000-0000-4000-8000-000000000001", "name": "Stammgäste", "users": [ { "user_id": "100000001" } ] } ],
+  "actions": [
+    {
+      "id": "b3000000-0000-4000-8000-000000000001", "name": "Begrüssung", "group": "Begrüssung", "enabled": true,
+      "queue": "00000000-0000-0000-0000-000000000000", "exclude_from_history": false,
+      "random_action": false, "concurrent": false, "always_run": false,
+      "template_id": null,
+      "triggers": [ { "id": "b4000000-0000-4000-8000-000000000001", "type": "twitch.first_message", "enabled": true } ],
+      "steps": [
+        { "id": "b5000000-0000-4000-8000-000000000001", "type": "user_info", "enabled": true, "login": "%userName%" },
+        { "id": "b5000000-0000-4000-8000-000000000002", "type": "chat_send", "enabled": true, "text": "Willkommen, %user%!", "use_bot": true, "fallback": true, "reply": false },
+        { "id": "b5000000-0000-4000-8000-000000000003", "type": "overlay_source", "enabled": true, "overlay": "b6000000-0000-4000-8000-000000000001", "mode": "show",
+          "elements": [ { "source": "b7000000-0000-4000-8000-000000000001", "text": null, "image": "%targetUserProfileImageUrl%" },
+                        { "source": "b7000000-0000-4000-8000-000000000002", "text": null, "image": null } ],
+          "duration_ms": 8000, "wait": true, "transition_in": "none", "transition_out": "none", "transition_ms": 0 }
+      ]
+    }
+  ],
+  "commands": [
+    { "id": "b8000000-0000-4000-8000-000000000001", "name": "Discord", "enabled": true, "group": "Info", "commands": ["!discord", "!dc"],
+      "mode": "basic", "location": "start", "case_sensitive": false,
+      "ignore_bot_account": true, "ignore_internal": true, "sources": ["twitch_message"],
+      "global_cooldown_s": 5, "user_cooldown_s": 0, "persist_counter": false, "persist_user_counter": false,
+      "permissions": { "grant": "allow", "roles": [], "groups": [], "users": [] } }
+  ],
+  "timers": [
+    { "id": "b9000000-0000-4000-8000-000000000001", "name": "Info alle 20 min", "enabled": true, "repeat": true,
+      "interval_s": 1200, "random": false, "random_min_s": 0, "random_max_s": 0, "lines": 5, "only_live": true }
+  ]
+}

@@ -6,19 +6,30 @@
 // 3 s ohne Meldung, Ende der Ereignisse, geändert, gelöscht), Einstieg danach und «die erste Seite
 // führt». Dazu Abbilden und Glätten der Uhr der Seite ohne Prozess (src/audio/pageclock.h).
 // Daten wie im Handtest (Regel 7): tests/daten/ton/blitz-piep.mp4 und .webm.
+//
+// P14 t (Plan P14, 4.3): Zweck «aktionen» mit eigenem Ersatzausgang im Kern (audio_outputs,
+// [ton-aktionen]) und Töne des Chat-Bots (dss::ActionSound) im Prozess mit dem Ersatzausgang:
+// Ende nach der Länge, ohne Ausgang, falsche Lautstärke, fehlende Datei, 8 gleichzeitig und der
+// 9. abgewiesen, Abbruch, Ausgang weg, Beenden. Daten: tests/daten/ton/ton-piep.wav (1 s).
 
+#include "actionsound.h"
 #include "browsersource.h"
+#include "coresettings.h"
+#include "mixer.h"
+#include "nulloutput.h"
 #include "overlaystore.h"
 #include "pageclock.h"
 #include "protocol.h"
 #include "prozesshilfe.h"
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalSocket>
 #include <QRandomGenerator>
 #include <QRegularExpression>
+#include <QSignalSpy>
 #include <QTcpSocket>
 #include <QTest>
 #include <QTimer>
@@ -354,12 +365,20 @@ private slots:
         QFile ini(m_config + QStringLiteral("/dons-streaming-studio-entwicklung/kern.ini"));
         QVERIFY(ini.open(QIODevice::Append));
         ini.write("\n[ton-video]\nausgang=dss_ersatzausgang\nversatz_ms=0\n");
+        // P14 t: Töne des Chat-Bots über einen zweiten Ersatzausgang
+        ini.write("\n[ton-aktionen]\nausgang=dss_ersatzausgang\n");
         ini.close();
 
         m_core = startCore(m_data.path(), m_socket, m_config, {QStringLiteral("--ersatzausgang")});
         QVERIFY2(expectLog(QStringLiteral("Verbindung offen"), 5000), qPrintable(m_log));
         QVERIFY2(expectLog(QStringLiteral("Overlay-Server lauscht auf 127.0.0.1:%1").arg(m_port), 5000), qPrintable(m_log));
-        QVERIFY2(expectLog(QStringLiteral("Ton: Ersatzausgang: Zustand playing"), 5000), qPrintable(m_log));
+        QVERIFY2(QTest::qWaitFor([this] {
+                     m_log += QString::fromUtf8(m_core->readAllStandardError());
+                     return m_log.contains(QStringLiteral("Ton: Ersatzausgang: Zustand playing"))
+                            && m_log.contains(QStringLiteral("Ton Chat-Bot: Ersatzausgang: Zustand playing"));
+                 }, 5000),
+                 qPrintable(m_log));
+        m_logPos = m_log.size();
         m_window.connectToServer(m_socket);
         QVERIFY(m_window.waitForConnected(3000));
         m_window.write(encodeMessage(helloMessage({QStringLiteral("tst_kernton"), QStringLiteral("0"), kProtocolVersion})));
@@ -591,6 +610,119 @@ private slots:
         QVERIFY2(expectJoin("seitef02", 2000), qPrintable(logTail()));
         b->stop();
         QVERIFY2(expectLog(stopped(QStringLiteral("Seite inaktiv")), 2000), qPrintable(logTail()));
+    }
+
+    // P14 t: audio_outputs meldet beide Zwecke mit ihrem Zustand, ein Gerät (dieselbe Liste).
+    void actionsRoute()
+    {
+        QLocalSocket window;
+        window.connectToServer(m_socket);
+        QVERIFY(window.waitForConnected(3000));
+        window.write(encodeMessage(helloMessage({QStringLiteral("tst_kernton"), QStringLiteral("0"), kProtocolVersion})));
+        LineSplitter lines;
+        AudioOutputsInfo info;
+        const bool got = QTest::qWaitFor([&] {
+            lines.append(window.readAll());
+            QByteArray line;
+            while (lines.next(&line) == LineSplitter::Result::Line) {
+                QJsonObject o;
+                QString error;
+                if (decodeMessage(line, &o, &error) && messageType(o) == QLatin1String(msg::kAudioOutputs))
+                    return parseAudioOutputs(o, &info, &error);
+            }
+            return false;
+        }, 3000);
+        QVERIFY(got);
+        QVERIFY(info.enabled);
+        QCOMPARE(info.devices.size(), 1);
+        QCOMPARE(info.devices.at(0).name, QStringLiteral("dss_ersatzausgang"));
+        QCOMPARE(info.routes.keys(), (QStringList{QStringLiteral("aktionen"), QStringLiteral("video")}));
+        QCOMPARE(info.routes.value(QStringLiteral("video")).state, QStringLiteral("playing"));
+        QCOMPARE(info.routes.value(QStringLiteral("aktionen")).state, QStringLiteral("playing"));
+        window.abort();
+    }
+
+    // P14 t: Töne des Chat-Bots im Prozess mit dem Ersatzausgang (gleicher Takt wie im Kern).
+    void actionSound()
+    {
+        QTemporaryDir data;
+        QVERIFY(data.isValid());
+        QVERIFY(QFile::copy(kTon + QStringLiteral("/ton-piep.wav"), data.filePath(QStringLiteral("piep.wav"))));
+        Mixer mixer(ActionSound::kMaxSounds);
+        NullOutput output(&mixer);
+        QString error;
+        QVERIFY2(output.start(&error), qPrintable(error));
+        ActionSound sound(data.path(), &mixer, &output);
+        QSignalSpy finished(&sound, &ActionSound::finished);
+
+        // Ohne Ausgang: Fehler mit Hinweis auf das Dock, keine Stelle belegt
+        QCOMPARE(sound.play(QStringLiteral("piep.wav"), 100, &error), quint64(0));
+        QVERIFY2(error.contains(QStringLiteral("Kein Ausgang für «Ton Chat-Bot»")), qPrintable(error));
+        output.setTarget(QString::fromLatin1(NullOutput::kDeviceName));
+        QTRY_COMPARE(output.state(), AudioOutput::State::Playing);
+        QCOMPARE(sound.play(QStringLiteral("piep.wav"), 201, &error), quint64(0));
+        QVERIFY2(error.contains(QStringLiteral("0 bis 200 %")), qPrintable(error));
+        QCOMPARE(sound.play(QStringLiteral("fehlt.wav"), 100, &error), quint64(0));
+        QVERIFY2(error.contains(QStringLiteral("fehlt.wav")), qPrintable(error));
+        QCOMPARE(finished.count(), 0);
+
+        // Ein Ton: endet nach seiner Länge (1 s) mit ok
+        QElapsedTimer timer;
+        timer.start();
+        const quint64 one = sound.play(QStringLiteral("piep.wav"), 200, &error);
+        QVERIFY2(one != 0, qPrintable(error));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
+        const qint64 tookMs = timer.elapsed();
+        QCOMPARE(finished.at(0).at(0).toULongLong(), one);
+        QVERIFY2(finished.at(0).at(1).toBool(), qPrintable(finished.at(0).at(2).toString()));
+        QVERIFY2(tookMs >= 950 && tookMs <= 2000, qPrintable(QString::number(tookMs)));
+
+        // 8 gleichzeitig, der 9. abgewiesen; alle 8 enden mit ok
+        finished.clear();
+        QList<quint64> ids;
+        for (int i = 0; i < ActionSound::kMaxSounds; ++i) {
+            const quint64 id = sound.play(QStringLiteral("piep.wav"), 100, &error);
+            QVERIFY2(id != 0, qPrintable(error));
+            ids.append(id);
+        }
+        QCOMPARE(sound.play(QStringLiteral("piep.wav"), 100, &error), quint64(0));
+        QVERIFY2(error.contains(QStringLiteral("Schon 8 Töne")), qPrintable(error));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), ActionSound::kMaxSounds, 5000);
+        for (const QList<QVariant> &f : std::as_const(finished)) {
+            QVERIFY(ids.contains(f.at(0).toULongLong()));
+            QVERIFY2(f.at(1).toBool(), qPrintable(f.at(2).toString()));
+        }
+
+        // Abbruch
+        finished.clear();
+        const quint64 aborted = sound.play(QStringLiteral("piep.wav"), 100, &error);
+        QVERIFY2(aborted != 0, qPrintable(error));
+        QTest::qWait(100);
+        sound.stop(aborted);
+        QCOMPARE(finished.count(), 1);
+        QVERIFY(!finished.at(0).at(1).toBool());
+        QCOMPARE(finished.at(0).at(2).toString(), QStringLiteral("abgebrochen"));
+
+        // Ausgang weg: der Ton endet nach 5 s ohne Fortschritt mit Fehler
+        finished.clear();
+        const quint64 lost = sound.play(QStringLiteral("piep.wav"), 100, &error);
+        QVERIFY2(lost != 0, qPrintable(error));
+        QTest::qWait(100);
+        output.setTarget(QString());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 8000);
+        QVERIFY(!finished.at(0).at(1).toBool());
+        QVERIFY2(finished.at(0).at(2).toString().contains(QStringLiteral("Kein Ausgang")),
+                 qPrintable(finished.at(0).at(2).toString()));
+
+        // Beenden: laufende Töne enden, danach nimmt es keinen mehr an
+        output.setTarget(QString::fromLatin1(NullOutput::kDeviceName));
+        QTRY_COMPARE(output.state(), AudioOutput::State::Playing);
+        finished.clear();
+        QVERIFY(sound.play(QStringLiteral("piep.wav"), 100, &error) != 0);
+        sound.shutdown();
+        QCOMPARE(finished.count(), 1);
+        QCOMPARE(finished.at(0).at(2).toString(), QStringLiteral("Kern beendet"));
+        QCOMPARE(sound.play(QStringLiteral("piep.wav"), 100, &error), quint64(0));
     }
 };
 

@@ -75,6 +75,11 @@ public:
 
     // Overlays (E-01). Rückgabe der neuen Kennung, bei Fehler eine leere QUuid.
     QUuid createOverlay(const QString &name, int width, int height, QString *error);
+    // P14 f2: fertiges Overlay mit eigenen Kennungen anlegen (mitgeliefertes Overlay «Chat-Bot»).
+    // Abgewiesen, wenn es die Kennung schon gibt oder eine Datei mit ihr liegt (auch eine kaputte,
+    // sie wird nie überschrieben). Adresse aus dem Namen (eindeutig), neuer Token, ans Ende der
+    // Liste. Die Verweise "media/…" der Quellen müssen schon im Datenordner liegen (importMedia).
+    bool addOverlay(const Overlay &overlay, QString *error);
     // changeAddress = false: Adresse bleibt (Entscheid 5).
     bool renameOverlay(const QUuid &overlayId, const QString &newName, bool changeAddress,
                        QString *error);
@@ -161,6 +166,12 @@ public:
     // Codec eines Videos aus der Medienliste (einmal gelesen, Dateien ändern sich nie); leer, wenn
     // unbekannt oder kein Video.
     QString videoCodec(const QString &reference) const;
+    // P14 t: Länge einer Tondatei in ms (dss_media, readMediaDuration). Gesetzt vom Kern; ohne: 0.
+    using MediaDurationReader = std::function<bool(const QString &path, qint64 *durationMs, QString *error)>;
+    void setMediaDurationReader(MediaDurationReader reader) { m_mediaDurationReader = std::move(reader); }
+    // Länge eines Tons aus der Medienliste (einmal gelesen wie videoCodec); 0, wenn unbekannt oder
+    // kein Ton.
+    qint64 mediaDurationMs(const QString &reference) const;
     // Hinweis, wenn die Browserquelle die Datei nicht abspielt (videoformat.h); name ist der Name
     // im Hinweis (Dateiname beim Übernehmen, sonst der Name in der Medienliste). Leer = kein Problem.
     QString browserProblem(const QString &reference, const QString &name = QString()) const;
@@ -267,6 +278,8 @@ private:
     MediaSizeReader m_mediaSizeReader;
     VideoCodecReader m_videoCodecReader;
     mutable QHash<QString, QString> m_videoCodecCache;
+    MediaDurationReader m_mediaDurationReader;
+    mutable QHash<QString, qint64> m_mediaDurationCache;
     std::function<void()> m_progress;
     struct CachedSize
     {
