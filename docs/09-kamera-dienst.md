@@ -41,6 +41,7 @@ Es gibt keine Zugangsdaten. Im Protokoll stehen Adressen anderer Absender nur be
 | `POST camera-presets/{id}/recall` | Preset abrufen (weckt die Tiny 2, Standard) |
 | `PUT lights/{light}`, `PUT lights/all` | Lampe oder alle schalten, Helligkeit, Farbtemperatur |
 | `POST lights`, `PUT lights/{light}/config`, `DELETE lights/{light}` | Lampe anlegen, umbenennen oder Adresse ändern, entfernen |
+| `POST lights/check` | Lampe unter einer Adresse lesen, ohne sie zu schalten («Verbindung prüfen») |
 | `POST light-presets` | neues Licht-Preset aus dem Stand aller Lampen |
 | `GET`, `PUT`, `DELETE light-presets/{id}` | Licht-Preset lesen, anlegen oder ändern, löschen |
 | `POST light-presets/{id}/save-current`, `…/recall` | Stand übernehmen, abrufen |
@@ -59,7 +60,7 @@ curl "$D/status"
 {"ok": true, "service_version": "…", "api_version": 1, "fake": false,
  "cameras": [{"id": "…", "name": "OBSBOT Tiny 2", "model": "OBSBOT Tiny 2", "present": true,
               "state": "asleep", "ptz": true}],
- "lights": [{"id": "links", "name": "Links", "reachable": true, "on": true,
+ "lights": [{"id": "links", "name": "Links", "host": "<lampe>", "reachable": true, "on": true,
              "brightness": 40, "temperature": 200}],
  "camera_presets": [{"id": "totale", "name": "Totale"}],
  "light_presets": [{"id": "stream", "name": "Stream"}]}
@@ -163,6 +164,7 @@ curl -X PUT "$D/lights/all" -d '{"on": "toggle"}'
 curl -X POST "$D/lights" -d '{"name": "Links", "host": "<lampe>"}'
 curl -X PUT "$D/lights/links/config" -d '{"host": "<lampe>:9123"}'
 curl -X DELETE "$D/lights/links"
+curl -X POST "$D/lights/check" -d '{"host": "<lampe>"}'
 ```
 
 - `on`: `true`, `false` oder `"toggle"`; `brightness` 3–100, `temperature` 143–344 (Mired). Jedes Feld ist wahlweise. Werte ausserhalb begrenzt der Dienst vor dem Senden.
@@ -170,6 +172,8 @@ curl -X DELETE "$D/lights/links"
 - Antwort `{"lights": […], "errors": […]}`. Nach jedem Setzen liest der Dienst zurück; weicht ein Wert ab, steht in `errors` ein Eintrag mit `not_applied`. Eine Lampe ohne Antwort steht mit `light_unreachable` in `errors`, die anderen werden trotzdem gesetzt. Antwortet keine der angesprochenen Lampen, kommt `502 light_unreachable`.
 - `all` ist reserviert und nie die Kennung einer Lampe. `host` ist Adresse oder Name, wahlweise mit `:port` (Standard 9123).
 - Der Dienst fragt alle Lampen alle 5 s ab; so stimmt der Stand auch, wenn die Elgato-App die Lampe schaltet. Eine Lampe ohne Antwort kostet pro Anfrage rund 2 s (1 s Zeitgrenze, ein neuer Versuch).
+- `host` jeder Lampe steht seit P15 e4 auch in `GET status` und im Ereignis `lights` (das Studio zeigt die Adressen im Dialog «Lampen»).
+- `lights/check` (P15 e4) liest die Lampe unter `host` sofort, ohne sie zu schalten, auch unter einer Adresse, die noch keiner Lampe gehört. Antwort immer `200`: `{"reachable": true, "on", "brightness", "temperature"}` oder `{"reachable": false, "message": "Lampe unter «…» antwortet nicht (…)."}`. Der Stand der Lampen im Dienst (`reachable` in `status`) ändert sich dadurch nicht. Ohne Antwort dauert die Prüfung rund 2 s wie oben. Falsches `host` gibt `400 invalid`.
 
 ### Licht-Presets
 
@@ -193,7 +197,7 @@ retry: 2000
 
 id: 3
 event: lights
-data: {"lights":[{"id":"links","name":"Links","reachable":true,"on":true,"brightness":40,"temperature":200}]}
+data: {"lights":[{"id":"links","name":"Links","host":"<lampe>","reachable":true,"on":true,"brightness":40,"temperature":200}]}
 
 id: 7
 event: controls

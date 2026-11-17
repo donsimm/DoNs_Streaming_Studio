@@ -148,6 +148,7 @@ void TestKernKamera::allowedCalls()
              {"POST", "cameras/046d:0893/move"},
              {"POST", "camera-presets"},
              {"DELETE", "light-presets/stream"},
+             {"POST", "lights/check"},
              {"GET", "export"}}) {
         const QString problem = dss::checkCameraCall(QString::fromLatin1(method), QString::fromLatin1(path));
         QVERIFY2(problem.isEmpty(), qPrintable(problem));
@@ -165,11 +166,12 @@ void TestKernKamera::allowedCalls()
              {"POST", "camera-presets/a?x=1/recall"},
              {"GET", "api/v1/status"},
              {"GET", "gibt-es-nicht"},
-             {"PATCH", "lights/all"}}) {
+             {"PATCH", "lights/all"},
+             {"GET", "lights/check"}}) {
         QVERIFY2(!dss::checkCameraCall(QString::fromLatin1(method), QString::fromLatin1(path)).isEmpty(), path);
     }
     QVERIFY(!dss::checkCameraCall(QStringLiteral("GET"), QStringLiteral("camera-presets/") + QString(600, QLatin1Char('a'))).isEmpty());
-    QCOMPARE(dss::allowedCameraCalls().size(), 28);
+    QCOMPARE(dss::allowedCameraCalls().size(), 29);
     QCOMPARE(dss::cameraApiPath(QStringLiteral("/api/v1/status")), QStringLiteral("status"));
     QCOMPARE(dss::cameraApiPath(QStringLiteral("status")), QStringLiteral("status"));
 }

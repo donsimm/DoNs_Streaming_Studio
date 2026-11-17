@@ -106,8 +106,11 @@ CameraSetupDialog::CameraSetupDialog(dss::CoreClient *client, const dss::CameraD
     direction->addStretch(1);
     column->addLayout(direction);
 
+    // «Tempo» und «Schritt» schmal wie die Grenzen (Entscheid 12 des Nutzers, 2026-11-17): Raster mit
+    // Dehnung rechts wie «Grenzen», Breite der Felder aus der Schrift (sizeHint der Grenzfelder).
     addSectionTitle(column, QStringLiteral("Bewegen"), this);
-    auto *move = new QFormLayout;
+    auto *move = new QGridLayout;
+    move->setHorizontalSpacing(8);
     m_speed = new QSpinBox(this);
     m_speed->setObjectName(QStringLiteral("cameraSetupSpeed"));
     m_speed->setSuffix(dss::cameraSpeedSuffix(camera));
@@ -119,9 +122,12 @@ CameraSetupDialog::CameraSetupDialog(dss::CoreClient *client, const dss::CameraD
     keepValueVisible(m_step);
     m_speed->setEnabled(false);
     m_step->setEnabled(false);
-    move->addRow(QStringLiteral("Tempo"), m_speed);
+    move->addWidget(fieldLabel(QStringLiteral("Tempo"), m_speed, this), 0, 0);
+    move->addWidget(m_speed, 0, 1);
     // Texte wie im Reiter: «Schritt» (Entscheid 7 des Nutzers, 2026-11-17)
-    move->addRow(QStringLiteral("Schritt"), m_step);
+    move->addWidget(fieldLabel(QStringLiteral("Schritt"), m_step, this), 1, 0);
+    move->addWidget(m_step, 1, 1);
+    move->setColumnStretch(2, 1);
     column->addLayout(move);
 
     // «Presets wecken die Kamera» entfällt (Entscheid 6 des Nutzers, 2026-11-17): Abrufen weckt die
@@ -140,7 +146,7 @@ CameraSetupDialog::CameraSetupDialog(dss::CoreClient *client, const dss::CameraD
     m_remembered->setAccessibleName(QStringLiteral("Gemerkte Werte"));
     m_remembered->setColumnCount(3);
     m_remembered->setHeaderLabels(
-        {QStringLiteral("Wert"), QStringLiteral("gemerkt"), QStringLiteral("Standard des Geräts")});
+        {QStringLiteral("Wert"), QStringLiteral("Gemerkt"), QStringLiteral("Standard des Geräts")});
     m_remembered->setRootIsDecorated(false);
     m_remembered->setUniformRowHeights(true);
     m_remembered->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -170,13 +176,13 @@ CameraSetupDialog::CameraSetupDialog(dss::CoreClient *client, const dss::CameraD
         m_forgetRequest = m_client->callCamera(dss::cameraControlsPutCall(m_cameraId, {{key, QJsonValue::Null}}));
     });
 
-    // Meldung des Dienstes: Platz für zwei Zeilen von Anfang an (wie #settingsProblem, Regel 9)
+    // Meldung des Dienstes: Platz für drei Zeilen von Anfang an (wie #settingsProblem, Regel 9)
     m_problem = new QLabel(this);
     m_problem->setObjectName(QStringLiteral("cameraSetupProblem"));
     m_problem->setWordWrap(true);
     m_problem->setTextFormat(Qt::PlainText);
     m_problem->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    m_problem->setFixedHeight(fontMetrics().lineSpacing() * 2);
+    m_problem->setFixedHeight(fontMetrics().lineSpacing() * 3);
     column->addWidget(m_problem);
 
     auto *buttons = new QDialogButtonBox(this);
@@ -245,6 +251,14 @@ void CameraSetupDialog::fill()
     setLimit(m_panMax, QStringLiteral("pan_max"));
     setLimit(m_tiltMin, QStringLiteral("tilt_min"));
     setLimit(m_tiltMax, QStringLiteral("tilt_max"));
+    // Bereiche der Grenzen stehen jetzt fest: alle sechs Zahlenfelder so breit wie das breiteste
+    // Grenzfeld (Entscheid 12)
+    int fieldWidth = 0;
+    for (const QDoubleSpinBox *box : {m_panMin, m_panMax, m_tiltMin, m_tiltMax})
+        fieldWidth = std::max(fieldWidth, box->sizeHint().width());
+    for (QAbstractSpinBox *box : std::initializer_list<QAbstractSpinBox *>{m_panMin, m_panMax, m_tiltMin, m_tiltMax,
+                                                                            m_speed, m_step})
+        box->setMinimumWidth(fieldWidth);
     m_invertPan->setChecked(values.value(QLatin1String("invert_pan")).toBool());
     m_invertTilt->setChecked(values.value(QLatin1String("invert_tilt")).toBool());
     const auto [speedLow, speedHigh] = dss::cameraConfigRange(config, QStringLiteral("speed"), 1, 100);

@@ -55,6 +55,11 @@ QWidget *buttonBar(const QList<QWidget *> &left, const QList<QWidget *> &right, 
 // Liste mit einer Knopfleiste (buttonBar) darunter.
 QWidget *listWithButtons(const QList<QToolButton *> &buttons, QWidget *list, QWidget *parent);
 
+// Farbe über die Eigenschaft state im Stylesheet setzen und neu anwenden (unpolish/polish wie
+// headerbar.cpp, setConnectionState). P15 e4: gemeinsam für den Reiter «Kameras» und den Dialog
+// «Lampen», statt einer Kopie je Datei.
+void setStyleState(QWidget *w, const QString &state);
+
 // Prüfmeldung unter einem Abschnitt (#fieldProblem, stateError): Zeile mit reservierter Höhe, auch
 // ohne Meldung. P14 e2-15 für die Mitte, seit e2-16 auch für die rechte Spalte.
 QLabel *problemLine(QWidget *parent);

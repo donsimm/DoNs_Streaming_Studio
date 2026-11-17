@@ -28,6 +28,7 @@
 #include <QDoubleSpinBox>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLayout>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
@@ -37,6 +38,7 @@
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
@@ -178,6 +180,20 @@ class TestFensterKameras : public QObject
 
     CameraPage *page() { return child<CameraPage>("cameraPage"); }
 
+    // Grauer bzw. farbiger Hinweis (#hintLabel) in einem Bereich (Objektname des Bereichs)
+    QLabel *hint(const char *area)
+    {
+        QWidget *w = child<QWidget>(area);
+        return w ? w->findChild<QLabel *>(QStringLiteral("hintLabel")) : nullptr;
+    }
+
+    // Ganz sichtbar: so breit wie der Text und innerhalb der Seite (nicht links abgeschnitten)
+    bool fullyShown(QLabel *label)
+    {
+        const QRect r(label->mapTo(page(), QPoint(0, 0)), label->size());
+        return label->width() >= label->sizeHint().width() && r.left() >= 0 && r.right() < page()->width();
+    }
+
     bool chooseCamera(const QString &id)
     {
         auto *choice = child<QComboBox>("cameraChoice");
@@ -298,7 +314,11 @@ private slots:
         auto *state = child<QLabel>("cameraState");
         QCOMPARE(state->text(), QStringLiteral("Kamera-Dienst: verbunden"));
         QCOMPARE(state->property("state").toString(), QStringLiteral("ok"));
-        QVERIFY(child<QLabel>("cameraBlockedHint")->text().isEmpty());
+        // Hinweis «… gesperrt …» in der zweiten Zeile der Kopfzeile, ohne eigene Zeile darüber (P15 e4)
+        QVERIFY(hint("cameraHeader")->text().isEmpty());
+        QVERIFY(child<QWidget>("cameraHeader")->geometry().bottom() < child<QSplitter>("cameraColumns")->geometry().top());
+        QCOMPARE(child<QSplitter>("cameraColumns")->geometry().top() - child<QWidget>("cameraHeader")->geometry().bottom() - 1,
+                 page()->layout()->spacing());
         auto *choice = child<QComboBox>("cameraChoice");
         QCOMPARE(choice->count(), 2);
         QVERIFY(choice->findData(kameradienst::kC922) >= 0);
@@ -326,8 +346,26 @@ private slots:
             QVERIFY(child<QToolButton>(i == 4 ? "cameraHome" : qPrintable(QStringLiteral("cameraMove%1").arg(i)))->isEnabled());
         QVERIFY(child<QLabel>("cameraZoomText")->text().endsWith(QStringLiteral(" %")));
         QCOMPARE(child<QSpinBox>("cameraSpeed")->suffix(), QStringLiteral(" °/s"));
-        QVERIFY(child<QLabel>("cameraMoveHint")->text().isEmpty());
+        QVERIFY(hint("cameraMovePanel")->text().isEmpty());
         QVERIFY(!child<QPushButton>("cameraHintWake")->isVisible());
+
+        // Entscheid 10: Hinweis und «Wecken» rechts neben dem Kreuz unter «Schritt», das Kreuz
+        // oben im Bereich; «KI-Verfolgung» in einer Zeile mit dem Hinweis rechts der Auswahl
+        QWidget *move = child<QWidget>("cameraMovePanel");
+        const QRect cross(crossButton(0)->mapTo(move, QPoint(0, 0)), crossButton(8)->mapTo(move, QPoint(0, 0))
+                                                                         + QPoint(crossButton(8)->width(), crossButton(8)->height()));
+        const QRect moveHint(hint("cameraMovePanel")->mapTo(move, QPoint(0, 0)), hint("cameraMovePanel")->size());
+        const QPoint step = child<QDoubleSpinBox>("cameraStep")->mapTo(move, QPoint(0, 0));
+        QVERIFY(moveHint.left() > cross.right());
+        QVERIFY(moveHint.top() > step.y());
+        QVERIFY(moveHint.bottom() <= cross.bottom() + crossButton(8)->height() / 2);
+        QVERIFY(cross.top() < move->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->height()
+                                  + crossButton(0)->height() / 2);
+        QWidget *ai = child<QWidget>("cameraAiPanel");
+        const QRect aiChoice(child<QComboBox>("cameraAi")->mapTo(ai, QPoint(0, 0)), child<QComboBox>("cameraAi")->size());
+        const QRect aiHint(hint("cameraAiPanel")->mapTo(ai, QPoint(0, 0)), hint("cameraAiPanel")->size());
+        QVERIFY(aiHint.left() > aiChoice.right());
+        QVERIFY(aiHint.top() >= aiChoice.top() && aiHint.bottom() <= aiChoice.bottom());
     }
 
     // Klick = ein Schritt, Halten = Fahrt mit Wiederholung und «stop», Pfeiltasten wie die Maus
@@ -385,7 +423,7 @@ private slots:
         // Schritt: die Anzeige geht sofort auf «Aus», ohne Ereignis des Dienstes
         QTest::mouseClick(crossButton(3), Qt::LeftButton);
         QCOMPARE(ai->currentText(), QStringLiteral("Aus"));
-        QVERIFY(child<QLabel>("cameraAiHint")->text().isEmpty());
+        QVERIFY(hint("cameraAiPanel")->text().isEmpty());
     }
 
     // «Positionen»: Speichern (Dialog), Abrufen, Überschreiben, Umbenennen, Löschen mit Rückfrage
@@ -506,6 +544,15 @@ private slots:
         QVERIFY(!labels.contains(QStringLiteral("Schrittweite")));
         for (QCheckBox *c : dialog->findChildren<QCheckBox *>())
             QVERIFY2(!c->text().contains(QStringLiteral("Preset")), qPrintable(c->text()));
+        // Entscheid 12: «Tempo» und «Schritt» so breit wie die Grenzen, Spaltenkopf «Gemerkt»,
+        // Meldungszeile für drei Zeilen wie #settingsProblem
+        auto *panMin = dialog->findChild<QDoubleSpinBox *>(QStringLiteral("cameraSetupPanMin"));
+        QCOMPARE(dialog->findChild<QSpinBox *>(QStringLiteral("cameraSetupSpeed"))->width(), panMin->width());
+        QCOMPARE(dialog->findChild<QDoubleSpinBox *>(QStringLiteral("cameraSetupStep"))->width(), panMin->width());
+        QCOMPARE(dialog->findChild<QTreeWidget *>(QStringLiteral("cameraRemembered"))->headerItem()->text(1),
+                 QStringLiteral("Gemerkt"));
+        QCOMPARE(dialog->findChild<QLabel *>(QStringLiteral("cameraSetupProblem"))->height(),
+                 dialog->fontMetrics().lineSpacing() * 3);
 
         name->setText(QStringLiteral("Kamera oben"));
         tiltMin->setValue(-50);
@@ -657,7 +704,14 @@ private slots:
         QTest::mouseClick(child<QToolButton>("cameraSectionReset_Weissabgleich"), Qt::LeftButton);
         QCOMPARE(waitForAnswer(QStringLiteral("PUT"), QStringLiteral("/controls"), from).result.status, 200);
         QTRY_VERIFY_WITH_TIMEOUT(autoWhite->isChecked(), 5000);
+        QVERIFY(brightness->value() > brightness->minimum());
         QVERIFY(chooseCamera(kTiny2));
+
+        // Entscheid 11: Regler ohne Wert ganz links, nicht die Stellung der C922
+        QTRY_VERIFY_WITH_TIMEOUT(!brightness->isEnabled(), 5000);
+        QCOMPARE(brightness->minimum(), brightness->maximum());
+        QCOMPARE(brightness->value(), brightness->minimum());
+        QCOMPARE(QStyle::sliderPositionFromValue(brightness->minimum(), brightness->maximum(), brightness->value(), 100), 0);
     }
 
     // P15 e3, Dialog «Lampen»: Hinzufügen (zwei Attrappen-Lampen und eine ohne Antwort), Verbindung
@@ -690,11 +744,30 @@ private slots:
         QCOMPARE(list->topLevelItem(1)->text(0), names.at(1));
         QCOMPARE(list->topLevelItem(1)->text(1), hosts.at(1));
         QCOMPARE(list->topLevelItem(1)->text(2), QStringLiteral("–"));
-        QVERIFY(!dialog->findChild<QPushButton *>(QStringLiteral("lightsCheck"))->isEnabled());
-        QCOMPARE(dialog->findChild<QLabel *>(QStringLiteral("lightsCheckResult"))->text(), QStringLiteral("Prüfbar nach OK"));
+
+        // Entscheid 13: «Verbindung prüfen» fragt sofort, auch eine noch nicht gespeicherte Adresse,
+        // mit POST lights/check (ohne Schalten); die Lampe ohne Antwort mit der Meldung des Dienstes
+        auto *check = dialog->findChild<QPushButton *>(QStringLiteral("lightsCheck"));
+        auto *result = dialog->findChild<QLabel *>(QStringLiteral("lightsCheckResult"));
+        list->setCurrentItem(list->topLevelItem(1));
+        QVERIFY(check->isEnabled());
+        qsizetype from = m_answers.size();
+        QTest::mouseClick(check, Qt::LeftButton);
+        QTRY_COMPARE_WITH_TIMEOUT(result->text(), QStringLiteral("✔ Lampe antwortet"), 5000);
+        QCOMPARE(result->property("state").toString(), QStringLiteral("ok"));
+        const Answer checked = waitForAnswer(QStringLiteral("POST"), QStringLiteral("lights/check"), from);
+        QCOMPARE(checked.result.status, 200);
+        QCOMPARE(checked.call.body->value(QStringLiteral("host")).toString(), hosts.at(1));
+        QCOMPARE(countAnswers(QStringLiteral("lights"), from), 0); // nichts angelegt vor OK
+        list->setCurrentItem(list->topLevelItem(2));
+        QVERIFY(result->text().isEmpty());
+        QTest::mouseClick(check, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(result->text().startsWith(QStringLiteral("Lampe unter «%1» antwortet nicht (").arg(hosts.at(2))),
+                                 8000);
+        QCOMPARE(result->property("state").toString(), QStringLiteral("error"));
 
         // Noch kein Bereich, solange der Dialog offen ist
-        const qsizetype from = m_answers.size();
+        from = m_answers.size();
         QTest::mouseClick(dialog->findChild<QPushButton *>(QStringLiteral("lightsOk")), Qt::LeftButton);
         QTRY_VERIFY_WITH_TIMEOUT(!dialog, 10000);
         m_lightIds.clear();
@@ -730,16 +803,16 @@ private slots:
         QCOMPARE(list->topLevelItem(0)->text(1), hosts.at(0));
         QCOMPARE(list->topLevelItem(0)->text(2), QStringLiteral("erreichbar"));
         list->setCurrentItem(list->topLevelItem(0));
-        auto *check = dialog->findChild<QPushButton *>(QStringLiteral("lightsCheck"));
+        check = dialog->findChild<QPushButton *>(QStringLiteral("lightsCheck"));
         QVERIFY(check->isEnabled());
         QTest::mouseClick(check, Qt::LeftButton);
-        auto *result = dialog->findChild<QLabel *>(QStringLiteral("lightsCheckResult"));
+        result = dialog->findChild<QLabel *>(QStringLiteral("lightsCheckResult"));
         QTRY_COMPARE_WITH_TIMEOUT(result->text(), QStringLiteral("✔ Lampe antwortet"), 5000);
         QCOMPARE(result->property("state").toString(), QStringLiteral("ok"));
         savePicture(dialog, QStringLiteral("kameras-e3-lampen.png"));
         list->setCurrentItem(list->topLevelItem(2));
         QTest::mouseClick(check, Qt::LeftButton);
-        QTRY_COMPARE_WITH_TIMEOUT(result->text(), QStringLiteral("Lampe antwortet nicht"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(result->text().contains(QStringLiteral("antwortet nicht")), 8000);
         QTest::mouseClick(dialog->findChild<QPushButton *>(QStringLiteral("lightsRemove")), Qt::LeftButton);
         QCOMPARE(list->topLevelItemCount(), 2);
         const qsizetype removeFrom = m_answers.size();
@@ -883,14 +956,17 @@ private slots:
         QTest::mouseClick(wake, Qt::LeftButton);
         QVERIFY(waitForTiny2(QStringLiteral("schläft")));
         QTRY_COMPARE_WITH_TIMEOUT(wake->text(), QStringLiteral("Wecken"), 3000);
-        auto *hint = child<QLabel>("cameraMoveHint");
-        QCOMPARE(hint->text(), QStringLiteral("Kamera schläft"));
-        QCOMPARE(hint->property("state").toString(), QStringLiteral("warning"));
+        auto *moveHint = hint("cameraMovePanel");
+        QCOMPARE(moveHint->text(), QStringLiteral("Kamera schläft"));
+        QCOMPARE(moveHint->property("state").toString(), QStringLiteral("warning"));
         QVERIFY(child<QPushButton>("cameraHintWake")->isVisible());
+        // «Wecken» rechts neben dem Hinweis, auf seiner Höhe
+        QVERIFY(child<QPushButton>("cameraHintWake")->mapTo(page(), QPoint(0, 0)).x()
+                > moveHint->mapTo(page(), QPoint(0, 0)).x() + moveHint->width() - 1);
         QVERIFY(!crossButton(1)->isEnabled());
         QVERIFY(!child<QToolButton>("cameraZoomIn")->isEnabled());
         QVERIFY(!child<QComboBox>("cameraAi")->isEnabled());
-        QCOMPARE(child<QLabel>("cameraAiHint")->text(), QStringLiteral("Nur bei wacher Kamera"));
+        QCOMPARE(hint("cameraAiPanel")->text(), QStringLiteral("Nur bei wacher Kamera"));
         QVERIFY(!child<QPushButton>("cameraPresetSave")->isEnabled());
         QVERIFY(child<QSpinBox>("cameraSpeed")->isEnabled()); // Einstellung, geht auch im Schlaf
         QTreeWidgetItem *item = presetItem(QStringLiteral("Nah"));
@@ -899,12 +975,12 @@ private slots:
         QVERIFY(child<QPushButton>("cameraPresetRecall")->isEnabled());
         QVERIFY(!child<QPushButton>("cameraPresetOverwrite")->isEnabled());
         QVERIFY(child<QPushButton>("cameraPresetRename")->isEnabled());
-        QCOMPARE(child<QLabel>("cameraRecallHint")->text(), QStringLiteral("weckt die Kamera zuerst"));
+        QCOMPARE(hint("cameraPresetsPanel")->text(), QStringLiteral("weckt die Kamera zuerst"));
 
         QTest::mouseClick(child<QPushButton>("cameraHintWake"), Qt::LeftButton);
         QVERIFY(waitForTiny2(QStringLiteral("wach")));
         QTRY_VERIFY_WITH_TIMEOUT(crossButton(1)->isEnabled(), 3000);
-        QVERIFY(child<QLabel>("cameraMoveHint")->text().isEmpty());
+        QVERIFY(hint("cameraMovePanel")->text().isEmpty());
     }
 
     // C922: Wecken/Schlafen und KI grau mit «Diese Kamera hat das nicht.», Tempo in %
@@ -929,13 +1005,46 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!child<QSplitter>("cameraColumns")->isEnabled(), 10000);
         auto *state = child<QLabel>("cameraState");
         QVERIFY2(state->property("state").toString() != QStringLiteral("ok"), qPrintable(state->text()));
-        QVERIFY(!child<QLabel>("cameraBlockedHint")->text().isEmpty());
         QVERIFY(!child<QPushButton>("cameraWake")->isEnabled());
         QVERIFY(!child<QPushButton>("cameraSetup")->isEnabled());
         QVERIFY(!child<QComboBox>("cameraChoice")->isEnabled());
         QVERIFY(!child<QPushButton>("cameraLamps")->isEnabled());
+
+        // Entscheid 9 (Entwurf 4 E): Auswahl nur mit Namen, Zoom und Lampen «–», kein veralteter Stand
+        auto *choice = child<QComboBox>("cameraChoice");
+        for (int i = 0; i < choice->count(); ++i)
+            QVERIFY2(!choice->itemText(i).contains(QStringLiteral(" · ")), qPrintable(choice->itemText(i)));
+        QVERIFY(!choice->currentText().isEmpty());
+        QCOMPARE(child<QLabel>("cameraZoomText")->text(), QStringLiteral("–"));
+        QVERIFY(!m_lightIds.isEmpty());
+        for (const QString &id : std::as_const(m_lightIds)) {
+            QCOMPARE(sectionText(QStringLiteral("cameraLight_") + id)->text(), QStringLiteral("–"));
+            QVERIFY(sectionText(QStringLiteral("cameraLight_") + id)->property("state").toString().isEmpty());
+            auto *on = child<QCheckBox>(qPrintable(QStringLiteral("cameraLightOn_") + id));
+            QVERIFY(!on->isChecked() && !on->isEnabled());
+            auto *brightness = child<QSlider>(qPrintable(QStringLiteral("cameraLightBrightness_") + id));
+            QCOMPARE(brightness->value(), brightness->minimum());
+        }
+
+        // Kopfzeile: Hinweis «… gesperrt …» links in der zweiten Zeile (rot), der Zustand rechts ganz
+        // sichtbar; eine lange Meldung des Kerns wird nie links abgeschnitten (Entscheid Lotse)
+        QLabel *blocked = hint("cameraHeader");
+        QVERIFY(blocked->text().startsWith(QStringLiteral("Steuerung, Bild und Licht sind gesperrt")));
+        QCOMPARE(blocked->property("state").toString(), QStringLiteral("error"));
+        auto *detail = child<QLabel>("cameraStateDetail");
+        QTRY_VERIFY_WITH_TIMEOUT(!detail->text().isEmpty(), 3000);
+        qInfo("Meldung des Kerns: %s", qPrintable(detail->text()));
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(state) && fullyShown(detail), 3000);
+        QVERIFY(blocked->mapTo(page(), QPoint(0, 0)).y() >= state->mapTo(page(), QPoint(0, 0)).y() + state->height());
         m_window->statusBar()->clearMessage();
         savePicture(m_window.get(), QStringLiteral("kameras-e3-weg.png"));
+
+        const QString message = detail->text();
+        detail->setText(QStringLiteral("Kamera-Dienst unter streaming-pc.heimnetz.example:8093 nicht erreichbar "
+                                       "(Verbindung abgelehnt). Neuer Versuch läuft."));
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(detail), 3000);
+        QVERIFY(m_window->minimumSizeHint().width() <= 1280);
+        detail->setText(message);
     }
 };
 

@@ -80,6 +80,15 @@ void keepValueVisible(QAbstractSpinBox *spin)
     spin->setSizePolicy(QSizePolicy::Minimum, spin->sizePolicy().verticalPolicy());
 }
 
+void setStyleState(QWidget *w, const QString &state)
+{
+    if (w->property("state").toString() == state)
+        return;
+    w->setProperty("state", state);
+    w->style()->unpolish(w);
+    w->style()->polish(w);
+}
+
 FieldSpinBox::FieldSpinBox(QWidget *parent) : QDoubleSpinBox(parent)
 {
     QLocale comma(QLocale::German, QLocale::Germany);

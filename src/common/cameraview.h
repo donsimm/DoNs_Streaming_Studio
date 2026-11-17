@@ -81,8 +81,9 @@ QList<CameraEntry> cameraEntries(const QJsonArray &cameras);
 bool cameraIsTiny2(const CameraEntry &camera);
 // «wach», «schläft», «Privatsphäre», «fehlt», «unbekannt»
 QString cameraStateText(const QString &state);
-// Eintrag der Auswahl: «OBSBOT Tiny 2 · wach»
-QString cameraChoiceText(const CameraEntry &camera);
+// Eintrag der Auswahl: «OBSBOT Tiny 2 · wach». Antwortet der Dienst nicht (serviceUsable false), nur
+// der Name, denn der Zustand ist veraltet (Entscheid 9 des Nutzers, 2026-11-17, Entwurf Seite 4 E).
+QString cameraChoiceText(const CameraEntry &camera, bool serviceUsable = true);
 // Gewählte Kamera nach einer neuen Liste: dieselbe Kennung, sonst die erste; leer bei leerer Liste.
 QString cameraChoiceAfterUpdate(const QList<CameraEntry> &cameras, const QString &currentId);
 
@@ -99,6 +100,9 @@ struct CameraControlView
     bool setupEnabled = false; // «Einrichten …»
 
     bool moveEnabled = false; // Steuerkreuz, Mitte, Zoom
+    // Zoom neben dem Kreuz (cameraZoomText); «–», solange der Dienst nicht antwortet oder die Kamera
+    // fehlt (Entscheid 9 des Nutzers, 2026-11-17)
+    QString zoomText = QStringLiteral("–");
     QString moveHint;
     QString moveHintState;
     bool moveHintWake = false;
@@ -184,7 +188,8 @@ QList<CameraPresetRow> cameraPresetRows(const QJsonArray &presets, const QString
                                         const QJsonArray &controls);
 
 // Eine Lampe im rechten Bereich (Entwurf Seite 1B und 4 F). Bereiche entstehen nur nach dem Dialog
-// «Lampen» neu (Plan 8); lightLayoutKey vergleicht dafür Kennungen und Namen.
+// «Lampen» neu (Plan 8); lightLayoutKey vergleicht dafür Kennungen und Namen. Antwortet der Dienst
+// nicht, sind Zustand und Werte «–» (stateKey leer, grau), nie der letzte Stand (Entscheid 9).
 struct LightRow
 {
     QString id;
@@ -194,8 +199,8 @@ struct LightRow
     bool on = false;
     int brightness = kLightBrightnessMin;
     int kelvin = kLightKelvinMin;
-    QString stateText; // «erreichbar», «nicht erreichbar»
-    QString stateKey;  // «ok», «error» für die Farbe
+    QString stateText = QStringLiteral("–"); // «erreichbar», «nicht erreichbar»
+    QString stateKey;                        // «ok», «error» für die Farbe
     QString brightnessText = QStringLiteral("–");
     QString kelvinText = QStringLiteral("–");
 
@@ -265,7 +270,8 @@ CameraCall lightPutCall(const QString &lightId, const QJsonObject &values);
 CameraCall lightsAllCall(bool on); // «Alle ein», «Alle aus»
 CameraCall lightPresetRecallCall(const QString &presetId);
 // P15 e3: Licht-Presets (POST und save-current übernehmen den Stand aller Lampen), Lampen anlegen,
-// ändern (Name, Adresse), löschen; GET status für «Verbindung prüfen», GET export für die Adressen
+// ändern (Name, Adresse), löschen. P15 e4 (Entscheid 13 des Nutzers): «Verbindung prüfen» mit
+// POST lights/check {"host"}, liest die Lampe sofort ohne zu schalten, auch unter einer neuen Adresse.
 CameraCall lightPresetGetCall(const QString &presetId);
 CameraCall lightPresetCreateCall(const QString &name);
 CameraCall lightPresetOverwriteCall(const QString &presetId);
@@ -274,8 +280,7 @@ CameraCall lightPresetDeleteCall(const QString &presetId);
 CameraCall lightCreateCall(const QString &name, const QString &host);
 CameraCall lightConfigCall(const QString &lightId, const QJsonObject &values);
 CameraCall lightDeleteCall(const QString &lightId);
-CameraCall cameraStatusGetCall();
-CameraCall cameraExportGetCall();
+CameraCall lightCheckCall(const QString &host);
 
 // Wertanzeige eines Reglers in der Mitte: «4600 K» beim Weissabgleich, sonst die Zahl
 QString cameraSliderText(const QString &key, int value);
@@ -298,8 +303,8 @@ struct LightPanelView
 };
 LightPanelView lightPanelView(const CameraServiceView &service, const QJsonArray &lights, bool presetSelected);
 
-// Dialog «Lampen»: Lampe mit Adresse (host). Die Adressen stehen nicht in GET status, nur in der Datei
-// licht.json aus GET export. id leer = neu im Dialog.
+// Dialog «Lampen»: Lampe mit Adresse (host). Die Adressen stehen seit P15 e4 je Lampe in GET status
+// und im Ereignis lights (Entscheid Lotse, statt GET export). id leer = neu im Dialog.
 struct LightEntry
 {
     QString id;
@@ -308,14 +313,14 @@ struct LightEntry
 
     bool operator==(const LightEntry &) const = default;
 };
-QList<LightEntry> lightEntriesFromExport(const QJsonObject &exportBody);
+QList<LightEntry> lightEntriesFromStatus(const QJsonArray &lights);
 // Anfragen für OK im Dialog: zuerst löschen, dann ändern (nur geänderte Felder), dann anlegen
 QList<CameraCall> lightsDialogCalls(const QList<LightEntry> &before, const QList<LightEntry> &after);
 // Prüft Name und Adresse aller Einträge; leer = in Ordnung
 QString lightsDialogProblem(const QList<LightEntry> &entries);
-// «Verbindung prüfen» aus der Antwort auf GET status: Text und state («ok», «error») wie die Kopfzeile.
-// Der Dienst fragt die Lampen alle 5 s ab; reachable ist der Stand dieser Abfrage.
-std::pair<QString, QString> lightCheckResult(const CameraResult &status, const QString &lightId);
+// «Verbindung prüfen» aus der Antwort auf POST lights/check: Text und state («ok», «error») wie die
+// Kopfzeile; ohne Antwort der Lampe die Meldung des Dienstes (mit Grund).
+std::pair<QString, QString> lightCheckResult(const CameraResult &check);
 
 // Halten am Steuerkreuz und bei Zoom «−»/«+» (Plan 8): press merkt sich die Richtung, nach
 // kCameraHoldDelayMs beginnt die Fahrt (move), danach alle kCameraHoldRepeatMs wieder. Loslassen
@@ -362,7 +367,8 @@ class CameraBundler
 public:
     std::optional<CameraCall> put(const QString &path, const QJsonObject &values, qint64 nowMs);
     QList<CameraCall> tick(qint64 nowMs);
-    // Alles Offene sofort (Kamera gewechselt, Regler losgelassen)
+    // Alles Offene, das fällig ist, sofort (Kamera gewechselt, Regler losgelassen); was weniger als
+    // kCameraBundleMs nach dem letzten PUT desselben Pfads käme, bleibt für tick (P15 e4)
     QList<CameraCall> flush(qint64 nowMs);
     int nextDueMs(qint64 nowMs) const;
 

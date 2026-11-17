@@ -1,6 +1,7 @@
 #include "lightsdialog.h"
 
 #include "coreclient.h"
+#include "panels.h"
 
 #include <QAbstractItemView>
 #include <QDialogButtonBox>
@@ -11,23 +12,12 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QStyle>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
 namespace {
 
 enum Column { kNameColumn, kHostColumn, kStateColumn };
-
-// Farbe über die Eigenschaft state im Theme (wie camerapage.cpp)
-void setState(QWidget *w, const QString &state)
-{
-    if (w->property("state").toString() == state)
-        return;
-    w->setProperty("state", state);
-    w->style()->unpolish(w);
-    w->style()->polish(w);
-}
 
 } // namespace
 
@@ -59,6 +49,7 @@ LightsDialog::LightsDialog(dss::CoreClient *client, const dss::CameraData *data,
         m_name->setText(row >= 0 ? m_entries.at(row).name : QString());
         m_host->setText(row >= 0 ? m_entries.at(row).host : QString());
         m_checkResult->clear();
+        m_checkRequest = 0; // eine laufende Prüfung gilt der vorigen Lampe
         refresh();
     });
     column->addWidget(m_list, 1);
@@ -88,6 +79,7 @@ LightsDialog::LightsDialog(dss::CoreClient *client, const dss::CameraData *data,
         m_entries[row].host = text;
         m_list->topLevelItem(row)->setText(kHostColumn, text);
         m_checkResult->clear();
+        m_checkRequest = 0; // eine laufende Prüfung galt der alten Adresse
         refresh();
     });
 
@@ -122,14 +114,17 @@ LightsDialog::LightsDialog(dss::CoreClient *client, const dss::CameraData *data,
         m_entries.removeAt(row);
         fillList();
     });
+    // Fragt sofort die Adresse im Feld, auch eine noch nicht gespeicherte (Entscheid 13 des Nutzers)
     connect(m_check, &QPushButton::clicked, this, [this] {
         const int row = currentRow();
-        if (row < 0 || m_entries.at(row).id.isEmpty())
+        if (row < 0 || m_entries.at(row).host.trimmed().isEmpty())
             return;
-        m_checkId = m_entries.at(row).id;
-        setState(m_checkResult, QString());
+        setStyleState(m_checkResult, QString());
         m_checkResult->setText(QStringLiteral("Prüfe …"));
-        m_checkRequest = m_client->callCamera(dss::cameraStatusGetCall());
+        m_checkRequest = m_client->callCamera(dss::lightCheckCall(m_entries.at(row).host));
+        if (m_checkRequest == 0)
+            m_checkResult->setText(QStringLiteral("Keine Verbindung zum Kern"));
+        refresh();
     });
 
     auto *hint = new QLabel(QStringLiteral("Die Adresse der Lampe im Heimnetz, am besten am Router fest zugeteilt. "
@@ -139,13 +134,13 @@ LightsDialog::LightsDialog(dss::CoreClient *client, const dss::CameraData *data,
     hint->setWordWrap(true);
     column->addWidget(hint);
 
-    // Meldung des Dienstes: Platz für zwei Zeilen von Anfang an (wie «Kamera einrichten», Regel 9)
+    // Meldung des Dienstes: Platz für drei Zeilen von Anfang an (wie #settingsProblem, Regel 9)
     m_problem = new QLabel(this);
     m_problem->setObjectName(QStringLiteral("lightsProblem"));
     m_problem->setWordWrap(true);
     m_problem->setTextFormat(Qt::PlainText);
     m_problem->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    m_problem->setFixedHeight(fontMetrics().lineSpacing() * 2);
+    m_problem->setFixedHeight(fontMetrics().lineSpacing() * 3);
     column->addWidget(m_problem);
 
     auto *buttons = new QDialogButtonBox(this);
@@ -164,11 +159,10 @@ LightsDialog::LightsDialog(dss::CoreClient *client, const dss::CameraData *data,
 
 void LightsDialog::load()
 {
-    m_loaded = false;
-    m_exportRequest = m_client->callCamera(dss::cameraExportGetCall());
-    if (m_exportRequest == 0)
-        m_problem->setText(QStringLiteral("Keine Verbindung zum Kern"));
-    refresh();
+    // Adressen aus dem Stand des Dienstes (host je Lampe in status, P15 e4)
+    m_before = dss::lightEntriesFromStatus(m_data->lights());
+    m_entries = m_before;
+    fillList();
 }
 
 int LightsDialog::currentRow() const
@@ -191,6 +185,12 @@ void LightsDialog::fillList()
 
 void LightsDialog::refresh()
 {
+    // Nach einer abgelehnten Änderung den Stand neu, sobald der Dienst ihn meldet (Ereignis lights)
+    if (m_reloadPending && m_request == 0 && dss::lightEntriesFromStatus(m_data->lights()) != m_before) {
+        m_reloadPending = false;
+        load();
+        return;
+    }
     // Zustand aus dem Stand des Dienstes; neue Lampen haben noch keinen
     for (int i = 0; i < m_list->topLevelItemCount() && i < m_entries.size(); ++i) {
         QString state = QStringLiteral("–");
@@ -202,54 +202,33 @@ void LightsDialog::refresh()
         }
         m_list->topLevelItem(i)->setText(kStateColumn, state);
     }
-    const bool idle = m_loaded && m_request == 0;
+    const bool idle = m_request == 0;
     const int row = currentRow();
-    m_list->setEnabled(m_loaded);
     m_add->setEnabled(idle);
     m_name->setEnabled(idle && row >= 0);
     m_host->setEnabled(idle && row >= 0);
     m_remove->setEnabled(idle && row >= 0);
-    // Prüfen geht nur mit der gespeicherten Adresse (der Dienst kennt nur sie)
-    bool saved = false;
-    if (row >= 0 && !m_entries.at(row).id.isEmpty()) {
-        for (const dss::LightEntry &old : std::as_const(m_before)) {
-            if (old.id == m_entries.at(row).id)
-                saved = old.host == m_entries.at(row).host.trimmed();
-        }
-    }
-    m_check->setEnabled(idle && saved && m_checkRequest == 0);
-    if (row >= 0 && !saved && m_checkResult->text().isEmpty()) {
-        setState(m_checkResult, QString());
-        m_checkResult->setText(QStringLiteral("Prüfbar nach OK"));
-    }
+    // Prüfen geht mit jeder Adresse im Feld, auch vor OK (Entscheid 13); eine Prüfung zur Zeit
+    m_check->setEnabled(idle && row >= 0 && !m_entries.at(row).host.trimmed().isEmpty() && m_checkRequest == 0);
     m_ok->setEnabled(idle);
 }
 
 void LightsDialog::onResult(const dss::CameraCall &call, const dss::CameraResult &result)
 {
-    const QString error = dss::cameraResultError(result);
-    if (call.requestId == m_exportRequest) {
-        m_exportRequest = 0;
-        if (!error.isEmpty()) {
-            m_problem->setText(error);
-            return;
-        }
-        m_before = dss::lightEntriesFromExport(result.body);
-        m_entries = m_before;
-        m_loaded = true;
-        fillList();
-    } else if (call.requestId == m_checkRequest) {
+    if (call.requestId == m_checkRequest) {
         m_checkRequest = 0;
-        const auto [text, state] = dss::lightCheckResult(result, m_checkId);
-        setState(m_checkResult, state);
+        const auto [text, state] = dss::lightCheckResult(result);
+        setStyleState(m_checkResult, state);
         m_checkResult->setText(text);
+        m_checkResult->setToolTip(text);
         refresh();
     } else if (call.requestId == m_request) {
         m_request = 0;
-        if (!error.isEmpty()) {
-            // Was schon ging, bleibt; den Stand neu lesen
+        if (const QString error = dss::cameraResultError(result); !error.isEmpty()) {
+            // Was schon ging, bleibt; den Stand neu, jetzt und mit dem nächsten Ereignis lights
             m_queue.clear();
             m_problem->setText(error);
+            m_reloadPending = true;
             load();
             return;
         }
@@ -259,7 +238,7 @@ void LightsDialog::onResult(const dss::CameraCall &call, const dss::CameraResult
 
 void LightsDialog::accept()
 {
-    if (!m_loaded || m_request != 0)
+    if (m_request != 0)
         return;
     if (const QString problem = dss::lightsDialogProblem(m_entries); !problem.isEmpty()) {
         m_problem->setText(problem);

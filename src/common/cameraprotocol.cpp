@@ -35,6 +35,7 @@ constexpr AllowedCall kAllowedCalls[] = {
     {"POST", "camera-presets/*/recall"},
     {"PUT", "lights/*"}, // auch lights/all
     {"POST", "lights"},
+    {"POST", "lights/check"}, // P15 e4: Lampe lesen ohne Schalten, Dialog «Lampen»
     {"PUT", "lights/*/config"},
     {"DELETE", "lights/*"},
     {"POST", "light-presets"},

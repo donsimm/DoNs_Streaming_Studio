@@ -48,10 +48,10 @@ class FakeBackend(Backend):
              "present": True, "state": "awake", "ptz": False},
         ]
         self._lights = [
-            {"id": "attrappe-links", "name": "Licht links (Attrappe)", "reachable": True,
-             "on": True, "brightness": 40, "temperature": 200},
-            {"id": "attrappe-rechts", "name": "Licht rechts (Attrappe)", "reachable": True,
-             "on": False, "brightness": 25, "temperature": 300},
+            {"id": "attrappe-links", "name": "Licht links (Attrappe)", "host": "192.0.2.21",
+             "reachable": True, "on": True, "brightness": 40, "temperature": 200},
+            {"id": "attrappe-rechts", "name": "Licht rechts (Attrappe)", "host": "192.0.2.22",
+             "reachable": True, "on": False, "brightness": 25, "temperature": 300},
         ]
         self._camera_presets = [{"id": "totale", "name": "Totale"}]
         self._light_presets = [{"id": "stream", "name": "Stream"}, {"id": "abend", "name": "Abend"}]

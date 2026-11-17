@@ -154,7 +154,7 @@ class ApiTest(unittest.TestCase):
         self.assertIs(cameras["Logitech C922 Pro Stream"]["ptz"], False)
         self.assertEqual(len(body["lights"]), 2)
         for light in body["lights"]:
-            self.assertEqual(set(light), {"id", "name", "reachable", "on", "brightness", "temperature"})
+            self.assertEqual(set(light), {"id", "name", "host", "reachable", "on", "brightness", "temperature"})
         for key in ("camera_presets", "light_presets"):
             self.assertTrue(body[key])
             for preset in body[key]:

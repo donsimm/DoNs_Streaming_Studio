@@ -323,16 +323,16 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #chatBotState[state="error"] { color: @stateError@; font-weight: bold; }
 /* P15 e2: Reiter «Kameras». Zustand des Kamera-Dienstes rechts in der Kopfzeile wie #chatBotState
    (state aus cameraview.h, cameraServiceView), die zweite Zeile ohne Fettdruck. Hinweise als Text
-   ohne Kasten in denselben Farben (Entscheid 3 des Nutzers, 2026-11-17). */
+   ohne Kasten (Entscheid 3 des Nutzers, 2026-11-17): grau über #hintLabel (unten), gelb und rot
+   über state in den Farben der Kopfzeile (P15 e4). */
 #cameraPage { background: @window@; }
-#cameraState, #cameraStateDetail, #cameraMoveHint, #cameraAiHint, #cameraRecallHint,
-#cameraBlockedHint { color: @textMuted@; }
+#cameraState, #cameraStateDetail { color: @textMuted@; }
 #cameraState[state="ok"] { color: @stateConnected@; font-weight: bold; }
 #cameraState[state="warning"] { color: @stateConnecting@; font-weight: bold; }
 #cameraState[state="error"] { color: @stateError@; font-weight: bold; }
 #cameraStateDetail[state="error"] { color: @stateError@; }
-#cameraMoveHint[state="warning"] { color: @stateConnecting@; }
-#cameraBlockedHint { color: @stateError@; }
+#hintLabel[state="warning"] { color: @stateConnecting@; }
+#hintLabel[state="error"] { color: @stateError@; }
 /* P15 e3: Text rechts in der Titelzeile eines Bereichs («erreichbar» der Lampen, Hinweis eines
    Bereichs der Bildwerte) und Ergebnis von «Verbindung prüfen» in den Farben der Kopfzeile ohne
    Fettdruck; Marke «•» vor gemerkten Bildwerten (Entscheid 3 des Nutzers). */

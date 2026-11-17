@@ -73,8 +73,9 @@ class LightTest(unittest.TestCase):
 
     def test_on_brightness_temperature(self) -> None:
         result = self.lights.set("links", {"on": True})
-        self.assertEqual(result, {"lights": [{"id": "links", "name": "Links", "reachable": True,
-                                              "on": True, "brightness": 20, "temperature": 200}],
+        self.assertEqual(result, {"lights": [{"id": "links", "name": "Links", "host": self.left.host,
+                                              "reachable": True, "on": True, "brightness": 20,
+                                              "temperature": 200}],
                                   "errors": []})
         self.assertEqual(self.left.state["on"], 1)
         self.assertEqual(self.left.puts, [{"on": 1}])
@@ -186,11 +187,47 @@ class LightTest(unittest.TestCase):
         self.assert_clean()
         self.assertEqual(self.left.state, {"on": 1, "brightness": 77, "temperature": 180})
 
+    # --- Verbindung prüfen (P15 e4) ----------------------------------------------------------
+
+    def test_check(self) -> None:
+        # Gespeicherte Lampe: gelesen, nicht geschaltet, Stand im Dienst unverändert.
+        self.assertEqual(self.lights.check({"host": self.left.host}),
+                         {"reachable": True, "on": False, "brightness": 20, "temperature": 200})
+        self.assertEqual((self.left.gets, self.left.puts), (1, []))
+        self.assertIs(self.status()["links"]["reachable"], False)
+        # Noch nicht gespeicherte Adresse (Leerzeichen am Rand zählen nicht).
+        other = FakeLight(on=True, brightness=70, temperature=180)
+        try:
+            self.assertEqual(self.lights.check({"host": f" {other.host} "}),
+                             {"reachable": True, "on": True, "brightness": 70, "temperature": 180})
+            self.assertEqual(other.puts, [])
+            # Lampe hängt: nicht erreichbar mit Grund, nach Zeitgrenze und einem neuen Versuch.
+            other.hang_s = HANG_S
+            start = time.monotonic()
+            result = self.lights.check({"host": other.host})
+            self.assertLess(time.monotonic() - start, HANG_S + 1.0)
+            self.assertEqual(result, {"reachable": False, "message": f"Lampe unter «{other.host}» antwortet "
+                                                                     "nicht (Zeitüberschreitung)."})
+            other.hang_s = 0.0
+        finally:
+            other.close()
+        # Niemand unter der Adresse (Port 1 auf 127.0.0.1, kein Netz).
+        result = self.lights.check({"host": "127.0.0.1:1"})
+        self.assertIs(result["reachable"], False)
+        self.assertTrue(result["message"].startswith("Lampe unter «127.0.0.1:1» antwortet nicht ("))
+        for body in ({}, {"host": ""}, {"host": "http://192.0.2.23/"}, {"host": 5},
+                     {"host": "192.0.2.23", "name": "A"}):
+            with self.subTest(body=body):
+                self.assert_api_error(400, "invalid", self.lights.check, body)
+        self.assertEqual([light["id"] for light in self.lights.status()], ["links", "rechts"])
+        self.assert_clean()
+
     # --- Nachführen --------------------------------------------------------------------------
 
     def test_poll_every_5s(self) -> None:
-        self.assertEqual(self.status()["links"], {"id": "links", "name": "Links", "reachable": False,
-                                                 "on": None, "brightness": None, "temperature": None})
+        self.assertEqual(self.status()["links"], {"id": "links", "name": "Links", "host": self.left.host,
+                                                 "reachable": False, "on": None, "brightness": None,
+                                                 "temperature": None})
         self.assertTrue(self.lights.tick())
         self.assertEqual((self.left.gets, self.right.gets), (1, 1))
         self.assertEqual(self.status()["rechts"]["brightness"], 50)
@@ -377,8 +414,10 @@ class ServiceTest(unittest.TestCase):
                 break
             time.sleep(0.1)
         self.assertEqual(body["lights"], [
-            {"id": "links", "name": "Links", "reachable": True, "on": False, "brightness": 20, "temperature": 200},
-            {"id": "rechts", "name": "Rechts", "reachable": True, "on": True, "brightness": 50, "temperature": 300}])
+            {"id": "links", "name": "Links", "host": self.left.host, "reachable": True, "on": False,
+             "brightness": 20, "temperature": 200},
+            {"id": "rechts", "name": "Rechts", "host": self.right.host, "reachable": True, "on": True,
+             "brightness": 50, "temperature": 300}])
         self.assertEqual(body["light_presets"], [])
 
         status, body = self.request("lights/all", "PUT", {"on": "toggle"})
@@ -416,6 +455,16 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(self.left.state["brightness"], 66)
         status, body = self.request("lights/rechts", "PUT", {"brightness": 66})
         self.assertEqual((status, body["code"]), (502, "light_unreachable"))
+        # Verbindung prüfen (P15 e4): ohne Schalten, auch hängend mit 200 und «reachable» false.
+        puts = len(self.left.puts)
+        status, body = self.request("lights/check", "POST", {"host": self.left.host})
+        self.assertEqual((status, body["reachable"], body["brightness"]), (200, True, 66))
+        self.assertEqual(len(self.left.puts), puts)
+        status, body = self.request("lights/check", "POST", {"host": self.right.host})
+        self.assertEqual((status, body["reachable"]), (200, False))
+        self.assertIn("antwortet nicht", body["message"])
+        status, body = self.request("lights/check", "POST", {"host": "a b"})
+        self.assertEqual((status, body["code"]), (400, "invalid"))
         self.right.hang_s = 0.0
         self.assertEqual((self.left.bad_requests, self.right.bad_requests), (0, 0))
         self.assertEqual(self.service.stop(), 0, self.service.stderr)

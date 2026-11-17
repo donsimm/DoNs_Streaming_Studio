@@ -133,6 +133,7 @@ class Api:
         self.router.add("POST", "camera-presets/{preset}/recall", self.post_recall)
         self.router.add("PUT", "lights/{light}", self.put_light)
         self.router.add("POST", "lights", self.post_light)
+        self.router.add("POST", "lights/check", self.post_light_check)
         self.router.add("PUT", "lights/{light}/config", self.put_light_config)
         self.router.add("DELETE", "lights/{light}", self.delete_light)
         self.router.add("POST", "light-presets", self.post_light_preset)
@@ -243,6 +244,9 @@ class Api:
 
     def post_light(self, request: Request) -> dict:
         return self._lights().create(request.json())
+
+    def post_light_check(self, request: Request) -> dict:
+        return self._lights().check(request.json())
 
     def put_light_config(self, request: Request, light: str) -> dict:
         return self._lights().config(light, request.json())

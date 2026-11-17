@@ -56,6 +56,10 @@ Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR und Bildwink
 - Beim Start des Dienstes und beim Einstecken hält der Dienst eine noch laufende Fahrt der wachen Tiny 2 an.
 - Einstellungen je Kamera in `kameras.json` unter `motion`: Grenzen (`pan_min`, `pan_max`, `tilt_min`, `tilt_max` in Grad), `invert_pan`/`invert_tilt`/`invert_zoom`, `step_deg`, `zoom_step_percent`, `home_pan`, `home_tilt`, `speed`, `auto_wake`, `ai_off_before_move`.
 
+## Lampen
+
+Die Lampen (Elgato Key Light) stehen in `~/.local/share/dss-kamera/licht.json` mit Name und Adresse (`host`, wahlweise mit `:port`). `GET /api/v1/status` meldet je Lampe Adresse, Erreichbarkeit und Stand; der Dienst fragt sie alle 5 s ab. `POST /api/v1/lights/check` mit `{"host": "<lampe>"}` liest eine Lampe sofort, ohne sie zu schalten, auch unter einer Adresse, die noch nicht gespeichert ist («Verbindung prüfen» im Dialog «Lampen» des Studios). Schalten, Licht-Presets und Antworten: `docs/09-kamera-dienst.md`.
+
 ## Installation
 
 | | Ort auf dem Streaming-PC |

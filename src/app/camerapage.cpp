@@ -59,24 +59,21 @@ QToolButton *directionButton(const QString &symbolFile, const QString &fallback,
     return button;
 }
 
-// Farbe über die Eigenschaft state im Theme (wie headerbar.cpp, setConnectionState)
-void setState(QWidget *w, const QString &state)
-{
-    if (w->property("state").toString() == state)
-        return;
-    w->setProperty("state", state);
-    w->style()->unpolish(w);
-    w->style()->polish(w);
-}
-
-// Hinweis als Text ohne Kasten (Entscheid 3), Höhe für eine Zeile immer da (Regel 9)
-QLabel *hintLine(const QString &objectName, QWidget *parent)
+// Hinweis als Text ohne Kasten (Entscheid 3) wie die Familie (#hintLabel, grau; Farbe der Kopfzeile
+// über state), Höhe für lines Zeilen immer da (Regel 9). Mehr als eine Zeile bricht um.
+QLabel *hintLine(QWidget *parent, int lines = 1)
 {
     auto *label = new QLabel(parent);
-    label->setObjectName(objectName);
+    label->setObjectName(QStringLiteral("hintLabel"));
     label->setTextFormat(Qt::PlainText);
     label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-    label->setMinimumHeight(label->fontMetrics().lineSpacing());
+    if (lines > 1) {
+        label->setWordWrap(true);
+        label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label->setFixedHeight(label->fontMetrics().lineSpacing() * lines);
+    } else {
+        label->setMinimumHeight(label->fontMetrics().lineSpacing());
+    }
     return label;
 }
 
@@ -131,10 +128,6 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
     column->setSpacing(6);
     column->addWidget(createHeader());
 
-    // Hinweis über den Spalten, solange der Dienst nicht antwortet (Entwurf Seite 4 E)
-    m_blockedHint = hintLine(QStringLiteral("cameraBlockedHint"), this);
-    column->addWidget(m_blockedHint);
-
     // Drei Spalten mit Teilern wie «Live» im Reiter «Chat-Bot»; keine lässt sich zuschieben.
     m_columns = new QSplitter(Qt::Horizontal, this);
     m_columns->setObjectName(QStringLiteral("cameraColumns"));
@@ -147,9 +140,15 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
     auto *leftColumn = new QVBoxLayout(left);
     leftColumn->setContentsMargins(0, 0, 0, 0);
     leftColumn->setSpacing(6);
-    leftColumn->addWidget(dockPanel(QStringLiteral("Bewegen"), createMovePanel(), left));
-    leftColumn->addWidget(dockPanel(QStringLiteral("KI-Verfolgung"), createAiPanel(), left));
-    leftColumn->addWidget(dockPanel(QStringLiteral("Positionen"), createPresetsPanel(), left), 1);
+    QWidget *move = dockPanel(QStringLiteral("Bewegen"), createMovePanel(), left);
+    move->setObjectName(QStringLiteral("cameraMovePanel"));
+    leftColumn->addWidget(move);
+    QWidget *ai = dockPanel(QStringLiteral("KI-Verfolgung"), createAiPanel(), left);
+    ai->setObjectName(QStringLiteral("cameraAiPanel"));
+    leftColumn->addWidget(ai);
+    QWidget *presets = dockPanel(QStringLiteral("Positionen"), createPresetsPanel(), left);
+    presets->setObjectName(QStringLiteral("cameraPresetsPanel"));
+    leftColumn->addWidget(presets, 1);
     leftScroll->setWidget(left);
     leftScroll->setMinimumWidth(left->minimumSizeHint().width()
                                 + leftScroll->verticalScrollBar()->sizeHint().width());
@@ -175,12 +174,20 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
 QWidget *CameraPage::createHeader()
 {
     // Kopfzeile mit fester Höhe (Regel 9) wie #chatBotHeader: Ein neuer Zustand ändert nur Texte.
+    // Zwei Zeilen (P15 e4, Entscheid Lotse): oben Auswahl und Knöpfe, darunter links der Hinweis
+    // «… gesperrt …» (statt einer eigenen Zeile über den Spalten); rechts der Zustand des Dienstes
+    // in beiden Zeilen. Der Zustand bekommt die Breite, die er braucht (nie abgeschnitten), der
+    // Hinweis links nimmt den Rest.
     auto *header = new QWidget(this);
     header->setObjectName(QStringLiteral("cameraHeader"));
     header->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    auto *row = new QHBoxLayout(header);
-    row->setContentsMargins(0, 0, 0, 0);
+    auto *grid = new QGridLayout(header);
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setHorizontalSpacing(12);
+    grid->setVerticalSpacing(0);
+    auto *row = new QHBoxLayout;
     row->setSpacing(6);
+    grid->addLayout(row, 0, 0);
 
     m_choice = new QComboBox(header);
     m_choice->setObjectName(QStringLiteral("cameraChoice"));
@@ -212,23 +219,23 @@ QWidget *CameraPage::createHeader()
     row->addWidget(m_setup);
     row->addStretch(1);
 
+    // Hinweis, solange der Dienst nicht antwortet (Entwurf Seite 4 E), rot über state
+    m_blockedHint = hintLine(header);
+    setStyleState(m_blockedHint, QStringLiteral("error"));
+    grid->addWidget(m_blockedHint, 1, 0);
+
     // Zustand des Dienstes in zwei Zeilen, Platz für beide von Anfang an (wie die Zeile «OBS»)
-    auto *state = new QWidget(header);
-    auto *stateColumn = new QVBoxLayout(state);
-    stateColumn->setContentsMargins(0, 0, 0, 0);
-    stateColumn->setSpacing(0);
-    m_state = new QLabel(state);
+    m_state = new QLabel(header);
     m_state->setObjectName(QStringLiteral("cameraState"));
-    m_state->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    m_stateDetail = new QLabel(state);
+    m_state->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+    m_stateDetail = new QLabel(header);
     m_stateDetail->setObjectName(QStringLiteral("cameraStateDetail"));
-    m_stateDetail->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_stateDetail->setAlignment(Qt::AlignRight | Qt::AlignTop);
     m_stateDetail->setTextFormat(Qt::PlainText);
-    stateColumn->addWidget(m_state);
-    stateColumn->addWidget(m_stateDetail);
-    state->setMinimumHeight(fontMetrics().lineSpacing() * 2);
-    state->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    row->addWidget(state, 1);
+    m_stateDetail->setMinimumHeight(fontMetrics().lineSpacing());
+    grid->addWidget(m_state, 0, 1);
+    grid->addWidget(m_stateDetail, 1, 1);
+    grid->setColumnStretch(0, 1);
     return header;
 }
 
@@ -238,24 +245,6 @@ QWidget *CameraPage::createMovePanel()
     auto *column = new QVBoxLayout(box);
     column->setContentsMargins(8, 6, 8, 8);
     column->setSpacing(6);
-
-    // Hinweis mit «Wecken» daneben; der Knopf behält seinen Platz, auch wenn er fehlt (Regel 9)
-    auto *hintRow = new QHBoxLayout;
-    hintRow->setSpacing(6);
-    m_moveHint = hintLine(QStringLiteral("cameraMoveHint"), box);
-    hintRow->addWidget(m_moveHint, 1);
-    m_hintWake = new QPushButton(QStringLiteral("Wecken"), box);
-    m_hintWake->setObjectName(QStringLiteral("cameraHintWake"));
-    QSizePolicy keep = m_hintWake->sizePolicy();
-    keep.setRetainSizeWhenHidden(true);
-    m_hintWake->setSizePolicy(keep);
-    m_hintWake->hide();
-    connect(m_hintWake, &QPushButton::clicked, this, [this] {
-        if (!m_cameraId.isEmpty())
-            send(dss::cameraWakeCall(m_cameraId, true));
-    });
-    hintRow->addWidget(m_hintWake);
-    column->addLayout(hintRow);
 
     auto *body = new QHBoxLayout;
     body->setSpacing(8);
@@ -359,8 +348,29 @@ QWidget *CameraPage::createMovePanel()
     side->addWidget(m_speed, 1, 1, Qt::AlignLeft);
     side->addWidget(fieldLabel(QStringLiteral("Schritt"), m_step, box), 2, 0);
     side->addWidget(m_step, 2, 1, Qt::AlignLeft);
-    side->setRowStretch(3, 1);
+
+    // Hinweis mit «Wecken» daneben in der freien Fläche unter «Tempo» und «Schritt» (Entscheid 10
+    // des Nutzers, 2026-11-17). Höhe für zwei Zeilen und die Breite des Knopfs bleiben auch ohne
+    // Hinweis und ohne Knopf (Regel 9).
+    auto *hintRow = new QHBoxLayout;
+    hintRow->setSpacing(6);
+    m_moveHint = hintLine(box, 2);
+    hintRow->addWidget(m_moveHint, 1, Qt::AlignTop);
+    m_hintWake = new QPushButton(QStringLiteral("Wecken"), box);
+    m_hintWake->setObjectName(QStringLiteral("cameraHintWake"));
+    QSizePolicy keep = m_hintWake->sizePolicy();
+    keep.setRetainSizeWhenHidden(true);
+    m_hintWake->setSizePolicy(keep);
+    m_hintWake->hide();
+    connect(m_hintWake, &QPushButton::clicked, this, [this] {
+        if (!m_cameraId.isEmpty())
+            send(dss::cameraWakeCall(m_cameraId, true));
+    });
+    hintRow->addWidget(m_hintWake, 0, Qt::AlignTop);
+    side->addLayout(hintRow, 3, 0, 1, 2);
+    side->setRowStretch(4, 1);
     body->addLayout(side, 1);
+    body->setAlignment(cross, Qt::AlignTop);
     column->addLayout(body);
     return box;
 }
@@ -372,8 +382,8 @@ QWidget *CameraPage::createAiPanel()
     grid->setContentsMargins(8, 6, 8, 8);
     grid->setHorizontalSpacing(8);
     grid->setVerticalSpacing(6);
-    m_aiHint = hintLine(QStringLiteral("cameraAiHint"), box);
-    grid->addWidget(m_aiHint, 0, 0, 1, 2);
+    // Eine Zeile (Entscheid 10: Leerzone knapp): Modus, Auswahl, rechts daneben der Hinweis
+    m_aiHint = hintLine(box);
     m_ai = new QComboBox(box);
     m_ai->setObjectName(QStringLiteral("cameraAi"));
     m_ai->setAccessibleName(QStringLiteral("KI-Verfolgung"));
@@ -385,9 +395,10 @@ QWidget *CameraPage::createAiPanel()
         if (!m_cameraId.isEmpty())
             send(dss::cameraAiCall(m_cameraId, m_ai->itemData(index).toInt()));
     });
-    grid->addWidget(fieldLabel(QStringLiteral("Modus"), m_ai, box), 1, 0);
-    grid->addWidget(m_ai, 1, 1, Qt::AlignLeft);
-    grid->setColumnStretch(1, 1);
+    grid->addWidget(fieldLabel(QStringLiteral("Modus"), m_ai, box), 0, 0);
+    grid->addWidget(m_ai, 0, 1);
+    grid->addWidget(m_aiHint, 0, 2);
+    grid->setColumnStretch(2, 1);
     return box;
 }
 
@@ -428,7 +439,7 @@ QWidget *CameraPage::createPresetsPanel()
     m_remove = new QPushButton(QStringLiteral("Löschen"));
     m_remove->setObjectName(QStringLiteral("cameraPresetRemove"));
     m_recallHint = new QLabel;
-    m_recallHint->setObjectName(QStringLiteral("cameraRecallHint"));
+    m_recallHint->setObjectName(QStringLiteral("hintLabel"));
     connect(m_recall, &QPushButton::clicked, this, &CameraPage::recallPreset);
     connect(m_save, &QPushButton::clicked, this, &CameraPage::savePreset);
     connect(m_overwrite, &QPushButton::clicked, this, &CameraPage::overwritePreset);
@@ -666,7 +677,10 @@ void CameraPage::onServiceChanged()
         m_pending.clear();
     }
     const QString before = m_cameraId;
-    applyParts(m_data.setService(info));
+    int parts = m_data.setService(info);
+    if (m_service.usable != wasUsable)
+        parts |= dss::CameraData::Cameras | dss::CameraData::Lights; // Auswahl ohne/mit Zustand (Entscheid 9)
+    applyParts(parts);
     if (m_service.usable && !wasUsable && m_cameraId == before)
         fetchCamera();
     fetchPresets();
@@ -719,10 +733,10 @@ void CameraPage::refreshChoice()
         if (!sameIds) {
             m_choice->clear();
             for (const dss::CameraEntry &c : cameras)
-                m_choice->addItem(dss::cameraChoiceText(c), c.id);
+                m_choice->addItem(dss::cameraChoiceText(c, m_service.usable), c.id);
         } else {
             for (qsizetype i = 0; i < cameras.size(); ++i)
-                m_choice->setItemText(int(i), dss::cameraChoiceText(cameras.at(i)));
+                m_choice->setItemText(int(i), dss::cameraChoiceText(cameras.at(i), m_service.usable));
         }
         m_choice->setCurrentIndex(m_choice->findData(next));
     }
@@ -854,6 +868,10 @@ void CameraPage::flushBundled()
     m_bundleTimer->stop();
     for (const dss::CameraCall &call : m_bundler.flush(m_clock.elapsed()))
         send(call);
+    // Was noch nicht fällig ist, geht mit dem Takt (P15 e4, CameraBundler::flush)
+    const int due = m_bundler.nextDueMs(m_clock.elapsed());
+    if (due >= 0)
+        m_bundleTimer->start(due);
 }
 
 void CameraPage::scheduleHold()
@@ -949,8 +967,8 @@ void CameraPage::refresh()
     m_state->setText(m_service.text);
     m_stateDetail->setText(m_service.detail);
     m_stateDetail->setToolTip(m_service.detail);
-    setState(m_state, m_service.state);
-    setState(m_stateDetail, m_service.state);
+    setStyleState(m_state, m_service.state);
+    setStyleState(m_stateDetail, m_service.state);
     m_blockedHint->setText(m_service.blockedHint);
     m_blockedHint->setToolTip(m_service.blockedHint); // einzeilig, der ganze Text beim Darüberfahren
     m_columns->setEnabled(m_service.usable);
@@ -958,12 +976,12 @@ void CameraPage::refresh()
     // Bewegen
     m_moveHint->setText(m_view.moveHint);
     m_moveHint->setToolTip(m_view.moveHint);
-    setState(m_moveHint, m_view.moveHintState);
+    setStyleState(m_moveHint, m_view.moveHintState);
     m_hintWake->setVisible(m_view.moveHintWake);
     m_hintWake->setEnabled(m_view.wakeEnabled);
     for (QToolButton *b : std::as_const(m_crossButtons))
         b->setEnabled(m_view.moveEnabled);
-    m_zoomText->setText(dss::cameraZoomText(controls));
+    m_zoomText->setText(m_view.zoomText);
     const QJsonObject config = m_data.config(m_cameraId);
     const QJsonObject values = config.value(QLatin1String("config")).toObject();
     const QJsonObject ranges = config.value(QLatin1String("ranges")).toObject();
@@ -1038,6 +1056,9 @@ void CameraPage::refreshImage(const dss::CameraEntry *camera, const QJsonArray &
                     w.slider->setSingleStep(row.step);
                     w.slider->setPageStep(std::max(row.step, (row.maximum - row.minimum) / 10));
                     w.slider->setValue(row.value);
+                } else {
+                    // Ohne Wert ganz links, nie die Stellung einer anderen Kamera (Entscheid 11)
+                    w.slider->setRange(0, 0);
                 }
                 w.value->setText(row.valueText);
             }
@@ -1121,11 +1142,14 @@ void CameraPage::rebuildLights()
         w.brightnessLabel = new QLabel(QStringLiteral("Helligkeit"), w.section);
         w.brightness = sliderRow(grid, 1, 0, w.brightnessLabel, &w.brightnessValue, w.section);
         w.brightness->setObjectName(QStringLiteral("cameraLightBrightness_") + row.id);
+        // Namen mit der Lampe, sonst heissen alle Regler gleich (Entscheid Lotse, P15 e4)
+        w.brightness->setAccessibleName(QStringLiteral("Helligkeit ") + row.name);
         w.brightness->setRange(dss::kLightBrightnessMin, dss::kLightBrightnessMax);
         w.brightness->setPageStep(10);
         w.kelvinLabel = new QLabel(QStringLiteral("Farbtemperatur"), w.section);
         w.kelvin = sliderRow(grid, 2, 0, w.kelvinLabel, &w.kelvinValue, w.section);
         w.kelvin->setObjectName(QStringLiteral("cameraLightKelvin_") + row.id);
+        w.kelvin->setAccessibleName(QStringLiteral("Farbtemperatur ") + row.name);
         w.kelvin->setRange(dss::kLightKelvinMin, dss::kLightKelvinMax);
         w.kelvin->setSingleStep(dss::kLightKelvinStep);
         w.kelvin->setPageStep(dss::kLightKelvinStep * 10);
@@ -1185,7 +1209,7 @@ void CameraPage::refreshLights()
         if (it == m_lightWidgets.cend())
             continue; // neue Lampe: Bereich erst nach dem Dialog «Lampen»
         it->state->setText(row.stateText);
-        setState(it->state, row.stateKey);
+        setStyleState(it->state, row.stateKey);
         {
             const QSignalBlocker block(it->on);
             it->on->setChecked(row.on);

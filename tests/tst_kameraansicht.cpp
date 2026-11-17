@@ -80,11 +80,16 @@ CameraEntry entry(const char *model, const char *state, bool present = true)
     return e;
 }
 
-CameraServiceView connected()
+CameraServiceView serviceIn(const QString &state)
 {
     CameraServiceInfo info;
-    info.state = QString::fromLatin1(kCameraStateConnected);
+    info.state = state;
     return cameraServiceView(info);
+}
+
+CameraServiceView connected()
+{
+    return serviceIn(QString::fromLatin1(kCameraStateConnected));
 }
 
 CameraControlRow row(const QList<CameraControlRow> &rows, const QString &key)
@@ -188,6 +193,10 @@ private slots:
         QCOMPARE(list.at(1).name, QStringLiteral("Logitech C922"));
         QCOMPARE(cameraChoiceText(list.at(0)), QStringLiteral("Kamera oben · schläft"));
         QCOMPARE(cameraChoiceText(list.at(1)), QStringLiteral("Logitech C922 · fehlt"));
+        // Dienst weg (Entscheid 9, Entwurf 4 E): nur der Name, ohne veralteten Zustand
+        QCOMPARE(cameraChoiceText(list.at(0), false), QStringLiteral("Kamera oben"));
+        QCOMPARE(cameraChoiceText(list.at(1), connected().usable), QStringLiteral("Logitech C922 · fehlt"));
+        QCOMPARE(cameraChoiceText(list.at(1), serviceIn(QStringLiteral("error")).usable), QStringLiteral("Logitech C922"));
         QCOMPARE(cameraStateText(QStringLiteral("awake")), QStringLiteral("wach"));
         QCOMPARE(cameraStateText(QStringLiteral("seltsam")), QStringLiteral("unbekannt"));
         QCOMPARE(cameraChoiceAfterUpdate(list, QStringLiteral("046d:085c:B2")), QStringLiteral("046d:085c:B2"));
@@ -334,10 +343,16 @@ private slots:
 
         QCOMPARE(cameraZoomText(c922Controls()), QStringLiteral("35 %"));
         QCOMPARE(cameraZoomText({}), QStringLiteral("–"));
+        // Zoom in der Ansicht: «–», solange der Dienst nicht antwortet (Entscheid 9) oder die Kamera fehlt
+        QCOMPARE(cameraControlView(connected(), &c922, false, c922Controls()).zoomText, QStringLiteral("35 %"));
+        for (const auto &gone : {serviceIn(QStringLiteral("error")), serviceIn(QStringLiteral("connecting")),
+                                 cameraServiceView(std::nullopt)})
+            QCOMPARE(cameraControlView(gone, &c922, false, c922Controls()).zoomText, QStringLiteral("–"));
 
         // Kamera fehlt: alle Zeilen ohne Wert
         CameraEntry absent = c922;
         absent.present = false;
+        QCOMPARE(cameraControlView(connected(), &absent, false, c922Controls()).zoomText, QStringLiteral("–"));
         for (const CameraControlRow &r : cameraControlRows(c922Controls(), &absent, connected()))
             QVERIFY(!r.available && !r.enabled);
     }
@@ -403,8 +418,19 @@ private slots:
         QCOMPARE(rows.at(1).stateKey, QStringLiteral("error"));
         QCOMPARE(rows.at(1).brightnessText, QStringLiteral("–"));
 
-        rows = lightRows(lights, cameraServiceView(std::nullopt));
-        QVERIFY(!rows.at(0).enabled);
+        // Dienst weg (Entscheid 9): kein veralteter Stand, alles «–» und grau
+        for (const auto &service : {cameraServiceView(std::nullopt), serviceIn(QStringLiteral("error"))}) {
+            rows = lightRows(lights, service);
+            QCOMPARE(rows.size(), 2);
+            QCOMPARE(rows.at(0).name, QStringLiteral("Key Light links"));
+            QVERIFY(!rows.at(0).enabled && !rows.at(0).on && !rows.at(0).reachable);
+            QCOMPARE(rows.at(0).stateText, QStringLiteral("–"));
+            QVERIFY(rows.at(0).stateKey.isEmpty());
+            QCOMPARE(rows.at(0).brightnessText, QStringLiteral("–"));
+            QCOMPARE(rows.at(0).kelvinText, QStringLiteral("–"));
+            QCOMPARE(rows.at(0).brightness, kLightBrightnessMin); // Regler ganz links
+            QCOMPARE(rows.at(0).kelvin, kLightKelvinMin);
+        }
 
         // Nur Kennung und Name bestimmen die Anordnung, nicht die Werte
         QJsonArray changed = lights;
@@ -541,8 +567,7 @@ private slots:
             lightPresetDeleteCall(QStringLiteral("stream")),
             lightCreateCall(QStringLiteral("Links"), QStringLiteral("192.0.2.21")),
             lightConfigCall(QStringLiteral("links"), {{QStringLiteral("host"), QStringLiteral("192.0.2.22")}}),
-            lightDeleteCall(QStringLiteral("links")),          cameraStatusGetCall(),
-            cameraExportGetCall()};
+            lightDeleteCall(QStringLiteral("links")),          lightCheckCall(QStringLiteral("192.0.2.23"))};
         for (const CameraCall &c : calls)
             QVERIFY2(checkCameraCall(c.method, c.path).isEmpty(), qPrintable(c.method + QLatin1Char(' ') + c.path));
         QCOMPARE(lightCreateCall(QStringLiteral("Links"), QStringLiteral("192.0.2.21")).method, QStringLiteral("POST"));
@@ -557,8 +582,11 @@ private slots:
                  (QJsonObject{{QStringLiteral("name"), QStringLiteral("Abend")}}));
         QCOMPARE(lightPresetOverwriteCall(QStringLiteral("abend")).path, QStringLiteral("light-presets/abend/save-current"));
         QCOMPARE(lightPresetRenameCall(QStringLiteral("abend"), QStringLiteral("Nacht")).method, QStringLiteral("PUT"));
-        QCOMPARE(cameraStatusGetCall().path, QStringLiteral("status"));
-        QVERIFY(!cameraExportGetCall().body);
+        // P15 e4: Prüfen ohne Schalten, Adresse ohne Leerzeichen am Rand
+        QCOMPARE(lightCheckCall(QStringLiteral(" 192.0.2.23:9123 ")).method, QStringLiteral("POST"));
+        QCOMPARE(lightCheckCall(QStringLiteral("x")).path, QStringLiteral("lights/check"));
+        QCOMPARE(*lightCheckCall(QStringLiteral(" 192.0.2.23:9123 ")).body,
+                 (QJsonObject{{QStringLiteral("host"), QStringLiteral("192.0.2.23:9123")}}));
     }
 
     void sliderAndCheckValues()
@@ -588,17 +616,16 @@ private slots:
         QCOMPARE(lightPanelView(cameraServiceView(std::nullopt), lights, true), LightPanelView());
     }
 
-    // Dialog «Lampen»: Adressen aus GET export, Anfragen für OK, Prüfung, «Verbindung prüfen»
+    // Dialog «Lampen»: Adressen aus status (P15 e4), Anfragen für OK, Prüfung, «Verbindung prüfen»
     void lightsDialogLogic()
     {
-        const QJsonObject exported = QJsonDocument::fromJson(R"({"ok": true, "format_version": 1, "files": {
-            "licht.json": {"format_version": 1, "lights": [{"id": "links", "name": "Links", "host": "192.0.2.21"},
-                                                           {"id": "rechts", "name": "Rechts", "host": "192.0.2.22"}]},
-            "kameras.json": {}}, "errors": []})").object();
-        const QList<LightEntry> before = lightEntriesFromExport(exported);
+        const QJsonArray status = QJsonDocument::fromJson(R"([
+            {"id": "links", "name": "Links", "host": "192.0.2.21", "reachable": true},
+            {"id": "rechts", "name": "Rechts", "host": "192.0.2.22", "reachable": false}])").array();
+        const QList<LightEntry> before = lightEntriesFromStatus(status);
         QCOMPARE(before.size(), 2);
         QCOMPARE(before.at(1), (LightEntry{QStringLiteral("rechts"), QStringLiteral("Rechts"), QStringLiteral("192.0.2.22")}));
-        QVERIFY(lightEntriesFromExport(QJsonObject()).isEmpty());
+        QVERIFY(lightEntriesFromStatus(QJsonArray()).isEmpty());
 
         QVERIFY(lightsDialogCalls(before, before).isEmpty());
         QList<LightEntry> after = before;
@@ -619,19 +646,23 @@ private slots:
         after[1].name.clear();
         QCOMPARE(lightsDialogProblem(after), QStringLiteral("Jede Lampe braucht einen Namen."));
 
-        CameraResult status;
-        status.status = 200;
-        status.body = QJsonDocument::fromJson(R"({"lights": [{"id": "links", "reachable": true},
-                                                             {"id": "rechts", "reachable": false}]})").object();
-        QCOMPARE(lightCheckResult(status, QStringLiteral("links")),
-                 (std::pair{QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")}));
-        QCOMPARE(lightCheckResult(status, QStringLiteral("rechts")),
-                 (std::pair{QStringLiteral("Lampe antwortet nicht"), QStringLiteral("error")}));
-        QCOMPARE(lightCheckResult(status, QStringLiteral("weg")).second, QStringLiteral("error"));
-        status.status = 0;
-        status.error = QStringLiteral("keine Verbindung");
-        QCOMPARE(lightCheckResult(status, QStringLiteral("links")),
-                 (std::pair{QStringLiteral("keine Verbindung"), QStringLiteral("error")}));
+        // Antwort auf POST lights/check (docs/09-kamera-dienst.md, «Lampen»)
+        CameraResult check;
+        check.status = 200;
+        check.body = QJsonDocument::fromJson(R"({"reachable": true, "on": true, "brightness": 40, "temperature": 200})")
+                         .object();
+        QCOMPARE(lightCheckResult(check), (std::pair{QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")}));
+        check.body = QJsonDocument::fromJson(
+                         R"({"reachable": false, "message": "Lampe unter «192.0.2.22» antwortet nicht (Zeitüberschreitung)."})")
+                         .object();
+        QCOMPARE(lightCheckResult(check),
+                 (std::pair{QStringLiteral("Lampe unter «192.0.2.22» antwortet nicht (Zeitüberschreitung)."),
+                            QStringLiteral("error")}));
+        check.body = QJsonObject{{QStringLiteral("reachable"), false}};
+        QCOMPARE(lightCheckResult(check), (std::pair{QStringLiteral("Lampe antwortet nicht"), QStringLiteral("error")}));
+        check.status = 0;
+        check.error = QStringLiteral("keine Verbindung");
+        QCOMPARE(lightCheckResult(check), (std::pair{QStringLiteral("keine Verbindung"), QStringLiteral("error")}));
     }
 
     // Licht-Presets nach dem Start einzeln (GET light-presets/<id>) wie die Kamera-Presets
@@ -682,12 +713,22 @@ private slots:
         // Pfade unabhängig
         QVERIFY(!b.put(path, {{QStringLiteral("brightness"), 13}}, 150));
         QVERIFY(b.put(QStringLiteral("lights/links"), {{QStringLiteral("brightness"), 50}}, 150));
-        // Lange danach geht ein Wert sofort
-        due = b.flush(160);
+        // Loslassen (flush) hält die 100 ms je Pfad ein (P15 e4): 60 ms nach dem letzten PUT noch
+        // nicht, sondern wenn er fällig ist
+        QVERIFY(b.flush(160).isEmpty());
+        QCOMPARE(b.nextDueMs(160), 40);
+        due = b.flush(200);
         QCOMPARE(due.size(), 1);
         QCOMPARE(due.at(0).path, path);
-        QVERIFY(b.flush(170).isEmpty());
+        QCOMPARE(*due.at(0).body, (QJsonObject{{QStringLiteral("brightness"), 13}}));
+        QVERIFY(b.flush(210).isEmpty());
+        QCOMPARE(b.nextDueMs(210), -1);
+        // Lange danach geht ein Wert sofort
         QVERIFY(b.put(path, {{QStringLiteral("brightness"), 14}}, 1000));
+        QVERIFY(b.put(QStringLiteral("cameras/neu/controls"), {{QStringLiteral("gain"), 1}}, 1000));
+        QVERIFY(!b.put(path, {{QStringLiteral("brightness"), 15}}, 1010));
+        QCOMPARE(b.flush(1010).size(), 0);
+        QCOMPARE(b.flush(1100).size(), 1);
     }
 
     void dataFromServiceAndEvents()

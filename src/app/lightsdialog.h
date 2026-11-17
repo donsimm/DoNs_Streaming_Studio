@@ -14,11 +14,12 @@ class QTreeWidget;
 
 // P15 e3: Dialog «Lampen» (Plan 8, Entwurf Seite 5, Checkliste «Dialoge»). Liste der Lampen mit Name,
 // Adresse und Zustand; Name und Adresse der gewählten Lampe direkt änderbar, «Hinzufügen», «Lampe
-// löschen» (Entscheid 4 des Nutzers), «Verbindung prüfen». Die Adressen kommen aus GET export (Datei
-// licht.json), der Zustand aus den Daten des Reiters. Änderungen gelten erst mit OK: Der Dialog schickt
-// die Anfragen aus lightsDialogCalls nacheinander und schliesst nach der letzten; lehnt der Dienst
-// eine ab, bleibt er offen, zeigt die Meldung und liest den Stand neu. Danach baut der Reiter die
-// Bereiche der Lampen neu (Plan 8).
+// löschen» (Entscheid 4 des Nutzers), «Verbindung prüfen». Adressen und Zustand kommen aus den Daten
+// des Reiters (host je Lampe in status, P15 e4). «Verbindung prüfen» fragt sofort die Adresse im Feld
+// mit POST lights/check, ohne die Lampe zu schalten, auch vor OK (Entscheid 13 des Nutzers).
+// Änderungen gelten erst mit OK: Der Dialog schickt die Anfragen aus lightsDialogCalls nacheinander
+// und schliesst nach der letzten; lehnt der Dienst eine ab, bleibt er offen, zeigt die Meldung und
+// liest den Stand neu. Danach baut der Reiter die Bereiche der Lampen neu (Plan 8).
 class LightsDialog : public QDialog
 {
     Q_OBJECT
@@ -40,12 +41,10 @@ private:
 
     dss::CoreClient *m_client;
     const dss::CameraData *m_data;
-    QList<dss::LightEntry> m_before;  // Stand aus licht.json
+    QList<dss::LightEntry> m_before;  // Stand des Dienstes beim Laden
     QList<dss::LightEntry> m_entries; // Stand im Dialog
-    bool m_loaded = false;
-    qint64 m_exportRequest = 0;
+    bool m_reloadPending = false;     // nach einer abgelehnten Änderung: neu laden mit dem nächsten Stand
     qint64 m_checkRequest = 0;
-    QString m_checkId;
     qint64 m_request = 0; // laufende Anfrage nach OK
     QList<dss::CameraCall> m_queue;
 

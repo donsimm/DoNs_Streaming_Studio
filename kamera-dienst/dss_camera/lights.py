@@ -227,12 +227,33 @@ class Lights:
     def _entry(self, light: dict) -> dict:
         with self._lock:
             state = self._state.get(light["id"], {})
-        return {"id": light["id"], "name": light["name"], "reachable": state.get("reachable", False),
-                **{key: state.get(key) for key in VALUE_KEYS}}
+        return {"id": light["id"], "name": light["name"], "host": light["host"],
+                "reachable": state.get("reachable", False), **{key: state.get(key) for key in VALUE_KEYS}}
 
     def status(self) -> list[dict]:
-        """Für GET status: `id`, `name`, `reachable`, `on`, `brightness`, `temperature`."""
+        """Für GET status: `id`, `name`, `host`, `reachable`, `on`, `brightness`, `temperature`
+        (`host` seit P15 e4, damit das Studio die Adressen ohne `GET export` zeigt)."""
         return [self._entry(light) for light in self.store.entries()]
+
+    def check(self, body: dict) -> dict:
+        """POST lights/check (P15 e4): liest eine Lampe unter `host`, ohne sie zu schalten, auch unter
+        einer Adresse, die noch nicht gespeichert ist. Antwort `{"reachable": true, "on",
+        "brightness", "temperature"}` oder `{"reachable": false, "message"}`. Der Stand der Lampen
+        im Dienst bleibt unverändert; gehört die Adresse einer Lampe, wartet die Anfrage auf deren
+        Sperre wie Setzen und Abfragen."""
+        _fields(body, {"host"})
+        host = body.get("host").strip() if isinstance(body.get("host"), str) else body.get("host")
+        error = _check_host(host)
+        if error is not None:
+            raise ApiError(400, "invalid", error)
+        owner = next((light for light in self.store.entries() if light["host"] == host), None)
+        lock = self._lamp_lock(owner["id"]) if owner is not None else threading.Lock()
+        with lock:
+            try:
+                values = self._client.get(host)
+            except LightUnreachable as reason:
+                return {"reachable": False, "message": f"Lampe unter «{host}» antwortet nicht ({reason})."}
+        return {"reachable": True, **values}
 
     def read(self, light: dict) -> dict:
         """Liest den Stand der Lampe; bei Fehler `LightUnreachable` und `reachable` false."""

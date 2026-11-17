@@ -185,8 +185,10 @@ QString cameraStateText(const QString &state)
     return QStringLiteral("unbekannt");
 }
 
-QString cameraChoiceText(const CameraEntry &camera)
+QString cameraChoiceText(const CameraEntry &camera, bool serviceUsable)
 {
+    if (!serviceUsable)
+        return camera.name;
     return camera.name + QStringLiteral(" · ") + cameraStateText(camera.state);
 }
 
@@ -226,6 +228,8 @@ CameraControlView cameraControlView(const CameraServiceView &service, const Came
     }
 
     v.moveEnabled = awake;
+    if (camera->present)
+        v.zoomText = cameraZoomText(controls);
     if (!camera->present) {
         v.moveHint = QStringLiteral("Kamera nicht gefunden. Sie erscheint wieder, sobald sie eingesteckt ist.");
     } else if (asleep) {
@@ -433,8 +437,13 @@ QList<LightRow> lightRows(const QJsonArray &lights, const CameraServiceView &ser
         LightRow row;
         row.id = str(o, "id");
         row.name = str(o, "name");
+        if (!service.usable) {
+            // Dienst weg: der letzte Stand ist veraltet (Entscheid 9), alles «–» und grau
+            rows.append(row);
+            continue;
+        }
         row.reachable = o.value(QLatin1String("reachable")).toBool();
-        row.enabled = service.usable && row.reachable;
+        row.enabled = row.reachable;
         row.stateText = row.reachable ? QStringLiteral("erreichbar") : QStringLiteral("nicht erreichbar");
         row.stateKey = row.reachable ? QStringLiteral("ok") : QStringLiteral("error");
         if (row.reachable) {
@@ -711,14 +720,9 @@ CameraCall lightDeleteCall(const QString &lightId)
     return call("DELETE", QStringLiteral("lights/%1").arg(lightId));
 }
 
-CameraCall cameraStatusGetCall()
+CameraCall lightCheckCall(const QString &host)
 {
-    return call("GET", QStringLiteral("status"));
-}
-
-CameraCall cameraExportGetCall()
-{
-    return call("GET", QStringLiteral("export"));
+    return call("POST", QStringLiteral("lights/check"), QJsonObject{{QStringLiteral("host"), host.trimmed()}});
 }
 
 QString cameraSliderText(const QString &key, int value)
@@ -750,12 +754,11 @@ LightPanelView lightPanelView(const CameraServiceView &service, const QJsonArray
     return v;
 }
 
-QList<LightEntry> lightEntriesFromExport(const QJsonObject &exportBody)
+QList<LightEntry> lightEntriesFromStatus(const QJsonArray &lights)
 {
-    // {"files": {"licht.json": {"lights": [{"id", "name", "host"}]}}} (export.py im Dienst)
-    const QJsonValue file = exportBody.value(QLatin1String("files")).toObject().value(QLatin1String("licht.json"));
+    // "lights" aus GET status bzw. dem Ereignis lights: id, name, host (lights.py, Lights.status)
     QList<LightEntry> entries;
-    for (const QJsonValue &v : file.toObject().value(QLatin1String("lights")).toArray()) {
+    for (const QJsonValue &v : lights) {
         const QJsonObject o = v.toObject();
         entries.append({str(o, "id"), str(o, "name"), str(o, "host")});
     }
@@ -800,19 +803,14 @@ QString lightsDialogProblem(const QList<LightEntry> &entries)
     return {};
 }
 
-std::pair<QString, QString> lightCheckResult(const CameraResult &status, const QString &lightId)
+std::pair<QString, QString> lightCheckResult(const CameraResult &check)
 {
-    if (const QString error = cameraResultError(status); !error.isEmpty())
+    if (const QString error = cameraResultError(check); !error.isEmpty())
         return {error, QStringLiteral("error")};
-    for (const QJsonValue &v : status.body.value(QLatin1String("lights")).toArray()) {
-        const QJsonObject o = v.toObject();
-        if (str(o, "id") != lightId)
-            continue;
-        if (o.value(QLatin1String("reachable")).toBool())
-            return {QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")};
-        return {QStringLiteral("Lampe antwortet nicht"), QStringLiteral("error")};
-    }
-    return {QStringLiteral("Lampe nicht gefunden"), QStringLiteral("error")};
+    if (check.body.value(QLatin1String("reachable")).toBool())
+        return {QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")};
+    const QString message = str(check.body, "message");
+    return {message.isEmpty() ? QStringLiteral("Lampe antwortet nicht") : message, QStringLiteral("error")};
 }
 
 void CameraHold::press(const QString &cameraId, int pan, int tilt, int zoom, qint64 nowMs)
@@ -906,8 +904,14 @@ QList<CameraCall> CameraBundler::tick(qint64 nowMs)
 
 QList<CameraCall> CameraBundler::flush(qint64 nowMs)
 {
+    // P15 e4: auch beim Loslassen höchstens alle kCameraBundleMs je Pfad. Zwei PUT im selben Moment
+    // kamen beim Dienst in beliebiger Reihenfolge an (tst_fensterkameras::lights, die Lampe blieb beim
+    // älteren Wert); der Rest geht mit tick, sobald er fällig ist.
     QList<CameraCall> calls;
     for (const QString &path : m_pending.keys()) {
+        const auto last = m_lastSent.constFind(path);
+        if (last != m_lastSent.cend() && nowMs - *last < kCameraBundleMs)
+            continue;
         m_lastSent.insert(path, nowMs);
         calls.append(call("PUT", path, m_pending.take(path)));
     }
