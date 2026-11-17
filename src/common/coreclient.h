@@ -112,6 +112,9 @@ public:
     std::optional<TwitchStatusInfo> twitchStatus() const { return m_twitchStatus; }
     // Kamera-Dienst (P15 d2), nach hello und bei jeder Änderung; ohne Verbindung leer.
     std::optional<CameraServiceInfo> cameraService() const { return m_cameraService; }
+    // P15 e2: Anfrage an den Kamera-Dienst (camera_call); call.requestId wird hier vergeben. Die
+    // Antwort kommt mit der Anfrage über cameraResultReceived. 0 = nicht verbunden.
+    qint64 callCamera(CameraCall call);
     // Schickt twitch_login_start, twitch_login_cancel oder twitch_logout (type aus msg) für das Konto
     // «channel» oder «bot»; requestId wird hier vergeben. Antwort über twitchRequestFinished.
     // 0 = nicht verbunden.
@@ -215,6 +218,8 @@ signals:
     // P15 d2: cameraService() hat sich geändert; Ereignis des Kamera-Dienstes (nicht gespeichert).
     void cameraServiceChanged();
     void cameraEventReceived(const dss::CameraEventInfo &event);
+    // P15 e2: Antwort camera_result auf callCamera, mit der Anfrage (nur an den Absender).
+    void cameraResultReceived(const dss::CameraCall &call, const dss::CameraResult &result);
     // actionsStatus() hat sich geändert (P14 e2-11).
     void actionsStatusChanged();
     // actionsConfig() hat sich geändert (P14 e2-14).
@@ -288,6 +293,7 @@ private:
     std::optional<TwitchStatusInfo> m_twitchStatus;
     QSet<qint64> m_twitchRequests;
     std::optional<CameraServiceInfo> m_cameraService; // P15 d2
+    QHash<qint64, CameraCall> m_cameraCalls;           // P15 e2: camera_call unterwegs
     std::optional<ActionsStatus> m_actionsStatus;
     std::optional<ActionsConfigInfo> m_actionsConfig;
     std::optional<VariablesInfo> m_variables;

@@ -186,9 +186,13 @@ HeaderBar::HeaderBar(const Theme &theme, QWidget *parent)
     QToolButton *chatBot = moduleButton(QStringLiteral("Chat-Bot"), tabs);
     m_modules->addButton(overlays, Overlays);
     m_modules->addButton(chatBot, ChatBot);
+    // P15 e2: Reiter «Kameras» (Antwort 1 des Nutzers: eigener Reiter statt Dock)
+    QToolButton *cameras = moduleButton(QStringLiteral("Kameras"), tabs);
+    m_modules->addButton(cameras, Cameras);
     overlays->setChecked(true);
     tabRow->addWidget(overlays);
     tabRow->addWidget(chatBot);
+    tabRow->addWidget(cameras);
     connect(m_modules, &QButtonGroup::idClicked, this, &HeaderBar::moduleSelected);
 
     leftRow->addWidget(tabs, 0, Qt::AlignVCenter);

@@ -15,6 +15,9 @@ add_library(dss_app_ui STATIC
   commandspage.h commandspage.cpp
   timerspage.h timerspage.cpp
   variablespage.h variablespage.cpp
+  camerapage.h camerapage.cpp
+  camerasetupdialog.h camerasetupdialog.cpp
+  presetnamedialog.h presetnamedialog.cpp
   gaugewidget.h gaugewidget.cpp
   canvaswidget.h canvaswidget.cpp
   docks.h docks.cpp

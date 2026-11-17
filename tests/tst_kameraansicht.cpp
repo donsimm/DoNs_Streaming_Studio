@@ -616,6 +616,166 @@ private slots:
         result.status = 200;
         QCOMPARE(data.applyResult(cameraStopCall(QStringLiteral("t")), result), 0);
     }
+
+    // P15 e2: Ganze Presets nach dem Start einzeln (GET camera-presets/<id>), nur bekannte Kennungen
+    void presetsFetchedSingly()
+    {
+        CameraData data;
+        CameraServiceInfo info;
+        info.state = QString::fromLatin1(kCameraStateConnected);
+        info.status = QJsonDocument::fromJson(R"({"cameras": [],
+            "camera_presets": [{"id": "totale", "name": "Totale"}, {"id": "nah", "name": "Nah"}]})").object();
+        data.setService(info);
+        QCOMPARE(data.cameraPresetsWithoutDetails(), (QStringList{QStringLiteral("totale"), QStringLiteral("nah")}));
+
+        CameraResult result;
+        result.status = 200;
+        result.body = QJsonDocument::fromJson(R"({"ok": true, "preset":
+            {"id": "nah", "name": "Nah", "camera": "c", "pan": 18, "tilt": -14, "zoom": 35}})").object();
+        QCOMPARE(data.applyResult(cameraPresetGetCall(QStringLiteral("nah")), result), int(CameraData::Presets));
+        QCOMPARE(data.applyResult(cameraPresetGetCall(QStringLiteral("nah")), result), 0);
+        QCOMPARE(data.cameraPresetsWithoutDetails(), QStringList{QStringLiteral("totale")});
+        const QList<CameraPresetRow> rows = cameraPresetRows(data.cameraPresets(), QStringLiteral("c"), {});
+        QCOMPARE(rows.size(), 2); // «Totale» noch ohne Kamera, steht bei jeder
+        QCOMPARE(rows.at(1).position, QStringLiteral("18° · −14° · Zoom –"));
+
+        // Gelöscht, bevor die Antwort kam: kommt nicht zurück
+        result.body = QJsonDocument::fromJson(R"({"ok": true, "preset":
+            {"id": "weg", "name": "Weg", "camera": "c", "pan": 0, "tilt": 0, "zoom": 0}})").object();
+        QCOMPARE(data.applyResult(cameraPresetGetCall(QStringLiteral("weg")), result), 0);
+        QCOMPARE(data.cameraPresets().size(), 2);
+        result.status = 404;
+        QCOMPARE(data.applyResult(cameraPresetGetCall(QStringLiteral("totale")), result), 0);
+    }
+
+    // Entscheid Lotse: Nach einer Bewegung zeigt die KI-Verfolgung «Aus», wenn ai_off_before_move gilt
+    void aiOffAfterMove()
+    {
+        const QString cam = QStringLiteral("t");
+        CameraData data;
+        CameraResult result;
+        result.status = 200;
+        result.body = QJsonObject{{QStringLiteral("controls"), tiny2Controls()}};
+        data.applyResult(cameraControlsGetCall(cam), result);
+        const auto aiValue = [&] {
+            for (const QJsonValue &v : data.controls(cam)) {
+                if (v.toObject().value(QStringLiteral("key")).toString() == QStringLiteral("obsbot_ai"))
+                    return v.toObject().value(QStringLiteral("value")).toInt();
+            }
+            return -1;
+        };
+        QCOMPARE(aiValue(), 1);
+        // Keine Bewegung: nichts
+        QCOMPARE(data.noteCallSent(cameraControlsGetCall(cam)), 0);
+        QCOMPARE(data.noteCallSent(cameraStopCall(cam)), 0);
+        QCOMPARE(data.noteCallSent(cameraWakeCall(cam, true)), 0);
+        QCOMPARE(aiValue(), 1);
+        // Ohne gelesene Einstellungen gilt der Standard (an)
+        QCOMPARE(data.noteCallSent(cameraStepCall(cam, 1, 0, 0)), int(CameraData::Controls));
+        QCOMPARE(aiValue(), 0);
+        QCOMPARE(data.noteCallSent(cameraMoveCall(cam, 1, 0, 0)), 0); // schon aus
+
+        // ai_off_before_move aus: bleibt
+        data.applyResult(cameraControlsGetCall(cam), result);
+        CameraResult config;
+        config.status = 200;
+        config.body = QJsonObject{{QStringLiteral("config"), QJsonObject{{QStringLiteral("ai_off_before_move"), false}}}};
+        data.applyResult(cameraConfigGetCall(cam), config);
+        QCOMPARE(data.noteCallSent(cameraMoveCall(cam, 0, 1, 0)), 0);
+        QCOMPARE(aiValue(), 1);
+        config.body = QJsonObject{{QStringLiteral("config"), QJsonObject{{QStringLiteral("ai_off_before_move"), true}}}};
+        data.applyResult(cameraConfigGetCall(cam), config);
+        QCOMPARE(data.noteCallSent(cameraHomeCall(cam)), int(CameraData::Controls));
+        QCOMPARE(aiValue(), 0);
+
+        // Preset abrufen: Kamera des Presets
+        data.applyResult(cameraControlsGetCall(cam), result);
+        data.applyEvent({QStringLiteral("presets"), QJsonDocument::fromJson(R"({"camera_presets":
+            [{"id": "nah", "name": "Nah", "camera": "t", "pan": 0, "tilt": 0, "zoom": 0}], "light_presets": []})").object()});
+        QCOMPARE(data.noteCallSent(cameraPresetRecallCall(QStringLiteral("gibt-es-nicht"))), 0);
+        QCOMPARE(data.noteCallSent(cameraPresetRecallCall(QStringLiteral("nah"))), int(CameraData::Controls));
+        QCOMPARE(aiValue(), 0);
+        // Andere Kamera ohne obsbot_ai: nichts
+        QCOMPARE(data.noteCallSent(cameraStepCall(QStringLiteral("c"), 1, 0, 0)), 0);
+    }
+
+    void callsE2()
+    {
+        const QString cam = QStringLiteral("t");
+        for (const CameraCall &c : {cameraPresetGetCall(QStringLiteral("nah")),
+                                    cameraPresetRenameCall(QStringLiteral("nah"), QStringLiteral("Nah 2")),
+                                    cameraPresetDeleteCall(QStringLiteral("nah")),
+                                    cameraConfigPutCall(cam, {{QStringLiteral("speed"), 20}})})
+            QVERIFY2(checkCameraCall(c.method, c.path).isEmpty(), qPrintable(c.method + QLatin1Char(' ') + c.path));
+        QCOMPARE(cameraPresetRenameCall(QStringLiteral("nah"), QStringLiteral("Nah 2")).method, QStringLiteral("PUT"));
+        QCOMPARE(*cameraPresetRenameCall(QStringLiteral("nah"), QStringLiteral("Nah 2")).body,
+                 (QJsonObject{{QStringLiteral("name"), QStringLiteral("Nah 2")}}));
+        QCOMPARE(cameraPresetDeleteCall(QStringLiteral("nah")).method, QStringLiteral("DELETE"));
+        QCOMPARE(cameraConfigPutCall(cam, {}).path, QStringLiteral("cameras/t/config"));
+
+        CameraResult r;
+        r.status = 200;
+        QVERIFY(cameraResultError(r).isEmpty());
+        r.status = 409;
+        r.body = QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("message"), QStringLiteral("Kamera schläft")}};
+        QCOMPARE(cameraResultError(r), QStringLiteral("Kamera schläft"));
+        r.body = {};
+        QCOMPARE(cameraResultError(r), QStringLiteral("Fehler 409"));
+        r.status = 0;
+        r.error = QStringLiteral("Kamera-Dienst nicht verbunden");
+        QCOMPARE(cameraResultError(r), QStringLiteral("Kamera-Dienst nicht verbunden"));
+
+        CameraEntry tiny2 = entry("OBSBOT Tiny 2", "awake");
+        CameraEntry c922 = entry("Logitech C922", "awake");
+        QCOMPARE(cameraSpeedSuffix(&tiny2), QStringLiteral(" °/s"));
+        QCOMPARE(cameraSpeedSuffix(&c922), QStringLiteral(" %"));
+        QCOMPARE(cameraSpeedSuffix(nullptr), QStringLiteral(" %"));
+    }
+
+    void configHelpers()
+    {
+        const QJsonObject config = QJsonDocument::fromJson(R"({"config": {}, "ranges": {"speed": [1, 100],
+            "tilt_min": [-75, 90], "kaputt": [1]}})").object();
+        QCOMPARE(cameraConfigRange(config, QStringLiteral("tilt_min"), 0, 1), (std::pair<double, double>{-75, 90}));
+        QCOMPARE(cameraConfigRange(config, QStringLiteral("pan_min"), -5, 5), (std::pair<double, double>{-5, 5}));
+        QCOMPARE(cameraConfigRange(config, QStringLiteral("kaputt"), 2, 3), (std::pair<double, double>{2, 3}));
+
+        const QJsonObject before{{QStringLiteral("name"), QStringLiteral("A")}, {QStringLiteral("tilt_min"), QJsonValue()},
+                                 {QStringLiteral("speed"), 10}};
+        QJsonObject after = before;
+        QVERIFY(cameraConfigChanges(before, after).isEmpty());
+        after.insert(QStringLiteral("tilt_min"), -50);
+        after.insert(QStringLiteral("speed"), 10);
+        QCOMPARE(cameraConfigChanges(before, after), (QJsonObject{{QStringLiteral("tilt_min"), -50}}));
+        after.insert(QStringLiteral("tilt_min"), QJsonValue());
+        after.insert(QStringLiteral("name"), QJsonValue());
+        QCOMPARE(cameraConfigChanges(before, after), (QJsonObject{{QStringLiteral("name"), QJsonValue()}}));
+    }
+
+    // «Gemerkte Werte» im Dialog «Kamera einrichten»: Anzeige wie in der Mitte, auch der Standard
+    void rememberedRows()
+    {
+        QJsonArray controls = c922Controls();
+        QJsonObject temperature = controls.at(3).toObject();
+        temperature.insert(QStringLiteral("label"), QStringLiteral("Farbtemperatur"));
+        temperature.insert(QStringLiteral("default"), 5000);
+        controls.replace(3, temperature);
+        QJsonObject automatic = controls.at(1).toObject();
+        automatic.insert(QStringLiteral("default"), true);
+        controls.replace(1, automatic);
+        const QList<CameraRememberedRow> rows = cameraRememberedRows(controls);
+        QCOMPARE(rows.size(), 3);
+        QCOMPARE(rows.at(0), (CameraRememberedRow{QStringLiteral("white_balance_automatic"),
+                                                  QStringLiteral("white_balance_automatic"), QStringLiteral("aus"),
+                                                  QStringLiteral("ein")}));
+        QCOMPARE(rows.at(1), (CameraRememberedRow{QStringLiteral("power_line_frequency"),
+                                                  QStringLiteral("power_line_frequency"), QStringLiteral("50 Hz"),
+                                                  QStringLiteral("Aus")}));
+        QCOMPARE(rows.at(2), (CameraRememberedRow{QStringLiteral("white_balance_temperature"),
+                                                  QStringLiteral("Farbtemperatur"), QStringLiteral("4600 K"),
+                                                  QStringLiteral("5000 K")}));
+        QVERIFY(cameraRememberedRows(tiny2Controls()).size() == 1); // Bildwinkel; KI nie gemerkt
+    }
 };
 
 QTEST_GUILESS_MAIN(TestKameraAnsicht)

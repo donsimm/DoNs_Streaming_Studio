@@ -552,6 +552,111 @@ CameraCall cameraPresetOverwriteCall(const QString &presetId, bool withControls)
                 QJsonObject{{QStringLiteral("with_controls"), withControls}});
 }
 
+CameraCall cameraPresetGetCall(const QString &presetId)
+{
+    return call("GET", QStringLiteral("camera-presets/%1").arg(presetId));
+}
+
+CameraCall cameraPresetRenameCall(const QString &presetId, const QString &name)
+{
+    return call("PUT", QStringLiteral("camera-presets/%1").arg(presetId),
+                QJsonObject{{QStringLiteral("name"), name}});
+}
+
+CameraCall cameraPresetDeleteCall(const QString &presetId)
+{
+    return call("DELETE", QStringLiteral("camera-presets/%1").arg(presetId));
+}
+
+CameraCall cameraConfigPutCall(const QString &cameraId, const QJsonObject &values)
+{
+    return call("PUT", cameraPath(cameraId, "config"), values);
+}
+
+QString cameraResultError(const CameraResult &result)
+{
+    if (result.status >= 200 && result.status < 300)
+        return {};
+    if (result.status == 0)
+        return result.error.isEmpty() ? QStringLiteral("keine Antwort") : result.error;
+    const QString message = str(result.body, "message");
+    return message.isEmpty() ? QStringLiteral("Fehler %1").arg(result.status) : message;
+}
+
+QString cameraSpeedSuffix(const CameraEntry *camera)
+{
+    return camera && cameraIsTiny2(*camera) ? QStringLiteral(" °/s") : QStringLiteral(" %");
+}
+
+std::pair<double, double> cameraConfigRange(const QJsonObject &config, const QString &key, double fallbackMin,
+                                            double fallbackMax)
+{
+    const QJsonArray range = config.value(QLatin1String("ranges")).toObject().value(key).toArray();
+    if (range.size() != 2 || !range.at(0).isDouble() || !range.at(1).isDouble())
+        return {fallbackMin, fallbackMax};
+    return {range.at(0).toDouble(), range.at(1).toDouble()};
+}
+
+QJsonObject cameraConfigChanges(const QJsonObject &before, const QJsonObject &after)
+{
+    QJsonObject changes;
+    for (auto it = after.constBegin(); it != after.constEnd(); ++it) {
+        if (before.value(it.key()) != it.value())
+            changes.insert(it.key(), it.value());
+    }
+    return changes;
+}
+
+QList<CameraRememberedRow> cameraRememberedRows(const QJsonArray &controls)
+{
+    // Anzeige wie in der mittleren Spalte (cameraControlRows), auch für den Standard des Geräts
+    const auto text = [](const CameraControlSpec *spec, const QJsonObject &o, const QJsonValue &v) {
+        if (v.isBool())
+            return v.toBool() ? QStringLiteral("ein") : QStringLiteral("aus");
+        if (!v.isDouble())
+            return kNoValue;
+        const int value = v.toInt();
+        for (const QJsonValue &m : o.value(QLatin1String("menu")).toArray()) {
+            const QJsonObject entry = m.toObject();
+            if (entry.value(QLatin1String("value")).toInt() == value)
+                return str(entry, "label");
+        }
+        if (!spec)
+            return QString::number(value);
+        switch (spec->kind) {
+        case CameraControlKind::Check:
+            return value ? QStringLiteral("ein") : QStringLiteral("aus");
+        case CameraControlKind::Text:
+            return value == 0 ? QStringLiteral("nie") : QStringLiteral("%1 s").arg(value);
+        case CameraControlKind::Slider:
+            return spec->key == QLatin1String("white_balance_temperature") ? lightKelvinText(value)
+                                                                            : QString::number(value);
+        case CameraControlKind::Choice:
+            break;
+        }
+        return QString::number(value);
+    };
+    QList<CameraRememberedRow> rows;
+    for (const QJsonValue &c : controls) {
+        const QJsonObject o = c.toObject();
+        if (!o.value(QLatin1String("remembered")).toBool())
+            continue;
+        const QString key = str(o, "key");
+        const CameraControlSpec *spec = nullptr;
+        for (const CameraControlSpec &s : cameraControlSpecs()) {
+            if (s.key == key)
+                spec = &s;
+        }
+        CameraRememberedRow row;
+        row.key = key;
+        row.label = str(o, "label").isEmpty() ? (spec ? spec->label : key) : str(o, "label");
+        row.value = text(spec, o, o.value(QLatin1String("value")));
+        row.defaultValue = text(spec, o, o.value(QLatin1String("default")));
+        rows.append(row);
+    }
+    return rows;
+}
+
 CameraCall lightPutCall(const QString &lightId, const QJsonObject &values)
 {
     return call("PUT", QStringLiteral("lights/%1").arg(lightId), values);
@@ -716,6 +821,8 @@ int CameraData::applyResult(const CameraCall &call, const CameraResult &result)
     if (call.method != QLatin1String("GET") || result.status != 200)
         return 0;
     const QStringList parts = call.path.split(QLatin1Char('/'));
+    if (parts.size() == 2 && parts.at(0) == QLatin1String("camera-presets"))
+        return setCameraPreset(result.body.value(QLatin1String("preset")).toObject());
     if (parts.size() != 3 || parts.at(0) != QLatin1String("cameras"))
         return 0;
     const QString &camera = parts.at(1);
@@ -728,6 +835,73 @@ int CameraData::applyResult(const CameraCall &call, const CameraResult &result)
         config.remove(QStringLiteral("ok"));
         m_config.insert(camera, config);
         return Config;
+    }
+    return 0;
+}
+
+int CameraData::setCameraPreset(const QJsonObject &preset)
+{
+    // Nur bekannte Kennungen: Ein inzwischen gelöschtes Preset kommt nicht zurück.
+    const QJsonValue id = preset.value(QLatin1String("id"));
+    for (qsizetype i = 0; i < m_cameraPresets.size(); ++i) {
+        if (m_cameraPresets.at(i).toObject().value(QLatin1String("id")) != id)
+            continue;
+        if (m_cameraPresets.at(i).toObject() == preset)
+            return 0;
+        m_cameraPresets.replace(i, preset);
+        return Presets;
+    }
+    return 0;
+}
+
+QStringList CameraData::cameraPresetsWithoutDetails() const
+{
+    QStringList ids;
+    for (const QJsonValue &v : m_cameraPresets) {
+        const QJsonObject o = v.toObject();
+        if (!o.value(QLatin1String("camera")).isString())
+            ids.append(str(o, "id"));
+    }
+    return ids;
+}
+
+int CameraData::noteCallSent(const CameraCall &call)
+{
+    if (call.method != QLatin1String("POST"))
+        return 0;
+    const QStringList parts = call.path.split(QLatin1Char('/'));
+    if (parts.size() != 3)
+        return 0;
+    QString cameraId;
+    if (parts.at(0) == QLatin1String("cameras")
+        && (parts.at(2) == QLatin1String("move") || parts.at(2) == QLatin1String("step")
+            || parts.at(2) == QLatin1String("home"))) {
+        cameraId = parts.at(1);
+    } else if (parts.at(0) == QLatin1String("camera-presets") && parts.at(2) == QLatin1String("recall")) {
+        for (const QJsonValue &v : m_cameraPresets) {
+            const QJsonObject o = v.toObject();
+            if (str(o, "id") == parts.at(1))
+                cameraId = str(o, "camera");
+        }
+    }
+    if (cameraId.isEmpty())
+        return 0;
+    // ai_off_before_move (Standard an, docs/09-kamera-dienst.md): Der Dienst schaltet die KI vor
+    // der Bewegung aus, ohne Ereignis controls. Ohne gelesene Einstellungen gilt der Standard.
+    const QJsonObject config = m_config.value(cameraId).value(QLatin1String("config")).toObject();
+    if (!config.value(QLatin1String("ai_off_before_move")).toBool(true))
+        return 0;
+    QJsonArray controls = m_controls.value(cameraId);
+    for (qsizetype i = 0; i < controls.size(); ++i) {
+        QJsonObject o = controls.at(i).toObject();
+        if (str(o, "key") != QLatin1String("obsbot_ai"))
+            continue;
+        if (o.value(QLatin1String("value")).toInt() == 0)
+            return 0;
+        o.insert(QStringLiteral("value"), 0);
+        controls.replace(i, o);
+        m_controls.insert(cameraId, controls);
+        return Controls;
     }
     return 0;
 }

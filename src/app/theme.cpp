@@ -321,6 +321,18 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #chatBotState[state="ok"] { color: @stateConnected@; font-weight: bold; }
 #chatBotState[state="warning"] { color: @stateConnecting@; font-weight: bold; }
 #chatBotState[state="error"] { color: @stateError@; font-weight: bold; }
+/* P15 e2: Reiter «Kameras». Zustand des Kamera-Dienstes rechts in der Kopfzeile wie #chatBotState
+   (state aus cameraview.h, cameraServiceView), die zweite Zeile ohne Fettdruck. Hinweise als Text
+   ohne Kasten in denselben Farben (Entscheid 3 des Nutzers, 2026-11-17). */
+#cameraPage { background: @window@; }
+#cameraState, #cameraStateDetail, #cameraMoveHint, #cameraAiHint, #cameraRecallHint,
+#cameraBlockedHint { color: @textMuted@; }
+#cameraState[state="ok"] { color: @stateConnected@; font-weight: bold; }
+#cameraState[state="warning"] { color: @stateConnecting@; font-weight: bold; }
+#cameraState[state="error"] { color: @stateError@; font-weight: bold; }
+#cameraStateDetail[state="error"] { color: @stateError@; }
+#cameraMoveHint[state="warning"] { color: @stateConnecting@; }
+#cameraBlockedHint { color: @stateError@; }
 /* Bereiche im Unterreiter «Live» wie ein Dock: Titel wie QDockWidget::title, Inhalt wie
    QDockWidget > QWidget. */
 #chatBotPanelTitle { background-color: @dockTitle@; border: 1px solid @border@; color: @text@;
@@ -341,7 +353,7 @@ QPlainTextEdit { background-color: @input@; border-radius: 4px; padding: 2px 4px
                  border: 1px solid @input@; }
 QPlainTextEdit:hover { background-color: @inputHover@; border-color: @inputBorderHover@; }
 QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; }
-#propertiesScroll, #propertiesForm { background: transparent; border: none; }
+#propertiesScroll, #propertiesForm, #cameraLeftScroll, #cameraLeftColumn { background: transparent; border: none; }
 #dockButtons QToolButton::menu-indicator { image: none; width: 0px; }
 
 #hintLabel { color: @textMuted@; }
@@ -357,7 +369,10 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #globalVariables::item:hover, #globalVariables::item:selected, #globalVariables::item:selected:hover,
 #userVariables::item, #userVariables::item:hover, #userVariables::item:selected,
 #userVariables::item:selected:hover, #queuesList::item, #queuesList::item:hover, #queuesList::item:selected,
-#queuesList::item:selected:hover { border-radius: 0px;
+#queuesList::item:selected:hover, #cameraPresets::item, #cameraPresets::item:hover,
+#cameraPresets::item:selected, #cameraPresets::item:selected:hover, #cameraRemembered::item,
+#cameraRemembered::item:hover, #cameraRemembered::item:selected,
+#cameraRemembered::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;

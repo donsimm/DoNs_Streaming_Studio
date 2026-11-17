@@ -22,6 +22,7 @@
 #include <functional>
 #include <optional>
 
+class CameraPage;
 class CanvasWidget;
 class ChatBotPage;
 class HeaderBar;
@@ -306,6 +307,7 @@ private:
     HeaderBar *m_header = nullptr;
     QStackedWidget *m_modules = nullptr;
     ChatBotPage *m_chatBot = nullptr;  // P13
+    CameraPage *m_cameras = nullptr;   // P15 e2
     dss::EventRows m_eventRows;        // P13: Bereich «Ereignisse»
     qint64 m_actionsEnabledRequest = 0; // P14 e2-11: offene Anfrage «Chat-Bot aktiv»
     dss::RunRows m_runRows;             // P14 e2-12: Bereich «Läufe der Aktionen»

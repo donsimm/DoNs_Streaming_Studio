@@ -195,6 +195,16 @@ qint64 CoreClient::sendTwitchAccountRequest(const char *type, const QString &acc
     return id;
 }
 
+qint64 CoreClient::callCamera(CameraCall call)
+{
+    if (!m_connected)
+        return 0;
+    call.requestId = m_nextRequestId++;
+    m_cameraCalls.insert(call.requestId, call);
+    send(cameraCallMessage(call));
+    return call.requestId;
+}
+
 qint64 CoreClient::sendActionsEdit(const ActionsEdit &edit)
 {
     if (!m_connected)
@@ -636,6 +646,18 @@ void CoreClient::handleMessage(const QJsonObject &message)
             return;
         }
         emit cameraEventReceived(event);
+    } else if (type == QLatin1String(msg::kCameraResult)) {
+        CameraResult result;
+        if (!parseCameraResult(message, &result, &error)) {
+            qWarning("Kern: camera_result ungültig: %s", qPrintable(error));
+            return;
+        }
+        const auto it = m_cameraCalls.find(result.requestId);
+        if (it == m_cameraCalls.end())
+            return;
+        const CameraCall call = it.value();
+        m_cameraCalls.erase(it);
+        emit cameraResultReceived(call, result);
     } else if (type == QLatin1String(msg::kActionsStatus)) {
         ActionsStatus status;
         if (!parseActionsStatus(message, &status, &error)) {
@@ -827,6 +849,7 @@ void CoreClient::clearData()
     m_settingsRequests.clear();
     m_obsRequests.clear();
     m_twitchRequests.clear();
+    m_cameraCalls.clear();
     const bool hadImports = !m_importNames.isEmpty();
     m_importNames.clear();
     if (hadImports)

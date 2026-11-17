@@ -459,6 +459,20 @@ if(DSS_BUILD_CLI AND DSS_CORE_CAMERA)
   add_dependencies(tst_kernkamera dss-core dss-cli)
   set_tests_properties(tst_kernkamera PROPERTIES TIMEOUT 180)
 endif()
+# P15 e2: Reiter «Kameras» im echten Fenster (MainWindow) mit eigenem dss-core gegen den Dienst in
+# der Attrappe, in der X11-Sitzung; ohne X11 übersprungen (77). Mit DSS_TEST_BILDER ein Bild.
+if(DSS_BUILD_APP AND DSS_CORE_CAMERA)
+  qt_add_executable(tst_fensterkameras tst_fensterkameras.cpp kameradiensthilfe.h)
+  target_link_libraries(tst_fensterkameras PRIVATE dss_app_ui dss_warnings Qt6::Test Qt6::Network)
+  target_compile_definitions(tst_fensterkameras PRIVATE DSS_CORE_BIN="$<TARGET_FILE:dss-core>"
+    DSS_TEST_APP_FONT_DIR="${PROJECT_SOURCE_DIR}/src/app/schriften"
+    DSS_PYTHON3="${DSS_PYTHON3}" DSS_CAMERA_SERVICE_DIR="${PROJECT_SOURCE_DIR}/kamera-dienst")
+  add_dependencies(tst_fensterkameras dss-core)
+  add_test(NAME tst_fensterkameras COMMAND tst_fensterkameras)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fenster-config-kameras)
+  set_tests_properties(tst_fensterkameras PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 180
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/fenster-config-kameras")
+endif()
 
 # P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
 qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)

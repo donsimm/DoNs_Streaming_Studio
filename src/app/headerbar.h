@@ -25,7 +25,7 @@ class HeaderBar : public QFrame
     Q_OBJECT
 
 public:
-    enum Module { Overlays = 0, ChatBot = 1 };
+    enum Module { Overlays = 0, ChatBot = 1, Cameras = 2 };
     enum Gauge { Cpu = 0, Ram = 1, Lan = 2 };
 
     explicit HeaderBar(const Theme &theme, QWidget *parent = nullptr);

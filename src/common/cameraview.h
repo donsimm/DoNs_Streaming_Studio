@@ -234,6 +234,33 @@ CameraCall cameraPresetRecallCall(const QString &presetId);
 // «Aktuelle Position speichern …» (Dialog: Name, «Bildwerte mitspeichern» Standard aus)
 CameraCall cameraPresetCreateCall(const QString &name, const QString &cameraId, bool withControls);
 CameraCall cameraPresetOverwriteCall(const QString &presetId, bool withControls);
+// P15 e2: Preset einzeln lesen, umbenennen, löschen; Einstellungen der Kamera ändern («Tempo»,
+// «Schritt», Dialog «Kamera einrichten»; null = Standard)
+CameraCall cameraPresetGetCall(const QString &presetId);
+CameraCall cameraPresetRenameCall(const QString &presetId, const QString &name);
+CameraCall cameraPresetDeleteCall(const QString &presetId);
+CameraCall cameraConfigPutCall(const QString &cameraId, const QJsonObject &values);
+// Meldung zu einer Antwort ohne Erfolg (Meldung des Dienstes oder des Kerns), leer bei 2xx
+QString cameraResultError(const CameraResult &result);
+// Einheit von «Tempo» (Entscheid 2 des Nutzers): Tiny 2 « °/s», sonst « %»
+QString cameraSpeedSuffix(const CameraEntry *camera);
+// Bereich eines Felds aus «ranges» von GET …/config, sonst fallback
+std::pair<double, double> cameraConfigRange(const QJsonObject &config, const QString &key, double fallbackMin,
+                                            double fallbackMax);
+// Felder aus after, die sich gegenüber before geändert haben (für PUT …/config)
+QJsonObject cameraConfigChanges(const QJsonObject &before, const QJsonObject &after);
+// Dialog «Kamera einrichten», «Gemerkte Werte»: Werte mit remembered, Anzeige wie in der Mitte
+struct CameraRememberedRow
+{
+    QString key;
+    QString label;        // Name des Dienstes («Farbtemperatur»)
+    QString value;        // gemerkt
+    QString defaultValue; // Standard des Geräts
+
+    bool operator==(const CameraRememberedRow &) const = default;
+};
+QList<CameraRememberedRow> cameraRememberedRows(const QJsonArray &controls);
+
 CameraCall lightPutCall(const QString &lightId, const QJsonObject &values);
 CameraCall lightsAllCall(bool on); // «Alle ein», «Alle aus»
 CameraCall lightPresetRecallCall(const QString &presetId);
@@ -294,8 +321,17 @@ public:
 
     int setService(const std::optional<CameraServiceInfo> &info);
     int applyEvent(const CameraEventInfo &event);
-    // Antwort auf eine eigene Anfrage (nur GET …/controls und GET …/config tragen Stand)
+    // Antwort auf eine eigene Anfrage (nur GET …/controls, GET …/config und GET camera-presets/<id>
+    // tragen Stand; ein Preset ersetzt nur einen bekannten Eintrag gleicher Kennung)
     int applyResult(const CameraCall &call, const CameraResult &result);
+    // P15 e2: Kennungen der Kamera-Presets, von denen nur id und name bekannt sind (aus GET status);
+    // das Fenster holt sie einzeln mit GET camera-presets/<id>.
+    QStringList cameraPresetsWithoutDetails() const;
+    // P15 e2 (Entscheid Lotse): Nach dem Senden einer Bewegung (move, step, home einer Kamera,
+    // recall eines Kamera-Presets) steht die KI-Verfolgung dieser Kamera auf «Aus», wenn
+    // ai_off_before_move gilt (Standard an); der Dienst meldet das nicht. Rückgabe Controls, wenn
+    // sich der Wert geändert hat, sonst 0 (auch bei anderen Anfragen).
+    int noteCallSent(const CameraCall &call);
 
     const QList<CameraEntry> &cameras() const { return m_cameras; }
     const CameraEntry *camera(const QString &id) const;
@@ -308,6 +344,7 @@ public:
 private:
     int setCameras(const QJsonArray &cameras);
     int setPresets(const QJsonArray &camera, const QJsonArray &light, bool full);
+    int setCameraPreset(const QJsonObject &preset);
 
     QList<CameraEntry> m_cameras;
     QHash<QString, QJsonArray> m_controls;

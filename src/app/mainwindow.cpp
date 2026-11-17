@@ -5,6 +5,7 @@
 #include "actionspage.h"
 #include "canvasimage.h"
 #include "canvaswidget.h"
+#include "camerapage.h"
 #include "chatbotpage.h"
 #include "configpaths.h"
 #include "coreclient.h"
@@ -222,6 +223,9 @@ void MainWindow::createCentralArea()
     m_chatBot = new ChatBotPage(m_theme, m_modules);
     m_chatBot->setHeader(dss::chatBotHeaderView(dss::ConnectionState::Off, std::nullopt));
     m_modules->addWidget(m_chatBot);
+    // P15 e2: Reiter «Kameras» (camerapage.h); ohne Kern zeigt die Kopfzeile «Kamera-Dienst: –».
+    m_cameras = new CameraPage(m_theme, m_modules);
+    m_modules->addWidget(m_cameras);
     column->addWidget(m_modules, 1);
 
     connect(m_header, &HeaderBar::moduleSelected, this, &MainWindow::onModuleSelected);
@@ -243,7 +247,7 @@ void MainWindow::onModuleSelected(int module)
     const QList<bool> next = m_moduleDocks.switchTo(editor, visible);
     for (qsizetype i = 0; i < next.size(); ++i)
         docks.at(i)->setVisible(next.at(i));
-    // Im Reiter «Chat-Bot» kein Dock über das Menü einblenden.
+    // In den Reitern «Chat-Bot» und «Kameras» kein Dock über das Menü einblenden.
     m_docksMenu->setEnabled(editor);
     requestShownVariables();
 }
@@ -390,6 +394,8 @@ void MainWindow::connectCore()
             m_settingsAction->trigger();
     });
     connectChatBot();
+    m_cameras->setClient(m_client);
+    connect(m_cameras, &CameraPage::statusMessage, this, &MainWindow::showStatus);
     connect(m_client, &dss::CoreClient::overlayListChanged, this, &MainWindow::refreshOverlayList);
     connect(m_client, &dss::CoreClient::overlayChanged, this, [this](const QUuid &id) {
         if (id == m_selectedOverlay)
