@@ -78,6 +78,25 @@ Nie während eines Streams (vorher Stream und Aufnahme prüfen). Am Gerät schon
 
 Stream Deck: nicht Teil dieses Gerätetests (eigener Auftrag im Stream-Deck-Projekt).
 
+## Gerätetest, Teil Lotse ohne Nutzer (2026-11-17, 13:40–13:55)
+
+**Aufbau:** Dienst von Lotse installiert (Freigabe Nutzer in der Sitzung, `kamera-dienst/installieren.sh <streaming-pc>`, Version 0.1.0, Commit dieses Branchs), `dienst.ini` mit Lauschadressen Streaming-PC und 127.0.0.1, erlaubt Studio-PC und 127.0.0.1. Einheit `enabled`, Streaming-PC meldet sich selbst an. Kein OBS, kein Stream. Nutzer nicht im Raum: Bild, Bewegung und KI-Verfolgung sind darum nicht gesehen.
+
+| Was | Ergebnis |
+|---|---|
+| N7, Teil Lotse | Installation Exit 0, `GET status` vom Studio-PC `200`, beide Kameras `present`. Drittes Gerät **nicht geprüft** (Nutzer) |
+| `system-einrichten.sh --trocken <studio-pc>` (b6) | «Zone FedoraWorkstation: Schnittstelle eno2, über die <studio-pc> erreicht wird», Trockenlauf ohne Änderung. **Bestätigt** |
+| Punkt 137 | `GET controls` an beiden Kameras: `contrast`, `saturation`, `sharpness`, `gain`, `backlight_compensation`, `exposure_dynamic_framerate` an beiden, `hue` an der Tiny 2; `gamma` an keiner (nur Attrappe). Schlüssel stimmen |
+| Punkt 136 | `v4l2-ctl -d /dev/video0 --list-ctrls` (jetzt vorhanden): `zoom_continuous min=-100 max=100 value=245`. Der Wert kommt vom Treiber/Gerät, nicht vom Dienst |
+| KI im Schlaf | `PUT controls {"obsbot_ai": 1}` → `409 camera_asleep`. **Bestätigt** |
+| KI an (e1b) | **Fehlschlag**: `PUT {"obsbot_ai": 1}` → `200`, zurückgelesen `0`; Status 0x18/0x1c bleibt 0/0, auch mit Videostrom (`v4l2-ctl --stream-mmap`, YUYV und MJPG 1920×1080, 30 fps), nach Schlafen/Wecken und mit dem Rohbefehl `16 02 02 01` sowie `16 02 02 00` direkt über die XU. HDR über dieselbe XU wirkt (`01 01 00` → 0). Am 16.11. ergab derselbe Befehl 2/1 (mit OBS-Quelle, Nutzer vor der Kamera). Bedingung unbekannt (Person im Bild? OBS-Format?), Prüfung mit dem Nutzer. Der Dienst meldet in diesem Fall `200` ohne Fehler; ob er bei abweichendem Rücklesen einen Fehler melden soll, ist offen |
+| Lampen über den Dienst | `lights/check` beide Lampen (rechts einmal Zeitüberschreitung, danach 4/4), Lampen angelegt («Key Light links», «Key Light rechts»), Schalten einzeln, `all` toggle, `all` mit Werten, Licht-Preset anlegen, abrufen, 5 Helligkeitswerte gleichzeitig und danach ein letzter (Lampe auf dem letzten Wert), Grenzen 200/100 → 100/143, `errors` immer leer. Danach Stand wie vorher (aus, 24 %, 220), Lampen bleiben eingetragen |
+| L5, Teil Dienst | `systemctl --user restart dss-kamera`: Lampen und Kamera-Preset erhalten, `recall` danach `200` |
+| Aktion mit beiden Schritten (Studio aus diesem Branch, eigener `XDG_CONFIG_HOME`, `dss-cli aktion-test … --echt`) | Tiny 2 im Schlaf: «Kamera-Position», «Licht-Preset» A, «Licht-Preset» B → alle `ok`, 7,4 s, Tiny 2 danach wach, Lampen auf B. Mit gelöschtem A: Schritt 2 `error, Unbekanntes Licht-Preset «dss-test-a».`, Schritt 3 `ok`. `dss-cli licht-preset` mit falscher Kennung: «Kamera-Dienst antwortet 404». **Bestätigt** |
+| C922 | `power_line_frequency=2` (60 Hz); 50 Hz setzt der Nutzer in N2 |
+
+Testdaten danach gelöscht (Presets, Aktion lag nur im Test-Datenordner), Tiny 2 im Schlaf. **Nicht geprüft** (Nutzer oder Bild nötig): L4 im Fenster mit OBS-Bild, Dialog «Lampen» im Fenster, Bewegung nach «KI aus» (b7), Dienst während einer Fahrt beenden (b4), Studio verbindet nach Neustart des Dienstes neu (Fenster), N1–N8.
+
 ## Prüfung am Gerät a bis c (2026-11-16, 07:20–07:50, Lotse, Nutzer am Streaming-PC)
 
 **Aufbau:** `kamera-dienst/installieren.sh <streaming-pc> --ziel ~/dss-kamera-test/opt --datenordner ~/dss-kamera-test/daten --ohne-einheit` (Exit 0, «Kamera-Dienst 0.1.0, Commit a94e73a»). Testinstanz per SSH mit `XDG_CONFIG_HOME` und `XDG_DATA_HOME` im Testordner, erst ohne `dienst.ini` (nur `127.0.0.1`), für L3 mit Test-`dienst.ini`. Kein installierter Dienst, keine Einheit. Kein Stream, keine Aufnahme (`GetStreamStatus`, `GetRecordStatus`). Kernel-Protokoll (`journalctl -k`) über die ganze Zeit: keine Meldung zu USB, UVC oder Video, kein `EPROTO`, keine Abmeldung.
