@@ -17,7 +17,7 @@ struct ChangeResult;
 }
 
 // «Werkzeuge → Einstellungen …» (P10-vor, Teil B 1): Port und Adresse im Heimnetz des Kerns, seit
-// P10c die Verbindung zu OBS. Liest die Werte vom Kern (get_settings), schickt Änderungen als
+// P10c die Verbindung zu OBS, seit P13 Twitch, seit P15 der Kamera-Dienst. Liest die Werte vom Kern (get_settings), schickt Änderungen als
 // update_settings und zeigt die Meldung des Kerns. Keine Prüfung hier (CLAUDE.md Regel 9): was sich
 // geändert hat, steht in windowdata.h (settingsUpdateFromForm), geprüft wird im Kern. Nicht
 // blockierend (open()).
@@ -79,6 +79,10 @@ private:
     TwitchAccountRow m_twitchBot;
     QLabel *m_twitchStatus = nullptr;
     QTimer *m_twitchTimer = nullptr; // Restzeit des Codes, solange der Dialog offen ist
+    // P15 d3: Verbindung zum Kamera-Dienst
+    QCheckBox *m_cameraEnabled = nullptr;
+    QLineEdit *m_cameraHost = nullptr;
+    QSpinBox *m_cameraPort = nullptr;
     qint64 m_twitchRequest = 0;      // twitch_login_* oder twitch_logout unterwegs
     bool m_deleteTwitchSecret = false; // «Secret löschen» gedrückt, gilt erst mit «OK»
     QLabel *m_problem = nullptr;

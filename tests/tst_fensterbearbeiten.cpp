@@ -2014,7 +2014,7 @@ private slots:
         QVERIFY(enabled && clientId && secret && deleteSecret && channelState && botState && channelLogin
                 && channelLogout && channelStack && botStack && status && ok && problem);
         QVERIFY(dialog->findChild<QLabel *>(QStringLiteral("settingsTwitchBotHint")));
-        QCOMPARE(dialog->findChildren<QLabel *>(QStringLiteral("propertySectionTitle")).size(), 2);
+        QCOMPARE(dialog->findChildren<QLabel *>(QStringLiteral("propertySectionTitle")).size(), 3); // P15: Kamera-Dienst
         QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled() && enabled->isEnabled(), 3000);
         QVERIFY(!enabled->isChecked());
         QCOMPARE(clientId->text(), QString());
@@ -2129,6 +2129,84 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(dialog->focusWidget(), static_cast<QWidget *>(enabled), 3000);
         dialog->reject();
         QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+    }
+
+    // P15 d3: Bereich «Kamera-Dienst» wie der Bereich «OBS». Kein Dienst läuft: Der Kern versucht es
+    // auf einem freien Port von 127.0.0.1 und meldet den Zustand, die Werte stehen danach im Kern.
+    void settingsDialogCamera()
+    {
+        quint16 freePort = 0;
+        {
+            QTcpServer probe;
+            QVERIFY(probe.listen(QHostAddress::LocalHost));
+            freePort = probe.serverPort();
+        }
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QDialog *dialog = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<QDialog *>(QStringLiteral("settingsDialog")))
+                                     && dialog->isVisible(), 3000);
+        auto *enabled = dialog->findChild<QCheckBox *>(QStringLiteral("settingsCameraEnabled"));
+        auto *host = dialog->findChild<QLineEdit *>(QStringLiteral("settingsCameraHost"));
+        auto *port = dialog->findChild<QSpinBox *>(QStringLiteral("settingsCameraPort"));
+        auto *ok = dialog->findChild<QPushButton *>(QStringLiteral("settingsOk"));
+        auto *problem = dialog->findChild<QLabel *>(QStringLiteral("settingsProblem"));
+        QVERIFY(enabled && host && port && ok && problem);
+        QStringList titles;
+        for (QLabel *l : dialog->findChildren<QLabel *>(QStringLiteral("propertySectionTitle")))
+            titles << l->text();
+        QCOMPARE(titles, (QStringList{QStringLiteral("OBS"), QStringLiteral("Twitch"), QStringLiteral("Kamera-Dienst")}));
+        QCOMPARE(enabled->text(), QStringLiteral("Mit dem Kamera-Dienst verbinden"));
+        QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled() && enabled->isEnabled(), 3000);
+        QVERIFY(host->isEnabled() && port->isEnabled());
+        QVERIFY(!enabled->isChecked());
+        QCOMPARE(host->placeholderText(), QStringLiteral("192.168.1.30"));
+        QCOMPARE(host->text(), QString());
+        QCOMPARE(port->value(), 8093);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->cameraService()
+                                     && m_client->cameraService()->state == QStringLiteral("off"), 3000);
+
+        // Einschalten ohne Adresse: Meldung des Kerns, Dialog bleibt offen
+        const int problemHeight = problem->height();
+        enabled->setChecked(true);
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("braucht die Adresse des Kamera-Dienstes")), 3000);
+        QVERIFY(dialog->isVisible());
+        QCOMPARE(problem->height(), problemHeight);
+        QVERIFY(!m_check->settings()->settings.cameraEnabled);
+
+        // Gültig: Dialog schliesst, die Werte stehen im Kern, der Kern versucht die Verbindung
+        host->setText(QStringLiteral(" 127.0.0.1 "));
+        port->setValue(freePort);
+        // Bild für den Prüfer (nur mit DSS_TEST_BILDER)
+        if (const QString dir = qEnvironmentVariable("DSS_TEST_BILDER"); !dir.isEmpty()) {
+            problem->clear();
+            QTest::qWait(200);
+            dialog->grab().save(dir + QStringLiteral("/einstellungen-kamera.png"));
+        }
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->settings() && m_check->settings()->settings.cameraEnabled, 3000);
+        QCOMPARE(m_check->settings()->settings.cameraHost, QStringLiteral("127.0.0.1"));
+        QCOMPARE(m_check->settings()->settings.cameraPort, int(freePort));
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->cameraService()
+                                     && (m_client->cameraService()->state == QStringLiteral("connecting")
+                                         || m_client->cameraService()->state == QStringLiteral("error")), 3000);
+
+        // Wieder offen: Werte aus dem Kern; Abschalten
+        m_window->findChild<QAction *>(QStringLiteral("settingsAction"))->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible() && ok->isEnabled(), 3000);
+        QVERIFY(enabled->isChecked());
+        QCOMPARE(host->text(), QStringLiteral("127.0.0.1"));
+        QCOMPARE(port->value(), int(freePort));
+        enabled->setChecked(false);
+        host->clear();
+        port->setValue(8093);
+        QTest::mouseClick(ok, Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_check->settings() && !m_check->settings()->settings.cameraEnabled
+                                     && m_check->settings()->settings.cameraHost.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(m_client->cameraService()
+                                     && m_client->cameraService()->state == QStringLiteral("off"), 3000);
     }
 
     // P10, Punkt 77: Dialog mit einem eigenen Kern, dessen kern.ini ungültig ist: «OK» ausgegraut,

@@ -102,6 +102,10 @@ struct SettingsForm
     QString twitchClientId;
     QString twitchClientSecret;            // leer = behalten
     bool deleteTwitchClientSecret = false; // Knopf «Secret löschen»; ein neues Secret geht vor
+    // P15 d3: Verbindung zum Kamera-Dienst, wie OBS ohne Passwort
+    bool cameraEnabled = false;
+    QString cameraHost;
+    int cameraPort = kCameraServiceDefaultPort;
 };
 // obsInError: Der OBS-Knopf ist rot. Dann geht auch ein unverändertes Formular an den Kern, denn
 // «OK» versucht es nach einem Abbruch durch OBS neu (P10c, Plan 1.7).

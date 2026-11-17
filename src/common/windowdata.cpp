@@ -170,8 +170,16 @@ std::optional<SettingsUpdate> settingsUpdateFromForm(const CoreSettings &current
         update.twitchClientSecret = form.twitchClientSecret;
     else if (form.deleteTwitchClientSecret)
         update.twitchClientSecret = QString();
+    const QString cameraHost = form.cameraHost.trimmed();
+    if (form.cameraEnabled != current.cameraEnabled)
+        update.cameraEnabled = form.cameraEnabled;
+    if (cameraHost != current.cameraHost)
+        update.cameraHost = cameraHost;
+    if (form.cameraPort != current.cameraPort)
+        update.cameraPort = form.cameraPort;
     if (!update.port && !update.homeAddress && !update.obsEnabled && !update.obsHost && !update.obsPort
-        && !update.obsPassword && !update.twitchEnabled && !update.twitchClientId && !update.twitchClientSecret) {
+        && !update.obsPassword && !update.twitchEnabled && !update.twitchClientId && !update.twitchClientSecret
+        && !update.cameraEnabled && !update.cameraHost && !update.cameraPort) {
         if (!form.obsEnabled || !obsInError)
             return std::nullopt;
         update.obsEnabled = form.obsEnabled;

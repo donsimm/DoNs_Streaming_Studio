@@ -195,6 +195,33 @@ private slots:
         QVERIFY(obsPasswordPlaceholder(std::nullopt, false).isEmpty());
     }
 
+    // P15 d3: Bereich «Kamera-Dienst»; nur geänderte Werte, Adresse ohne Leerzeichen am Rand.
+    void settingsFormCamera()
+    {
+        CoreSettings current{8081, QStringLiteral("192.168.1.20")};
+        SettingsForm f;
+        f.port = 8081;
+        f.address = QStringLiteral("192.168.1.20");
+        QCOMPARE(f.cameraPort, 8093);
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        f.cameraEnabled = true;
+        f.cameraHost = QStringLiteral(" 192.168.1.30 ");
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && !u->port && !u->obsEnabled && !u->twitchEnabled && !u->cameraPort);
+        QCOMPARE(u->cameraEnabled, std::optional<bool>(true));
+        QCOMPARE(u->cameraHost, std::optional<QString>(QStringLiteral("192.168.1.30")));
+        current.cameraEnabled = true;
+        current.cameraHost = QStringLiteral("192.168.1.30");
+        QVERIFY(!settingsUpdateFromForm(current, f, false));
+        f.cameraPort = 8094;
+        u = settingsUpdateFromForm(current, f, false);
+        QVERIFY(u && !u->cameraEnabled && !u->cameraHost);
+        QCOMPARE(u->cameraPort, std::optional<int>(8094));
+        // Der rote OBS-Knopf schickt ein unverändertes Formular nur bei OBS nochmals
+        f.cameraPort = 8093;
+        QVERIFY(!settingsUpdateFromForm(current, f, true));
+    }
+
     // P13: Bereich «Twitch»; Client-ID und Secret sind Platzhalter, keine echten Werte.
     void settingsFormTwitch()
     {

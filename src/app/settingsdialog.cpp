@@ -122,6 +122,28 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     m_twitchStatus->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     m_twitchStatus->setFixedHeight(fontMetrics().lineSpacing() * 3);
     form->addRow(QStringLiteral("Zustand"), m_twitchStatus);
+
+    // P15 d3, Bereich «Kamera-Dienst»: wie der Bereich «OBS», ohne Passwort (Plan P15, 7.). Den
+    // Zustand der Verbindung zeigt der Bereich «OBS» im Dialog nicht, deshalb auch hier nicht.
+    auto *cameraTitle = new QLabel(QStringLiteral("Kamera-Dienst"), this);
+    cameraTitle->setObjectName(QStringLiteral("propertySectionTitle"));
+    form->addRow(cameraTitle);
+    auto *cameraLine = new QFrame(this);
+    cameraLine->setObjectName(QStringLiteral("propertySectionLine"));
+    cameraLine->setFixedHeight(1);
+    form->addRow(cameraLine);
+    m_cameraEnabled = new QCheckBox(QStringLiteral("Mit dem Kamera-Dienst verbinden"), this);
+    m_cameraEnabled->setObjectName(QStringLiteral("settingsCameraEnabled"));
+    m_cameraHost = new QLineEdit(this);
+    m_cameraHost->setObjectName(QStringLiteral("settingsCameraHost"));
+    m_cameraHost->setPlaceholderText(QStringLiteral("192.168.1.30"));
+    m_cameraPort = new QSpinBox(this);
+    m_cameraPort->setObjectName(QStringLiteral("settingsCameraPort"));
+    m_cameraPort->setRange(dss::kObsPortMin, dss::kObsPortMax); // wie validateCameraPort im Kern
+    m_cameraPort->setValue(dss::kCameraServiceDefaultPort);
+    form->addRow(QString(), m_cameraEnabled);
+    form->addRow(QStringLiteral("Adresse des Kamera-Dienstes"), m_cameraHost);
+    form->addRow(QStringLiteral("Port des Kamera-Dienstes"), m_cameraPort);
     column->addLayout(form);
 
     connect(m_obsDeletePassword, &QPushButton::clicked, this, [this] {
@@ -189,6 +211,7 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
             m_problem->setText(result.message);
         updateState();
     });
+    connect(m_client, &dss::CoreClient::cameraServiceChanged, this, &SettingsDialog::updateState);
     onTwitchStatusChanged();
 }
 
@@ -344,6 +367,9 @@ void SettingsDialog::accept()
     values.twitchClientId = m_twitchClientId->text();
     values.twitchClientSecret = m_twitchSecret->text();
     values.deleteTwitchClientSecret = m_deleteTwitchSecret;
+    values.cameraEnabled = m_cameraEnabled->isChecked();
+    values.cameraHost = m_cameraHost->text();
+    values.cameraPort = m_cameraPort->value();
     const bool obsInError = m_client->connectionStates().value(dss::Connection::Obs) == dss::ConnectionState::Error;
     const std::optional<dss::SettingsUpdate> update =
         dss::settingsUpdateFromForm(info->settings, values, obsInError);
@@ -379,6 +405,9 @@ void SettingsDialog::onSettingsChanged()
             m_obsPort->setValue(info->settings.obsPort);
             m_twitchEnabled->setChecked(info->settings.twitchEnabled);
             m_twitchClientId->setText(info->settings.twitchClientId);
+            m_cameraEnabled->setChecked(info->settings.cameraEnabled);
+            m_cameraHost->setText(info->settings.cameraHost);
+            m_cameraPort->setValue(info->settings.cameraPort);
             m_filled = true;
         }
     }
@@ -426,7 +455,13 @@ void SettingsDialog::updateState()
         w->setEnabled(twitchUsable);
     m_twitchDeleteSecret->setEnabled(twitchUsable && info->twitchClientSecretSet && !m_deleteTwitchSecret);
     m_twitchSecret->setPlaceholderText(dss::twitchSecretPlaceholder(info, m_deleteTwitchSecret));
-    const bool accountUsable = m_client->isConnected() && m_twitchRequest == 0;
+    // P15 d3: Ohne Kamera-Dienst im Kern (Schalter DSS_CORE_CAMERA) bleibt der Bereich grau, wie Twitch.
+    const std::optional<dss::CameraServiceInfo> camera = m_client->cameraService();
+    const bool cameraUsable = usable && m_pendingRequest == 0 && camera
+                              && camera->state != QLatin1String(dss::kCameraStateUnavailable);
+    for (QWidget *w : std::initializer_list<QWidget *>{m_cameraEnabled, m_cameraHost, m_cameraPort})
+        w->setEnabled(cameraUsable);
+    const bool accountUsable =m_client->isConnected() && m_twitchRequest == 0;
     for (TwitchAccountRow *row : {&m_twitchChannel, &m_twitchBot}) {
         const dss::TwitchAccountView view = dss::twitchAccountView(twitch, row->account);
         row->login->setEnabled(accountUsable && view.loginEnabled);
