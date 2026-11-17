@@ -63,3 +63,9 @@ add_test(NAME kd_installieren
   COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_installieren.py
           ${CMAKE_CURRENT_BINARY_DIR}/kd_installieren)
 set_tests_properties(kd_installieren PROPERTIES TIMEOUT 180)
+
+# Lastprobe der Prüfstufe «Baustein» (Plan 12: 10 Anfragen je Sekunde über 60 s, Ein-/Ausstecken
+# alle 5 s, Totmann, CPU des Dienstes): nur mit ctest -C Lastprobe, nicht im normalen ctest.
+add_test(NAME kd_last CONFIGURATIONS Lastprobe
+  COMMAND ${DSS_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_last.py)
+set_tests_properties(kd_last PROPERTIES ENVIRONMENT DSS_LASTPROBE=1 TIMEOUT 300)

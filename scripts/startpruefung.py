@@ -57,7 +57,14 @@ CORE_EXPECTED = [" gestartet, Qt ", " Overlays geladen", "Verbindung offen: ",
                  "Overlay-Server lauscht auf ",
                  # P12b b3: Ausgang über PipeWire, ohne gewählten Ausgang kein Strom
                  "Ton: Ton (ton-video): verbunden, libpipewire ",
-                 "Ton: Ton (ton-video): Zustand no_target"]
+                 "Ton: Ton (ton-video): Zustand no_target",
+                 # P14: Aktionen und Ton des Chat-Bots (zweiter Ausgang über PipeWire)
+                 "Aktionen: ", "Ton Chat-Bot: Ton (ton-aktionen): verbunden, libpipewire ",
+                 "Ton Chat-Bot: Ton (ton-aktionen): Zustand no_target"]
+# Zeilen, die vorkommen dürfen, aber nicht müssen (P15 Prüfstufe «Baustein»):
+# nur beim ersten Start im leeren Datenordner (P14) und die Emote-Zeile des Fensters, sobald die
+# Emote-Listen innerhalb der Laufzeit geladen sind (Twitch-Anbindung P13)
+OPTIONAL = ["Overlay «Chat-Bot» angelegt", "Emotes geladen: ", "Emotes: "]
 
 # Programm, Signal zum Beenden, Muster der Startzeile, erwartete Protokollzeilen
 CASES = {
@@ -231,7 +238,7 @@ def one_run(build, case, idx, env=None, data_dir=None, socket_path=None):
         core_ok = (core_ok and core_exit == 0
                    and any("Beenden erbeten von dss-app" in l for l in core_lines))
 
-    unexpected = [l for l in lines if not any(e in l for e in expected)]
+    unexpected = [l for l in lines if not any(e in l for e in expected + OPTIONAL)]
     missing = [e for e in expected if not any(e in l for l in lines)]
     clean = (p.returncode == 0 and not timeout and t_ready is not None and not leftovers
              and not unexpected and not missing and visible is not False and not out.strip()

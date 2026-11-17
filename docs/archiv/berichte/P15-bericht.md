@@ -1,6 +1,6 @@
 # P15 – Bericht (Kamerasteuerung, Abschnitte a bis f)
 
-Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» je Abschnitt bestanden (letzter ganzer Lauf in f2a: `scripts/testen.sh` 88 von 88). **Offen:** Prüfstufe «Baustein», Gerätetest mit Lotse und Nutzer (Liste unten), Installation des Dienstes durch den Nutzer (N7). Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste des Reiters `docs/archiv/prompts/P15-e-checkliste.md`.
+Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» je Abschnitt bestanden, Prüfstufe «Baustein» bestanden bis auf die Lastprobe (geschrieben, Lauf durch Lotse, Abschnitt «Prüfstufe Baustein» unten). **Offen:** Lastprobe `kd_last`, Gerätetest mit Lotse und Nutzer (Liste unten), Installation des Dienstes durch den Nutzer (N7). Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste des Reiters `docs/archiv/prompts/P15-e-checkliste.md`.
 
 ## Gesamtübersicht
 
@@ -15,19 +15,42 @@ Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» 
 | f1 | Schritte «Kamera-Position» (`camera_preset`) und «Licht-Preset» (`light_preset`) im Aktionssystem | gebaut, nur gegen die Attrappe |
 | f2a | Reihenfolge der schreibenden Anfragen je Lampe und Kamera im Kamera-Client (Punkt 129), Kopfzeile «Kameras» mit zweiter Zeile über beide Spalten | gebaut, nur gegen die Attrappe |
 | f2b | Dokumente `01` bis `09` nachgeführt, diese Übersicht | erledigt (nur Doku) |
+| Prüfstufe «Baustein» | Plan 12; dazu Fix der Attrappe (Punkt 135), erwartete Zeilen in `scripts/startpruefung.py`, Lastprobe `kd_last` | bestanden; `kd_last` geschrieben, nicht ausgeführt (Lotse) |
 
 ### Offene Punkte
 
-- In `docs/04-offene-punkte.md` aufgenommen (Entscheid Lotse 2026-11-17: aufnehmen, nicht bauen): **130** Warten, bis die Bewegung fertig ist; **131** `stop` kann `move` überholen; **132** «Kamera» als Ganzes hält beim Wecken der Tiny 2 andere Kameras auf; **133** Dauerbewegung während eines laufenden Ziels (b4); **134** weitere KI-Modi erst nach Test am Gerät; **135** `kd_presets` scheiterte einmal (e4); **136** `zoom_continuous` meldet 245 (b6); **137** Schlüssel der Bildwerte nicht an den echten Kameras geprüft.
-- Punkt 129 erledigt in f2a (Archiv `docs/archiv/04-erledigte-punkte.md`).
+- In `docs/04-offene-punkte.md` aufgenommen (Entscheid Lotse 2026-11-17: aufnehmen, nicht bauen): **130** Warten, bis die Bewegung fertig ist; **131** `stop` kann `move` überholen; **132** «Kamera» als Ganzes hält beim Wecken der Tiny 2 andere Kameras auf; **133** Dauerbewegung während eines laufenden Ziels (b4); **134** weitere KI-Modi erst nach Test am Gerät; **136** `zoom_continuous` meldet 245 (b6); **137** Schlüssel der Bildwerte nicht an den echten Kameras geprüft.
+- Punkt 129 erledigt in f2a, Punkt 135 (`kd_presets` scheiterte einmal) in der Prüfstufe «Baustein» (Archiv `docs/archiv/04-erledigte-punkte.md`). Neu aus der Prüfstufe: **138** `tst_fensterchatbot::chatEmotesLoading` scheiterte einmal (nicht P15).
 - `[OFFEN]` Lampe links fiel im WLAN aus (Prüfung c); kein Fehler des Dienstes, beobachten.
 - `[OFFEN]` Die Rechte von Lotse am Streaming-PC für P15 (Plan, Frage 4 A: «wird in `CLAUDE.md`, «Umgebung», eingetragen») stehen nicht in `CLAUDE.md`. Nicht Teil von f2b (nur `docs/`), Entscheid Lotse.
 - `[OFFEN]` Nicht als Fenstertest abgedeckt: Fehler einmal je Halten (e3, nur ohne Fenster), Weg über den Kern-Socket mit langsamer Lampe (f2a, geprüft ist der Client).
 - Reste ohne Freigabe zum Löschen: `build/bilder-e4` (leer, e4), `build/scratch-f1-teil.txt` (f1).
 
-### Prüfstufe «Baustein» (steht aus, Plan 12, Ordner `build/pruefung-p15/`)
+### Prüfstufe Baustein (2026-11-17)
 
-Bau, `ctest` mit X11-Sitzung (0 übersprungen), frischer Klon, `scripts/startpruefung.py --runs 20`, `scripts/dienstpruefung.py --kills 5`. 50 Wiederholungen ohne Last daneben, Fenstertests nie gleichzeitig: `kd_bewegen`, `kd_obsbot`, `kd_ereignisse`, `kd_presets` (Punkt 135), `tst_kameradienst`, `tst_kernkamera`, `tst_fensterkameras`. Last am Dienst (Attrappe, Plan 12): 10 Anfragen je Sekunde über 60 s mit Ein-/Ausstecken alle 5 s, CPU des Dienstes als Messwert.
+Stand `lotse/p15` nach f2b, dazu die drei Änderungen unten. Studio-PC, X11-Sitzung aktiv (`loginctl show-session 1`: `Type=x11`, `Active=yes`, `LockedHint=no` vor jedem Fensterlauf; `wiederholen.sh` prüft vor jedem Lauf). Kein anderer Agent, keine Bauten oder Tests daneben, die Läufe nacheinander, nie zwei Fenstertests gleichzeitig; Last am Ende 0,14/0,34/0,32. Rohdaten unter `build/pruefung-p15/` (nicht im Repo).
+
+| Stufe | Befehl | Ergebnis |
+|---|---|---|
+| Bau | `scripts/bauen.sh -j 8` (vor und nach den Änderungen) | «Bau ok (0 Warnungen)» |
+| Tests | `scripts/testen.sh` (ohne Filter), vor den Änderungen | **88 von 88**, keiner übersprungen, 461 s |
+| Tests | dasselbe nach den Änderungen | **87 von 88**, 459 s: `tst_fensterchatbot` (`chatEmotesLoading`, Zeitgrenze 5000 ms) einmal gescheitert, Wiederholung `scripts/testen.sh -R tst_fensterchatbot` **1 von 1**, 26 s. Nicht P15, Punkt 138 |
+| Tests `kd_*` | `scripts/testen.sh -R ^kd_` nach dem Fix | **10 von 10**, 63 s |
+| Frischer Klon | `/var/tmp/dss-klon-p15` (Stand e9a44dd, von Lotse angelegt): `cmake -S … -B …/build`, `cmake --build …/build -j8`, `ctest --test-dir …/build` | Bau ohne Fehler und ohne Warnung; **88 von 88**, keiner übersprungen, 484 s |
+| Startprüfung | `python3 scripts/startpruefung.py --runs 20 --out build/pruefung-p15/start/startpruefung` (11:52–11:54) | je **20 von 20** sauber: `core-sigterm` (Start Median 47,7 ms, Ende 8,1 ms), `core-sigint` (47,2 / 7,8 ms), `app-sigterm` (478,0 / 32,8 ms), `app-kern-sigterm` (465,8 / 48,7 ms); keine Restprozesse, keine unerwarteten Zeilen. Erster Lauf (11:48) «nicht sauber», siehe unten |
+| Dienstprüfung | `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p15/dienst` | **bestanden**. Fenster startet den Kern in 0,520 s (verbunden 0,580 s); Neustart nach `kill -9` 1,136 bis 1,175 s, Fenster wieder verbunden 1,906 bis 2,979 s |
+| 50 Wiederholungen | `scripts/wiederholen.sh build <Test> 50 <absoluter Ordner>`, nacheinander 11:57–13:26 | `kd_presets` vor dem Fix **48 von 50** (Lauf 7 und 9, Punkt 135), nach dem Fix **100 von 100** (2 × 50, Ende 12:22:42 und 12:26:27); je **50 von 50**: `kd_bewegen` (vor dem Fix 12:01:01, nach dem Fix 13:12:33), `kd_obsbot` (12:05:30, 13:17:03), `kd_ereignisse` (12:14:39, 13:26:14), `tst_kameradienst` (12:37:42), `tst_kernkamera` (12:42:45), `tst_fensterkameras` (13:01:07) |
+| Lastprobe | `ctest --test-dir build -C Lastprobe -R '^kd_last$' -V` | **nicht geprüft**: Der Testfall ist geschrieben, der Aufruf (auch `DSS_LASTPROBE=1 python3 kamera-dienst/tests/test_last.py`) war dem Agenten nicht freigegeben. Lauf durch Lotse, ohne Last daneben |
+
+**Fix Punkt 135 (Attrappe).** Mit 50 Wiederholungen nachgestellt: 2 von 50 gescheitert, beide in `test_presets_over_http` beim Lesen der Gerätedatei (`FakeDeviceFolder.values` → `JSONDecodeError: Expecting value: line 1 column 1`). Ursache: `Path.write_text` leert die Datei zuerst und schreibt dann; der Dienst schreibt die Knotendatei bei jedem Wert neu, der Test liest sie gleichzeitig. Ein Fehler der Attrappe, nicht des Dienstes (am Gerät gibt es keine Datei). `kamera-dienst/dss_camera/fake.py`: neue Funktion `_write_node` schreibt in eine Hilfsdatei `.<knoten>.<pid>.<thread>.tmp` im selben Ordner und tauscht sie mit `os.replace` (rename(2), atomar); alle fünf Schreibstellen der Knotendateien nutzen sie. Die Gerätesuche liest `dev/` nicht (nur `by-id`), die Hilfsdatei wird also nie als Gerät gesehen. Danach 100 von 100 (bei 4 % Fehlerrate wären 0 von 100 mit ≈ 1,7 % Wahrscheinlichkeit Zufall).
+
+**Startprüfung: erwartete Zeilen nachgeführt.** Der erste Lauf meldete alle 80 Starts «nicht sauber», nur wegen unerwarteter Info-Zeilen; Exit-Code, Startzeile, Ende und Restprozesse waren in allen 80 in Ordnung. Die Zeilen: im Kern «Aktionen: …» und «Ton Chat-Bot: Ton (ton-aktionen): …» (P14, jeder Start), «Overlay «Chat-Bot» angelegt» (P14, nur erster Start im leeren Datenordner), im Fenster mit Kern «Emotes geladen: …» (P13, sobald die Listen innerhalb der Laufzeit geladen sind). P14 hatte die Stufe «Baustein» nicht laufen lassen (P14-Bericht, «Nicht geprüft»). `scripts/startpruefung.py`: die festen Zeilen in `CORE_EXPECTED`, die übrigen in der neuen Liste `OPTIONAL` (dürfen vorkommen, müssen nicht). Der zweite Lauf war sauber.
+
+**Lastprobe (neu, `kamera-dienst/tests/test_last.py`, ctest-Eintrag `kd_last` nur mit `-C Lastprobe`).** Der Dienst läuft als eigener Prozess mit Attrappen-Ordner (Tiny 2, C922) und zwei Attrappen-Lampen. 60 s lang alle 100 ms eine Anfrage in eigenem Faden, reihum: `move` der Tiny 2 (Pan und Tilt, Tempo 50) in den ersten 2,5 s jeder 5 s, sonst `GET status`; Bildwerte (abwechselnd `PUT controls` C922 Helligkeit und `GET controls` Tiny 2); Positionsabruf (`recall` je eines Kamera-Presets der Tiny 2 und der C922); Licht (`PUT lights/links`, `PUT lights/all` umschalten, Licht-Preset abrufen). Ab 6 s alle 5 s Ein- oder Ausstecken, abwechselnd Tiny 2 und C922; die Tiny 2 wird so während einer Dauerbewegung ausgesteckt. Prüft: jede Anfrage beantwortet, kein 5xx; keine Antwort über 3 s; null «Neustarts» der Tiny-2-Attrappe; Totmann: Ist die Tiny 2 eingesteckt und läuft kein `move`, steht ihr Tempo spätestens 0,5 s + 0,35 s nach der letzten Antwort auf `move` auf 0 (Abfrage alle 50 ms), und der Dienst meldet mindestens einmal «(Totmann)»; Exit-Code 0. Ausgabe: Anzahl und Status je Art, Antwortzeiten (Median, p95, max), CPU des Dienstes in % eines Kerns (Mittel, Median, p95, max, aus `utime + stime` in `/proc/<pid>/stat`). Ohne `DSS_LASTPROBE=1` besteht der Testfall sofort (ohne `skipTest`, wie `chatLoad` in P13). **Ausnahme von der 3-s-Grenze:** Nach dem Einstecken wartet der Dienst absichtlich, bis die Kamera 3 s da ist (Plan 2.3 Regel 7, `devices.SETTLE_S`, Abfrage alle `POLL_INTERVAL_S` = 1 s). Anfragen an diese Kamera, die vorher gesendet werden, dürfen darum bis 3 s nach dem Ende dieser Wartezeit brauchen; die Ausgabe nennt sie getrennt. Alle anderen Anfragen haben die feste Grenze von 3 s.
+
+**Dienste:** `dss-core.service` war beim ersten Blick (nach dem `ctest` im Klon) `inactive` und ist es am Ende auch; den Zustand vor dem ersten Lauf hat der Agent nicht festgehalten. Die Einheit hat kein `[Install]` und läuft nur, solange ein Fenster sie gestartet hat; keine Prüfung hält sie an (die Dienstprüfung nutzt die eigene Einheit `dss-core-pruefung.service` und entfernt sie wieder). Am Ende kein Prozess `dss-*` und kein Kamera-Dienst aus den Tests.
+
+**Beobachtung:** Der Start des Fensters dauert jetzt im Median 478 ms (`app-sigterm`), in P13 waren es 243 ms. Kein Fehler und keine Grenze überschritten; Ursache nicht untersucht.
 
 ### Handtest-Liste für den Gerätetest
 

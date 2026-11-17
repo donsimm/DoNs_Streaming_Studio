@@ -90,6 +90,19 @@ def _read_node(node: Path) -> dict:
     return data
 
 
+def _write_node(node: Path, data: dict) -> None:
+    """Knotendatei ganz oder gar nicht ersetzen (Punkt 135).
+
+    `write_text` leert die Datei zuerst; liest der Test oder der Dienst genau dann, ist sie
+    leer (`JSONDecodeError` in `kd_presets`, 2 von 50 in der Prüfstufe «Baustein»). Daher
+    in eine Hilfsdatei daneben schreiben und mit `os.replace` (rename(2), atomar im selben
+    Ordner) tauschen. Die Gerätesuche liest `dev/` nicht, nur `by-id`.
+    """
+    tmp = node.with_name(f".{node.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(data), encoding="utf-8")
+    os.replace(tmp, node)
+
+
 def _controls(data: dict) -> list[v4l2.Control]:
     return [v4l2.Control(**{**control, "menu": {int(k): v for k, v in control.get("menu", {}).items()}})
             for control in data.get("controls", [])]
@@ -168,7 +181,7 @@ class FakeDevice:
         self._controls = {control.id: control for control in _controls(self._data)}
 
     def _save(self) -> None:
-        self._node.write_text(json.dumps(self._data), encoding="utf-8")
+        _write_node(self._node, self._data)
 
     def _tiny2(self) -> dict | None:
         """Zustand der Tiny 2 zur aktuellen Zeit (Wecken nach TINY2_WAKE_S fertig)."""
@@ -398,7 +411,7 @@ class FakeDeviceFolder:
             data["fehler"] = failure
         if tiny2:
             data["obsbot"] = tiny2_state()
-        (self.dev / node).write_text(json.dumps(data), encoding="utf-8")
+        _write_node(self.dev / node, data)
         interface = self.usb / port / f"{port}:1.0"
         interface.mkdir(parents=True, exist_ok=True)
         link = self.sysfs / node / "device"
@@ -425,7 +438,7 @@ class FakeDeviceFolder:
             if data.pop("values", None) is not None:
                 if "obsbot" in data:
                     data["obsbot"]["lage"] = tiny2_axes()
-                path.write_text(json.dumps(data), encoding="utf-8")
+                _write_node(path, data)
             link.symlink_to(os.path.relpath(path, self.by_id))
 
     def values(self, node: str) -> dict[int, int]:
@@ -446,7 +459,7 @@ class FakeDeviceFolder:
         path = self.dev / node
         data = json.loads(path.read_text(encoding="utf-8"))
         data["obsbot"].update(fields)
-        path.write_text(json.dumps(data), encoding="utf-8")
+        _write_node(path, data)
 
     def fail(self, node: str, failure: str | None) -> None:
         """Knoten unerreichbar machen (z. B. `"EPROTO"`, `"ETIMEDOUT"`) oder mit None wieder heilen."""
@@ -456,7 +469,7 @@ class FakeDeviceFolder:
             data["fehler"] = failure
         else:
             data.pop("fehler", None)
-        path.write_text(json.dumps(data), encoding="utf-8")
+        _write_node(path, data)
 
     def unplug(self, by_id_name: str) -> None:
         (self.by_id / by_id_name).unlink(missing_ok=True)
