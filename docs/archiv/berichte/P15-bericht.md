@@ -269,3 +269,45 @@ Ein Commit (Auftrag): Entscheide 9–14 des Nutzers und die Entscheide Lotse bet
 - Gelöschtes Preset: `404 not_found`; für die Prüfmeldung am Feld die Liste aus `camera_service`.
 - Fenstertest nach `tst_fensterkameras` (Dienst in der Attrappe, `FakeLights` aus `kameradiensthilfe.h`).
 - Neu seit e4: Lampen tragen `host` in `status`; `lights/check` liest ohne zu schalten (für f1 nicht nötig). Punkt 129: mehrere Anfragen an dieselbe Lampe kurz hintereinander können überholen; ein Schritt, der zwei Licht-Presets direkt nacheinander abruft, ist davon betroffen.
+
+## f1: Schritte «Kamera-Position» (`camera_preset`) und «Licht-Preset» (`light_preset`) (2026-11-17)
+
+Ein Commit (Auftrag).
+
+- **Geändert:**
+  - Typen und Ablauf (`dss_actions`): `src/actions/steptypes.{h,cpp}` (zwei Typen, Feld `preset`, anlegbar, ohne Nummer bei Streamer.bot), `src/actions/actionservices.h` (`PresetKind`, Schnittstelle `CameraControl`, `ActionServices::camera`), `src/actions/actionrun.cpp` (Abruf, Probelauf, «keine Position gewählt», «nicht verfügbar»).
+  - Kern: neu `src/core/cameraactions.{h,cpp}` (`CameraActions` über den Kamera-Client, feste Liste `checkCameraCall`, Fehler und `errors` der Lampen), `src/core/actionservice.{h,cpp}` (`Options::camera`), `src/core/main.cpp`, `src/core/CMakeLists.txt` (nur mit `DSS_CORE_CAMERA`).
+  - Fensterlogik: `src/common/actionview.{h,cpp}` (`ActionViewNames` mit Presets und `cameraUnavailable`, Kurzinhalt, Menü-Abschnitt «Kamera und Licht»), `src/common/actionfields.{h,cpp}` (Abschnitte, Auswahl `camera_preset`/`light_preset`, `setCameraNames`, `fieldInactiveReason`, `fieldNotice`).
+  - Fenster: `src/app/actionfieldspanel.{h,cpp}` (Grund aus der Logik ausgegraut mit Tooltip, Hinweis unter dem Abschnitt), `src/app/mainwindow.{h,cpp}` (Namen aus `camera_service`, Neuaufbau nur bei anderen Presets oder anderem Zustand).
+  - Tests: `tst_aktionsablauf` (`cameraSteps`, Probelauf), `tst_kernaktionen` (`cameraSteps` gegen den Dienst in der Attrappe mit zwei Attrappen-Lampen), `tst_aktionsfelder` (`cameraChoices`), `tst_aktionsformat` (22 Typen), `tst_aktionsansicht` (Menü, Kurzinhalt), `tst_fensterkameras` (`actionSteps` nach `serviceGone`), `tests/CMakeLists.txt`, `tests/daten/aktionen/vollstaendig.json` (beide Typen am Ende der Aktion «Alle Auslöser»).
+- **Geprüft (2026-11-17, Studio-PC, Stufe «Klein»; X11-Sitzung 1 aktiv, nicht gesperrt, `loginctl show-session 1`):** `scripts/bauen.sh` Bau ok, 0 Warnungen; `scripts/testen.sh -R '^(tst_aktionsablauf|tst_aktionsfelder|tst_aktionsformat|tst_aktionsansicht)$'` 4 von 4; `scripts/testen.sh --voll tst_kernaktionen` 14 von 14 Testfällen (`cameraSteps` grün, 17,7 s); `scripts/testen.sh --voll tst_fensterkameras` 15 bestanden, `picture` übersprungen (ohne `DSS_TEST_BILDER`); `scripts/testen.sh` 88 von 88 (454,75 s), nichts übersprungen. Bild `schritt-kamera.png` **nicht erzeugt** (Auftrag: Lotse). Nur gegen die Attrappe; an Kameras und Key Lights **nicht geprüft**. Stumm-Regel mit diesen Schritten **nicht eigens geprüft** (keine neue Logik, siehe unten).
+- **Handtest, prüft Lotse:**
+  - **Bild:** `DSS_TEST_BILDER=<ordner> scripts/testen.sh -R '^tst_fensterkameras$'`, Datei `schritt-kamera.png`: Reiter «Chat-Bot», «Aktionen», Aktion «DSS-Test Kamera» mit beiden Schritten in der Mitte (Kurzinhalte «Weit» und «Hell»), rechts «Schritt «Kamera-Position»» mit Auswahl «Weit». Grund: im Bau nicht angesehen.
+  - **Kamera und Lampen:** Aktion mit «Kamera-Position» und «Licht-Preset» im echten Lauf (nicht Probelauf) aus der Version in Arbeit, Tiny 2 im Schlaf; danach im Verlauf die Meldungen. Grund: echte Geräte, Wecken bis 10 s.
+- **Handtest, prüft der Nutzer:** kein Handtest nötig über das Bild hinaus; ob Abschnitt «Kamera und Licht» im Menü «Schritt hinzufügen» und der Hinweistext passen, sieht Lotse im Bild.
+- **Nicht erledigt, `[OFFEN]`:**
+  - Feld `wait` weggelassen: `POST camera-presets/<id>/recall` antwortet, sobald das Ziel gesetzt ist; der Dienst meldet das Ende der Bewegung nicht (`kamera-dienst/dss_camera/motion.py`, `_goto`). Dafür bräuchte der Dienst eine Rückmeldung (Position lesen, bis sie steht).
+  - «Ausgegraut mit Hinweis wie andere Schritte mit fehlender Verbindung (Twitch, OBS)»: Ein solches Muster gibt es im Panel noch nicht (Twitch-Schritte sind ohne Verbindung bedienbar und melden erst im Lauf, OBS-Schritte sind nicht anlegbar). Umgesetzt mit den vorhandenen Mitteln: ausgegraut wie «weich» (Tooltip mit Grund) und derselbe Grund in der Prüfmeldungszeile unter dem Abschnitt.
+  - Befund in `tst_fensterkameras::serviceGone` (aus e4, nicht von f1): Mit der langen Meldung braucht die Seite «Kameras» 1294 px Mindestbreite (`page()->minimumSizeHint()`), das Fenster meldet aber 1084, weil sein Layout nicht neu gerechnet wird; nach einem Wechsel in einen anderen Reiter und zurück meldet es 1302 (> 1280), die Prüfung scheitert dann. Darum steht `actionSteps` nach `serviceGone`. Die Kopfzeile sollte bei langen Meldungen nicht über 1280 gehen; nicht angefasst (ausserhalb des Auftrags).
+  - Punkt 129 nicht angefasst (f2).
+  - Die Datei `build/scratch-f1-teil.txt` (versehentlich angelegt, ohne Inhalt von Belang) blieb liegen; Löschen nicht freigegeben.
+  - `ui-consistency:verifying` nicht gelaufen (nicht im Auftrag); die Felder folgen dem bestehenden Muster des Panels.
+- **Annahmen, Interna-Entscheide:**
+  - Schritt ohne Nummer bei Streamer.bot (`sbType` 0), Teil P14-1 (läuft und ist anlegbar), eigener Menü-Abschnitt «Kamera und Licht» nach «Overlay und Ton».
+  - Fehler im Lauf: Dienst aus («Kamera-Dienst ist aus.»), ohne Antwort (Meldung des Clients), Status ≥ 400 mit der Meldung des Dienstes (`cameraResultError`), Licht mit `errors` bei 200 als Fehler mit allen Meldungen (die anderen Lampen sind gesetzt). Der Lauf geht immer weiter und endet wie bei anderen Schritten als «Fehler» mit der ersten Meldung. Kern ohne `DSS_CORE_CAMERA`: «nicht verfügbar».
+  - Protokoll des Kerns ohne Inhalt: «Aktionen: Kamera-Dienst: <Methode> <Pfad>: <Status> <Code>» bzw. «… n Meldungen».
+  - Wartezeit: die des Kamera-Clients (15 s je Anfrage, wegen Wecken der Tiny 2); der Lauf wartet so lange auf den Schritt.
+  - Probelauf: «Probelauf: würde Position «<Name>» abrufen» bzw. «… Licht-Preset «<Name>» …», Name aus dem letzten Stand des Dienstes im Kern, sonst die Kennung.
+  - Stumm-Regel: keine neue Logik nötig. Ein stummer Kern startet keine Läufe aus Ereignissen, Befehlen und Zeitnachrichten und weist echte Testläufe ab (`ActionService`, Plan P14 3.4); Probeläufe rufen nichts ab.
+  - Auswahl im Fenster: Einträge nach Name, «Keine» vorne; gelöschte Kennung als «<Kennung> (fehlt)» mit Hinweis «Position «x» gibt es im Kamera-Dienst nicht mehr.»; ohne verbundenen Dienst Feld ausgegraut, Kennung ohne «(fehlt)», Grund «Kamera-Dienst nicht verbunden: Auswahl erst möglich, wenn er antwortet.» als Tooltip und unter dem Abschnitt. Kurzinhalt in der Mitte: Name in Guillemets, sonst die Kennung.
+  - Das Fenster baut die Aktion nur neu auf, wenn sich Presets oder Verbindungszustand ändern (`camera_service` kommt auch beim Bewegen).
+- **Quellen:** `docs/09-kamera-dienst.md` («Kamera-Presets», «Licht-Presets», «Fehlercodes»); `kamera-dienst/dss_camera/presets.py` (`recall`, `not_found`), `lights.py` (`recall`, `errors`), `motion.py` (`goto`, `_goto`); Plan `docs/archiv/prompts/P15-kamera.md` Abschnitt 9 und 11 f; Checkliste `docs/archiv/prompts/P15-e-checkliste.md` Abschnitt 4 (Entscheide 6 und 7).
+
+### Für den nächsten Abschnitt (f2: Dokumente, Bericht, Punkt 129)
+- `docs/03` braucht die Schritte «Kamera-Position» und «Licht-Preset» im neuen Abschnitt «Kameras und Licht» (Felder, Probelauf, Fehler im Verlauf, kein `wake`, kein `wait`).
+- `docs/08`: keine neue Nachricht; die Schritte laufen im Kern über den Kamera-Client (`CameraActions`), nicht über `camera_call`.
+- `docs/04`: neuer Punkt «Warten, bis die Bewegung fertig ist» (Dienst müsste das Ende melden); Befund Mindestbreite der Kopfzeile «Kameras» bei langer Meldung (1294 px, siehe f1 `[OFFEN]`).
+- `docs/05`: keine neue externe Quelle aus f1.
+- Punkt 129 betrifft jetzt auch Aktionen: Zwei Schritte «Licht-Preset» direkt nacheinander gehen ohne Pause an den Dienst.
+- `tests/daten/aktionen/vollstaendig.json` enthält beide Typen; neue Typen dort ergänzen, sonst scheitert `tst_aktionsformat::typeTables`.
+- Prüfung f: Stufe «Baustein» (frischer Klon, `startpruefung.py`, `dienstpruefung.py`).

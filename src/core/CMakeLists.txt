@@ -52,6 +52,8 @@ endif()
 if(DSS_CORE_CAMERA)
   target_link_libraries(dss-core PRIVATE dss_camera)
   target_compile_definitions(dss-core PRIVATE DSS_CORE_CAMERA=1)
+  # P15 f1: Schritte «Kamera-Position» und «Licht-Preset» des Aktionssystems
+  target_sources(dss-core PRIVATE cameraactions.h cameraactions.cpp)
 else()
   target_compile_definitions(dss-core PRIVATE DSS_CORE_CAMERA=0)
 endif()

@@ -239,7 +239,7 @@ private slots:
             stepKeys.insert(t.key);
             QVERIFY(!t.label.isEmpty());
         }
-        QCOMPARE(stepKeys.size(), 20);
+        QCOMPARE(stepKeys.size(), 22);
         // Nummern aus Plan 2.4
         const QList<std::pair<QString, int>> numbers{
             {QStringLiteral("comment"), 1009}, {QStringLiteral("group"), 99900}, {QStringLiteral("if"), 120},
@@ -257,6 +257,13 @@ private slots:
         QCOMPARE(stepType(QStringLiteral("script"))->part, StepPart::Never);
         QVERIFY(!stepType(QStringLiteral("unsupported"))->creatable);
         QCOMPARE(stepType(QStringLiteral("obs_source_visible"))->part, StepPart::P14_2);
+        // P15 f1: ohne Entsprechung bei Streamer.bot, im Editor anlegbar, nur das Feld preset
+        for (const char *key : {"camera_preset", "light_preset"}) {
+            const StepTypeInfo *t = stepType(QString::fromLatin1(key));
+            QVERIFY2(t && t->creatable && t->part == StepPart::P14_1 && t->sbType == 0, key);
+            QCOMPARE(t->fields.size(), 1);
+            QCOMPARE(t->fields[0].name, QStringLiteral("preset"));
+        }
         QVERIFY(stepType(QStringLiteral("gibt-es-nicht")) == nullptr);
 
         QSet<QString> triggerKeys;

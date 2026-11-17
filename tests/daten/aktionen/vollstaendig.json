@@ -119,7 +119,11 @@
                 { "id": "a5000000-0000-4000-8000-000000000042", "type": "script", "enabled": true, "weight": 0,
                   "language": "csharp", "code": "public class CPHInline { }" },
                 { "id": "a5000000-0000-4000-8000-000000000043", "type": "unsupported", "enabled": false, "weight": 0,
-                  "sb_type": 16, "original": { "type": 16, "gameName": "Beispiel", "index": 3 } }
+                  "sb_type": 16, "original": { "type": 16, "gameName": "Beispiel", "index": 3 } },
+                { "id": "a5000000-0000-4000-8000-000000000044", "type": "camera_preset", "enabled": true, "weight": 0,
+                  "preset": "totale" },
+                { "id": "a5000000-0000-4000-8000-000000000045", "type": "light_preset", "enabled": true, "weight": 0,
+                  "preset": "stream" }
             ]
         }
     ],

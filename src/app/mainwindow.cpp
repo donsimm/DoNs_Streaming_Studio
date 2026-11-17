@@ -623,6 +623,16 @@ void MainWindow::connectActions()
 {
     ActionsPage *page = m_chatBot->actionsPage();
     connect(m_client, &dss::CoreClient::actionsConfigChanged, this, &MainWindow::refreshActionList);
+    // P15 f1: Presets oder Zustand des Kamera-Dienstes geändert (Kurzinhalte, Auswahl rechts); der
+    // Stand ändert sich auch beim Bewegen, darum nur bei anderen Namen
+    connect(m_client, &dss::CoreClient::cameraServiceChanged, this, [this] {
+        dss::ActionViewNames names;
+        dss::setCameraNames(&names, m_client->cameraService());
+        if (names == m_actionCameraNames)
+            return;
+        m_actionCameraNames = names;
+        refreshActionDetail();
+    });
     connect(page, &ActionsPage::searchChanged, this, &MainWindow::refreshActionList);
     connect(page, &ActionsPage::actionSelected, this, &MainWindow::refreshActionButtons);
     connect(page, &ActionsPage::actionEnabledToggled, this, [this](const QUuid &id, bool enabled) {
@@ -903,6 +913,8 @@ dss::ActionViewNames MainWindow::actionViewNames() const
                 names.sources.insert(source.id, source.name);
         }
     }
+    // P15 f1: Positionen und Licht-Presets des Kamera-Dienstes
+    dss::setCameraNames(&names, m_client->cameraService());
     return names;
 }
 

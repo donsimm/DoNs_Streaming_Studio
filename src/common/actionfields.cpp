@@ -4,6 +4,9 @@
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <QJsonArray>
+#include <QJsonObject>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -181,6 +184,13 @@ QList<FieldSection> sectionsFor(const QString &type)
                       {{QStringLiteral("on"), QStringLiteral("ein")},
                        {QStringLiteral("off"), QStringLiteral("aus")},
                        {QStringLiteral("toggle"), QStringLiteral("umschalten")}})}}};
+    // P15 f1: Auswahl aus den Presets des Kamera-Dienstes («Positionen», Entscheid 7)
+    if (type == QLatin1String(kStepCameraPreset))
+        return {{QStringLiteral("Kamera-Position"),
+                 {row(QStringLiteral("preset"), QStringLiteral("Position"), {}, {}, QStringLiteral("camera_preset"))}}};
+    if (type == QLatin1String(kStepLightPreset))
+        return {{QStringLiteral("Licht-Preset"),
+                 {row(QStringLiteral("preset"), QStringLiteral("Licht-Preset"), {}, {}, QStringLiteral("light_preset"))}}};
     if (type == QLatin1String(kStepScript))
         return {{QStringLiteral("Skript"),
                  {row(QStringLiteral("language"), QStringLiteral("Sprache")),
@@ -241,6 +251,16 @@ QList<FieldSection> triggerSectionsFor(const QString &type)
     if (type == QLatin1String(kTriggerTest))
         return {{QStringLiteral("Testwerte"), {row(QStringLiteral("variables"), QStringLiteral("Testwerte"))}}};
     return {}; // Chat-Nachricht, Erste Nachricht, Follow, Stream offline: keine Filter
+}
+
+// P15 f1: Presets des Kamera-Dienstes zur Auswahl camera_preset bzw. light_preset; sonst nullptr
+const QHash<QString, QString> *cameraPresets(const QString &choices, const ActionViewNames &names)
+{
+    if (choices == QLatin1String("camera_preset"))
+        return &names.cameraPresets;
+    if (choices == QLatin1String("light_preset"))
+        return &names.lightPresets;
+    return nullptr;
 }
 
 // Art und Grenzen der Zeilen aus der Feldbeschreibung; Grenzen als angezeigter Wert
@@ -341,7 +361,12 @@ QList<FieldChoice> fieldChoices(const QString &choices, const ActionsConfig &con
     const auto add = [&entries](const QUuid &id, const QString &label) {
         entries.append({id.toString(QUuid::WithoutBraces), label});
     };
-    if (choices == QLatin1String("overlay")) {
+    const QHash<QString, QString> *presets = cameraPresets(choices, names);
+    if (presets) {
+        // Kennungen des Dienstes sind schon klein geschrieben (kamera-dienst/dss_camera/presets.py)
+        for (auto it = presets->cbegin(); it != presets->cend(); ++it)
+            entries.append({it.key().toLower(), it.value()});
+    } else if (choices == QLatin1String("overlay")) {
         for (auto it = names.overlays.cbegin(); it != names.overlays.cend(); ++it)
             add(it.key(), it.value());
     } else if (choices == QLatin1String("source")) {
@@ -371,8 +396,52 @@ QList<FieldChoice> fieldChoices(const QString &choices, const ActionsConfig &con
     const QString wanted = current.toLower();
     if (!wanted.isEmpty()
         && std::none_of(entries.cbegin(), entries.cend(), [&](const FieldChoice &e) { return e.value == wanted; }))
-        entries.append({wanted, QStringLiteral("%1 (fehlt)").arg(wanted)});
+        entries.append({wanted, presets && !names.cameraUnavailable.isEmpty()
+                                    ? wanted
+                                    : QStringLiteral("%1 (fehlt)").arg(wanted)});
     return entries;
+}
+
+void setCameraNames(ActionViewNames *names, const std::optional<CameraServiceInfo> &info)
+{
+    names->cameraPresets.clear();
+    names->lightPresets.clear();
+    names->cameraUnavailable.clear();
+    if (!info || info->state != QLatin1String(kCameraStateConnected)) {
+        names->cameraUnavailable = QStringLiteral("Kamera-Dienst nicht verbunden: Auswahl erst möglich, wenn er antwortet.");
+        return;
+    }
+    const auto fill = [&info](const char *key, QHash<QString, QString> *target) {
+        for (const QJsonValue &v : info->status.value(QLatin1String(key)).toArray()) {
+            const QJsonObject o = v.toObject();
+            const QString id = o.value(QLatin1String("id")).toString();
+            if (!id.isEmpty())
+                target->insert(id, o.value(QLatin1String("name")).toString());
+        }
+    };
+    fill("camera_presets", &names->cameraPresets);
+    fill("light_presets", &names->lightPresets);
+}
+
+QString fieldInactiveReason(const FieldRow &row, const ActionViewNames &names)
+{
+    if (!row.inactiveReason.isEmpty())
+        return row.inactiveReason;
+    return cameraPresets(row.choices, names) ? names.cameraUnavailable : QString();
+}
+
+QString fieldNotice(const FieldRow &row, const QJsonValue &value, const ActionViewNames &names)
+{
+    const QHash<QString, QString> *presets = cameraPresets(row.choices, names);
+    if (!presets)
+        return {};
+    if (!names.cameraUnavailable.isEmpty())
+        return names.cameraUnavailable;
+    const QString id = value.toString();
+    if (id.isEmpty() || presets->contains(id))
+        return {};
+    return QStringLiteral("%1 «%2» gibt es im Kamera-Dienst nicht mehr.")
+        .arg(row.choices == QLatin1String("light_preset") ? QStringLiteral("Licht-Preset") : QStringLiteral("Position"), id);
 }
 
 QString fieldSection(const QList<FieldSection> &form, const QString &fieldName)

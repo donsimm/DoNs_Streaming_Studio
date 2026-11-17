@@ -341,6 +341,8 @@ private:
     // Schritte und Auslöser wählen); nach dem Löschen «Gelöscht: <Name>»
     ActionsPage::Section m_actionEditSection = ActionsPage::NoSection;
     bool m_actionEditDeleted = false;
+    // P15 f1: zuletzt gezeigte Namen des Kamera-Dienstes (nur cameraPresets, lightPresets, cameraUnavailable)
+    dss::ActionViewNames m_actionCameraNames;
     qint64 m_actionTestRequest = 0;     // offene Anfrage action_test
     QString m_actionTestName;
     bool m_actionTestReal = false;

@@ -459,6 +459,13 @@ if(DSS_BUILD_CLI AND DSS_CORE_CAMERA)
   add_dependencies(tst_kernkamera dss-core dss-cli)
   set_tests_properties(tst_kernkamera PROPERTIES TIMEOUT 180)
 endif()
+# P15 f1: Schritte «Kamera-Position» und «Licht-Preset» im Kern gegen den Dienst in der Attrappe
+if(TARGET tst_kernaktionen AND DSS_CORE_CAMERA)
+  target_sources(tst_kernaktionen PRIVATE kameradiensthilfe.h)
+  target_link_libraries(tst_kernaktionen PRIVATE Qt6::Network)
+  target_compile_definitions(tst_kernaktionen PRIVATE DSS_PYTHON3="${DSS_PYTHON3}"
+    DSS_CAMERA_SERVICE_DIR="${PROJECT_SOURCE_DIR}/kamera-dienst")
+endif()
 # P15 e2: Reiter «Kameras» im echten Fenster (MainWindow) mit eigenem dss-core gegen den Dienst in
 # der Attrappe, in der X11-Sitzung; ohne X11 übersprungen (77). Seit e3 mit Attrappen-Lampen
 # (FakeLight). Mit DSS_TEST_BILDER (Ordnerpfad) fünf Bilder kameras-e3*.png.

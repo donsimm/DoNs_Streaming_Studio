@@ -83,6 +83,14 @@ struct ActionViewNames
     QHash<QUuid, QString> overlays;
     QHash<QUuid, QString> sources;
     QHash<QString, QString> media; // Verweis «media/…» → Name der Datei
+    // P15 f1: Positionen und Licht-Presets des Kamera-Dienstes (Kennung → Name), aus camera_service
+    // (setCameraNames in actionfields.h)
+    QHash<QString, QString> cameraPresets;
+    QHash<QString, QString> lightPresets;
+    // Leer = Kamera-Dienst verbunden; sonst der Hinweis, warum die Auswahl gesperrt ist
+    QString cameraUnavailable;
+
+    bool operator==(const ActionViewNames &) const = default;
 };
 
 // Dauer für Kurzinhalte: «500 ms», «1.5 s», «10 s», «20 min»

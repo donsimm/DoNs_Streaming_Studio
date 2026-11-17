@@ -1115,6 +1115,15 @@ QString stepSummary(const Step &step, const ActionsConfig &config, const ActionV
                  : state == QLatin1String("toggle") ? QStringLiteral("umschalten")
                                                     : QStringLiteral("ein"));
     }
+    // P15 f1: Name laut Kamera-Dienst, sonst die Kennung
+    if (type == QLatin1String(kStepCameraPreset) || type == QLatin1String(kStepLightPreset)) {
+        const bool light = type == QLatin1String(kStepLightPreset);
+        const QString id = text(f, "preset");
+        if (id.isEmpty())
+            return light ? QStringLiteral("kein Licht-Preset gewählt") : QStringLiteral("keine Position gewählt");
+        const QString name = (light ? names.lightPresets : names.cameraPresets).value(id);
+        return quoted(name.isEmpty() ? id : name);
+    }
     if (type == QLatin1String(kStepScript))
         return text(f, "language");
     return QString(); // Dann, Sonst, nicht unterstützt (Typ steht in der Bezeichnung)
@@ -1137,6 +1146,8 @@ QList<TypeChoice> stepChoices()
           QString::fromLatin1(kStepTwitchShoutout), QString::fromLatin1(kStepTwitchAnnounce)}},
         {QStringLiteral("Overlay und Ton"),
          {QString::fromLatin1(kStepOverlaySource), QString::fromLatin1(kStepPlaySound)}},
+        {QStringLiteral("Kamera und Licht"),
+         {QString::fromLatin1(kStepCameraPreset), QString::fromLatin1(kStepLightPreset)}},
         {QStringLiteral("Ablauf"),
          {QString::fromLatin1(kStepDelay), QString::fromLatin1(kStepIf), QString::fromLatin1(kStepGroup),
           QString::fromLatin1(kStepRunAction), QString::fromLatin1(kStepBreak), QString::fromLatin1(kStepComment)}},

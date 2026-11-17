@@ -49,6 +49,8 @@ inline constexpr char kStepTwitchAnnounce[] = "twitch_announce";
 inline constexpr char kStepPlaySound[] = "play_sound";
 inline constexpr char kStepOverlaySource[] = "overlay_source";
 inline constexpr char kStepObsSourceVisible[] = "obs_source_visible";
+inline constexpr char kStepCameraPreset[] = "camera_preset"; // P15 f1
+inline constexpr char kStepLightPreset[] = "light_preset";   // P15 f1
 inline constexpr char kStepScript[] = "script";
 inline constexpr char kStepUnsupported[] = "unsupported";
 

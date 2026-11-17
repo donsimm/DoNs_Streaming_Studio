@@ -19,9 +19,24 @@ namespace {
 using FakeClock = FakeActionClock;
 
 // Ersatz für alle Dienste nach aussen. sync: Rückruf im Aufruf selbst, sonst in pending.
-class FakeServices : public ChatSender, public TwitchApi, public ObsControl, public SoundPlayer, public OverlayLive
+class FakeServices : public ChatSender,
+                     public TwitchApi,
+                     public ObsControl,
+                     public SoundPlayer,
+                     public OverlayLive,
+                     public CameraControl
 {
 public:
+    // P15 f1: Abruf mit Ergebnis aus presetResults (Kennung → Ergebnis), sonst ok
+    void recallPreset(PresetKind kind, const QString &presetId, StepDone done) override
+    {
+        recalls.append({kind, presetId});
+        answer(std::move(done), presetResults.value(presetId));
+    }
+    QString presetName(PresetKind kind, const QString &presetId) const override
+    {
+        return kind == PresetKind::Camera && presetId == QLatin1String("totale") ? QStringLiteral("Totale") : QString();
+    }
     void sendChat(const ChatRequest &request, StepDone done) override
     {
         chats.append(request);
@@ -59,7 +74,7 @@ public:
         answer(std::move(done), {});
     }
 
-    ActionServices services() { return {this, this, this, this, this}; }
+    ActionServices services() { return {this, this, this, this, this, this}; }
     QStringList chatTexts() const
     {
         QStringList t;
@@ -79,6 +94,8 @@ public:
     QList<SoundRequest> sounds;
     QList<QUuid> stoppedRuns;
     QList<OverlayRequest> overlays;
+    QList<std::pair<PresetKind, QString>> recalls;
+    QHash<QString, StepResult> presetResults;
 
 private:
     void answer(StepDone done, const StepResult &result)
@@ -791,6 +808,8 @@ private slots:
                                      mk(kStepTwitchShoutout, {{"login", "%targetUser%"}}),
                                      mk(kStepTwitchAnnounce, {{"text", "Ansage"}}),
                                      mk(kStepObsSourceVisible, {{"scene_name", "test 2"}, {"source_name", "Quelle"}}),
+                                     mk(kStepCameraPreset, {{"preset", "totale"}}),
+                                     mk(kStepLightPreset, {{"preset", "stream"}}),
                                      mk(kStepPlaySound, {{"file", "media/ton.mp3"}}), overlay,
                                      mk(kStepGlobalSet, {{"name", "zaehler"}, {"operation", "increment"}, {"value", "1"}}),
                                      mk(kStepGlobalGet, {{"name", "zaehler"}, {"destination", "z"}}),
@@ -805,6 +824,7 @@ private slots:
         QVERIFY(env.services.shoutouts.isEmpty());
         QVERIFY(env.services.announces.isEmpty());
         QVERIFY(env.services.obs.isEmpty());
+        QVERIFY(env.services.recalls.isEmpty());
         QCOMPARE(env.services.userInfos, QStringList{QStringLiteral("ziel")});
         QCOMPARE(env.services.sounds.size(), 1);
         QCOMPARE(env.services.overlays.size(), 1);
@@ -812,12 +832,58 @@ private slots:
                  (QStringList{QStringLiteral("Probelauf: würde senden als Bot: Hallo Ziel"),
                               QStringLiteral("Probelauf: würde Shoutout geben für Ziel"),
                               QStringLiteral("Probelauf: würde Ansage senden: Ansage"),
-                              QStringLiteral("Probelauf: würde OBS-Quelle Quelle in test 2 schalten: on")}));
+                              QStringLiteral("Probelauf: würde OBS-Quelle Quelle in test 2 schalten: on"),
+                              // P15 f1: Name laut Dienst, sonst die Kennung
+                              QStringLiteral("Probelauf: würde Position «Totale» abrufen"),
+                              QStringLiteral("Probelauf: würde Licht-Preset «stream» abrufen")}));
         // echte Variable unverändert, im Probelauf erhöht
         QCOMPARE(env.variables.value({VariableScope::Global, QString(), QStringLiteral("zaehler"), true}).value_or(QJsonValue()),
                  QJsonValue(5));
         QVERIFY(!env.variables.changed());
         QCOMPARE(finished, 1);
+    }
+
+    // P15 f1: Kamera-Position und Licht-Preset echt; Fehler des Dienstes im Verlauf, der Lauf geht
+    // weiter und endet als Fehler; ohne Auswahl bzw. ohne Dienst kein Abruf
+    void cameraSteps()
+    {
+        Env env;
+        env.services.sync = false;
+        env.services.presetResults.insert(QStringLiteral("weg"),
+                                          StepResult::failure(QStringLiteral("Kamera-Preset «weg» gibt es nicht.")));
+        env.services.presetResults.insert(QStringLiteral("stream"),
+                                          StepResult::failure(QStringLiteral("Lampe «links» antwortet nicht.")));
+        const QUuid a = env.add(act(QStringLiteral("Kamera"),
+                                    {mk(kStepCameraPreset, {{"preset", "totale"}}), mk(kStepCameraPreset, {{"preset", "weg"}}),
+                                     mk(kStepLightPreset, {{"preset", "stream"}}), mk(kStepCameraPreset),
+                                     mk(kStepLightPreset, {{"preset", " "}}), chat(QStringLiteral("weiter"))}));
+        const QUuid run = env.run(a);
+        // Wartet auf die Antwort des Dienstes, Schritt für Schritt (drei Abrufe, dann der Chat)
+        for (int i = 0; i < 4; ++i) {
+            QCOMPARE(env.state(run), RunState::Running);
+            QCOMPARE(env.services.pending.size(), 1);
+            QCOMPARE(env.services.recalls.size(), qMin(i + 1, 3));
+            env.services.pending.takeFirst()({});
+        }
+        const RunRecord r = env.rec(run);
+        QCOMPARE(r.state, RunState::Error);
+        QCOMPARE(r.message, QStringLiteral("Kamera-Preset «weg» gibt es nicht."));
+        QCOMPARE(env.services.recalls,
+                 (QList<std::pair<PresetKind, QString>>{{PresetKind::Camera, QStringLiteral("totale")},
+                                                        {PresetKind::Camera, QStringLiteral("weg")},
+                                                        {PresetKind::Light, QStringLiteral("stream")}}));
+        QCOMPARE(messages(r, StepLogEntry::Result::Error),
+                 (QStringList{QStringLiteral("Kamera-Preset «weg» gibt es nicht."),
+                              QStringLiteral("Lampe «links» antwortet nicht."), QStringLiteral("keine Position gewählt"),
+                              QStringLiteral("kein Licht-Preset gewählt")}));
+        QCOMPARE(env.services.chatTexts(), QStringList{QStringLiteral("weiter")});
+
+        // Kern ohne Kamera-Dienst: «nicht verfügbar», im Probelauf die Kennung
+        env.engine.setServices({});
+        const QUuid none = env.add(act(QStringLiteral("Ohne Dienst"), {mk(kStepCameraPreset, {{"preset", "totale"}})}));
+        QCOMPARE(messages(env.rec(env.run(none)), StepLogEntry::Result::Error), QStringList{QStringLiteral("nicht verfügbar")});
+        QCOMPARE(messages(env.rec(env.run(none, {}, true)), StepLogEntry::Result::DryRun),
+                 QStringList{QStringLiteral("Probelauf: würde Position «totale» abrufen")});
     }
 
     // Dienste: Rückruf im Aufruf oder später, doppelter Rückruf ignoriert, Argumente aus dem Ergebnis

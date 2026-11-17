@@ -295,6 +295,7 @@ ActionService::ActionService(dss::events::EventBus *bus, const Options &options,
     services.twitch = m_twitch.get();
     services.sound = m_sound.get();
     services.overlay = m_overlay.get();
+    services.camera = options.camera;
     m_engine->setServices(services);
     m_chat->setResultHandler([this](const dss::actions::ChatOutcome &outcome) { publishChat(outcome); });
     m_engine->setBaseArguments([this] {

@@ -32,6 +32,7 @@
 #include "twitchservice.h"
 #endif
 #if DSS_CORE_CAMERA
+#include "cameraactions.h"
 #include "cameraserviceclient.h"
 #endif
 #include "systemdnotify.h"
@@ -383,6 +384,11 @@ int main(int argc, char *argv[])
     actionOptions.templateCreated = [&service] { service.createChatBotOverlay(); };
 #if DSS_CORE_AUDIO
     actionOptions.actionSound = [&service] { return service.actionSound(); };
+#endif
+#if DSS_CORE_CAMERA
+    // P15 f1: Kamera-Position und Licht-Preset; nach cameraService angelegt, also vor ihm zerstört
+    CameraActions cameraActions(&cameraService);
+    actionOptions.camera = &cameraActions;
 #endif
     ActionService actions(service.eventBus(), actionOptions);
     actions.load();

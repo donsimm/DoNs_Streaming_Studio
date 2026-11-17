@@ -9,6 +9,8 @@
 #include "steptypes.h"
 #include "triggertypes.h"
 
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QSet>
 #include <QTest>
 
@@ -65,6 +67,7 @@ private slots:
     void inactiveRows();
     void listenButton();
     void choicesFromData();
+    void cameraChoices();
 };
 
 void TestActionFields::everyFieldOnce_data()
@@ -570,6 +573,68 @@ void TestActionFields::choicesFromData()
     // Ohne Kennungen keine Auswahl
     QVERIFY(fieldChoices(QStringLiteral("media"), config, names, QString()).isEmpty());
     QVERIFY(fieldChoices(QString(), config, names, QString()).isEmpty());
+}
+
+// P15 f1: Auswahl aus den Presets des Kamera-Dienstes, gesperrt ohne Dienst, Hinweis bei fehlender Kennung
+void TestActionFields::cameraChoices()
+{
+    const QList<FieldSection> camera = stepForm(QStringLiteral("camera_preset"));
+    QCOMPARE(sectionTitles(camera), QStringList{QStringLiteral("Kamera-Position")});
+    const FieldRow position = camera[0].rows[0];
+    QCOMPARE(position.label, QStringLiteral("Position"));
+    QCOMPARE(position.choices, QStringLiteral("camera_preset"));
+    const QList<FieldSection> light = stepForm(QStringLiteral("light_preset"));
+    QCOMPARE(sectionTitles(light), QStringList{QStringLiteral("Licht-Preset")});
+    const FieldRow lightRow = light[0].rows[0];
+    QCOMPARE(lightRow.choices, QStringLiteral("light_preset"));
+
+    // Stand von camera_service wie im Kern (status mit id und name)
+    CameraServiceInfo info;
+    info.state = QString::fromLatin1(kCameraStateConnected);
+    info.status = QJsonObject{
+        {QStringLiteral("camera_presets"),
+         QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("totale")}, {QStringLiteral("name"), QStringLiteral("Totale")}},
+                    QJsonObject{{QStringLiteral("id"), QStringLiteral("nah")}, {QStringLiteral("name"), QStringLiteral("Nah")}}}},
+        {QStringLiteral("light_presets"),
+         QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("stream")}, {QStringLiteral("name"), QStringLiteral("Stream")}}}}};
+    ActionViewNames names;
+    setCameraNames(&names, info);
+    QVERIFY(names.cameraUnavailable.isEmpty());
+    QCOMPARE(names.cameraPresets.size(), 2);
+    const ActionsConfig config;
+    const QList<FieldChoice> positions = fieldChoices(position.choices, config, names, QString());
+    QCOMPARE(positions, (QList<FieldChoice>{{QString(), QStringLiteral("Keine")},
+                                            {QStringLiteral("nah"), QStringLiteral("Nah")},
+                                            {QStringLiteral("totale"), QStringLiteral("Totale")}}));
+    QCOMPARE(fieldChoices(lightRow.choices, config, names, QStringLiteral("stream")).size(), 2);
+    QVERIFY(fieldInactiveReason(position, names).isEmpty());
+    QVERIFY(fieldNotice(position, QStringLiteral("totale"), names).isEmpty());
+    QVERIFY(fieldNotice(position, QString(), names).isEmpty());
+    // Gelöschte Position: «(fehlt)» in der Auswahl und Hinweis am Feld
+    QCOMPARE(fieldChoices(position.choices, config, names, QStringLiteral("weg")).last(),
+             (FieldChoice{QStringLiteral("weg"), QStringLiteral("weg (fehlt)")}));
+    QCOMPARE(fieldNotice(position, QStringLiteral("weg"), names),
+             QStringLiteral("Position «weg» gibt es im Kamera-Dienst nicht mehr."));
+    QCOMPARE(fieldNotice(lightRow, QStringLiteral("abend"), names),
+             QStringLiteral("Licht-Preset «abend» gibt es im Kamera-Dienst nicht mehr."));
+
+    // Dienst nicht verbunden (auch ohne Kern): gesperrt mit Grund, Kennung ohne «(fehlt)»
+    for (const std::optional<CameraServiceInfo> &other :
+         {std::optional<CameraServiceInfo>(), std::optional<CameraServiceInfo>(CameraServiceInfo{
+                                                 QString::fromLatin1(kCameraStateError), QStringLiteral("weg"), info.status})}) {
+        setCameraNames(&names, other);
+        QVERIFY(names.cameraPresets.isEmpty() && names.lightPresets.isEmpty());
+        QVERIFY(!names.cameraUnavailable.isEmpty());
+        QVERIFY(!names.cameraUnavailable.contains(QChar(0x00DF)));
+        QCOMPARE(fieldInactiveReason(position, names), names.cameraUnavailable);
+        QCOMPARE(fieldNotice(lightRow, QStringLiteral("stream"), names), names.cameraUnavailable);
+        QCOMPARE(fieldChoices(position.choices, config, names, QStringLiteral("totale")).last(),
+                 (FieldChoice{QStringLiteral("totale"), QStringLiteral("totale")}));
+    }
+    // Andere Felder hängen nicht vom Dienst ab
+    const FieldRow overlay = stepForm(QStringLiteral("overlay_source"))[0].rows[0];
+    QVERIFY(fieldInactiveReason(overlay, names).isEmpty());
+    QVERIFY(fieldNotice(overlay, QStringLiteral("x"), names).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestActionFields)

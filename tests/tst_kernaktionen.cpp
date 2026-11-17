@@ -8,9 +8,14 @@
 // P14 c2 (Plan 4.3, 4.4): «Ton abspielen» über den Zweck «aktionen» mit dem Ersatzausgang
 // (--ersatzausgang, ohne Gerät; tests/daten/ton/ton-piep.wav, 1 s) und «Overlay-Element zeigen/
 // verstecken» über den Laufzustand des Kerns (overlay_live), Overlay-Datei bleibt unverändert.
+//
+// P15 f1: «Kamera-Position» und «Licht-Preset» gegen den Kamera-Dienst in der Attrappe
+// (kameradiensthilfe.h), nur mit DSS_CORE_CAMERA.
 
 #include "actionjson.h"
 #include "actionprotocol.h"
+#include "cameraprotocol.h"
+#include "cameraview.h"
 #include "coreclient.h"
 #include "coresettings.h"
 #include "eventbus.h"
@@ -35,6 +40,10 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+
+#ifdef DSS_CAMERA_SERVICE_DIR
+#include "kameradiensthilfe.h"
+#endif
 
 using namespace dss;
 using namespace dss::actions;
@@ -253,12 +262,14 @@ private:
         QString log;
     };
 
-    Core start(const QString &dataDir, const QString &name, const QStringList &extra = {})
+    // configHome leer: eigener Ordner der Einstellungen (testConfigHome)
+    Core start(const QString &dataDir, const QString &name, const QStringList &extra = {},
+               const QString &configHome = QString())
     {
         Core c;
         c.socket = m_run->path() + QLatin1Char('/') + name + QStringLiteral(".sock");
         writeEmptyActions(dataDir); // ohne mitgelieferte Aktionen (P14 f1, tst_mitgeliefert)
-        c.process = startCore(dataDir, c.socket, testConfigHome(),
+        c.process = startCore(dataDir, c.socket, configHome.isEmpty() ? testConfigHome() : configHome,
                               QStringList{QStringLiteral("--einsatz-verbindung"), m_inUseSocket,
                                           QStringLiteral("--testereignisse")}
                                   + extra);
@@ -303,8 +314,9 @@ private:
     }
 
     // c2: legt die Aktion an, startet sie echt (action_test) und wartet auf das Ende des Laufs.
-    // tookMs: vom Start bis zum gemeldeten Ende (Abfrage alle 20 ms).
-    RunRecord runAction(CoreLink &c, const Action &action, const QJsonObject &arguments = {}, qint64 *tookMs = nullptr)
+    // tookMs: vom Start bis zum gemeldeten Ende (Abfrage alle 20 ms). P15 f1: dryRun als Probelauf.
+    RunRecord runAction(CoreLink &c, const Action &action, const QJsonObject &arguments = {}, qint64 *tookMs = nullptr,
+                        bool dryRun = false)
     {
         RunRecord run;
         const QJsonObject put = c.request(QString::fromLatin1(msg::kActionPut), {{QStringLiteral("action"), actionToJson(action)}});
@@ -316,7 +328,7 @@ private:
         timer.start();
         const QJsonObject started = c.request(QString::fromLatin1(msg::kActionTest),
                                               {{QStringLiteral("action_id"), idText(action.id)},
-                                               {QStringLiteral("dry_run"), false},
+                                               {QStringLiteral("dry_run"), dryRun},
                                                {QStringLiteral("arguments"), arguments}});
         if (!ok(started)) {
             qWarning("action_test: %s", QJsonDocument(started).toJson(QJsonDocument::Compact).constData());
@@ -337,6 +349,35 @@ private:
             *tookMs = timer.elapsed();
         return run;
     }
+
+#ifdef DSS_CAMERA_SERVICE_DIR
+    // P15 f1: zuletzt gemeldeter Zustand des Kamera-Dienstes (camera_service nach hello und bei Änderungen)
+    QString m_cameraState;
+    bool isCameraConnected(CoreLink &c)
+    {
+        for (QJsonObject m; !(m = c.waitFor(QString::fromLatin1(msg::kCameraService), 100)).isEmpty();)
+            m_cameraState = m.value(QStringLiteral("state")).toString();
+        return m_cameraState == QLatin1String(kCameraStateConnected);
+    }
+
+    // P15 f1: Anfrage an den Dienst über den Kern (camera_call); Status der Antwort, -1 ohne Antwort
+    static int cameraCall(CoreLink &c, CameraCall call)
+    {
+        static qint64 next = 1000;
+        call.requestId = next++;
+        c.send(cameraCallMessage(call));
+        CameraResult result;
+        QString error;
+        if (!parseCameraResult(c.waitFor(QString::fromLatin1(msg::kCameraResult), 15000), &result, &error)) {
+            qWarning("camera_result: %s", qPrintable(error));
+            return -1;
+        }
+        if (result.status != 200)
+            qWarning("%s %s: %d %s %s", qPrintable(call.method), qPrintable(call.path), result.status,
+                     qPrintable(result.error), QJsonDocument(result.body).toJson(QJsonDocument::Compact).constData());
+        return result.status;
+    }
+#endif
 
     // c2: Laufzustand eines Overlays, wie ihn ein neues Fenster nach hello bekommt
     static LiveElements liveElements(const QString &socket, const QUuid &overlay)
@@ -1034,6 +1075,100 @@ private slots:
         QCOMPARE(readFile(overlayFile), before);
         QVERIFY2(!core.log.contains(QStringLiteral("Zuschauer42")), qPrintable(core.log));
     }
+
+#ifdef DSS_CAMERA_SERVICE_DIR
+    // P15 f1: Kamera-Position und Licht-Preset gegen den Dienst in der Attrappe mit zwei
+    // Attrappen-Lampen: Abruf echt, fehlende Position (404 not_found) und gelöschte Lampe (errors bei
+    // Status 200) als Fehler im Verlauf, der Lauf geht weiter; Probelauf mit den Namen des Dienstes
+    // ohne Abruf; ohne Dienst «nicht erreichbar» im Verlauf.
+    void cameraSteps()
+    {
+        QTemporaryDir tmp(QDir::tempPath() + QStringLiteral("/tst_kernaktionen-XXXXXX"));
+        QVERIFY(tmp.isValid());
+        const QString devices = kameradienst::createFakeDevices(tmp.filePath(QStringLiteral("geraete")));
+        QVERIFY2(devices.isEmpty(), qPrintable(devices));
+        const int port = kameradienst::freePort();
+        QVERIFY(port > 0);
+        kameradienst::Service service(tmp.path(), port);
+        QVERIFY2(service.start(), qPrintable(service.log()));
+        kameradienst::FakeLights lamps;
+        QVERIFY(lamps.start(2));
+
+        QTemporaryDir data;
+        const QString configHome = testConfigHome();
+        {
+            QFile ini(configHome + QStringLiteral("/dons-streaming-studio-entwicklung/kern.ini"));
+            QVERIFY(ini.open(QIODevice::Append));
+            ini.write(QStringLiteral("[kamera-dienst]\naktiv=ja\nadresse=127.0.0.1\nport=%1\n").arg(port).toUtf8());
+        }
+        Core core = start(data.path(), QStringLiteral("kamera"), {}, configHome);
+        CoreLink c(core.socket);
+        QVERIFY(c.isConnected());
+        QTRY_VERIFY_WITH_TIMEOUT(isCameraConnected(c), 10000);
+
+        // Position «Totale», zwei Lampen, Licht-Preset «Stream», dann eine Lampe gelöscht
+        QCOMPARE(cameraCall(c, cameraPresetCreateCall(QStringLiteral("Totale"), QStringLiteral("aaaa:0001"), false)), 200);
+        QCOMPARE(cameraCall(c, {0, QStringLiteral("POST"), QStringLiteral("lights"),
+                                QJsonObject{{QStringLiteral("name"), QStringLiteral("Links")},
+                                            {QStringLiteral("host"), lamps.hosts().at(0)}}}), 200);
+        QCOMPARE(cameraCall(c, {0, QStringLiteral("POST"), QStringLiteral("lights"),
+                                QJsonObject{{QStringLiteral("name"), QStringLiteral("Rechts")},
+                                            {QStringLiteral("host"), lamps.hosts().at(1)}}}), 200);
+        QCOMPARE(cameraCall(c, lightPresetCreateCall(QStringLiteral("Stream"))), 200);
+        QCOMPARE(cameraCall(c, {0, QStringLiteral("DELETE"), QStringLiteral("lights/rechts"), std::nullopt}), 200);
+
+        const auto step = [](const char *type, const QString &preset) {
+            Step s = newStep(QString::fromLatin1(type));
+            s.fields.insert(QStringLiteral("preset"), preset);
+            return s;
+        };
+        Step after = newStep(QString::fromLatin1(kStepSetArgument));
+        after.fields.insert(QStringLiteral("name"), QStringLiteral("weiter"));
+        const Action action = newAction(QStringLiteral("DSS-Test Kamera"),
+                                        {step(kStepCameraPreset, QStringLiteral("totale")),
+                                         step(kStepCameraPreset, QStringLiteral("geloescht")),
+                                         step(kStepLightPreset, QStringLiteral("stream")), after});
+        RunRecord run = runAction(c, action);
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.size(), 4);
+        QCOMPARE(run.log.at(0).result, StepLogEntry::Result::Ok);
+        QCOMPARE(run.log.at(1).result, StepLogEntry::Result::Error);
+        QVERIFY2(run.log.at(1).message.contains(QStringLiteral("«geloescht»")), qPrintable(run.log.at(1).message));
+        QCOMPARE(run.log.at(2).result, StepLogEntry::Result::Error);
+        QVERIFY2(run.log.at(2).message.contains(QStringLiteral("«rechts»")), qPrintable(run.log.at(2).message));
+        QCOMPARE(run.log.at(3).result, StepLogEntry::Result::Ok);
+        QCOMPARE(run.message, run.log.at(1).message);
+
+        // Probelauf: Namen aus dem Stand des Dienstes (kommt mit dem Ereignis presets), kein Abruf
+        const auto dryMessages = [&] {
+            QStringList m;
+            for (const StepLogEntry &e : runAction(c, action, {}, nullptr, true).log) {
+                if (e.result == StepLogEntry::Result::DryRun)
+                    m.append(e.message);
+            }
+            return m;
+        };
+        QTRY_COMPARE_WITH_TIMEOUT(dryMessages(),
+                                  (QStringList{QStringLiteral("Probelauf: würde Position «Totale» abrufen"),
+                                               QStringLiteral("Probelauf: würde Position «geloescht» abrufen"),
+                                               QStringLiteral("Probelauf: würde Licht-Preset «Stream» abrufen")}),
+                                  5000);
+
+        // Dienst weg: Fehler im Verlauf, Lauf geht weiter
+        QCOMPARE(service.stop(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!isCameraConnected(c), 10000);
+        run = runAction(c, action);
+        QCOMPARE(run.state, RunState::Error);
+        QCOMPARE(run.log.size(), 4);
+        for (int i = 0; i < 3; ++i)
+            QCOMPARE(run.log.at(i).result, StepLogEntry::Result::Error);
+        QCOMPARE(run.log.at(3).result, StepLogEntry::Result::Ok);
+
+        stop(core);
+        QVERIFY2(core.log.contains(QStringLiteral("Aktionen: Kamera-Dienst: POST camera-presets/geloescht/recall: 404 not_found")),
+                 qPrintable(core.log));
+    }
+#endif
 
     // e3-3: Fenster (CoreClient) holt Variablen und Zuschauer, fasst Anfragen zusammen, holt nach
     // eigenem variable_set neu und leert bei Trennung. Daten: Import aus tests/daten/streamerbot-export.

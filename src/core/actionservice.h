@@ -50,6 +50,9 @@ class SaveScheduler;
 // - Overlay-Element zeigen/verstecken (c2, Plan 4.4) über Options::overlayLive, derselbe Weg wie
 //   overlay_live_set: nur im Speicher, nie in die Overlay-Datei. Übergang «fade» wirkt in P14-1
 //   wie «none» (Hinweis im Lauf). OBS ist «nicht verfügbar» (P14-2).
+// - Kamera-Position und Licht-Preset (P15 f1) über Options::camera (CameraActions). Stumm wie alle
+//   Schritte: Ein stummer Kern startet keine Läufe ausser Probeläufen, die beide Schritte nicht
+//   echt ausführen.
 class ActionService : public QObject
 {
     Q_OBJECT
@@ -74,6 +77,9 @@ public:
         std::function<dss::ActionSound *()> actionSound;
         // c2: Laufzustand der Overlays; nullptr = nicht verfügbar. Lebt länger als der Dienst.
         dss::OverlayLiveState *overlayLive = nullptr;
+        // P15 f1: Kamera-Position und Licht-Preset; nullptr = Kern ohne Kamera-Dienst gebaut
+        // (Schritt «nicht verfügbar»). Lebt länger als der Dienst.
+        dss::actions::CameraControl *camera = nullptr;
         // f2: nach dem Anlegen der mitgelieferten Aktionen (aktionen.json fehlte); der Kern legt
         // dann das Overlay «Chat-Bot» an, wenn es fehlt. Leer = nichts.
         std::function<void()> templateCreated;

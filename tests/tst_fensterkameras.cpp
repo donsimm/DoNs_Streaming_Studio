@@ -7,10 +7,16 @@
 // auch die Mitte «Bildwerte» (Regler gebündelt, Kästchen, Auswahl, Marke «gemerkt», Kontextmenü und
 // «Zurücksetzen» je Bereich) und rechts «Licht» mit Attrappen-Lampen (Dialog «Lampen», Regler,
 // «Alle aus», «Licht-Presets»).
+// Seit P15 f1 auch die Schritte «Kamera-Position» und «Licht-Preset» im Unterreiter «Aktionen».
 // Mit DSS_TEST_BILDER (Ordnerpfad) legt der Test kameras-e3.png, kameras-e3-c922.png,
-// kameras-e3-weg.png, kameras-e3-lampen.png und kameras-e3-einrichten.png in diesem Ordner ab.
+// kameras-e3-weg.png, kameras-e3-lampen.png, kameras-e3-einrichten.png und schritt-kamera.png in
+// diesem Ordner ab.
 // Muster: tst_fensterchatbot (Fenster), tst_kernkamera (Kern mit Dienst).
 
+#include "actionfieldspanel.h"
+#include "actionjson.h"
+#include "actionprotocol.h"
+#include "actionspage.h"
 #include "camerapage.h"
 #include "camerasetupdialog.h"
 #include "coreclient.h"
@@ -19,6 +25,7 @@
 #include "mainwindow.h"
 #include "presetnamedialog.h"
 #include "prozesshilfe.h"
+#include "steptypes.h"
 #include "theme.h"
 #include "version.h"
 
@@ -179,6 +186,32 @@ class TestFensterKameras : public QObject
     }
 
     CameraPage *page() { return child<CameraPage>("cameraPage"); }
+
+    // P15 f1: Aktion im Kern anlegen (action_put), true bei Erfolg
+    bool putAction(const actions::Action &a)
+    {
+        std::optional<ChangeResult> answer;
+        const qint64 id = m_client->sendActionsEdit(
+            {QString::fromLatin1(msg::kActionPut), QJsonObject{{QStringLiteral("action"), actions::actionToJson(a)}}});
+        const QMetaObject::Connection c = connect(m_client.get(), &CoreClient::changeFinished, this,
+                                                  [&](const ChangeResult &r) { if (r.requestId == id) answer = r; });
+        (void)QTest::qWaitFor([&] { return answer.has_value(); }, 3000);
+        disconnect(c);
+        return id != 0 && answer && answer->ok;
+    }
+
+    // P15 f1: Feld preset eines Schritts im Stand des Kerns
+    QString stepPreset(const QUuid &actionId, const QUuid &stepId) const
+    {
+        QString value;
+        const std::optional<ActionsConfigInfo> info = m_client->actionsConfig();
+        if (const actions::Action *a = info && info->config ? info->config->action(actionId) : nullptr)
+            actions::forEachStep(a->steps, [&](const actions::Step &s, const QList<int> &) {
+                if (s.id == stepId)
+                    value = s.fields.value(QStringLiteral("preset")).toString();
+            });
+        return value;
+    }
 
     // Grauer bzw. farbiger Hinweis (#hintLabel) in einem Bereich (Objektname des Bereichs)
     QLabel *hint(const char *area)
@@ -1045,6 +1078,84 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(fullyShown(detail), 3000);
         QVERIFY(m_window->minimumSizeHint().width() <= 1280);
         detail->setText(message);
+    }
+
+    // P15 f1: Schritte «Kamera-Position» und «Licht-Preset» im Reiter «Chat-Bot», Unterreiter
+    // «Aktionen», rechts. Nach serviceGone: zuerst ohne Dienst ausgegraut mit Grund, dann mit dem neu
+    // gestarteten Dienst Auswahl aus seinen Presets, Hinweis bei gelöschter Kennung, Wahl geht an den
+    // Kern. Mit DSS_TEST_BILDER das Bild schritt-kamera.png.
+    void actionSteps()
+    {
+        actions::Step camera = actions::newStep(QString::fromLatin1(actions::kStepCameraPreset));
+        camera.fields.insert(QStringLiteral("preset"), QStringLiteral("weit"));
+        actions::Step light = actions::newStep(QString::fromLatin1(actions::kStepLightPreset));
+        light.fields.insert(QStringLiteral("preset"), QStringLiteral("geloescht"));
+        actions::Action a;
+        a.id = QUuid::createUuid();
+        a.name = QStringLiteral("DSS-Test Kamera");
+        a.steps = {camera, light};
+        QVERIFY(putAction(a));
+
+        for (QToolButton *b : child<QFrame>("moduleTabs")->findChildren<QToolButton *>()) {
+            if (b->text() == QStringLiteral("Chat-Bot"))
+                QTest::mouseClick(b, Qt::LeftButton);
+        }
+        QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
+        auto *actionsPage = child<ActionsPage>("actionsPage");
+        QTRY_VERIFY_WITH_TIMEOUT(actionsPage->isVisible(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(actionsPage->selectAction(a.id), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(actionsPage->detailAction(), a.id, 3000);
+        ActionFieldsPanel *panel = actionsPage->fieldsPanel();
+        QWidget *cameraPage = panel->page(ActionFieldsPanel::Target::Step, camera.type);
+        auto *position = cameraPage->findChild<QComboBox *>(QStringLiteral("field:preset"));
+        QWidget *lightPage = panel->page(ActionFieldsPanel::Target::Step, light.type);
+        auto *preset = lightPage->findChild<QComboBox *>(QStringLiteral("field:preset"));
+        auto *notice = lightPage->findChild<QLabel *>(QStringLiteral("fieldProblem"));
+
+        // Ohne Dienst: ausgegraut mit Grund, Kennung ohne «(fehlt)», Grund auch unter dem Abschnitt
+        actionsPage->selectStep(camera.id);
+        QCOMPARE(panel->currentPage(), cameraPage);
+        QCOMPARE(actionsPage->areaTitle(ActionsPage::Detail), QStringLiteral("Schritt «Kamera-Position»"));
+        const QString reason = QStringLiteral("Kamera-Dienst nicht verbunden: Auswahl erst möglich, wenn er antwortet.");
+        QVERIFY(!position->isEnabled());
+        QCOMPARE(position->toolTip(), reason);
+        QCOMPARE(position->currentText(), QStringLiteral("weit"));
+        QCOMPARE(cameraPage->findChild<QLabel *>(QStringLiteral("fieldProblem"))->text(), reason);
+
+        // Dienst wieder da (Daten im Testordner bleiben), Position «Weit» und Licht-Preset «Hell»
+        QVERIFY2(m_service->start(), qPrintable(m_service->log()));
+        QVERIFY(waitForState(QStringLiteral("connected")));
+        qsizetype from = m_answers.size();
+        m_client->callCamera(cameraPresetCreateCall(QStringLiteral("Weit"), kTiny2, false));
+        QCOMPARE(waitForAnswer(QStringLiteral("POST"), QStringLiteral("camera-presets"), from).result.status, 200);
+        from = m_answers.size();
+        m_client->callCamera(lightPresetCreateCall(QStringLiteral("Hell")));
+        QCOMPARE(waitForAnswer(QStringLiteral("POST"), QStringLiteral("light-presets"), from).result.status, 200);
+
+        // Kamera-Position: Name aus dem Dienst, bedienbar, kein Hinweis
+        QTRY_COMPARE_WITH_TIMEOUT(position->currentText(), QStringLiteral("Weit"), 3000);
+        QVERIFY(position->isEnabled());
+        QVERIFY(position->toolTip().isEmpty());
+        QCOMPARE(position->itemText(0), QStringLiteral("Keine"));
+        QVERIFY(cameraPage->findChild<QLabel *>(QStringLiteral("fieldProblem"))->text().isEmpty());
+
+        // Licht-Preset mit gelöschter Kennung: «(fehlt)» und Hinweis unter dem Abschnitt
+        actionsPage->selectStep(light.id);
+        QCOMPARE(panel->currentPage(), lightPage);
+        QCOMPARE(preset->currentText(), QStringLiteral("geloescht (fehlt)"));
+        QCOMPARE(notice->text(), QStringLiteral("Licht-Preset «geloescht» gibt es im Kamera-Dienst nicht mehr."));
+        // Wahl geht an den Kern, der Hinweis verschwindet
+        QTRY_VERIFY_WITH_TIMEOUT(preset->findText(QStringLiteral("Hell")) > 0, 3000); // Ereignis presets
+        const int index = preset->findText(QStringLiteral("Hell"));
+        preset->setCurrentIndex(index);
+        emit preset->activated(index);
+        QTRY_COMPARE_WITH_TIMEOUT(stepPreset(a.id, light.id), QStringLiteral("hell"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(notice->text().isEmpty(), 3000);
+        QCOMPARE(preset->currentText(), QStringLiteral("Hell"));
+
+        actionsPage->selectStep(camera.id);
+        m_window->statusBar()->clearMessage();
+        savePicture(m_window.get(), QStringLiteral("schritt-kamera.png"));
     }
 };
 

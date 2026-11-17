@@ -101,6 +101,8 @@ private:
     void showField(Field &field, const QJsonValue &value, const QJsonValue &previous, bool keepTyping);
     void showElements(Page &page, const QJsonValue &previous, bool keepTyping);
     void enableFields(Page &page);
+    // P15 f1: Hinweise der Logik (dss::fieldNotice) unter den Abschnitten, solange keine Prüfmeldung steht
+    void showNotices(Page &page);
     // element: Inhalt eines Elements (Prüfmeldung unter «Inhalt der Quellen»)
     void commit(const QString &field, const QJsonValue &value, bool element = false);
     void commitElement(Page &page, const QString &key, const QJsonValue &value);

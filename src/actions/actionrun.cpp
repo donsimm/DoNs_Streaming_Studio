@@ -335,6 +335,24 @@ void ActionRun::execute(const Step &step, const QList<int> &path, int depth)
             log(StepLogEntry::Result::Error, unavailable);
         else
             services.obs->setSourceVisible(request, waitForService());
+    } else if (type == QLatin1String(kStepCameraPreset) || type == QLatin1String(kStepLightPreset)) {
+        // P15 f1: ändert etwas Sichtbares im Raum, darum im Probelauf nicht echt (Plan P15 9.)
+        const bool light = type == QLatin1String(kStepLightPreset);
+        const PresetKind kind = light ? PresetKind::Light : PresetKind::Camera;
+        const QString id = step.fields.value(QStringLiteral("preset")).toString().trimmed();
+        if (id.isEmpty()) {
+            log(StepLogEntry::Result::Error,
+                light ? QStringLiteral("kein Licht-Preset gewählt") : QStringLiteral("keine Position gewählt"));
+        } else if (dry) {
+            const QString name = services.camera ? services.camera->presetName(kind, id) : QString();
+            log(StepLogEntry::Result::DryRun,
+                QStringLiteral("Probelauf: würde %1 «%2» abrufen")
+                    .arg(light ? QStringLiteral("Licht-Preset") : QStringLiteral("Position"), name.isEmpty() ? id : name));
+        } else if (!services.camera) {
+            log(StepLogEntry::Result::Error, unavailable);
+        } else {
+            services.camera->recallPreset(kind, id, waitForService());
+        }
     } else if (type == QLatin1String(kStepScript)) {
         log(StepLogEntry::Result::Skipped, QStringLiteral("Skript-Schritt nicht verfügbar"));
     } else if (type == QLatin1String(kStepUnsupported)) {

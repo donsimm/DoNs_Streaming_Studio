@@ -127,6 +127,14 @@ QList<StepTypeInfo> buildStepTypes()
                enumField(QStringLiteral("state"),
                          {QStringLiteral("on"), QStringLiteral("off"), QStringLiteral("toggle")},
                          QStringLiteral("on"))}});
+    // P15 f1 (Plan P15 9.): Position bzw. Licht-Preset des Kamera-Dienstes abrufen; preset ist die
+    // Kennung im Dienst, leer = keins gewählt. Kein Feld wake: Abrufen weckt die Tiny 2 immer
+    // (Entscheid 6). Kein Feld wait: Der Dienst antwortet, sobald das Ziel gesetzt ist, und meldet
+    // das Ende der Bewegung nicht (kamera-dienst/dss_camera/motion.py, _goto).
+    t.append({QString::fromLatin1(kStepCameraPreset), QStringLiteral("Kamera-Position"), 0, StepPart::P14_1,
+              false, true, {textField(QStringLiteral("preset"))}});
+    t.append({QString::fromLatin1(kStepLightPreset), QStringLiteral("Licht-Preset"), 0, StepPart::P14_1,
+              false, true, {textField(QStringLiteral("preset"))}});
     t.append({QString::fromLatin1(kStepScript), QStringLiteral("Skript-Schritt nicht verfügbar"), 99999,
               StepPart::Never, false, false,
               {textField(QStringLiteral("language")), textField(QStringLiteral("code"))}});

@@ -9,8 +9,8 @@
 #include <functional>
 #include <optional>
 
-// Schnittstellen der Schritte nach aussen (P14 b1, Plan 3.1): Chat, Twitch, OBS, Ton und
-// Laufzustand der Overlays. Der Kern verbindet sie (b3, c), die Tests ersetzen sie. Nur Qt Core,
+// Schnittstellen der Schritte nach aussen (P14 b1, Plan 3.1): Chat, Twitch, OBS, Ton,
+// Laufzustand der Overlays und seit P15 f1 der Kamera-Dienst. Der Kern verbindet sie (b3, c), die Tests ersetzen sie. Nur Qt Core,
 // kein Netz (CLAUDE.md Regel 9 und 14).
 //
 // Jeder Aufruf bekommt einen Rückruf done, den der Dienst genau einmal aufruft, sobald der Schritt
@@ -83,6 +83,12 @@ struct ObsVisibilityRequest
     QString state; // on, off, toggle
 };
 
+// Schritte «Kamera-Position» und «Licht-Preset» (P15 f1, Plan P15 9.)
+enum class PresetKind {
+    Camera,
+    Light,
+};
+
 class ChatSender
 {
 public:
@@ -105,6 +111,17 @@ class ObsControl
 public:
     virtual ~ObsControl() = default;
     virtual void setSourceVisible(const ObsVisibilityRequest &request, StepDone done) = 0;
+};
+
+// Kamera-Dienst (P15 f1): done nach der Antwort des Dienstes. Fehler (Dienst weg, Kamera fehlt,
+// Preset gelöscht, Lampe ohne Antwort) als failure mit Meldung; der Lauf geht weiter.
+class CameraControl
+{
+public:
+    virtual ~CameraControl() = default;
+    virtual void recallPreset(PresetKind kind, const QString &presetId, StepDone done) = 0;
+    // Name laut letztem Stand des Dienstes, für den Probelauf; leer = unbekannt
+    virtual QString presetName(PresetKind kind, const QString &presetId) const = 0;
 };
 
 class SoundPlayer
@@ -132,6 +149,7 @@ struct ActionServices
     ObsControl *obs = nullptr;
     SoundPlayer *sound = nullptr;
     OverlayLive *overlay = nullptr;
+    CameraControl *camera = nullptr; // P15 f1
 };
 
 } // namespace dss::actions

@@ -645,6 +645,21 @@ private slots:
                 QVERIFY2(keys.contains(t.key), qPrintable(t.key));
         }
         QCOMPARE(keys.size(), QSet<QString>(keys.cbegin(), keys.cend()).size());
+
+        // P15 f1: eigener Abschnitt, Kurzinhalt mit dem Namen aus dem Kamera-Dienst
+        for (const TypeChoice &c : choices) {
+            if (c.key == QLatin1String(kStepCameraPreset) || c.key == QLatin1String(kStepLightPreset))
+                QCOMPARE(c.section, QStringLiteral("Kamera und Licht"));
+        }
+        ActionViewNames cameraNames;
+        cameraNames.cameraPresets.insert(QStringLiteral("totale"), QStringLiteral("Totale"));
+        Step camera = newStep(QString::fromLatin1(kStepCameraPreset));
+        QCOMPARE(stepSummary(camera, {}, cameraNames), QStringLiteral("keine Position gewählt"));
+        camera.fields.insert(QStringLiteral("preset"), QStringLiteral("totale"));
+        QCOMPARE(stepSummary(camera, {}, cameraNames), QStringLiteral("«Totale»"));
+        QCOMPARE(stepSummary(camera, {}, {}), QStringLiteral("«totale»"));
+        Step light = newStep(QString::fromLatin1(kStepLightPreset));
+        QCOMPARE(stepSummary(light, {}, cameraNames), QStringLiteral("kein Licht-Preset gewählt"));
     }
 
     void addSteps()

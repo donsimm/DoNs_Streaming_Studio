@@ -458,8 +458,24 @@ void ActionFieldsPanel::setState(const State &state, bool resetFields)
         }
         showElements(*page, previous.value(QStringLiteral("elements")), keep);
         enableFields(*page);
+        showNotices(*page);
     }
     m_filling = false;
+}
+
+void ActionFieldsPanel::showNotices(Page &page)
+{
+    if (!m_problem.isEmpty())
+        return;
+    for (QLabel *problem : std::as_const(page.problems))
+        problem->clear();
+    for (const Field &f : std::as_const(page.fields)) {
+        const QString notice = dss::fieldNotice(f.row, m_state.fields.value(f.row.name), m_state.names);
+        if (QLabel *problem = notice.isEmpty() ? nullptr : page.problems.value(dss::fieldSection(page.form, f.row.name))) {
+            problem->setText(notice);
+            problem->setToolTip(notice);
+        }
+    }
 }
 
 void ActionFieldsPanel::showField(Field &f, const QJsonValue &value, const QJsonValue &previous, bool keepTyping)
@@ -569,11 +585,19 @@ void ActionFieldsPanel::showElements(Page &page, const QJsonValue &previous, boo
 void ActionFieldsPanel::enableFields(Page &page)
 {
     const bool editable = m_state.editable;
-    const auto apply = [editable](Field &f, bool allowed) {
-        const bool on = editable && allowed && f.row.inactiveReason.isEmpty();
+    const auto apply = [this, editable](Field &f, bool allowed) {
+        // Grund aus der Logik: fest (wirkt noch nicht) oder P15 f1 Kamera-Dienst nicht verbunden
+        const QString reason = dss::fieldInactiveReason(f.row, m_state.names);
+        const bool on = editable && allowed && reason.isEmpty();
         for (QWidget *w : {f.editor, static_cast<QWidget *>(f.check), static_cast<QWidget *>(f.list)}) {
-            if (w)
+            if (w) {
                 w->setEnabled(on);
+                w->setToolTip(reason);
+            }
+        }
+        if (f.label) {
+            f.label->setEnabled(reason.isEmpty());
+            f.label->setToolTip(reason);
         }
         for (QCheckBox *option : std::as_const(f.options))
             option->setEnabled(on);
@@ -655,8 +679,10 @@ void ActionFieldsPanel::setProblem(const QString &text)
         problem->clear();
     if (page->elementProblem)
         page->elementProblem->clear();
-    if (text.isEmpty())
+    if (text.isEmpty()) {
+        showNotices(*page);
         return;
+    }
     // Unter dem Abschnitt des zuletzt bearbeiteten Felds (Inhalt eines Elements: unter «Inhalt der
     // Quellen»), sonst unter dem ersten
     QLabel *problem = m_lastInElement ? page->elementProblem

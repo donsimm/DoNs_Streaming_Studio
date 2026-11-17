@@ -1,11 +1,15 @@
 #pragma once
 
 #include "actionmodel.h"
+#include "cameraprotocol.h"
 #include "fieldspec.h"
 
+#include <QJsonValue>
 #include <QList>
 #include <QPair>
 #include <QString>
+
+#include <optional>
 
 // Felder der rechten Spalte im Unterreiter «Aktionen» (P14 e2-8, Plan 4 und 6): Beschriftung,
 // Reihenfolge und Abschnitte der Felder eines Schritts. Nur Qt Core (CLAUDE.md Regel 9): Das Fenster
@@ -35,7 +39,9 @@ struct FieldRow
     double scale = 1; // gespeicherter Wert = angezeigter Wert × scale
     int decimals = 0; // Nachkommastellen des angezeigten Werts
     QString suffix;  // Einheit hinter dem Feld («s», «%»), leer = keine
-    QString choices; // Auswahl aus den Daten: overlay, source, media, action, queue, command, timer; leer = keine
+    // Auswahl aus den Daten: overlay, source, media, action, queue, command, timer, seit P15 f1
+    // camera_preset und light_preset (Kamera-Dienst); leer = keine
+    QString choices;
     // Leer = wirkt. Sonst sichtbar, aber ausgegraut, mit diesem Text als Tooltip (P14 e2-9b).
     QString inactiveReason;
 };
@@ -65,11 +71,23 @@ struct FieldChoice
     QString label;
     bool operator==(const FieldChoice &) const = default;
 };
-// Auswahl zu FieldRow::choices mit Kennungen (overlay, source, action, command, timer, queue):
-// «Keine», dann die Einträge nach Name. Fehlt current in den Daten, steht er als «<Kennung> (fehlt)»
-// am Ende, damit das Feld den Wert des Kerns zeigen kann. Andere Arten (media, leer): leer.
+// Auswahl zu FieldRow::choices mit Kennungen (overlay, source, action, command, timer, queue,
+// camera_preset, light_preset): «Keine», dann die Einträge nach Name. Fehlt current in den Daten,
+// steht er als «<Kennung> (fehlt)» am Ende, damit das Feld den Wert des Kerns zeigen kann; bei den
+// Presets ohne verbundenen Dienst nur als Kennung (fehlen ist dann unbekannt). Andere Arten
+// (media, leer): leer.
 QList<FieldChoice> fieldChoices(const QString &choices, const actions::ActionsConfig &config,
                                 const ActionViewNames &names, const QString &current);
+
+// P15 f1: Positionen und Licht-Presets aus camera_service (status: camera_presets, light_presets)
+// in names; cameraUnavailable, solange der Dienst nicht verbunden ist (auch ohne Kern: nullopt).
+void setCameraNames(ActionViewNames *names, const std::optional<CameraServiceInfo> &info);
+// Grund, warum das Feld gerade nicht bedienbar ist: FieldRow::inactiveReason oder (Auswahl aus dem
+// Kamera-Dienst) ActionViewNames::cameraUnavailable. Leer = bedienbar.
+QString fieldInactiveReason(const FieldRow &row, const ActionViewNames &names);
+// P15 f1: Hinweis unter dem Abschnitt des Felds, solange keine Prüfmeldung dort steht: Auswahl aus
+// dem Kamera-Dienst gesperrt, oder die gewählte Kennung gibt es im Dienst nicht mehr. Leer = nichts.
+QString fieldNotice(const FieldRow &row, const QJsonValue &value, const ActionViewNames &names);
 
 // Gespeicherter Wert (aus aktionen.json) in den angezeigten Wert umrechnen, z. B. 8500 ms → 8,5 s.
 double toDisplay(const FieldRow &row, double stored);
