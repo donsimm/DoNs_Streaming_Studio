@@ -439,6 +439,16 @@ qt_add_executable(tst_obsquellen tst_obsquellen.cpp obstestserver.h)
 target_link_libraries(tst_obsquellen PRIVATE dss_obs dss_warnings Qt6::Test)
 add_test(NAME tst_obsquellen COMMAND tst_obsquellen)
 
+# P15 d1: Verbindung zum Kamera-Dienst (dss_camera) gegen den echten Python-Dienst in der Attrappe
+# (eigener Prozess auf 127.0.0.1, freier Port, eigene XDG-Ordner), dazu der Leser für SSE.
+find_program(DSS_PYTHON3 python3 REQUIRED)
+qt_add_executable(tst_kameradienst tst_kameradienst.cpp)
+target_link_libraries(tst_kameradienst PRIVATE dss_camera dss_warnings Qt6::Test)
+target_compile_definitions(tst_kameradienst PRIVATE DSS_PYTHON3="${DSS_PYTHON3}"
+  DSS_CAMERA_SERVICE_DIR="${PROJECT_SOURCE_DIR}/kamera-dienst")
+add_test(NAME tst_kameradienst COMMAND tst_kameradienst)
+set_tests_properties(tst_kameradienst PROPERTIES TIMEOUT 120)
+
 # P13: Ereignisfluss (Reihenfolge, Filter, Verlauf, Abmelden, Threads, 10 000 Ereignisse), ohne Qt Gui.
 qt_add_executable(tst_ereignisfluss tst_ereignisfluss.cpp)
 target_link_libraries(tst_ereignisfluss PRIVATE dss_events dss_warnings Qt6::Test)
