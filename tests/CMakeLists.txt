@@ -460,7 +460,8 @@ if(DSS_BUILD_CLI AND DSS_CORE_CAMERA)
   set_tests_properties(tst_kernkamera PROPERTIES TIMEOUT 180)
 endif()
 # P15 e2: Reiter «Kameras» im echten Fenster (MainWindow) mit eigenem dss-core gegen den Dienst in
-# der Attrappe, in der X11-Sitzung; ohne X11 übersprungen (77). Mit DSS_TEST_BILDER ein Bild.
+# der Attrappe, in der X11-Sitzung; ohne X11 übersprungen (77). Seit e3 mit Attrappen-Lampen
+# (FakeLight). Mit DSS_TEST_BILDER (Ordnerpfad) fünf Bilder kameras-e3*.png.
 if(DSS_BUILD_APP AND DSS_CORE_CAMERA)
   qt_add_executable(tst_fensterkameras tst_fensterkameras.cpp kameradiensthilfe.h)
   target_link_libraries(tst_fensterkameras PRIVATE dss_app_ui dss_warnings Qt6::Test Qt6::Network)

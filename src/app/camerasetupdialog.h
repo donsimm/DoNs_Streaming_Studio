@@ -56,7 +56,6 @@ private:
     QCheckBox *m_invertTilt = nullptr;
     QSpinBox *m_speed = nullptr;
     QDoubleSpinBox *m_step = nullptr;
-    QCheckBox *m_presetsWake = nullptr;
     QCheckBox *m_aiOff = nullptr;
     QTreeWidget *m_remembered = nullptr;
     QPushButton *m_forget = nullptr;

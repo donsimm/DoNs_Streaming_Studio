@@ -15,23 +15,28 @@ namespace dss {
 class CoreClient;
 }
 class CameraSetupDialog;
+class LightsDialog;
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
+class QSlider;
 class QSpinBox;
 class QSplitter;
 class QTimer;
 class QToolButton;
 class QTreeWidget;
+class QVBoxLayout;
 
 // P15 e2: Reiter «Kameras» (Plan P15 Abschnitt 8 mit den Antworten des Nutzers 1, 2 und 5:
 // eigener Reiter, Variante 1B «Alles sichtbar»; Checkliste docs/archiv/prompts/P15-e-checkliste.md).
 // Oben die Kopfzeile mit Kamera-Auswahl, «Wecken»/«Schlafen», «Einrichten …» und dem Zustand des
 // Dienstes, darunter drei Spalten: links «Bewegen», «KI-Verfolgung», «Positionen»; Mitte «Bildwerte»
-// und rechts «Licht» (Inhalt ab e3). Dünn (Regel 9): Texte, Freigaben, Anfragen und Halten kommen
-// aus cameraview.h; die Seite schickt die Anfragen über CoreClient::callCamera und zeigt den Stand
-// aus camera_service, camera_event und camera_result.
+// mit festen Zeilen (P15 e3) und rechts «Licht» mit den Lampen und «Licht-Presets» (P15 e3). Dünn
+// (Regel 9): Texte, Freigaben, Anfragen, Halten und Bündeln kommen aus cameraview.h; die Seite
+// schickt die Anfragen über CoreClient::callCamera und zeigt den Stand aus camera_service,
+// camera_event und camera_result.
 class CameraPage : public QWidget
 {
     Q_OBJECT
@@ -55,6 +60,9 @@ private:
     QWidget *createMovePanel();
     QWidget *createAiPanel();
     QWidget *createPresetsPanel();
+    QWidget *createImagePanel();
+    QWidget *createLightPanel();
+    QWidget *createLightPresetsSection(QWidget *parent);
 
     void onServiceChanged();
     void onEvent(const dss::CameraEventInfo &event);
@@ -73,6 +81,27 @@ private:
     void stopHolding(bool sendStop);
     void scheduleHold();
     void onHoldTimer();
+    // Anfrage aus dem Halten: ein Fehler des Dienstes nur einmal je Halten in die Statuszeile
+    void sendHoldCall(const dss::CameraCall &call);
+
+    // Regler: höchstens alle kCameraBundleMs je Pfad (CameraBundler), beim Loslassen alles
+    void putBundled(const QString &path, const QJsonObject &values);
+    void flushBundled();
+    void onBundleTimer();
+    void refreshImage(const dss::CameraEntry *camera, const QJsonArray &controls);
+    void showControlMenu(const QString &key, const QPoint &globalPos);
+
+    // Bereiche der Lampen nur neu, wenn sich Kennungen oder Namen ändern und der Dialog «Lampen»
+    // zu ist (Plan 8)
+    void rebuildLights();
+    void refreshLights();
+    QString selectedLightPresetId() const;
+    QString selectedLightPresetName() const;
+    void saveLightPreset();
+    void renameLightPreset();
+    void removeLightPreset();
+    void openLights();
+    void fetchLightPresets();
 
     const dss::CameraEntry *currentCamera() const;
     QString selectedPresetId() const;
@@ -128,4 +157,56 @@ private:
     QLabel *m_recallHint = nullptr;
 
     QLabel *m_imageTitle = nullptr;
+
+    // Mitte «Bildwerte»: je Schlüssel aus cameraControlSpecs() eine feste Zeile
+    struct ControlWidgets
+    {
+        QLabel *mark = nullptr;  // «•» bei gemerkten Werten
+        QLabel *label = nullptr; // leer bei Kästchen
+        QSlider *slider = nullptr;
+        QLabel *value = nullptr;
+        QComboBox *choice = nullptr;
+        QCheckBox *check = nullptr;
+    };
+    QHash<QString, ControlWidgets> m_controlWidgets;
+    struct SectionWidgets
+    {
+        QToolButton *reset = nullptr;
+        QLabel *hint = nullptr;
+    };
+    QHash<QString, SectionWidgets> m_sectionWidgets;
+    QList<dss::CameraControlRow> m_controlRows;
+    dss::CameraBundler m_bundler;
+    QTimer *m_bundleTimer = nullptr;
+
+    // Rechts «Licht»
+    struct LightWidgets
+    {
+        QString id;
+        QWidget *section = nullptr;
+        QLabel *state = nullptr;
+        QCheckBox *on = nullptr;
+        QLabel *brightnessLabel = nullptr;
+        QLabel *kelvinLabel = nullptr;
+        QSlider *brightness = nullptr;
+        QLabel *brightnessValue = nullptr;
+        QSlider *kelvin = nullptr;
+        QLabel *kelvinValue = nullptr;
+    };
+    QList<LightWidgets> m_lightWidgets;
+    QStringList m_lightLayout;
+    bool m_lightsBuilt = false;
+    QVBoxLayout *m_lightSections = nullptr;
+    QPushButton *m_allOn = nullptr;
+    QPushButton *m_allOff = nullptr;
+    QPushButton *m_lamps = nullptr;
+    QTreeWidget *m_lightPresets = nullptr;
+    QList<dss::LightPresetRow> m_lightPresetRows;
+    QPushButton *m_lightRecall = nullptr;
+    QPushButton *m_lightSave = nullptr;
+    QPushButton *m_lightOverwrite = nullptr;
+    QPushButton *m_lightRename = nullptr;
+    QPushButton *m_lightRemove = nullptr;
+    QSet<QString> m_lightPresetsFetched;
+    QPointer<LightsDialog> m_lightsDialog;
 };

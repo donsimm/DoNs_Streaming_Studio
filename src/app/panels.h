@@ -36,9 +36,11 @@ public:
 
 // Bereich wie im Dock «Eigenschaften»: kleiner Titel (#propertySectionTitle), feine Linie
 // (#propertySectionLine), darunter die Felder im Raster *grid. Knöpfe in titleButtons stehen
-// in der Titelzeile am rechten Rand.
+// in der Titelzeile am rechten Rand. Ist titleText gesetzt, steht vor den Knöpfen ein Text
+// (#propertySectionText, Farbe über die Eigenschaft state; P15 e3, Entscheid 1 des Nutzers: «erreichbar»
+// bei den Lampen); *titleText bekommt das QLabel, der Aufrufer setzt den Text.
 QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
-                 const QList<QToolButton *> &titleButtons = {});
+                 const QList<QToolButton *> &titleButtons = {}, QLabel **titleText = nullptr);
 
 // Beschriftung eines Felds im Raster von section(), mit dem Feld als Buddy (P14 e3-5, seit e3-6
 // geteilt für die Formulare rechts in «Befehle» und «Zeitnachrichten»).

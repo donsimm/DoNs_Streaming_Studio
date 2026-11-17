@@ -142,4 +142,58 @@ private:
     QString m_stderr;
 };
 
+// P15 e3: Attrappen-Lampen (FakeLight in fake.py, HTTP-Server auf 127.0.0.1, freier Port) in einem
+// eigenen Python-Prozess; er läuft, bis stop() seine Eingabe schliesst. hosts() wie «127.0.0.1:<port>».
+class FakeLights
+{
+public:
+    ~FakeLights() { stop(); }
+
+    // count Lampen, eingeschaltet mit 40 % und 222 Mired (4500 K)
+    bool start(int count)
+    {
+        m_process = std::make_unique<QProcess>();
+        m_process->setWorkingDirectory(QStringLiteral(DSS_CAMERA_SERVICE_DIR));
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert(QStringLiteral("PYTHONDONTWRITEBYTECODE"), QStringLiteral("1"));
+        m_process->setProcessEnvironment(env);
+        m_process->start(QStringLiteral(DSS_PYTHON3),
+                         {QStringLiteral("-c"),
+                          QStringLiteral("import sys; from dss_camera.fake import FakeLight; "
+                                         "lights = [FakeLight(on=True, brightness=40, temperature=222) "
+                                         "for _ in range(int(sys.argv[1]))]; "
+                                         "print(' '.join(l.host for l in lights), flush=True); sys.stdin.read()"),
+                          QString::number(count)});
+        QElapsedTimer timer;
+        timer.start();
+        QByteArray out;
+        while (timer.elapsed() < kStartTimeoutMs && !out.contains('\n')) {
+            if (m_process->state() == QProcess::NotRunning)
+                return false;
+            m_process->waitForReadyRead(200);
+            out += m_process->readAllStandardOutput();
+        }
+        m_hosts = QString::fromUtf8(out).trimmed().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        return m_hosts.size() == count;
+    }
+
+    QStringList hosts() const { return m_hosts; }
+
+    void stop()
+    {
+        if (!m_process)
+            return;
+        m_process->closeWriteChannel();
+        if (!m_process->waitForFinished(5000)) {
+            m_process->kill();
+            m_process->waitForFinished();
+        }
+        m_process.reset();
+    }
+
+private:
+    std::unique_ptr<QProcess> m_process;
+    QStringList m_hosts;
+};
+
 } // namespace kameradienst

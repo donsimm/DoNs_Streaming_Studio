@@ -264,6 +264,58 @@ QList<CameraRememberedRow> cameraRememberedRows(const QJsonArray &controls);
 CameraCall lightPutCall(const QString &lightId, const QJsonObject &values);
 CameraCall lightsAllCall(bool on); // «Alle ein», «Alle aus»
 CameraCall lightPresetRecallCall(const QString &presetId);
+// P15 e3: Licht-Presets (POST und save-current übernehmen den Stand aller Lampen), Lampen anlegen,
+// ändern (Name, Adresse), löschen; GET status für «Verbindung prüfen», GET export für die Adressen
+CameraCall lightPresetGetCall(const QString &presetId);
+CameraCall lightPresetCreateCall(const QString &name);
+CameraCall lightPresetOverwriteCall(const QString &presetId);
+CameraCall lightPresetRenameCall(const QString &presetId, const QString &name);
+CameraCall lightPresetDeleteCall(const QString &presetId);
+CameraCall lightCreateCall(const QString &name, const QString &host);
+CameraCall lightConfigCall(const QString &lightId, const QJsonObject &values);
+CameraCall lightDeleteCall(const QString &lightId);
+CameraCall cameraStatusGetCall();
+CameraCall cameraExportGetCall();
+
+// Wertanzeige eines Reglers in der Mitte: «4600 K» beim Weissabgleich, sonst die Zahl
+QString cameraSliderText(const QString &key, int value);
+// Wert eines Kästchens für PUT …/controls: true/false bei Werten vom Typ «bool» (der Dienst nimmt dort
+// nur bool), sonst 1/0
+QJsonValue cameraCheckValue(const QJsonArray &controls, const QString &key, bool checked);
+
+// Freigaben der rechten Spalte «Licht» (ausser den Lampen selbst, dafür LightRow::enabled)
+struct LightPanelView
+{
+    bool allEnabled = false;     // «Alle ein», «Alle aus»
+    bool lampsEnabled = false;   // «Lampen …»
+    bool presetsEnabled = false; // Liste «Licht-Presets»
+    bool recallEnabled = false;  // braucht ein gewähltes Preset
+    bool saveEnabled = false;    // «Aktuelles Licht speichern …» (mindestens eine Lampe)
+    bool overwriteEnabled = false;
+    bool editEnabled = false;    // «Umbenennen», «Löschen»
+
+    bool operator==(const LightPanelView &) const = default;
+};
+LightPanelView lightPanelView(const CameraServiceView &service, const QJsonArray &lights, bool presetSelected);
+
+// Dialog «Lampen»: Lampe mit Adresse (host). Die Adressen stehen nicht in GET status, nur in der Datei
+// licht.json aus GET export. id leer = neu im Dialog.
+struct LightEntry
+{
+    QString id;
+    QString name;
+    QString host;
+
+    bool operator==(const LightEntry &) const = default;
+};
+QList<LightEntry> lightEntriesFromExport(const QJsonObject &exportBody);
+// Anfragen für OK im Dialog: zuerst löschen, dann ändern (nur geänderte Felder), dann anlegen
+QList<CameraCall> lightsDialogCalls(const QList<LightEntry> &before, const QList<LightEntry> &after);
+// Prüft Name und Adresse aller Einträge; leer = in Ordnung
+QString lightsDialogProblem(const QList<LightEntry> &entries);
+// «Verbindung prüfen» aus der Antwort auf GET status: Text und state («ok», «error») wie die Kopfzeile.
+// Der Dienst fragt die Lampen alle 5 s ab; reachable ist der Stand dieser Abfrage.
+std::pair<QString, QString> lightCheckResult(const CameraResult &status, const QString &lightId);
 
 // Halten am Steuerkreuz und bei Zoom «−»/«+» (Plan 8): press merkt sich die Richtung, nach
 // kCameraHoldDelayMs beginnt die Fahrt (move), danach alle kCameraHoldRepeatMs wieder. Loslassen
@@ -277,6 +329,12 @@ public:
     std::optional<CameraCall> tick(qint64 nowMs);
     std::optional<CameraCall> release(qint64 nowMs);
     void cancel();
+    // P15 e3 (Entscheid Lotse): Lehnt der Dienst eine Anfrage beim Halten ab, kommt die Meldung nur
+    // einmal je Halten in die Statuszeile. serial zählt jedes press; reportFailure gibt für jedes
+    // Halten nur beim ersten Fehler true (auch wenn die Antwort erst nach dem Loslassen kommt); ein
+    // früheres Halten bleibt still, wenn ein neueres schon gemeldet hat.
+    int serial() const { return m_serial; }
+    bool reportFailure(int serial);
     bool pressed() const { return m_pressed; }
     bool moving() const { return m_moving; }
     QString cameraId() const { return m_cameraId; }
@@ -292,6 +350,8 @@ private:
     int m_zoom = 0;
     qint64 m_pressedAt = 0;
     qint64 m_lastSent = 0;
+    int m_serial = 0;
+    int m_reportedSerial = 0;
 };
 
 // Regler bündeln (Plan 8): PUT je Pfad höchstens alle kCameraBundleMs; dazwischen gilt der letzte
@@ -327,6 +387,8 @@ public:
     // P15 e2: Kennungen der Kamera-Presets, von denen nur id und name bekannt sind (aus GET status);
     // das Fenster holt sie einzeln mit GET camera-presets/<id>.
     QStringList cameraPresetsWithoutDetails() const;
+    // P15 e3: dasselbe für Licht-Presets (GET light-presets/<id>), ohne Feld lights
+    QStringList lightPresetsWithoutDetails() const;
     // P15 e2 (Entscheid Lotse): Nach dem Senden einer Bewegung (move, step, home einer Kamera,
     // recall eines Kamera-Presets) steht die KI-Verfolgung dieser Kamera auf «Aus», wenn
     // ai_off_before_move gilt (Standard an); der Dienst meldet das nicht. Rückgabe Controls, wenn
@@ -345,6 +407,7 @@ private:
     int setCameras(const QJsonArray &cameras);
     int setPresets(const QJsonArray &camera, const QJsonArray &light, bool full);
     int setCameraPreset(const QJsonObject &preset);
+    int setLightPreset(const QJsonObject &preset);
 
     QList<CameraEntry> m_cameras;
     QHash<QString, QJsonArray> m_controls;

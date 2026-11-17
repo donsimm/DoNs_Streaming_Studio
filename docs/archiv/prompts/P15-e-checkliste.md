@@ -35,7 +35,8 @@ Reiter «Kameras»            QWidget im QStackedWidget m_modules (wie ChatBotPa
                             Farbe über [state] wie #chatBotState (cameraServiceView)
   Hinweis gesperrt          QLabel über den Spalten, immer da (Regel 9), Text blockedHint
   Spalten                   QSplitter waagrecht, setChildrenCollapsible(false)
-    links                   QWidget mit QVBoxLayout aus drei dockPanel
+    links                   QScrollArea (#cameraLeftScroll, wie #propertiesScroll), darin QWidget
+                            mit QVBoxLayout aus drei dockPanel
       dockPanel «Bewegen»   Hinweis (moveHint, mit «Wecken» bei moveHintWake), Steuerkreuz 3 × 3
                             (8 Pfeile, «Mitte»), Zoom «−»/Anzeige/«+», Zahlenfelder «Tempo», «Schritt»
       dockPanel «KI-Verfolgung»  Hinweis aiHint, Modus (QComboBox aus aiMenu, Wert aiValue, frei
@@ -46,8 +47,9 @@ Reiter «Kameras»            QWidget im QStackedWidget m_modules (wie ChatBotPa
     Mitte                   dockPanel «Bildwerte · <Kamera>» (cameraImageTitle)
       QScrollArea           wie #propertiesScroll, darin je Bereich section() mit «Zurücksetzen» in der
                             Titelzeile; je Wert eine Zeile aus cameraControlRows (Regler + Wert,
-                            Auswahl, Kästchen, Text); Hinweis cameraSectionHint je Bereich
-    rechts                  dockPanel «Licht»
+                            Auswahl, Kästchen, Text); Hinweis cameraSectionHint je Bereich rechts in
+                            der Titelzeile (Text-Parameter von section(), e3)
+    rechts                  dockPanel «Licht», darin QScrollArea (#cameraLightScroll) wie links
       Leiste oben           «Alle ein», «Alle aus», Dehnung, «Lampen …»
       je Lampe section()    Titel = Name, rechts in der Titelzeile «erreichbar»/«nicht erreichbar»;
                             «Ein» (QCheckBox), Helligkeit und Farbtemperatur (Regler + Wert)
@@ -55,8 +57,9 @@ Reiter «Kameras»            QWidget im QStackedWidget m_modules (wie ChatBotPa
                             buttonBar «Abrufen», «Aktuelles Licht speichern …», «Überschreiben»,
                             «Umbenennen», «Löschen»
 Dialog «Kamera einrichten – <Name>»   QDialog: Name; Grenzen (Schwenken, Neigen von/bis in °);
-                            Richtung (2 Kästchen); Bewegen (Tempo, Schrittweite); Verhalten (2
-                            Kästchen); Gemerkte Werte (Tabelle, «Vergessen», Hinweis); OK/Abbrechen
+                            Richtung (2 Kästchen); Bewegen (Tempo, Schritt); Verhalten (1 Kästchen
+                            «KI-Verfolgung vor dem Bewegen aus», Entscheid 6); Gemerkte Werte
+                            (Tabelle, «Vergessen», Hinweis); OK/Abbrechen
 Dialog «Position speichern» QDialog: Name, «Bildwerte mitspeichern» (aus), Hinweis; OK/Abbrechen
 Dialog «Lampen»             QDialog: Tabelle Name/Adresse/Zustand; Name, Adresse; «Hinzufügen»,
                             «Lampe löschen», «Verbindung prüfen» mit Ergebnis; Hinweis; OK/Abbrechen
@@ -90,7 +93,7 @@ Reiter «Kameras» gegen «Bereich wie ein Dock», Referenz `chatbotpage`, Famil
 - [ ] **Bereiche:** `dockPanel("Bewegen" | "KI-Verfolgung" | "Positionen", …)`, fest ohne Lösen und Schliessen. Entschieden: geteilter Baustein (`dockPanel` in `chatbotpage.cpp`, `listdetailpage.cpp`, `variablespage.cpp`, `actionspage.cpp`).
 - [ ] **Steuerkreuz:** 9 Knöpfe im `QGridLayout`, 8 mit Symbol (`nach-oben.svg`, `nach-unten.svg`, neu `nach-links.svg`, `nach-rechts.svg` und vier Schrägen, gedrehte Fassungen von `nach-oben.svg`, Plan 8). Ohne Datei steht der Ersatztext «←» usw. da, wie bei `symbolButton`. In der Mitte «Mitte» (`cameraHomeCall`). Drücken und Loslassen gehen an `CameraHold` (press, tick über einen `QTimer` mit `nextDueMs`, release), nicht über `setAutoRepeat`, denn ein Klick ist ein Schritt und Halten eine Fahrt. Pfeiltasten tun dasselbe, wenn das Kreuz den Fokus hat. Freigabe aus `moveEnabled`. Entschieden: wie verlangt (Plan 8). Das ist eine Stelle ohne Mitglied: 0 Treffer für `setAutoRepeat`, `symbolButton` ist mit 14 px zu klein. Ein neuer Baustein, Entscheid 1.
 - [ ] **Zoom, Tempo, Schritt:** Zoom «−»/«+» wie das Kreuz (`CameraHold` mit `zoom`), dazwischen die Anzeige `cameraZoomText`, Mindestbreite für «100 %». «Tempo» und «Schritt» als `QSpinBox`/`QDoubleSpinBox` mit Suffix `" %"` bzw. `" °"`, `keepValueVisible`, `setKeyboardTracking(false)`. Entschieden: geteilter Baustein `keepValueVisible`, Suffix mit Leerzeichen als Mehrheit (6 von 6 laut e3-Checkliste, bestätigt durch `setSuffix` in `docks.cpp:201`). Die Felder ändern die Einstellungen der Kamera (`speed`, `step_deg` über `PUT cameras/<id>/config`, wie der Dialog «Kamera einrichten»), Einheit je Kamera (Entscheid 2).
-- [ ] **Hinweise über «Bewegen» und in «KI-Verfolgung»:** ein `QLabel` immer da, Text aus `moveHint`/`aiHint`, Farbe über `state` (warning/leer) wie die Kopfzeile, «Wecken» als `QPushButton` daneben (sichtbar nur bei `moveHintWake`, die Breite bleibt reserviert). Kein farbiger Kasten (Entscheid 3). Entschieden: `#hintLabel` (Theme `@textMuted@`) und die Farben der Kopfzeile, weil das Theme keinen Kasten kennt.
+- [ ] **Hinweise über «Bewegen» und in «KI-Verfolgung»:** ein `QLabel` immer da, Text aus `moveHint`/`aiHint`, Farbe beim Hinweis über «Bewegen» über `state` (warning/leer) wie die Kopfzeile, der KI-Hinweis immer grau (`#cameraAiHint` ohne `state`, nachgeführt nach e2), «Wecken» als `QPushButton` daneben (sichtbar nur bei `moveHintWake`, die Breite bleibt reserviert). Kein farbiger Kasten (Entscheid 3). Entschieden: `#hintLabel` (Theme `@textMuted@`) und die Farben der Kopfzeile, weil das Theme keinen Kasten kennt.
 - [ ] **KI-Verfolgung:** `QLabel` «Modus» und `QComboBox` mit den Einträgen aus `aiMenu` (Wert in den Daten), gewählt `aiValue`, frei bei `aiEnabled`, `setAccessibleName("KI-Verfolgung")`. Eine Wahl durch den Nutzer schickt `cameraAiCall`; ein neues Ereignis `controls` setzt nur den Wert (ohne Signal, wie die Bildwerte). Kein Regler «Tempo». Entschieden: wie verlangt (Entscheid 5), `QComboBox` wie die Kamera-Auswahl.
 - [ ] **Positionen:** `QTreeWidget` mit Spaltenkopf (Name, Position, Bildwerte aus `cameraPresetRows`), `setRootIsDecorated(false)`, `setUniformRowHeights(true)`, `SingleSelection`, Spaltenbreiten in Ziffern der Schrift, letzte Spalte gedehnt. Der Objektname kommt in die Selektorliste `theme.cpp:350–361`. Doppelklick = Abrufen (Plan 8; nicht umbenennen wie in P14, das ist eine andere Liste). Entschieden: Mehrheit der Listen mit Spalten (e3-Checkliste, 4 von 4, seither 8 in der Selektorliste).
 - [ ] **Leiste unter «Positionen»:** `buttonBar({Abrufen, Speichern …, Überschreiben, Umbenennen, Löschen}, {recallHint})` mit Textknöpfen (`QPushButton`), Freigaben aus `cameraControlView`. Löschen fragt mit `confirm()`. Nach dem Speichern bzw. Löschen erscheint in der Statuszeile `showStatus` mit `savedStatusText`/`deletedStatusText`. Entschieden: geteilter Baustein `buttonBar`; Textknöpfe in einer Leiste wie «Läufe der Aktionen» (`chatbotpage.cpp:677`). Fünf Knöpfe: Umbruch auf zwei Zeilen wie im Entwurf (Entscheid 1).
@@ -114,8 +117,8 @@ Dialoge gegen «Dialog» (`QDialog`), Referenz `queuesdialog` (der neueste), 3 M
 - [ ] **Rahmen:** je eine eigene Klasse `CameraSetupDialog`, `PresetNameDialog`, `LightsDialog` in `src/app`. Fenstertitel «Kamera einrichten – <Name>», «Position speichern» (bzw. «Licht speichern»), «Lampen». Entschieden: Mehrheit, 2 von 3 als eigene Klasse (e3-Checkliste; `queuesdialog` seither die dritte).
 - [ ] **Abschnitte im Dialog:** Titel und Linie wie im Dialog «Einstellungen» (`settingsdialog.cpp:49–57`, `#propertySectionTitle`/`#propertySectionLine`) für «Grenzen», «Richtung», «Bewegen», «Verhalten», «Gemerkte Werte». Entschieden: Referenz `settingsdialog`, 1 von 1 Dialog mit Abschnitten.
 - [ ] **Knopfzeile:** `QDialogButtonBox` mit OK/Abbrechen (Entwurf Seite 5). Die Meldung des Dienstes steht im Dialog in einer Zeile mit fester Höhe wie `#settingsProblem` (`settingsdialog.cpp:174`). Entschieden: Mehrheit, 3 von 3 `QDialogButtonBox`; OK/Abbrechen wie «Einstellungen», weil der Entwurf es so zeigt.
-- [ ] **Felder:** Grenzen als `QDoubleSpinBox` mit Suffix `" °"`, Bereich aus `ranges` von `GET …/config`. Leer bedeutet Standard (`null`), siehe [OFFEN] in Abschnitt 5. «Verhalten» ist bei der C922 grau. Die gemerkten Werte stehen als `QTreeWidget` wie oben, mit «Vergessen» und `#hintLabel`. Entschieden: geteilte Bausteine.
-- [ ] **Lampen:** Tabelle wie oben, Name und Adresse direkt änderbar in `QLineEdit` unter der Tabelle (Entwurf 8), «Hinzufügen», «Lampe löschen», «Verbindung prüfen» als `QPushButton`. Das Ergebnis steht daneben in `#hintLabel` bzw. mit der Farbe von `state`. Entschieden: wie verlangt (Entwurf 5); «Lampe löschen» statt «Entfernen» wie «… löschen» in P14 (Entscheid 4).
+- [ ] **Felder:** Grenzen als `QDoubleSpinBox` mit Suffix `" °"`, Bereich aus `ranges` von `GET …/config`. «Standard» ist der Sonderwert des Felds (`setSpecialValueText("Standard")` am kleinsten Wert, schickt `null`; entschieden in e2). «Verhalten» ist bei der C922 grau. Die gemerkten Werte stehen als `QTreeWidget` wie oben, mit «Vergessen» und `#hintLabel`. Entschieden: geteilte Bausteine.
+- [ ] **Lampen:** Tabelle wie oben, Name und Adresse direkt änderbar in `QLineEdit` unter der Tabelle (Entwurf 8), «Hinzufügen», «Lampe löschen», «Verbindung prüfen» als `QPushButton`. Das Ergebnis steht daneben (`#lightsCheckResult`, grau bzw. mit der Farbe von `state` wie die Kopfzeile). Änderungen gelten mit OK (Anfragen nacheinander, `lightsDialogCalls`); die Adressen liest der Dialog aus `GET export` (in e3 so gebaut). Entschieden: wie verlangt (Entwurf 5); «Lampe löschen» statt «Entfernen» wie «… löschen» in P14 (Entscheid 4).
 
 ### Nicht übernehmen
 - [ ] Die Werte aus `studio.css`: Grössen 56/64 px des Kreuzes (die Grösse kommt aus der Schrift: `fontMetrics().height() * n`), farbige Kästen `.hinweis` (#3a3220 …), Farbverlauf des Kelvin-Reglers, Farben `.zust` (`core-connected` …), `.btn.fest` 96 px, die Breiten der Spalten (600/540 px), die gelben Markierungen. Auch nicht «Spiegeln» und einen eigenen Bereich «Zustand» (der Zustand steht in der Auswahl). Die Kopfzeile wird nicht von Hand nachgebaut: Sie ist eine eigene Zeile der Seite wie `#chatBotHeader`.
@@ -137,6 +140,14 @@ In der Sitzung mit Lotse beantwortet; sie ersetzen die Fragen aus e1.
 3. **Farben:** Hinweise als Text ohne Kasten in den Farben der Kopfzeile (`@stateConnecting@`, `@stateError@`, `@textMuted@`). Die Marke «•» vor gemerkten Werten in `@primaryLighter@`. Die Kamera-Auswahl ohne Farben. Keine neuen Theme-Werte.
 4. **Dialog «Lampen»:** «Lampe löschen» statt «Entfernen».
 5. **KI-Verfolgung** ist bei der Tiny 2 bedienbar, Auswahl nur «Aus» und «Oberkörper» (Wert `obsbot_ai` des Dienstes, e1b). Weitere Modi erst nach einem Test am Gerät. Kein Regler «Tempo» für die KI (nicht geprüft). Bei der C922 ausgegraut mit «Diese Kamera hat das nicht.».
+
+Nach e2 (Entscheide des Nutzers 2026-11-17, umgesetzt in e3):
+
+6. **Dialog «Kamera einrichten»:** Das Kästchen «Presets wecken die Kamera» entfällt. Abrufen weckt die Tiny 2 immer; im Reiter bleibt der Hinweis «weckt die Kamera zuerst».
+7. **Texte wie im Reiter:** überall «Schritt» und «Positionen», auch im Dialog (statt «Schrittweite» und «Presets»).
+8. **Linke Spalte:** Aussehen bestätigt («passt so»).
+
+**Entscheid Lotse (Interna, e3):** Lehnt der Dienst eine Fahrt beim Halten ab, erscheint die Meldung in der Statuszeile nur einmal je Halten, nicht bei jeder Wiederholung (`CameraHold::serial`, `reportFailure`, Test `holdFailureOncePerHold`).
 
 ### Neue Texte (zum Lesen durch den Nutzer; die aus der Logik stehen in `cameraview.cpp`)
 - Kopfzeile:
@@ -168,6 +179,6 @@ In der Sitzung mit Lotse beantwortet; sie ersetzen die Fragen aus e1.
 
 - Nicht geöffnet: `1a-…`, `2-bild.html`, `3-licht.html`, `index.html`, die Fotos bei Lotse. `docks.cpp` habe ich nur in Zeilen 140–270 gelesen, `theme.cpp` in 300–388, `chatbotpage.cpp` in 560–790, `headerbar.cpp` in 140–250.
 - `DESIGN.md` gibt es nicht. Die Werte des Entwurfs habe ich den Theme-Einträgen nach ihrer Rolle zugeordnet. Die Werte, die das Theme nicht hat, kommen nicht dazu (Entscheid 3).
-- **[OFFEN] Grenzen im Dialog:** Wie zeigt ein Zahlenfeld «Standard» (`null`)? Etwa mit dem Sonderwert `setSpecialValueText("Standard")`, der im Projekt noch nicht vorkommt. Das entscheidet e2.
+- ~~**[OFFEN] Grenzen im Dialog:**~~ Erledigt in e2: «Standard» ist der Sonderwert `setSpecialValueText("Standard")` am kleinsten Wert des Felds.
 - **[OFFEN] Schlüssel der Bildwerte:** Die feste Liste nutzt die Schlüssel des Dienstes (Name des Treibers, `controls.control_key`). `exposure_dynamic_framerate`, `backlight_compensation`, `contrast`, `saturation`, `sharpness`, `gain`, `gamma` und `hue` sind aus den Kernel-Namen abgeleitet und **nicht an den echten Kameras geprüft**. Die Attrappe kennt nur einen Teil davon. Lotse kann das mit `dss-cli kamera-aufruf GET cameras/<id>/controls` am Dienst prüfen.
 - **Kosten:** etwa 22 geöffnete Dateien bzw. Ausschnitte im Projekt und 4 Seiten des Entwurfs, etwa 16 Suchen (geschätzt), Skill-Dateien: `finding-patterns`, `words.md`, `checklist.md`, `design`, `design/reading.md`. Keine Subagenten. `values`, `conventions` und `decisions` habe ich nicht neu geöffnet; ihre Regeln stammen aus der e3-Checkliste.

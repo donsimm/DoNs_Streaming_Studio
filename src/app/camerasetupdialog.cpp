@@ -120,25 +120,18 @@ CameraSetupDialog::CameraSetupDialog(dss::CoreClient *client, const dss::CameraD
     m_speed->setEnabled(false);
     m_step->setEnabled(false);
     move->addRow(QStringLiteral("Tempo"), m_speed);
-    move->addRow(QStringLiteral("Schrittweite"), m_step);
+    // Texte wie im Reiter: «Schritt» (Entscheid 7 des Nutzers, 2026-11-17)
+    move->addRow(QStringLiteral("Schritt"), m_step);
     column->addLayout(move);
 
+    // «Presets wecken die Kamera» entfällt (Entscheid 6 des Nutzers, 2026-11-17): Abrufen weckt die
+    // Tiny 2 immer (docs/09-kamera-dienst.md, «Kamera-Presets»), im Reiter steht «weckt die Kamera zuerst».
     addSectionTitle(column, QStringLiteral("Verhalten"), this);
-    // [OFFEN] Der Dienst hat dafür kein Feld: Abrufen weckt die Tiny 2 immer (docs/09-kamera-dienst.md,
-    // «Kamera-Presets»). Darum angekreuzt und nicht bedienbar.
-    m_presetsWake = new QCheckBox(QStringLiteral("Presets wecken die Kamera"), this);
-    m_presetsWake->setObjectName(QStringLiteral("cameraSetupPresetsWake"));
-    m_presetsWake->setChecked(tiny2);
-    m_presetsWake->setEnabled(false);
     m_aiOff = new QCheckBox(QStringLiteral("KI-Verfolgung vor dem Bewegen aus"), this);
     m_aiOff->setObjectName(QStringLiteral("cameraSetupAiOff"));
     m_aiOff->setEnabled(false);
-    if (!tiny2) {
-        // Entwurf Seite 5: bei der C922 ausgegraut
-        m_presetsWake->setToolTip(QStringLiteral("Diese Kamera hat das nicht."));
+    if (!tiny2) // Entwurf Seite 5: bei der C922 ausgegraut
         m_aiOff->setToolTip(QStringLiteral("Diese Kamera hat das nicht."));
-    }
-    column->addWidget(m_presetsWake);
     column->addWidget(m_aiOff);
 
     addSectionTitle(column, QStringLiteral("Gemerkte Werte"), this);

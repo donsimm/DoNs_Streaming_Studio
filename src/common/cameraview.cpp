@@ -362,8 +362,7 @@ QList<CameraControlRow> cameraControlRows(const QJsonArray &controls, const Came
             row.valueText = row.value == 0 ? QStringLiteral("nie") : QStringLiteral("%1 s").arg(row.value);
             break;
         case CameraControlKind::Slider:
-            row.valueText = spec.key == QLatin1String("white_balance_temperature") ? lightKelvinText(row.value)
-                                                                                    : QString::number(row.value);
+            row.valueText = cameraSliderText(spec.key, row.value);
             break;
         }
         rows.append(row);
@@ -629,8 +628,7 @@ QList<CameraRememberedRow> cameraRememberedRows(const QJsonArray &controls)
         case CameraControlKind::Text:
             return value == 0 ? QStringLiteral("nie") : QStringLiteral("%1 s").arg(value);
         case CameraControlKind::Slider:
-            return spec->key == QLatin1String("white_balance_temperature") ? lightKelvinText(value)
-                                                                            : QString::number(value);
+            return cameraSliderText(spec->key, value);
         case CameraControlKind::Choice:
             break;
         }
@@ -672,6 +670,151 @@ CameraCall lightPresetRecallCall(const QString &presetId)
     return call("POST", QStringLiteral("light-presets/%1/recall").arg(presetId), QJsonObject());
 }
 
+CameraCall lightPresetGetCall(const QString &presetId)
+{
+    return call("GET", QStringLiteral("light-presets/%1").arg(presetId));
+}
+
+CameraCall lightPresetCreateCall(const QString &name)
+{
+    return call("POST", QStringLiteral("light-presets"), QJsonObject{{QStringLiteral("name"), name}});
+}
+
+CameraCall lightPresetOverwriteCall(const QString &presetId)
+{
+    return call("POST", QStringLiteral("light-presets/%1/save-current").arg(presetId), QJsonObject());
+}
+
+CameraCall lightPresetRenameCall(const QString &presetId, const QString &name)
+{
+    return call("PUT", QStringLiteral("light-presets/%1").arg(presetId), QJsonObject{{QStringLiteral("name"), name}});
+}
+
+CameraCall lightPresetDeleteCall(const QString &presetId)
+{
+    return call("DELETE", QStringLiteral("light-presets/%1").arg(presetId));
+}
+
+CameraCall lightCreateCall(const QString &name, const QString &host)
+{
+    return call("POST", QStringLiteral("lights"),
+                QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("host"), host}});
+}
+
+CameraCall lightConfigCall(const QString &lightId, const QJsonObject &values)
+{
+    return call("PUT", QStringLiteral("lights/%1/config").arg(lightId), values);
+}
+
+CameraCall lightDeleteCall(const QString &lightId)
+{
+    return call("DELETE", QStringLiteral("lights/%1").arg(lightId));
+}
+
+CameraCall cameraStatusGetCall()
+{
+    return call("GET", QStringLiteral("status"));
+}
+
+CameraCall cameraExportGetCall()
+{
+    return call("GET", QStringLiteral("export"));
+}
+
+QString cameraSliderText(const QString &key, int value)
+{
+    return key == QLatin1String("white_balance_temperature") ? lightKelvinText(value) : QString::number(value);
+}
+
+QJsonValue cameraCheckValue(const QJsonArray &controls, const QString &key, bool checked)
+{
+    // controls.py im Dienst: Typ «bool» nur mit true/false, «int» und «menu» nur mit ganzen Zahlen
+    const QJsonObject o = controlByKey(controls, key);
+    if (str(o, "type") == QLatin1String("bool") || o.value(QLatin1String("value")).isBool())
+        return checked;
+    return checked ? 1 : 0;
+}
+
+LightPanelView lightPanelView(const CameraServiceView &service, const QJsonArray &lights, bool presetSelected)
+{
+    LightPanelView v;
+    if (!service.usable)
+        return v;
+    v.allEnabled = !lights.isEmpty();
+    v.lampsEnabled = true;
+    v.presetsEnabled = true;
+    v.recallEnabled = presetSelected;
+    v.saveEnabled = !lights.isEmpty();
+    v.overwriteEnabled = v.saveEnabled && presetSelected;
+    v.editEnabled = presetSelected;
+    return v;
+}
+
+QList<LightEntry> lightEntriesFromExport(const QJsonObject &exportBody)
+{
+    // {"files": {"licht.json": {"lights": [{"id", "name", "host"}]}}} (export.py im Dienst)
+    const QJsonValue file = exportBody.value(QLatin1String("files")).toObject().value(QLatin1String("licht.json"));
+    QList<LightEntry> entries;
+    for (const QJsonValue &v : file.toObject().value(QLatin1String("lights")).toArray()) {
+        const QJsonObject o = v.toObject();
+        entries.append({str(o, "id"), str(o, "name"), str(o, "host")});
+    }
+    return entries;
+}
+
+QList<CameraCall> lightsDialogCalls(const QList<LightEntry> &before, const QList<LightEntry> &after)
+{
+    QList<CameraCall> removed;
+    QList<CameraCall> changed;
+    QList<CameraCall> created;
+    for (const LightEntry &old : before) {
+        const auto it = std::find_if(after.cbegin(), after.cend(),
+                                     [&old](const LightEntry &e) { return e.id == old.id; });
+        if (it == after.cend()) {
+            removed.append(lightDeleteCall(old.id));
+            continue;
+        }
+        QJsonObject values;
+        if (it->name.trimmed() != old.name)
+            values.insert(QStringLiteral("name"), it->name.trimmed());
+        if (it->host.trimmed() != old.host)
+            values.insert(QStringLiteral("host"), it->host.trimmed());
+        if (!values.isEmpty())
+            changed.append(lightConfigCall(old.id, values));
+    }
+    for (const LightEntry &e : after) {
+        if (e.id.isEmpty())
+            created.append(lightCreateCall(e.name.trimmed(), e.host.trimmed()));
+    }
+    return removed + changed + created;
+}
+
+QString lightsDialogProblem(const QList<LightEntry> &entries)
+{
+    for (const LightEntry &e : entries) {
+        if (e.name.trimmed().isEmpty())
+            return QStringLiteral("Jede Lampe braucht einen Namen.");
+        if (e.host.trimmed().isEmpty())
+            return QStringLiteral("Lampe «%1»: Adresse fehlt.").arg(e.name.trimmed());
+    }
+    return {};
+}
+
+std::pair<QString, QString> lightCheckResult(const CameraResult &status, const QString &lightId)
+{
+    if (const QString error = cameraResultError(status); !error.isEmpty())
+        return {error, QStringLiteral("error")};
+    for (const QJsonValue &v : status.body.value(QLatin1String("lights")).toArray()) {
+        const QJsonObject o = v.toObject();
+        if (str(o, "id") != lightId)
+            continue;
+        if (o.value(QLatin1String("reachable")).toBool())
+            return {QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")};
+        return {QStringLiteral("Lampe antwortet nicht"), QStringLiteral("error")};
+    }
+    return {QStringLiteral("Lampe nicht gefunden"), QStringLiteral("error")};
+}
+
 void CameraHold::press(const QString &cameraId, int pan, int tilt, int zoom, qint64 nowMs)
 {
     m_pressed = true;
@@ -682,6 +825,16 @@ void CameraHold::press(const QString &cameraId, int pan, int tilt, int zoom, qin
     m_zoom = zoom;
     m_pressedAt = nowMs;
     m_lastSent = nowMs;
+    ++m_serial;
+}
+
+bool CameraHold::reportFailure(int serial)
+{
+    // Auch eine späte Antwort auf ein früheres Halten bleibt still, wenn ein neueres schon gemeldet ist
+    if (serial <= m_reportedSerial)
+        return false;
+    m_reportedSerial = serial;
+    return true;
 }
 
 std::optional<CameraCall> CameraHold::tick(qint64 nowMs)
@@ -823,6 +976,8 @@ int CameraData::applyResult(const CameraCall &call, const CameraResult &result)
     const QStringList parts = call.path.split(QLatin1Char('/'));
     if (parts.size() == 2 && parts.at(0) == QLatin1String("camera-presets"))
         return setCameraPreset(result.body.value(QLatin1String("preset")).toObject());
+    if (parts.size() == 2 && parts.at(0) == QLatin1String("light-presets"))
+        return setLightPreset(result.body.value(QLatin1String("preset")).toObject());
     if (parts.size() != 3 || parts.at(0) != QLatin1String("cameras"))
         return 0;
     const QString &camera = parts.at(1);
@@ -852,6 +1007,32 @@ int CameraData::setCameraPreset(const QJsonObject &preset)
         return Presets;
     }
     return 0;
+}
+
+int CameraData::setLightPreset(const QJsonObject &preset)
+{
+    // Wie setCameraPreset: nur bekannte Kennungen
+    const QJsonValue id = preset.value(QLatin1String("id"));
+    for (qsizetype i = 0; i < m_lightPresets.size(); ++i) {
+        if (m_lightPresets.at(i).toObject().value(QLatin1String("id")) != id)
+            continue;
+        if (m_lightPresets.at(i).toObject() == preset)
+            return 0;
+        m_lightPresets.replace(i, preset);
+        return Presets;
+    }
+    return 0;
+}
+
+QStringList CameraData::lightPresetsWithoutDetails() const
+{
+    QStringList ids;
+    for (const QJsonValue &v : m_lightPresets) {
+        const QJsonObject o = v.toObject();
+        if (!o.value(QLatin1String("lights")).isObject())
+            ids.append(str(o, "id"));
+    }
+    return ids;
 }
 
 QStringList CameraData::cameraPresetsWithoutDetails() const

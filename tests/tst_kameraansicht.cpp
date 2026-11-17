@@ -514,6 +514,149 @@ private slots:
         QVERIFY(!hold.release(5000));
     }
 
+    // P15 e3 (Entscheid Lotse): Fehler beim Halten nur einmal je Halten melden
+    void holdFailureOncePerHold()
+    {
+        CameraHold hold;
+        hold.press(QStringLiteral("c"), 1, 0, 0, 0);
+        const int first = hold.serial();
+        QVERIFY(hold.reportFailure(first));
+        QVERIFY(!hold.reportFailure(first)); // Wiederholung
+        QVERIFY(hold.tick(kCameraHoldDelayMs));
+        QVERIFY(hold.release(kCameraHoldDelayMs + 50));
+        QVERIFY(!hold.reportFailure(first)); // Antwort auf stop nach dem Loslassen
+        hold.press(QStringLiteral("c"), 0, 1, 0, 1000);
+        QVERIFY(hold.serial() != first);
+        QVERIFY(hold.reportFailure(hold.serial())); // neues Halten meldet wieder
+        QVERIFY(!hold.reportFailure(first));          // alte Antwort, schon gemeldet
+    }
+
+    // P15 e3: Anfragen für Licht-Presets und Lampen, alle in der festen Liste des Kerns
+    void lightCalls()
+    {
+        const QList<CameraCall> calls = {
+            lightPresetGetCall(QStringLiteral("stream")),     lightPresetCreateCall(QStringLiteral("Stream")),
+            lightPresetOverwriteCall(QStringLiteral("stream")),
+            lightPresetRenameCall(QStringLiteral("stream"), QStringLiteral("Live")),
+            lightPresetDeleteCall(QStringLiteral("stream")),
+            lightCreateCall(QStringLiteral("Links"), QStringLiteral("192.0.2.21")),
+            lightConfigCall(QStringLiteral("links"), {{QStringLiteral("host"), QStringLiteral("192.0.2.22")}}),
+            lightDeleteCall(QStringLiteral("links")),          cameraStatusGetCall(),
+            cameraExportGetCall()};
+        for (const CameraCall &c : calls)
+            QVERIFY2(checkCameraCall(c.method, c.path).isEmpty(), qPrintable(c.method + QLatin1Char(' ') + c.path));
+        QCOMPARE(lightCreateCall(QStringLiteral("Links"), QStringLiteral("192.0.2.21")).method, QStringLiteral("POST"));
+        QCOMPARE(*lightCreateCall(QStringLiteral("Links"), QStringLiteral("192.0.2.21")).body,
+                 (QJsonObject{{QStringLiteral("name"), QStringLiteral("Links")},
+                              {QStringLiteral("host"), QStringLiteral("192.0.2.21")}}));
+        QCOMPARE(lightConfigCall(QStringLiteral("links"), {}).method, QStringLiteral("PUT"));
+        QCOMPARE(lightConfigCall(QStringLiteral("links"), {}).path, QStringLiteral("lights/links/config"));
+        QCOMPARE(lightDeleteCall(QStringLiteral("links")).method, QStringLiteral("DELETE"));
+        QCOMPARE(lightDeleteCall(QStringLiteral("links")).path, QStringLiteral("lights/links"));
+        QCOMPARE(*lightPresetCreateCall(QStringLiteral("Abend")).body,
+                 (QJsonObject{{QStringLiteral("name"), QStringLiteral("Abend")}}));
+        QCOMPARE(lightPresetOverwriteCall(QStringLiteral("abend")).path, QStringLiteral("light-presets/abend/save-current"));
+        QCOMPARE(lightPresetRenameCall(QStringLiteral("abend"), QStringLiteral("Nacht")).method, QStringLiteral("PUT"));
+        QCOMPARE(cameraStatusGetCall().path, QStringLiteral("status"));
+        QVERIFY(!cameraExportGetCall().body);
+    }
+
+    void sliderAndCheckValues()
+    {
+        QCOMPARE(cameraSliderText(QStringLiteral("white_balance_temperature"), 4600), QStringLiteral("4600 K"));
+        QCOMPARE(cameraSliderText(QStringLiteral("brightness"), -3), QStringLiteral("-3"));
+        const QJsonArray controls = QJsonDocument::fromJson(R"([
+            {"key": "focus_automatic_continuous", "type": "bool", "value": true},
+            {"key": "obsbot_hdr", "type": "int", "value": 0}])").array();
+        QCOMPARE(cameraCheckValue(controls, QStringLiteral("focus_automatic_continuous"), false), QJsonValue(false));
+        QCOMPARE(cameraCheckValue(controls, QStringLiteral("obsbot_hdr"), true), QJsonValue(1));
+        QCOMPARE(cameraCheckValue(controls, QStringLiteral("fehlt"), false), QJsonValue(0));
+    }
+
+    void lightPanel()
+    {
+        const QJsonArray lights = QJsonDocument::fromJson(R"([{"id": "links", "name": "Links"}])").array();
+        LightPanelView v = lightPanelView(connected(), lights, false);
+        QVERIFY(v.allEnabled && v.lampsEnabled && v.presetsEnabled && v.saveEnabled);
+        QVERIFY(!v.recallEnabled && !v.overwriteEnabled && !v.editEnabled);
+        v = lightPanelView(connected(), lights, true);
+        QVERIFY(v.recallEnabled && v.overwriteEnabled && v.editEnabled);
+        // Ohne Lampe: nichts zu schalten oder zu speichern, Abrufen und Löschen gehen
+        v = lightPanelView(connected(), {}, true);
+        QVERIFY(!v.allEnabled && !v.saveEnabled && !v.overwriteEnabled);
+        QVERIFY(v.lampsEnabled && v.recallEnabled && v.editEnabled);
+        QCOMPARE(lightPanelView(cameraServiceView(std::nullopt), lights, true), LightPanelView());
+    }
+
+    // Dialog «Lampen»: Adressen aus GET export, Anfragen für OK, Prüfung, «Verbindung prüfen»
+    void lightsDialogLogic()
+    {
+        const QJsonObject exported = QJsonDocument::fromJson(R"({"ok": true, "format_version": 1, "files": {
+            "licht.json": {"format_version": 1, "lights": [{"id": "links", "name": "Links", "host": "192.0.2.21"},
+                                                           {"id": "rechts", "name": "Rechts", "host": "192.0.2.22"}]},
+            "kameras.json": {}}, "errors": []})").object();
+        const QList<LightEntry> before = lightEntriesFromExport(exported);
+        QCOMPARE(before.size(), 2);
+        QCOMPARE(before.at(1), (LightEntry{QStringLiteral("rechts"), QStringLiteral("Rechts"), QStringLiteral("192.0.2.22")}));
+        QVERIFY(lightEntriesFromExport(QJsonObject()).isEmpty());
+
+        QVERIFY(lightsDialogCalls(before, before).isEmpty());
+        QList<LightEntry> after = before;
+        after.removeFirst();                                   // «Links» löschen
+        after[0].host = QStringLiteral(" 192.0.2.23:9123 ");   // Adresse ändern, Name gleich
+        after.append({QString(), QStringLiteral(" Oben "), QStringLiteral("192.0.2.24")});
+        const QList<CameraCall> calls = lightsDialogCalls(before, after);
+        QCOMPARE(calls.size(), 3);
+        QCOMPARE(calls.at(0).method + QLatin1Char(' ') + calls.at(0).path, QStringLiteral("DELETE lights/links"));
+        QCOMPARE(calls.at(1).path, QStringLiteral("lights/rechts/config"));
+        QCOMPARE(*calls.at(1).body, (QJsonObject{{QStringLiteral("host"), QStringLiteral("192.0.2.23:9123")}}));
+        QCOMPARE(calls.at(2).method + QLatin1Char(' ') + calls.at(2).path, QStringLiteral("POST lights"));
+        QCOMPARE(calls.at(2).body->value(QStringLiteral("name")).toString(), QStringLiteral("Oben"));
+
+        QVERIFY(lightsDialogProblem(after).isEmpty());
+        after[1].host = QStringLiteral("  ");
+        QCOMPARE(lightsDialogProblem(after), QStringLiteral("Lampe «Oben»: Adresse fehlt."));
+        after[1].name.clear();
+        QCOMPARE(lightsDialogProblem(after), QStringLiteral("Jede Lampe braucht einen Namen."));
+
+        CameraResult status;
+        status.status = 200;
+        status.body = QJsonDocument::fromJson(R"({"lights": [{"id": "links", "reachable": true},
+                                                             {"id": "rechts", "reachable": false}]})").object();
+        QCOMPARE(lightCheckResult(status, QStringLiteral("links")),
+                 (std::pair{QStringLiteral("✔ Lampe antwortet"), QStringLiteral("ok")}));
+        QCOMPARE(lightCheckResult(status, QStringLiteral("rechts")),
+                 (std::pair{QStringLiteral("Lampe antwortet nicht"), QStringLiteral("error")}));
+        QCOMPARE(lightCheckResult(status, QStringLiteral("weg")).second, QStringLiteral("error"));
+        status.status = 0;
+        status.error = QStringLiteral("keine Verbindung");
+        QCOMPARE(lightCheckResult(status, QStringLiteral("links")),
+                 (std::pair{QStringLiteral("keine Verbindung"), QStringLiteral("error")}));
+    }
+
+    // Licht-Presets nach dem Start einzeln (GET light-presets/<id>) wie die Kamera-Presets
+    void lightPresetsFetchedSingly()
+    {
+        CameraData data;
+        CameraServiceInfo info;
+        info.state = QString::fromLatin1(kCameraStateConnected);
+        info.status = QJsonDocument::fromJson(R"({"cameras": [], "lights": [{"id": "links", "name": "Links"}],
+            "light_presets": [{"id": "stream", "name": "Stream"}, {"id": "abend", "name": "Abend"}]})").object();
+        data.setService(info);
+        QCOMPARE(data.lightPresetsWithoutDetails(), (QStringList{QStringLiteral("stream"), QStringLiteral("abend")}));
+        CameraResult result;
+        result.status = 200;
+        result.body = QJsonDocument::fromJson(R"({"preset": {"id": "abend", "name": "Abend",
+            "lights": {"links": {"on": true, "brightness": 20, "temperature": 312}}}})").object();
+        QCOMPARE(data.applyResult(lightPresetGetCall(QStringLiteral("abend")), result), int(CameraData::Presets));
+        QCOMPARE(data.applyResult(lightPresetGetCall(QStringLiteral("abend")), result), 0);
+        QCOMPARE(data.lightPresetsWithoutDetails(), QStringList{QStringLiteral("stream")});
+        QCOMPARE(lightPresetRows(data.lightPresets(), data.lights()).at(1).cells,
+                 QStringList{QStringLiteral("ein · 20 % · 3200 K")});
+        result.body = QJsonDocument::fromJson(R"({"preset": {"id": "weg", "name": "Weg", "lights": {}}})").object();
+        QCOMPARE(data.applyResult(lightPresetGetCall(QStringLiteral("weg")), result), 0);
+    }
+
     void bundler()
     {
         CameraBundler b;

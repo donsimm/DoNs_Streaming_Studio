@@ -103,7 +103,7 @@ QString FieldSpinBox::textFromValue(double value) const
 // P09b, E-26: Titel und Linie wie der Rahmen des Kopfbereichs (Farbe border); P10a, Teil A 2:
 // Knöpfe in der Titelzeile.
 QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
-                 const QList<QToolButton *> &titleButtons)
+                 const QList<QToolButton *> &titleButtons, QLabel **titleText)
 {
     auto *w = new QWidget(parent);
     auto *column = new QVBoxLayout(w);
@@ -116,6 +116,12 @@ QWidget *section(const QString &title, QWidget *parent, QGridLayout **grid,
     label->setObjectName(QStringLiteral("propertySectionTitle"));
     titleRow->addWidget(label);
     titleRow->addStretch(1);
+    if (titleText) {
+        *titleText = new QLabel(w);
+        (*titleText)->setObjectName(QStringLiteral("propertySectionText"));
+        (*titleText)->setTextFormat(Qt::PlainText);
+        titleRow->addWidget(*titleText);
+    }
     for (QToolButton *b : titleButtons) {
         b->setParent(w);
         titleRow->addWidget(b);

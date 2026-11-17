@@ -4,11 +4,13 @@
 #include "camerasetupdialog.h"
 #include "coreclient.h"
 #include "dialogs.h"
+#include "lightsdialog.h"
 #include "panels.h"
 #include "presetnamedialog.h"
 #include "symbols.h"
 
 #include <QAbstractItemView>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGridLayout>
@@ -16,10 +18,12 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalBlocker>
+#include <QSlider>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStyle>
@@ -76,6 +80,38 @@ QLabel *hintLine(const QString &objectName, QWidget *parent)
     return label;
 }
 
+// Bildlauf wie das Dock «Eigenschaften» (docks.cpp, #propertiesScroll)
+QScrollArea *scrollColumn(const QString &objectName, QWidget *parent)
+{
+    auto *scroll = new QScrollArea(parent);
+    scroll->setObjectName(objectName);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    return scroll;
+}
+
+// Reglerzeile «Regler + Wert fester Breite» (Entscheid 1 des Nutzers, 2026-11-17), wie «Lautstärke»
+// im Dock «Eigenschaften»: Beschriftung in Spalte column, Regler daneben (dehnbar), Wert rechtsbündig
+// mit der Breite des längsten Werts, damit ein neuer Wert die Anordnung nicht ändert (Regel 9).
+QSlider *sliderRow(QGridLayout *grid, int row, int column, QLabel *label, QLabel **value, QWidget *parent)
+{
+    auto *slider = new QSlider(Qt::Horizontal, parent);
+    slider->setAccessibleName(label->text());
+    slider->setEnabled(false);
+    label->setBuddy(slider);
+    *value = new QLabel(QStringLiteral("–"), parent);
+    (*value)->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    int width = 0;
+    for (const QString &longest : {QStringLiteral("−00000"), QStringLiteral("0000 K"), QStringLiteral("100 %")})
+        width = std::max(width, (*value)->fontMetrics().horizontalAdvance(longest));
+    (*value)->setMinimumWidth(width);
+    grid->addWidget(label, row, column);
+    grid->addWidget(slider, row, column + 1);
+    grid->addWidget(*value, row, column + 2);
+    return slider;
+}
+
 } // namespace
 
 CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m_theme(theme)
@@ -86,6 +122,9 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
     m_holdTimer = new QTimer(this);
     m_holdTimer->setSingleShot(true);
     connect(m_holdTimer, &QTimer::timeout, this, &CameraPage::onHoldTimer);
+    m_bundleTimer = new QTimer(this);
+    m_bundleTimer->setSingleShot(true);
+    connect(m_bundleTimer, &QTimer::timeout, this, &CameraPage::onBundleTimer);
 
     auto *column = new QVBoxLayout(this);
     column->setContentsMargins(0, 0, 0, 0);
@@ -102,11 +141,7 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
     m_columns->setChildrenCollapsible(false);
     // Links mit Bildlauf wie das Dock «Eigenschaften»: Die Spalte streckt das Fenster nicht über
     // 1280x800 hinaus (scripts/bildschirmfoto), bei kleiner Höhe läuft sie senkrecht.
-    auto *leftScroll = new QScrollArea(m_columns);
-    leftScroll->setObjectName(QStringLiteral("cameraLeftScroll"));
-    leftScroll->setWidgetResizable(true);
-    leftScroll->setFrameShape(QFrame::NoFrame);
-    leftScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    QScrollArea *leftScroll = scrollColumn(QStringLiteral("cameraLeftScroll"), m_columns);
     auto *left = new QWidget;
     left->setObjectName(QStringLiteral("cameraLeftColumn"));
     auto *leftColumn = new QVBoxLayout(left);
@@ -120,12 +155,13 @@ CameraPage::CameraPage(const Theme &theme, QWidget *parent) : QWidget(parent), m
                                 + leftScroll->verticalScrollBar()->sizeHint().width());
     m_columns->addWidget(leftScroll);
 
-    // Mitte und rechts: Bereiche mit Titel, Inhalt ab e3
-    QWidget *image = dockPanel(dss::cameraImageTitle(nullptr), new QWidget, m_columns);
+    // Mitte «Bildwerte» mit Bildlauf, rechts «Licht» (P15 e3); rechts ebenfalls mit Bildlauf, damit
+    // viele Lampen das Fenster nicht über 1280x800 hinaus strecken.
+    QWidget *image = dockPanel(dss::cameraImageTitle(nullptr), createImagePanel(), m_columns);
     image->setObjectName(QStringLiteral("cameraImagePanel"));
     m_imageTitle = image->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"));
     m_columns->addWidget(image);
-    QWidget *light = dockPanel(QStringLiteral("Licht"), new QWidget, m_columns);
+    QWidget *light = dockPanel(QStringLiteral("Licht"), createLightPanel(), m_columns);
     light->setObjectName(QStringLiteral("cameraLightPanel"));
     m_columns->addWidget(light);
     m_columns->setStretchFactor(0, 0);
@@ -404,6 +440,211 @@ QWidget *CameraPage::createPresetsPanel()
     return box;
 }
 
+QWidget *CameraPage::createImagePanel()
+{
+    QScrollArea *scroll = scrollColumn(QStringLiteral("cameraImageScroll"), nullptr);
+    auto *form = new QWidget(scroll);
+    form->setObjectName(QStringLiteral("cameraImageForm"));
+    auto *formColumn = new QVBoxLayout(form);
+    formColumn->setContentsMargins(0, 0, 0, 0);
+    formColumn->setSpacing(0);
+
+    // Je Bereich aus cameraControlSections() alle Zeilen fest (Regel 9); «Zurücksetzen» in der
+    // Titelzeile, davor der Hinweis des Bereichs («Diese Kamera hat das nicht.»).
+    for (const QString &title : dss::cameraControlSections()) {
+        SectionWidgets s;
+        s.reset = symbolButton(QStringLiteral("zuruecksetzen.svg"), QStringLiteral("Z"),
+                               QStringLiteral("%1 zurücksetzen").arg(title), nullptr);
+        s.reset->setObjectName(QStringLiteral("cameraSectionReset_") + title);
+        QGridLayout *grid = nullptr;
+        QWidget *sec = section(title, form, &grid, {s.reset}, &s.hint);
+        sec->setObjectName(QStringLiteral("cameraSection_") + title);
+        connect(s.reset, &QToolButton::clicked, this, [this, title] {
+            if (!m_cameraId.isEmpty())
+                send(dss::cameraSectionResetCall(m_cameraId, m_controlRows, title));
+        });
+        m_sectionWidgets.insert(title, s);
+
+        int row = 0;
+        for (const dss::CameraControlSpec &spec : dss::cameraControlSpecs()) {
+            if (spec.section != title)
+                continue;
+            const QString key = spec.key;
+            ControlWidgets w;
+            // Marke «•» vor gemerkten Werten (Entscheid 3), Platz immer da
+            w.mark = new QLabel(QStringLiteral("•"), sec);
+            w.mark->setObjectName(QStringLiteral("cameraRememberedMark"));
+            w.mark->setProperty("controlKey", key); // für tst_fensterkameras
+            w.mark->setToolTip(QStringLiteral("Gemerkt: Der Dienst setzt den Wert, sobald die Kamera erscheint."));
+            QSizePolicy keep = w.mark->sizePolicy();
+            keep.setRetainSizeWhenHidden(true);
+            w.mark->setSizePolicy(keep);
+            w.mark->hide();
+            grid->addWidget(w.mark, row, 0);
+            QWidget *control = nullptr;
+            switch (spec.kind) {
+            case dss::CameraControlKind::Slider:
+                w.label = new QLabel(spec.label, sec);
+                w.slider = sliderRow(grid, row, 1, w.label, &w.value, sec);
+                w.slider->setObjectName(QStringLiteral("cameraControl_") + key);
+                connect(w.slider, &QSlider::valueChanged, this, [this, key](int value) {
+                    m_controlWidgets.value(key).value->setText(dss::cameraSliderText(key, value));
+                    if (!m_cameraId.isEmpty())
+                        putBundled(dss::cameraControlsPutCall(m_cameraId, {}).path, {{key, value}});
+                });
+                connect(w.slider, &QSlider::sliderReleased, this, &CameraPage::flushBundled);
+                control = w.slider;
+                break;
+            case dss::CameraControlKind::Choice:
+                w.label = new QLabel(spec.label, sec);
+                w.choice = new QComboBox(sec);
+                w.choice->setObjectName(QStringLiteral("cameraControl_") + key);
+                w.choice->setAccessibleName(spec.label);
+                w.choice->setPlaceholderText(QStringLiteral("–"));
+                w.choice->setMinimumContentsLength(14);
+                w.choice->setEnabled(false);
+                w.label->setBuddy(w.choice);
+                connect(w.choice, &QComboBox::activated, this, [this, key](int index) {
+                    if (!m_cameraId.isEmpty())
+                        send(dss::cameraControlsPutCall(
+                            m_cameraId, {{key, m_controlWidgets.value(key).choice->itemData(index).toInt()}}));
+                });
+                grid->addWidget(w.label, row, 1);
+                grid->addWidget(w.choice, row, 2, 1, 2, Qt::AlignLeft);
+                control = w.choice;
+                break;
+            case dss::CameraControlKind::Check:
+                // Kästchen über die Spalten von Regler und Wert (wie «Wiederholen» in «Eigenschaften»)
+                w.check = new QCheckBox(spec.label, sec);
+                w.check->setObjectName(QStringLiteral("cameraControl_") + key);
+                w.check->setEnabled(false);
+                connect(w.check, &QCheckBox::clicked, this, [this, key](bool checked) {
+                    if (!m_cameraId.isEmpty())
+                        send(dss::cameraControlsPutCall(
+                            m_cameraId, {{key, dss::cameraCheckValue(m_data.controls(m_cameraId), key, checked)}}));
+                });
+                grid->addWidget(w.check, row, 1, 1, 3);
+                control = w.check;
+                break;
+            case dss::CameraControlKind::Text:
+                w.label = new QLabel(spec.label, sec);
+                w.value = new QLabel(QStringLiteral("–"), sec);
+                w.value->setObjectName(QStringLiteral("cameraControl_") + key);
+                grid->addWidget(w.label, row, 1);
+                grid->addWidget(w.value, row, 2, 1, 2);
+                control = w.value;
+                break;
+            }
+            // Kontextmenü «Zurücksetzen» an gemerkten Werten (Plan 8)
+            for (QWidget *target : {static_cast<QWidget *>(w.label), control}) {
+                if (!target)
+                    continue;
+                target->setContextMenuPolicy(Qt::CustomContextMenu);
+                connect(target, &QWidget::customContextMenuRequested, this, [this, key, target](const QPoint &pos) {
+                    showControlMenu(key, target->mapToGlobal(pos));
+                });
+            }
+            m_controlWidgets.insert(key, w);
+            ++row;
+        }
+        grid->setColumnStretch(2, 1);
+        formColumn->addWidget(sec);
+    }
+    formColumn->addStretch(1);
+    scroll->setWidget(form);
+    return scroll;
+}
+
+QWidget *CameraPage::createLightPanel()
+{
+    QScrollArea *scroll = scrollColumn(QStringLiteral("cameraLightScroll"), nullptr);
+    auto *box = new QWidget(scroll);
+    box->setObjectName(QStringLiteral("cameraLightColumn"));
+    auto *column = new QVBoxLayout(box);
+    column->setContentsMargins(0, 0, 0, 0);
+    column->setSpacing(0);
+
+    // Leiste oben (Entwurf 1B): «Alle ein», «Alle aus», rechts «Lampen …»
+    m_allOn = new QPushButton(QStringLiteral("Alle ein"));
+    m_allOn->setObjectName(QStringLiteral("cameraLightsAllOn"));
+    m_allOff = new QPushButton(QStringLiteral("Alle aus"));
+    m_allOff->setObjectName(QStringLiteral("cameraLightsAllOff"));
+    m_lamps = new QPushButton(QStringLiteral("Lampen …"));
+    m_lamps->setObjectName(QStringLiteral("cameraLamps"));
+    connect(m_allOn, &QPushButton::clicked, this, [this] { send(dss::lightsAllCall(true)); });
+    connect(m_allOff, &QPushButton::clicked, this, [this] { send(dss::lightsAllCall(false)); });
+    connect(m_lamps, &QPushButton::clicked, this, &CameraPage::openLights);
+    column->addWidget(buttonBar({m_allOn, m_allOff}, {m_lamps}, box));
+
+    // Je Lampe ein Bereich (rebuildLights), darunter «Licht-Presets»
+    m_lightSections = new QVBoxLayout;
+    m_lightSections->setContentsMargins(0, 0, 0, 0);
+    m_lightSections->setSpacing(0);
+    column->addLayout(m_lightSections);
+    column->addWidget(createLightPresetsSection(box), 1);
+    scroll->setWidget(box);
+    scroll->setMinimumWidth(box->minimumSizeHint().width() + scroll->verticalScrollBar()->sizeHint().width());
+    return scroll;
+}
+
+QWidget *CameraPage::createLightPresetsSection(QWidget *parent)
+{
+    auto *box = new QWidget(parent);
+    auto *column = new QVBoxLayout(box);
+    column->setContentsMargins(0, 0, 0, 0);
+    column->setSpacing(0);
+    // Titel und Linie wie die Bereiche, die Liste darunter über die ganze Breite (Entwurf 1B)
+    QGridLayout *grid = nullptr;
+    column->addWidget(section(QStringLiteral("Licht-Presets"), box, &grid));
+
+    m_lightPresets = new QTreeWidget(box);
+    m_lightPresets->setObjectName(QStringLiteral("cameraLightPresets"));
+    m_lightPresets->setAccessibleName(QStringLiteral("Licht-Presets"));
+    m_lightPresets->setColumnCount(1);
+    m_lightPresets->setHeaderLabels({QStringLiteral("Name")});
+    m_lightPresets->setRootIsDecorated(false);
+    m_lightPresets->setUniformRowHeights(true);
+    m_lightPresets->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_lightPresets->header()->setStretchLastSection(true);
+    m_lightPresets->setMinimumHeight(m_lightPresets->fontMetrics().lineSpacing() * 6);
+    connect(m_lightPresets, &QTreeWidget::itemSelectionChanged, this, &CameraPage::refresh);
+    // Doppelklick = Abrufen wie bei «Positionen»
+    connect(m_lightPresets, &QTreeWidget::itemDoubleClicked, this, [this] {
+        if (m_lightRecall->isEnabled())
+            send(dss::lightPresetRecallCall(selectedLightPresetId()));
+    });
+    column->addWidget(m_lightPresets, 1);
+
+    m_lightRecall = new QPushButton(QStringLiteral("Abrufen"));
+    m_lightRecall->setObjectName(QStringLiteral("cameraLightPresetRecall"));
+    m_lightSave = new QPushButton(QStringLiteral("Aktuelles Licht speichern …"));
+    m_lightSave->setObjectName(QStringLiteral("cameraLightPresetSave"));
+    m_lightOverwrite = new QPushButton(QStringLiteral("Überschreiben"));
+    m_lightOverwrite->setObjectName(QStringLiteral("cameraLightPresetOverwrite"));
+    m_lightRename = new QPushButton(QStringLiteral("Umbenennen"));
+    m_lightRename->setObjectName(QStringLiteral("cameraLightPresetRename"));
+    m_lightRemove = new QPushButton(QStringLiteral("Löschen"));
+    m_lightRemove->setObjectName(QStringLiteral("cameraLightPresetRemove"));
+    connect(m_lightRecall, &QPushButton::clicked, this, [this] {
+        if (const QString id = selectedLightPresetId(); !id.isEmpty())
+            send(dss::lightPresetRecallCall(id));
+    });
+    connect(m_lightSave, &QPushButton::clicked, this, &CameraPage::saveLightPreset);
+    connect(m_lightOverwrite, &QPushButton::clicked, this, [this] {
+        const QString id = selectedLightPresetId();
+        const QString name = selectedLightPresetName();
+        if (!id.isEmpty())
+            send(dss::lightPresetOverwriteCall(id),
+                 [this, name](const dss::CameraResult &r) { reportResult(r, dss::savedStatusText(name)); });
+    });
+    connect(m_lightRename, &QPushButton::clicked, this, &CameraPage::renameLightPreset);
+    connect(m_lightRemove, &QPushButton::clicked, this, &CameraPage::removeLightPreset);
+    // Fünf Knöpfe: Umbruch auf zwei Zeilen wie «Positionen» (Entscheid 1)
+    column->addWidget(buttonBar({m_lightRecall, m_lightSave, m_lightOverwrite}, {}, box));
+    column->addWidget(buttonBar({m_lightRename, m_lightRemove}, {}, box));
+    return box;
+}
+
 void CameraPage::setClient(dss::CoreClient *client)
 {
     m_client = client;
@@ -421,6 +662,7 @@ void CameraPage::onServiceChanged()
     if (!m_service.usable) {
         stopHolding(false); // Dienst weg: der Totmann des Dienstes hält an
         m_presetsFetched.clear();
+        m_lightPresetsFetched.clear();
         m_pending.clear();
     }
     const QString before = m_cameraId;
@@ -428,6 +670,7 @@ void CameraPage::onServiceChanged()
     if (m_service.usable && !wasUsable && m_cameraId == before)
         fetchCamera();
     fetchPresets();
+    fetchLightPresets();
     refresh();
 }
 
@@ -452,10 +695,14 @@ void CameraPage::applyParts(int parts)
 {
     if (parts & dss::CameraData::Cameras)
         refreshChoice();
-    if (parts & dss::CameraData::Presets)
+    if (parts & dss::CameraData::Presets) {
         fetchPresets();
+        fetchLightPresets();
+    }
     if (m_setupDialog && (parts & (dss::CameraData::Config | dss::CameraData::Controls)))
         m_setupDialog->refresh();
+    if (m_lightsDialog && (parts & dss::CameraData::Lights))
+        m_lightsDialog->refresh();
     if (parts)
         refresh();
 }
@@ -488,6 +735,7 @@ void CameraPage::switchCamera(const QString &cameraId)
     if (cameraId == m_cameraId)
         return;
     stopHolding(true);
+    flushBundled(); // Regler der bisherigen Kamera zuerst
     m_cameraId = cameraId;
     {
         const QSignalBlocker block(m_presets);
@@ -519,6 +767,19 @@ void CameraPage::fetchPresets()
     }
 }
 
+void CameraPage::fetchLightPresets()
+{
+    // Wie fetchPresets: camera_service bringt nur Kennung und Name der Licht-Presets
+    if (!m_service.usable)
+        return;
+    for (const QString &id : m_data.lightPresetsWithoutDetails()) {
+        if (m_lightPresetsFetched.contains(id))
+            continue;
+        m_lightPresetsFetched.insert(id);
+        send(dss::lightPresetGetCall(id));
+    }
+}
+
 void CameraPage::send(const dss::CameraCall &call, std::function<void(const dss::CameraResult &)> done)
 {
     if (!m_client)
@@ -547,15 +808,52 @@ void CameraPage::releaseDirection()
         return;
     m_holdTimer->stop();
     if (const std::optional<dss::CameraCall> call = m_hold.release(m_clock.elapsed()))
-        send(*call);
+        sendHoldCall(*call);
 }
 
 void CameraPage::stopHolding(bool sendStop)
 {
     m_holdTimer->stop();
     if (sendStop && m_hold.moving())
-        send(dss::cameraStopCall(m_hold.cameraId()));
+        sendHoldCall(dss::cameraStopCall(m_hold.cameraId()));
     m_hold.cancel();
+}
+
+void CameraPage::sendHoldCall(const dss::CameraCall &call)
+{
+    // Entscheid Lotse (P15 e3): Lehnt der Dienst die Fahrt ab, steht die Meldung nur einmal je
+    // Halten in der Statuszeile, nicht bei jeder Wiederholung.
+    const int serial = m_hold.serial();
+    send(call, [this, serial](const dss::CameraResult &result) {
+        const QString error = dss::cameraResultError(result);
+        if (!error.isEmpty() && m_hold.reportFailure(serial))
+            emit statusMessage(QStringLiteral("Kamera-Dienst: ") + error);
+    });
+}
+
+void CameraPage::putBundled(const QString &path, const QJsonObject &values)
+{
+    if (const std::optional<dss::CameraCall> call = m_bundler.put(path, values, m_clock.elapsed()))
+        send(*call);
+    const int due = m_bundler.nextDueMs(m_clock.elapsed());
+    if (due >= 0 && !m_bundleTimer->isActive())
+        m_bundleTimer->start(due);
+}
+
+void CameraPage::onBundleTimer()
+{
+    for (const dss::CameraCall &call : m_bundler.tick(m_clock.elapsed()))
+        send(call);
+    const int due = m_bundler.nextDueMs(m_clock.elapsed());
+    if (due >= 0)
+        m_bundleTimer->start(due);
+}
+
+void CameraPage::flushBundled()
+{
+    m_bundleTimer->stop();
+    for (const dss::CameraCall &call : m_bundler.flush(m_clock.elapsed()))
+        send(call);
 }
 
 void CameraPage::scheduleHold()
@@ -570,7 +868,7 @@ void CameraPage::scheduleHold()
 void CameraPage::onHoldTimer()
 {
     if (const std::optional<dss::CameraCall> call = m_hold.tick(m_clock.elapsed()))
-        send(*call);
+        sendHoldCall(*call);
     scheduleHold();
 }
 
@@ -715,6 +1013,281 @@ void CameraPage::refresh()
 
     if (m_imageTitle)
         m_imageTitle->setText(dss::cameraImageTitle(camera));
+    refreshImage(camera, controls);
+    refreshLights();
+}
+
+void CameraPage::refreshImage(const dss::CameraEntry *camera, const QJsonArray &controls)
+{
+    // Ein Ereignis setzt nur Werte, Freigaben, Tooltips und Marken (Regel 9). Einen Regler, den der
+    // Nutzer gerade zieht, lässt der Stand des Dienstes in Ruhe.
+    m_controlRows = dss::cameraControlRows(controls, camera, m_service);
+    for (const dss::CameraControlRow &row : std::as_const(m_controlRows)) {
+        const ControlWidgets w = m_controlWidgets.value(row.spec.key);
+        w.mark->setVisible(row.remembered);
+        if (w.label) {
+            w.label->setEnabled(row.enabled);
+            w.label->setToolTip(row.toolTip);
+        }
+        switch (row.spec.kind) {
+        case dss::CameraControlKind::Slider:
+            if (!w.slider->isSliderDown()) {
+                const QSignalBlocker block(w.slider);
+                if (row.available) {
+                    w.slider->setRange(row.minimum, row.maximum);
+                    w.slider->setSingleStep(row.step);
+                    w.slider->setPageStep(std::max(row.step, (row.maximum - row.minimum) / 10));
+                    w.slider->setValue(row.value);
+                }
+                w.value->setText(row.valueText);
+            }
+            w.slider->setEnabled(row.enabled);
+            w.slider->setToolTip(row.toolTip);
+            w.value->setEnabled(row.enabled);
+            break;
+        case dss::CameraControlKind::Choice: {
+            const QSignalBlocker block(w.choice);
+            bool same = w.choice->count() == row.menu.size();
+            for (qsizetype i = 0; same && i < row.menu.size(); ++i)
+                same = w.choice->itemData(int(i)).toInt() == row.menu.at(i).first
+                       && w.choice->itemText(int(i)) == row.menu.at(i).second;
+            if (!same) {
+                w.choice->clear();
+                for (const auto &[value, label] : row.menu)
+                    w.choice->addItem(label, value);
+            }
+            w.choice->setCurrentIndex(row.available ? w.choice->findData(row.value) : -1);
+            w.choice->setEnabled(row.enabled);
+            w.choice->setToolTip(row.toolTip);
+            break;
+        }
+        case dss::CameraControlKind::Check: {
+            const QSignalBlocker block(w.check);
+            w.check->setChecked(row.available && row.value != 0);
+            w.check->setEnabled(row.enabled);
+            w.check->setToolTip(row.toolTip);
+            break;
+        }
+        case dss::CameraControlKind::Text:
+            w.value->setText(row.valueText);
+            w.value->setEnabled(row.enabled);
+            w.value->setToolTip(row.toolTip);
+            break;
+        }
+    }
+    for (auto it = m_sectionWidgets.cbegin(); it != m_sectionWidgets.cend(); ++it) {
+        it->reset->setEnabled(dss::cameraSectionResettable(m_controlRows, it.key()));
+        it->hint->setText(dss::cameraSectionHint(m_controlRows, it.key()));
+    }
+}
+
+void CameraPage::showControlMenu(const QString &key, const QPoint &globalPos)
+{
+    // «Zurücksetzen» nur an gemerkten, bedienbaren Werten: null = Standard des Geräts, vergessen
+    for (const dss::CameraControlRow &row : std::as_const(m_controlRows)) {
+        if (row.spec.key != key || !row.remembered || !row.enabled || m_cameraId.isEmpty())
+            continue;
+        QMenu menu(this);
+        const QString cameraId = m_cameraId;
+        menu.addAction(QStringLiteral("Zurücksetzen"), this, [this, cameraId, key] {
+            send(dss::cameraControlsPutCall(cameraId, {{key, QJsonValue::Null}}));
+        });
+        menu.exec(globalPos);
+        return;
+    }
+}
+
+void CameraPage::rebuildLights()
+{
+    const QStringList key = dss::lightLayoutKey(m_data.lights());
+    if ((m_lightsBuilt && key == m_lightLayout) || m_lightsDialog)
+        return;
+    flushBundled();
+    for (const LightWidgets &w : std::as_const(m_lightWidgets))
+        delete w.section;
+    m_lightWidgets.clear();
+
+    QStringList headers{QStringLiteral("Name")};
+    for (const dss::LightRow &row : dss::lightRows(m_data.lights(), m_service)) {
+        LightWidgets w;
+        w.id = row.id;
+        QGridLayout *grid = nullptr;
+        w.section = section(row.name, m_lightSections->parentWidget(), &grid, {}, &w.state);
+        w.section->setObjectName(QStringLiteral("cameraLight_") + row.id);
+        w.on = new QCheckBox(QStringLiteral("Ein"), w.section);
+        w.on->setObjectName(QStringLiteral("cameraLightOn_") + row.id);
+        w.on->setEnabled(false);
+        grid->addWidget(w.on, 0, 1, 1, 2);
+        w.brightnessLabel = new QLabel(QStringLiteral("Helligkeit"), w.section);
+        w.brightness = sliderRow(grid, 1, 0, w.brightnessLabel, &w.brightnessValue, w.section);
+        w.brightness->setObjectName(QStringLiteral("cameraLightBrightness_") + row.id);
+        w.brightness->setRange(dss::kLightBrightnessMin, dss::kLightBrightnessMax);
+        w.brightness->setPageStep(10);
+        w.kelvinLabel = new QLabel(QStringLiteral("Farbtemperatur"), w.section);
+        w.kelvin = sliderRow(grid, 2, 0, w.kelvinLabel, &w.kelvinValue, w.section);
+        w.kelvin->setObjectName(QStringLiteral("cameraLightKelvin_") + row.id);
+        w.kelvin->setRange(dss::kLightKelvinMin, dss::kLightKelvinMax);
+        w.kelvin->setSingleStep(dss::kLightKelvinStep);
+        w.kelvin->setPageStep(dss::kLightKelvinStep * 10);
+        grid->setColumnStretch(1, 1);
+
+        const QString path = dss::lightPutCall(row.id, {}).path;
+        const QString id = row.id;
+        connect(w.on, &QCheckBox::clicked, this, [this, id](bool on) {
+            send(dss::lightPutCall(id, {{QStringLiteral("on"), on}}));
+        });
+        QLabel *brightnessValue = w.brightnessValue;
+        connect(w.brightness, &QSlider::valueChanged, this, [this, path, brightnessValue](int value) {
+            brightnessValue->setText(dss::lightBrightnessText(value));
+            putBundled(path, {{QStringLiteral("brightness"), value}});
+        });
+        QLabel *kelvinValue = w.kelvinValue;
+        connect(w.kelvin, &QSlider::valueChanged, this, [this, path, kelvinValue](int value) {
+            // Schritte von 50 K (Plan 2.6); der Dienst bekommt Mired
+            const int kelvin = qRound(value / double(dss::kLightKelvinStep)) * dss::kLightKelvinStep;
+            kelvinValue->setText(dss::lightKelvinText(kelvin));
+            putBundled(path, {{QStringLiteral("temperature"), dss::lightMiredFromKelvin(kelvin)}});
+        });
+        connect(w.brightness, &QSlider::sliderReleased, this, &CameraPage::flushBundled);
+        connect(w.kelvin, &QSlider::sliderReleased, this, &CameraPage::flushBundled);
+        m_lightSections->addWidget(w.section);
+        m_lightWidgets.append(w);
+        headers << row.name;
+    }
+    m_lightPresets->setColumnCount(int(headers.size()));
+    m_lightPresets->setHeaderLabels(headers);
+    const int digit = m_lightPresets->fontMetrics().horizontalAdvance(QLatin1Char('0'));
+    for (int i = 0; i + 1 < headers.size(); ++i)
+        m_lightPresets->setColumnWidth(i, digit * (i == 0 ? 12 : 18));
+    m_lightPresetRows.clear(); // Spalten neu: Liste neu füllen
+    m_lightLayout = key;
+    m_lightsBuilt = true;
+}
+
+QString CameraPage::selectedLightPresetId() const
+{
+    const QList<QTreeWidgetItem *> selected = m_lightPresets->selectedItems();
+    return selected.isEmpty() ? QString() : selected.first()->data(0, kPresetIdRole).toString();
+}
+
+QString CameraPage::selectedLightPresetName() const
+{
+    const QList<QTreeWidgetItem *> selected = m_lightPresets->selectedItems();
+    return selected.isEmpty() ? QString() : selected.first()->text(0);
+}
+
+void CameraPage::refreshLights()
+{
+    rebuildLights();
+    for (const dss::LightRow &row : dss::lightRows(m_data.lights(), m_service)) {
+        const auto it = std::find_if(m_lightWidgets.cbegin(), m_lightWidgets.cend(),
+                                     [&row](const LightWidgets &w) { return w.id == row.id; });
+        if (it == m_lightWidgets.cend())
+            continue; // neue Lampe: Bereich erst nach dem Dialog «Lampen»
+        it->state->setText(row.stateText);
+        setState(it->state, row.stateKey);
+        {
+            const QSignalBlocker block(it->on);
+            it->on->setChecked(row.on);
+        }
+        it->on->setEnabled(row.enabled);
+        if (!it->brightness->isSliderDown()) {
+            const QSignalBlocker block(it->brightness);
+            it->brightness->setValue(row.brightness);
+            it->brightnessValue->setText(row.brightnessText);
+        }
+        if (!it->kelvin->isSliderDown()) {
+            const QSignalBlocker block(it->kelvin);
+            it->kelvin->setValue(row.kelvin);
+            it->kelvinValue->setText(row.kelvinText);
+        }
+        for (QWidget *w : std::initializer_list<QWidget *>{it->brightnessLabel, it->brightness, it->brightnessValue,
+                                                           it->kelvinLabel, it->kelvin, it->kelvinValue})
+            w->setEnabled(row.enabled);
+    }
+
+    // Licht-Presets nur neu, wenn sich Zeilen ändern; die Wahl bleibt beim selben Preset
+    const QList<dss::LightPresetRow> rows = dss::lightPresetRows(m_data.lightPresets(), m_data.lights());
+    if (rows != m_lightPresetRows) {
+        const QString selected = selectedLightPresetId();
+        const QSignalBlocker block(m_lightPresets);
+        m_lightPresets->clear();
+        for (const dss::LightPresetRow &row : rows) {
+            auto *item = new QTreeWidgetItem(QStringList{row.name} + row.cells);
+            item->setData(0, kPresetIdRole, row.id);
+            m_lightPresets->addTopLevelItem(item);
+            if (row.id == selected) {
+                m_lightPresets->setCurrentItem(item);
+                item->setSelected(true);
+            }
+        }
+        m_lightPresetRows = rows;
+    }
+    const dss::LightPanelView view =
+        dss::lightPanelView(m_service, m_data.lights(), !selectedLightPresetId().isEmpty());
+    m_allOn->setEnabled(view.allEnabled);
+    m_allOff->setEnabled(view.allEnabled);
+    m_lamps->setEnabled(view.lampsEnabled);
+    m_lightPresets->setEnabled(view.presetsEnabled);
+    m_lightRecall->setEnabled(view.recallEnabled);
+    m_lightSave->setEnabled(view.saveEnabled);
+    m_lightOverwrite->setEnabled(view.overwriteEnabled);
+    m_lightRename->setEnabled(view.editEnabled);
+    m_lightRemove->setEnabled(view.editEnabled);
+}
+
+void CameraPage::saveLightPreset()
+{
+    // Wie «Position speichern», nur mit Name (Entwurf Seite 5, Entscheid 1)
+    auto *dialog = new PresetNameDialog(
+        QStringLiteral("Licht speichern"),
+        QStringLiteral("Gespeichert wird der Stand aller Lampen. Eine Lampe, die nicht antwortet, bleibt beim "
+                       "Abrufen unverändert."),
+        false, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        const QString name = dialog->name();
+        send(dss::lightPresetCreateCall(name),
+             [this, name](const dss::CameraResult &r) { reportResult(r, dss::savedStatusText(name)); });
+    });
+    dialog->open();
+}
+
+void CameraPage::renameLightPreset()
+{
+    const QString id = selectedLightPresetId();
+    QString name = selectedLightPresetName();
+    if (id.isEmpty() || !askText(this, QStringLiteral("Licht-Preset umbenennen"), QStringLiteral("Neuer Name"), &name))
+        return;
+    name = name.trimmed();
+    send(dss::lightPresetRenameCall(id, name),
+         [this, name](const dss::CameraResult &r) { reportResult(r, dss::savedStatusText(name)); });
+}
+
+void CameraPage::removeLightPreset()
+{
+    const QString id = selectedLightPresetId();
+    const QString name = selectedLightPresetName();
+    if (id.isEmpty()
+        || !confirm(this, QStringLiteral("Licht-Preset löschen?"), QStringLiteral("Licht-Preset «%1» löschen?").arg(name),
+                    QStringLiteral("Löschen"), QStringLiteral("Abbrechen")))
+        return;
+    send(dss::lightPresetDeleteCall(id),
+         [this, name](const dss::CameraResult &r) { reportResult(r, dss::deletedStatusText(name)); });
+}
+
+void CameraPage::openLights()
+{
+    if (!m_client || m_lightsDialog)
+        return;
+    m_lightsDialog = new LightsDialog(m_client, &m_data, this);
+    m_lightsDialog->setAttribute(Qt::WA_DeleteOnClose);
+    // Nach dem Dialog die Bereiche der Lampen neu (Plan 8); der Dialog wird erst danach gelöscht
+    connect(m_lightsDialog, &QDialog::finished, this, [this] {
+        m_lightsDialog = nullptr;
+        refreshLights();
+    });
+    m_lightsDialog->open();
 }
 
 void CameraPage::reportResult(const dss::CameraResult &result, const QString &okText)

@@ -333,6 +333,13 @@ QToolButton#connectionButton[state="connected"] { border-color: @stateConnected@
 #cameraStateDetail[state="error"] { color: @stateError@; }
 #cameraMoveHint[state="warning"] { color: @stateConnecting@; }
 #cameraBlockedHint { color: @stateError@; }
+/* P15 e3: Text rechts in der Titelzeile eines Bereichs («erreichbar» der Lampen, Hinweis eines
+   Bereichs der Bildwerte) und Ergebnis von «Verbindung prüfen» in den Farben der Kopfzeile ohne
+   Fettdruck; Marke «•» vor gemerkten Bildwerten (Entscheid 3 des Nutzers). */
+#propertySectionText, #lightsCheckResult { color: @textMuted@; }
+#propertySectionText[state="ok"], #lightsCheckResult[state="ok"] { color: @stateConnected@; }
+#propertySectionText[state="error"], #lightsCheckResult[state="error"] { color: @stateError@; }
+#cameraRememberedMark { color: @primaryLighter@; }
 /* Bereiche im Unterreiter «Live» wie ein Dock: Titel wie QDockWidget::title, Inhalt wie
    QDockWidget > QWidget. */
 #chatBotPanelTitle { background-color: @dockTitle@; border: 1px solid @border@; color: @text@;
@@ -353,7 +360,8 @@ QPlainTextEdit { background-color: @input@; border-radius: 4px; padding: 2px 4px
                  border: 1px solid @input@; }
 QPlainTextEdit:hover { background-color: @inputHover@; border-color: @inputBorderHover@; }
 QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; }
-#propertiesScroll, #propertiesForm, #cameraLeftScroll, #cameraLeftColumn { background: transparent; border: none; }
+#propertiesScroll, #propertiesForm, #cameraLeftScroll, #cameraLeftColumn, #cameraImageScroll, #cameraImageForm,
+#cameraLightScroll, #cameraLightColumn { background: transparent; border: none; }
 #dockButtons QToolButton::menu-indicator { image: none; width: 0px; }
 
 #hintLabel { color: @textMuted@; }
@@ -372,7 +380,9 @@ QPlainTextEdit:focus { background-color: @inputHover@; border-color: @primary@; 
 #queuesList::item:selected:hover, #cameraPresets::item, #cameraPresets::item:hover,
 #cameraPresets::item:selected, #cameraPresets::item:selected:hover, #cameraRemembered::item,
 #cameraRemembered::item:hover, #cameraRemembered::item:selected,
-#cameraRemembered::item:selected:hover { border-radius: 0px;
+#cameraRemembered::item:selected:hover, #cameraLightPresets::item, #cameraLightPresets::item:hover,
+#cameraLightPresets::item:selected, #cameraLightPresets::item:selected:hover, #lightsList::item,
+#lightsList::item:hover, #lightsList::item:selected, #lightsList::item:selected:hover { border-radius: 0px;
     border: none; padding: 2px 2px; }
 QHeaderView { background: transparent; border: none; }
 QHeaderView::section { background-color: @dockTitle@; color: @text@; border: none;
