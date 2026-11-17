@@ -6,7 +6,8 @@ Aufruf: test_obsbot.py PFAD_ZU_kamera_ioctl_werte
 - CRC-16/USB und Aufbau eines Frames (Musterframe seq 0xA5, Befehl 0xA0C2, Nutzlast 0).
 - Im Prozess mit ersetzbarer Uhr: Statusblock, Zustand in GET status, Wecken mit Wartezeit
   (Bewegung erst 4,5 s nach Zustand 1), Schlafen, Schlaf durch Neigen, kein «Neustart»
-  (Bewegung im Schlaf bei offenem Strom), HDR lesen/setzen/merken, gesperrte Funktionen.
+  (Bewegung im Schlaf bei offenem Strom), HDR lesen/setzen/merken, Bildwinkel,
+  KI-Verfolgung (setzen, nicht merken), gesperrte Funktionen.
 - Über HTTP gegen den Dienst mit Attrappen-Ordner: wake, sleep, GET/PUT controls.
 """
 
@@ -138,7 +139,8 @@ class ManagerTest(unittest.TestCase):
     def test_status_block(self) -> None:
         controls = self.controls()
         obsbot_items = {key: item for key, item in controls.items() if item["group"] == "OBSBOT"}
-        self.assertEqual(set(obsbot_items), {"obsbot_hdr", "obsbot_fov", "obsbot_state", "obsbot_auto_sleep"})
+        self.assertEqual(set(obsbot_items), {"obsbot_hdr", "obsbot_fov", "obsbot_ai", "obsbot_state",
+                                             "obsbot_auto_sleep"})
         self.assertEqual((controls["obsbot_hdr"]["value"], controls["obsbot_hdr"]["readonly"]), (False, False))
         fov = controls["obsbot_fov"]
         self.assertEqual((fov["label"], fov["type"], fov["value"], fov["default"], fov["readonly"]),
@@ -335,15 +337,78 @@ class ManagerTest(unittest.TestCase):
         self.assertEqual((result["obsbot_fov"]["value"], result["obsbot_fov"]["remembered"]), (0, False))
         self.assertEqual(self.store.remembered(TINY2_ID), {})
 
+    def test_ai(self) -> None:
+        # P15 e1b: «Oberkörper» 16 02 02 01 → 2/1, «Aus» 16 02 00 00 → 6/1, nach ≈ 5 s 0/0.
+        changes = []
+        self.manager.on_change = changes.append
+        ai = self.controls()["obsbot_ai"]
+        self.assertEqual((ai["label"], ai["type"], ai["value"], ai["default"], ai["readonly"],
+                          ai["remembered"]), ("KI-Verfolgung", "menu", 1, 0, False, False))
+        self.assertEqual([(entry["value"], entry["label"]) for entry in ai["menu"]],
+                         [(0, "Aus"), (1, "Oberkörper")])
+
+        # Aus: Übergang 6 gilt schon als «Aus», kein Warten auf 0/0; nicht gemerkt.
+        before = self.time.slept
+        result = {item["key"]: item for item in self.manager.put(TINY2_ID, {"obsbot_ai": 0})}
+        self.assertEqual((result["obsbot_ai"]["value"], result["obsbot_ai"]["remembered"]), (0, False))
+        self.assertEqual(self.time.slept, before)
+        # Das Protokoll der Attrappe lässt Nullen am Ende weg.
+        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, "1602"]])
+        self.assertEqual((self.tiny2()["ai"], self.tiny2()["ai_sub"]), (obsbot.AI_MODE_TURNING_OFF, 1))
+        self.assertEqual(self.store.remembered(TINY2_ID), {})
+        self.assertEqual(changes, [TINY2_ID])
+        self.time.now += 5.0
+        self.assertEqual(self.controls()["obsbot_ai"]["value"], 0)
+        self.assertEqual((self.tiny2()["ai"], self.tiny2()["ai_sub"]), (0, 0))
+
+        # Oberkörper, mit Rücklesen.
+        self.folder.update_tiny2(NODE, xu_protokoll=[])
+        result = {item["key"]: item for item in self.manager.put(TINY2_ID, {"obsbot_ai": 1})}
+        self.assertEqual(result["obsbot_ai"]["value"], 1)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, "16020201"]])
+        self.assertEqual(self.store.remembered(TINY2_ID), {})
+
+        # Nicht neu gesetzt beim Erscheinen: neu einstecken sendet keinen KI-Befehl.
+        self.folder.update_tiny2(NODE, xu_protokoll=[])
+        self.folder.unplug(TINY2_BY_ID)
+        self.watcher.scan()
+        self.folder.plug(TINY2_BY_ID, NODE)
+        self.watcher.scan()
+        self.time.now += 3.0
+        self.watcher.scan()
+        self.assertEqual(self.tiny2()["xu_protokoll"], [])
+
+        # Unbekannter Modus (nicht geprüft, z. B. 2/0) erscheint ausserhalb der Auswahl.
+        self.folder.update_tiny2(NODE, ai=2, ai_sub=0)
+        ai = self.controls()["obsbot_ai"]
+        self.assertEqual((ai["value"], ai["menu"][-1]), (512, {"value": 512, "label": "Unbekannt (2/0)"}))
+
+        # Im Schlaf abgewiesen, ohne Befehl.
+        self.folder.update_tiny2(NODE, run=obsbot.RUN_ASLEEP, xu_protokoll=[])
+        error = self.assert_api_error(409, "camera_asleep", self.manager.put, TINY2_ID, {"obsbot_ai": 1})
+        self.assertIn("KI-Verfolgung", error.message)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [])
+
+        # Ungültig: nichts gesendet. null: aus.
+        self.folder.update_tiny2(NODE, run=obsbot.RUN_AWAKE)
+        for value in (2, -1, True, "aus", 1.0):
+            with self.subTest(value=value):
+                error = self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {"obsbot_ai": value})
+                self.assertIn("erlaubt: 0, 1", error.message)
+        self.assertEqual(self.tiny2()["xu_protokoll"], [])
+        result = {item["key"]: item for item in self.manager.put(TINY2_ID, {"obsbot_ai": None})}
+        self.assertEqual((result["obsbot_ai"]["value"], result["obsbot_ai"]["remembered"]), (0, False))
+        self.assertEqual(self.store.remembered(TINY2_ID), {})
+
     def test_locked_functions(self) -> None:
         keys = set(self.controls())
         self.assertFalse({key for key in keys if "ai" in key or "view" in key
-                          or "tracking" in key} - {"obsbot_state"})
+                          or "tracking" in key} - {"obsbot_state", "obsbot_ai"})
         for key in ("obsbot_state", "obsbot_auto_sleep"):
             with self.subTest(key=key):
                 error = self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {key: 60})
                 self.assertIn("nur lesbar", error.message)
-        # KI einschalten bietet der Dienst nicht an (P15 b7, nicht entschieden).
+        # KI nur über «obsbot_ai» (P15 e1b); andere Namen gibt es nicht.
         for key in ("obsbot_ai_mode", "obsbot_tracking"):
             with self.subTest(key=key):
                 self.assert_api_error(400, "invalid", self.manager.put, TINY2_ID, {key: 0})

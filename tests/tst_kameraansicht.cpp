@@ -63,6 +63,7 @@ QJsonArray tiny2Controls()
             control("zoom_absolute", "int", 0, 100, 35),
             control("obsbot_hdr", "bool", 0, 1, 0),
             control("obsbot_fov", "menu", 0, 2, 0, false, true, menu({{0, "Weit"}, {1, "Mittel"}, {2, "Eng"}})),
+            control("obsbot_ai", "menu", 0, 1, 1, false, false, menu({{0, "Aus"}, {1, "Oberkörper"}})),
             control("obsbot_state", "menu", 0, 255, 1, false, false, {}, true),
             control("obsbot_auto_sleep", "int", 0, 65535, 0, false, false, {}, true)};
 }
@@ -200,17 +201,26 @@ private slots:
         const CameraServiceView service = connected();
 
         CameraEntry tiny = entry("OBSBOT Tiny 2", "awake");
-        CameraControlView v = cameraControlView(service, &tiny, true);
+        CameraControlView v = cameraControlView(service, &tiny, true, tiny2Controls());
         QVERIFY(v.chooserEnabled && v.setupEnabled && v.moveEnabled && v.imageEnabled);
         QCOMPARE(v.wakeText, QStringLiteral("Schlafen"));
         QVERIFY(v.wakeEnabled);
         QVERIFY(v.moveHint.isEmpty());
         QVERIFY(v.recallEnabled && v.saveEnabled && v.editEnabled);
-        QVERIFY(!v.aiEnabled);
-        QVERIFY(!v.aiHint.isEmpty());
+        // KI-Verfolgung (P15 e1b): bedienbar bei wacher Tiny 2, Wert und Auswahl vom Dienst
+        QVERIFY(v.aiEnabled);
+        QVERIFY(v.aiHint.isEmpty());
+        QCOMPARE(v.aiValue, 1);
+        QCOMPARE(v.aiMenu, (QList<std::pair<int, QString>>{{0, QStringLiteral("Aus")}, {1, QStringLiteral("Oberkörper")}}));
+        // Ohne Werte vom Dienst (noch nicht gelesen) nicht bedienbar, ohne Hinweis
+        v = cameraControlView(service, &tiny, true);
+        QVERIFY(!v.aiEnabled && v.aiHint.isEmpty() && v.aiMenu.isEmpty());
 
         tiny.state = QStringLiteral("asleep");
-        v = cameraControlView(service, &tiny, true);
+        v = cameraControlView(service, &tiny, true, tiny2Controls());
+        QVERIFY(!v.aiEnabled);
+        QCOMPARE(v.aiHint, QStringLiteral("Nur bei wacher Kamera"));
+        QCOMPARE(v.aiValue, 1);
         QCOMPARE(v.wakeText, QStringLiteral("Wecken"));
         QVERIFY(v.wakeEnabled);
         QVERIFY(!v.moveEnabled);
@@ -232,8 +242,9 @@ private slots:
         QVERIFY(v.setupEnabled); // Einstellungen gehen auch bei ausgesteckter Kamera
 
         CameraEntry c922 = entry("Logitech C922", "awake");
-        v = cameraControlView(service, &c922, false);
+        v = cameraControlView(service, &c922, false, c922Controls());
         QVERIFY(v.moveEnabled);
+        QVERIFY(!v.aiEnabled && v.aiMenu.isEmpty());
         QVERIFY(!v.wakeEnabled);
         QCOMPARE(v.wakeText, QStringLiteral("Schlafen"));
         QCOMPARE(v.wakeToolTip, QStringLiteral("Diese Kamera hat das nicht."));
@@ -423,7 +434,8 @@ private slots:
             cameraStepCall(cam, 0, 1, 0),          cameraHomeCall(cam),
             cameraWakeCall(cam, true),             cameraWakeCall(cam, false),
             cameraControlsGetCall(cam),            cameraConfigGetCall(cam),
-            cameraControlsPutCall(cam, {}),        cameraPresetRecallCall(QStringLiteral("totale")),
+            cameraControlsPutCall(cam, {}),        cameraAiCall(cam, 1),
+            cameraPresetRecallCall(QStringLiteral("totale")),
             cameraPresetCreateCall(QStringLiteral("Totale"), cam, false),
             cameraPresetOverwriteCall(QStringLiteral("totale"), true),
             lightPutCall(QStringLiteral("links"), {}), lightsAllCall(true),
@@ -434,6 +446,9 @@ private slots:
         QCOMPARE(*cameraMoveCall(cam, -1, 1, 0).body,
                  (QJsonObject{{QStringLiteral("pan"), -1}, {QStringLiteral("tilt"), 1}, {QStringLiteral("zoom"), 0}}));
         QCOMPARE(cameraWakeCall(cam, false).path, QStringLiteral("cameras/046d:085c:B2/sleep"));
+        QCOMPARE(cameraAiCall(cam, 0).method, QStringLiteral("PUT"));
+        QCOMPARE(cameraAiCall(cam, 0).path, QStringLiteral("cameras/046d:085c:B2/controls"));
+        QCOMPARE(*cameraAiCall(cam, 0).body, (QJsonObject{{QStringLiteral("obsbot_ai"), 0}}));
         QCOMPARE(*cameraPresetCreateCall(QStringLiteral("Nah"), cam, false).body,
                  (QJsonObject{{QStringLiteral("name"), QStringLiteral("Nah")},
                               {QStringLiteral("camera"), cam},

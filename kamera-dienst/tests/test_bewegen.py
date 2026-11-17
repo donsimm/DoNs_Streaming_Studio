@@ -319,7 +319,7 @@ class MoverTest(unittest.TestCase):
         self.assertEqual(obsbot.command(*obsbot.AI_OFF_COMMAND)[:4], bytes.fromhex("16020000"))
         self.hold({"pan": 1}, 0.5)
         self.assertEqual(self.tiny2()["xu_protokoll"], [[uvc_xu.SELECTOR_COMMAND, AI_OFF]])
-        self.assertEqual(self.tiny2()["ai"], 0)
+        self.assertEqual(self.tiny2()["ai"], obsbot.AI_MODE_TURNING_OFF)
         self.mover.stop(TINY2_ID)
         self.mover.step(TINY2_ID, {"tilt": 1})
         self.mover.home(TINY2_ID, {})

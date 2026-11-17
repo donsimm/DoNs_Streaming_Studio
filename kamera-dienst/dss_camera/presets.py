@@ -25,6 +25,7 @@ import threading
 import unicodedata
 from pathlib import Path
 
+from . import obsbot
 from .controls import POSITION, control_key
 from .http_api import ApiError
 from .motion import is_number
@@ -253,10 +254,11 @@ class CameraPresets:
         if with_controls:
             camera = self._manager.camera(camera_id)
             position = {control_key(c.name) for c in camera.controls if c.id in POSITION}
-            # Nur schreibbare, aktive Werte; Position kommt aus pan/tilt/zoom.
+            # Nur schreibbare, aktive Werte; Position kommt aus pan/tilt/zoom. Die KI-Verfolgung
+            # ist ein Zustand, kein Bildwert (P15 e1b).
             fields["controls"] = {item["key"]: item["value"] for item in self._manager.get(camera_id)
                                   if not item["readonly"] and not item["inactive"]
-                                  and item["key"] not in position}
+                                  and item["key"] not in position and item["key"] != obsbot.KEY_AI}
         else:
             fields["controls"] = None
         return fields

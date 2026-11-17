@@ -82,6 +82,7 @@ curl -X PUT "$D/cameras/$CAM/controls" -d '{"brightness": null}'
 - Ein falscher Wert ändert nichts (`400 invalid`). Ein Wert, der wegen eingeschalteter Automatik inaktiv ist, wird nicht gesetzt (`400 invalid`, die übrigen sind gesetzt).
 - Pan, Tilt und Zoom stehen in der Liste, gesetzt werden sie nur über Bewegen.
 - Tiny 2: Gruppe «OBSBOT» mit HDR (`obsbot_hdr`) und Bildwinkel (`obsbot_fov`, Typ `menu`: 0 «Weit», 1 «Mittel», 2 «Eng», Standard «Weit»), beide nur bei wacher Kamera (sonst `409 camera_asleep`) und gemerkt, dazu Zustand und «Automatisch schlafen nach» (nur lesbar). Die Zuordnung der Stufen zu weit, mittel, eng ist am Gerät bestätigt (2026-11-16).
+- Tiny 2, KI-Verfolgung (`obsbot_ai`, Typ `menu`: 0 «Aus», 1 «Oberkörper», Standard «Aus»): setzbar nur bei wacher Kamera (sonst `409 camera_asleep`), mit Rücklesen (höchstens 1 s). Sie ist ein Zustand, kein Bildwert: Der Dienst merkt sie nicht (`remembered` immer `false`), setzt sie beim Erscheinen nicht neu und nimmt sie nicht in Presets «mit Bildwerten» auf; `null` schaltet aus. Der Wert kommt aus dem Statusblock (Modus/Untermodus 2/1 = «Oberkörper», 0/0 und der Übergang 6 nach «aus» = «Aus»). Ein anderer Modus (z. B. aus einem anderen Programm) erscheint als zusätzlicher Eintrag «Unbekannt (m/u)» mit dem Wert 256 · m + u. Setzen löst das Ereignis `controls` aus; das Ausschalten vor einer Bewegung (`ai_off_before_move`) nicht.
 
 ### Bewegen
 
@@ -263,7 +264,7 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 
 ## Einschränkungen
 
-- **Tiny 2, KI-Modus:** Vor jeder Bewegung (Start, Schritt, Ziel, nicht je Takt) sendet der Dienst «KI-Verfolgung aus» (`16 02 00 00`, am Gerät bestätigt 2026-11-16, `ai_off_before_move`). Die Kamera braucht ≈ 5 s, bis die Verfolgung aus ist (Status 6, dann 0); der Dienst wartet nicht darauf. Ob sie Bewegungsbefehle während dieses Übergangs annimmt, ist nicht geprüft. Einschalten bietet der Dienst nicht an, `ai_mode` gibt es in `controls` nicht. Auto-Schlaf wird nur gelesen.
+- **Tiny 2, KI-Modus:** Vor jeder Bewegung (Start, Schritt, Ziel, nicht je Takt) sendet der Dienst «KI-Verfolgung aus» (`16 02 00 00`, am Gerät bestätigt 2026-11-16, `ai_off_before_move`). Die Kamera braucht ≈ 5 s, bis die Verfolgung aus ist (Status 6, dann 0); der Dienst wartet nicht darauf. Ob sie Bewegungsbefehle während dieses Übergangs annimmt, ist nicht geprüft. Einschalten geht über `obsbot_ai` (nur «Oberkörper», `16 02 02 01`, am Gerät bestätigt 2026-11-16); weitere Modi und ein Tempo der Verfolgung sind nicht geprüft und nicht angeboten. Auto-Schlaf wird nur gelesen.
 - **Richtung und Tempo:** Die Standards von «Richtung umkehren» und bei der C922 das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
 - **Lage der Tiny 2:** geschätzt, nicht gemessen (die Kamera meldet sie nicht). Die Schätzung folgt der am Gerät gemessenen Kurve Tempo → Grad pro Sekunde (2026-11-16, über das OBS-Bild; Pan bis 80, Tilt bis 20 gemessen, darüber verlängert). Nach einem Abbruch (Kamera unerreichbar) ist die Lage unsicher, bis `home` oder ein Preset sie absolut setzt.
 

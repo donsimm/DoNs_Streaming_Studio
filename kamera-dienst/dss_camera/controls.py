@@ -14,8 +14,8 @@
   (Abschnitt b), damit die Schutzregeln (Plan 2.3) immer gelten. Das Tempo von Pan und
   Tilt (Tiny 2) fehlt in der Liste. Erscheint eine wache Tiny 2 (auch beim Start), sendet
   der Dienst einmal Tempo 0, falls ein beendeter Dienst eine Fahrt hinterliess.
-- Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR und Bildwinkel
-  schreibbar (nur wach), Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
+- Die Tiny 2 hat zusätzlich die Gruppe «OBSBOT» (`obsbot.py`): HDR, Bildwinkel und
+  KI-Verfolgung schreibbar (nur wach; die KI-Verfolgung wird nicht gemerkt), Zustand und Auto-Schlaf nur lesbar (`readonly`). Wecken, Schlafen und die Prüfung vor
   Bewegungsbefehlen (`movable`) laufen unter derselben Sperre wie die Bildwerte.
 
 Quellen:
@@ -256,6 +256,8 @@ class ControlManager:
             self._sleep(remaining)
         remember: dict[str, int | bool | None] = {}
         rejected: list[str] = []
+        # Gesetzt, aber nicht gemerkt (KI-Verfolgung): meldet trotzdem «controls».
+        changed = False
         try:
             with self._lock, self._open(camera.node) as device:
                 controls = {control_key(c.name): c for c in device.controls() if supported(c)}
@@ -280,7 +282,10 @@ class ControlManager:
                 try:
                     for key, raw, forget in special:
                         value = self.obsbot.set_value(device, camera_id, key, raw)
-                        remember[key] = None if forget else value
+                        if key in obsbot.REMEMBERED:
+                            remember[key] = None if forget else value
+                        else:
+                            changed = True
                     for control, raw in sorted(plan, key=auto_first):
                         key = control_key(control.name)
                         inactive = (control.id not in AUTO_SWITCHES
@@ -295,7 +300,7 @@ class ControlManager:
                             device.set(control.id, raw)
                             remember[key] = to_api(control, device.get(control.id))
                 finally:
-                    if remember:
+                    if remember or changed:
                         self.on_change(camera_id)
                     # Auch bei einem Abbruch: Was geschrieben ist, bleibt gemerkt.
                     self._save(camera_id, remember)
@@ -418,7 +423,7 @@ class ControlManager:
                 controls = {control_key(c.name): c for c in device.controls() if supported(c)}
                 plan = []
                 for key, value in remembered.items():
-                    if key in obsbot.WRITABLE and obsbot.is_tiny2(camera.model):
+                    if key in obsbot.REMEMBERED and obsbot.is_tiny2(camera.model):
                         # Nur bei wacher Kamera (restore_pending prüft den Zustand).
                         try:
                             raw = obsbot.to_raw(key, value)

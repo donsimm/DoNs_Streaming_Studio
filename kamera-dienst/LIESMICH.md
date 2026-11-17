@@ -43,7 +43,7 @@ Der Dienst sucht die Kameras jede Sekunde in `/dev/v4l/by-id` (Meta-Knoten zähl
 
 ## OBSBOT Tiny 2
 
-Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR und Bildwinkel (`obsbot_fov`: 0 weit, 1 mittel, 2 eng; setzbar, nur wenn die Kamera wach ist, werden gemerkt), Zustand und «Automatisch schlafen nach» (nur lesbar, `readonly: true`). Vor jeder Bewegung schaltet der Dienst die KI-Verfolgung aus (`ai_off_before_move`), einschalten bietet er nicht an. Geräte ohne einen einstellbaren Wert (z. B. eine Aufnahmekarte) erscheinen nicht in `status`. `POST /api/v1/cameras/{cam}/wake` weckt die Kamera und wartet, bis sie wach ist (höchstens 10 s), `…/sleep` legt sie schlafen. Bewegungsbefehle gehen nur an die wache Kamera und frühestens 4,5 s nach dem Wecken. Der Zustand in `status` (`awake`, `asleep`, `privacy`) wird höchstens alle 5 s gelesen.
+Die Tiny 2 hat in `controls` zusätzlich die Gruppe «OBSBOT»: HDR und Bildwinkel (`obsbot_fov`: 0 weit, 1 mittel, 2 eng; setzbar, nur wenn die Kamera wach ist, werden gemerkt), KI-Verfolgung (`obsbot_ai`: 0 aus, 1 Oberkörper; setzbar nur bei wacher Kamera, wird nicht gemerkt und kommt nicht in Presets), Zustand und «Automatisch schlafen nach» (nur lesbar, `readonly: true`). Vor jeder Bewegung schaltet der Dienst die KI-Verfolgung aus (`ai_off_before_move`). Geräte ohne einen einstellbaren Wert (z. B. eine Aufnahmekarte) erscheinen nicht in `status`. `POST /api/v1/cameras/{cam}/wake` weckt die Kamera und wartet, bis sie wach ist (höchstens 10 s), `…/sleep` legt sie schlafen. Bewegungsbefehle gehen nur an die wache Kamera und frühestens 4,5 s nach dem Wecken. Der Zustand in `status` (`awake`, `asleep`, `privacy`) wird höchstens alle 5 s gelesen.
 
 ## Bewegen
 

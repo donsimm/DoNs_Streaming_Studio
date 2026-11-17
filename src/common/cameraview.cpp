@@ -200,7 +200,7 @@ QString cameraChoiceAfterUpdate(const QList<CameraEntry> &cameras, const QString
 }
 
 CameraControlView cameraControlView(const CameraServiceView &service, const CameraEntry *camera,
-                                    bool presetSelected)
+                                    bool presetSelected, const QJsonArray &controls)
 {
     CameraControlView v;
     v.chooserEnabled = service.usable && camera;
@@ -239,8 +239,20 @@ CameraControlView cameraControlView(const CameraServiceView &service, const Came
         v.moveHint = QStringLiteral("Zustand der Kamera unbekannt");
     }
 
-    // KI-Verfolgung: Bytefolgen in Schritt 0 nicht bestätigt, im Dienst nicht freigeschaltet
-    v.aiHint = tiny2 ? QStringLiteral("Noch nicht freigeschaltet.") : kNotThere;
+    // KI-Verfolgung: Wert «obsbot_ai» des Dienstes (obsbot.py, P15 e1b), nur bei wacher Tiny 2
+    if (!tiny2) {
+        v.aiHint = kNotThere;
+    } else {
+        const QJsonObject ai = controlByKey(controls, QStringLiteral("obsbot_ai"));
+        v.aiValue = ai.value(QLatin1String("value")).toInt();
+        for (const QJsonValue &m : ai.value(QLatin1String("menu")).toArray()) {
+            const QJsonObject entry = m.toObject();
+            v.aiMenu.append({entry.value(QLatin1String("value")).toInt(), str(entry, "label")});
+        }
+        v.aiEnabled = awake && !ai.isEmpty();
+        if (!awake)
+            v.aiHint = QStringLiteral("Nur bei wacher Kamera");
+    }
 
     v.presetsEnabled = camera->present;
     v.editEnabled = v.presetsEnabled && presetSelected;
@@ -503,6 +515,11 @@ CameraCall cameraConfigGetCall(const QString &cameraId)
 CameraCall cameraControlsPutCall(const QString &cameraId, const QJsonObject &values)
 {
     return call("PUT", cameraPath(cameraId, "controls"), values);
+}
+
+CameraCall cameraAiCall(const QString &cameraId, int mode)
+{
+    return cameraControlsPutCall(cameraId, {{QStringLiteral("obsbot_ai"), mode}});
 }
 
 CameraCall cameraSectionResetCall(const QString &cameraId, const QList<CameraControlRow> &rows,

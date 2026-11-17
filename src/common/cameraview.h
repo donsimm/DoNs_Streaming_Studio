@@ -103,8 +103,12 @@ struct CameraControlView
     QString moveHintState;
     bool moveHintWake = false;
 
-    bool aiEnabled = false; // KI-Verfolgung (bis zur Prüfung mit Videostrom nicht freigeschaltet)
+    // KI-Verfolgung aus dem Wert «obsbot_ai» (P15 e1b): bedienbar bei wacher Tiny 2. aiMenu wie
+    // vom Dienst («Aus», «Oberkörper», bei einem nicht geprüften Modus dazu «Unbekannt (m/u)»).
+    bool aiEnabled = false;
     QString aiHint;
+    int aiValue = 0;
+    QList<std::pair<int, QString>> aiMenu;
 
     bool presetsEnabled = false; // Liste «Positionen»
     bool recallEnabled = false;  // braucht eine gewählte Position
@@ -116,8 +120,9 @@ struct CameraControlView
 
     bool operator==(const CameraControlView &) const = default;
 };
+// controls: Antwort von GET cameras/<id>/controls bzw. CameraState::controls (für die KI-Verfolgung).
 CameraControlView cameraControlView(const CameraServiceView &service, const CameraEntry *camera,
-                                    bool presetSelected = false);
+                                    bool presetSelected = false, const QJsonArray &controls = {});
 // Titel der mittleren Spalte: «Bildwerte · OBSBOT Tiny 2», ohne Kamera «Bildwerte»
 QString cameraImageTitle(const CameraEntry *camera);
 
@@ -220,6 +225,8 @@ CameraCall cameraWakeCall(const QString &cameraId, bool wake);
 CameraCall cameraControlsGetCall(const QString &cameraId);
 CameraCall cameraConfigGetCall(const QString &cameraId);
 CameraCall cameraControlsPutCall(const QString &cameraId, const QJsonObject &values);
+// KI-Verfolgung schalten: PUT controls {"obsbot_ai": mode} (0 «Aus», 1 «Oberkörper»)
+CameraCall cameraAiCall(const QString &cameraId, int mode);
 // «Zurücksetzen» eines Bereichs: alle bedienbaren Werte mit null (Standard des Geräts, vergessen)
 CameraCall cameraSectionResetCall(const QString &cameraId, const QList<CameraControlRow> &rows,
                                   const QString &section);

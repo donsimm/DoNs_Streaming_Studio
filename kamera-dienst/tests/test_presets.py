@@ -176,7 +176,8 @@ class PresetTest(unittest.TestCase):
         # save-current ohne Kästchen entfernt die Bildwerte; mit Kästchen kommen sie wieder.
         self.assertNotIn("controls", self.presets.save_current("pult-hell", {})["preset"])
         self.assertIn("controls", self.presets.save_current("pult-hell", {"with_controls": True})["preset"])
-        # Tiny 2: HDR und Bildwinkel kommen mit, die nur lesbaren Werte nicht.
+        # Tiny 2: HDR und Bildwinkel kommen mit, die nur lesbaren Werte und die KI-Verfolgung
+        # (ein Zustand, P15 e1b) nicht.
         tiny = self.presets.create({"name": "Tiny", "camera": TINY2_ID, "with_controls": True})["preset"]
         self.assertEqual(set(tiny["controls"]), {obsbot.KEY_HDR, obsbot.KEY_FOV})
 

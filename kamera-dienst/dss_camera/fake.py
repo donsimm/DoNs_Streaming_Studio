@@ -117,6 +117,8 @@ _INACTIVE_WHEN = {
 # Neigen auf −76° oder tiefer legt sie schlafen.
 TINY2_WAKE_S = 1.5
 TINY2_HOMING_S = 4.0
+# KI aus: Status 6/1, nach ≈ 5 s 0/0 (Prüfung mit Videostrom 2026-11-16).
+TINY2_AI_OFF_S = 5.0
 TINY2_SLEEP_TILT = -76 * 3600
 TINY2_POSITION = (v4l2.V4L2_CID_PAN_ABSOLUTE, v4l2.V4L2_CID_TILT_ABSOLUTE, v4l2.V4L2_CID_ZOOM_ABSOLUTE)
 # Prüfung am Gerät (2026-11-16): Dauerfahrt über das Tempo (Messkurve in obsbot.py), Tempo 0
@@ -135,14 +137,16 @@ def tiny2_axes() -> dict:
 def tiny2_state() -> dict:
     """Zustand der Attrappe unter `obsbot` in der Knotendatei.
 
-    `run`, `hdr`, `fov`, `auto_sleep` wie im Statusblock; `ai` der zuletzt gesetzte KI-Modus
-    (`16 02 xx`; Start 2 = Verfolgung an, Annahme); `wake_at`/`awake_since` Zeitpunkte der Uhr;
+    `run`, `hdr`, `fov`, `auto_sleep` wie im Statusblock; `ai`/`ai_sub` der KI-Modus
+    (Status 0x18/0x1c, Befehl `16 02 xx yy`; Start 2/1 = «Oberkörper», Annahme; nach «aus»
+    6/1 und ab `ai_off_at` + `TINY2_AI_OFF_S` 0/0); `wake_at`/`awake_since` Zeitpunkte der Uhr;
     `stream_open` setzt der Test; `lage` die echte Lage (`tiny2_axes`, `FakeDevice.position`);
     Zähler: `lost_moves` (in der Grundstellungsfahrt verworfen), `moves_asleep` (im Schlaf,
     ohne Strom), `restarts` (im Schlaf mit offenem Strom; gilt am Gerät als Absturz mit
     Neustart der Kamera und darf nie vorkommen).
     """
-    return {"run": obsbot.RUN_AWAKE, "hdr": 0, "fov": obsbot.FOV_WIDE, "ai": 2, "auto_sleep": 120,
+    return {"run": obsbot.RUN_AWAKE, "hdr": 0, "fov": obsbot.FOV_WIDE, "ai": 2, "ai_sub": 1,
+            "ai_off_at": None, "auto_sleep": 120,
             "wake_at": None,
             "awake_since": None, "stream_open": False, "lost_moves": 0, "moves_asleep": 0,
             "restarts": 0, "xu_protokoll": [], "lage": tiny2_axes()}
@@ -173,6 +177,9 @@ class FakeDevice:
             done = state["wake_at"] + TINY2_WAKE_S
             if self._clock() >= done:
                 state.update(run=obsbot.RUN_AWAKE, awake_since=done, wake_at=None)
+        if (state is not None and state.get("ai_off_at") is not None
+                and self._clock() >= state["ai_off_at"] + TINY2_AI_OFF_S):
+            state.update(ai=0, ai_sub=0, ai_off_at=None)
         if state is not None:
             self._drive(state)
         return state
@@ -217,6 +224,8 @@ class FakeDevice:
         block[obsbot.STATUS_HDR] = state["hdr"]
         block[obsbot.STATUS_RUN] = state["run"]
         block[obsbot.STATUS_FOV] = state["fov"]
+        block[obsbot.STATUS_AI_MODE] = state["ai"]
+        block[obsbot.STATUS_AI_SUB] = state.get("ai_sub", 0)
         struct.pack_into("<H", block, obsbot.STATUS_AUTO_SLEEP, state["auto_sleep"])
         self._save()
         return bytes(block)
@@ -233,8 +242,11 @@ class FakeDevice:
                 state["hdr"] = data[2]
             elif data[0:2] == b"\x04\x01" and data[2] in obsbot.FOV_LABELS:
                 state["fov"] = data[2]
+            elif data[0:2] == b"\x16\x02" and data[2] == 0:
+                if state["ai"] not in (0, obsbot.AI_MODE_TURNING_OFF):
+                    state.update(ai=obsbot.AI_MODE_TURNING_OFF, ai_sub=1, ai_off_at=self._clock())
             elif data[0:2] == b"\x16\x02":
-                state["ai"] = data[2]
+                state.update(ai=data[2], ai_sub=data[3], ai_off_at=None)
         else:
             raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
         self._save()
