@@ -13,6 +13,8 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QHostAddress>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QProcess>
 #include <QRandomGenerator>
 #include <QString>
@@ -144,13 +146,16 @@ private:
 
 // P15 e3: Attrappen-Lampen (FakeLight in fake.py, HTTP-Server auf 127.0.0.1, freier Port) in einem
 // eigenen Python-Prozess; er läuft, bis stop() seine Eingabe schliesst. hosts() wie «127.0.0.1:<port>».
+// P15 f2a: Die erste Lampe antwortet wahlweise langsam (hang_s); nach stop() stehen in puts() die
+// Werte, die jede Lampe in der Reihenfolge des Eingangs bekommen hat (FakeLight.puts).
 class FakeLights
 {
 public:
     ~FakeLights() { stop(); }
 
-    // count Lampen, eingeschaltet mit 40 % und 222 Mired (4500 K)
-    bool start(int count)
+    // count Lampen, eingeschaltet mit 40 % und 222 Mired (4500 K); die erste antwortet erst nach
+    // firstHangS Sekunden (unter 1 s: der Dienst wartet, docs/09-kamera-dienst.md, «Lampen»).
+    bool start(int count, double firstHangS = 0.0)
     {
         m_process = std::make_unique<QProcess>();
         m_process->setWorkingDirectory(QStringLiteral(DSS_CAMERA_SERVICE_DIR));
@@ -159,11 +164,13 @@ public:
         m_process->setProcessEnvironment(env);
         m_process->start(QStringLiteral(DSS_PYTHON3),
                          {QStringLiteral("-c"),
-                          QStringLiteral("import sys; from dss_camera.fake import FakeLight; "
+                          QStringLiteral("import json, sys; from dss_camera.fake import FakeLight; "
                                          "lights = [FakeLight(on=True, brightness=40, temperature=222) "
                                          "for _ in range(int(sys.argv[1]))]; "
-                                         "print(' '.join(l.host for l in lights), flush=True); sys.stdin.read()"),
-                          QString::number(count)});
+                                         "lights[0].hang_s = float(sys.argv[2]); "
+                                         "print(' '.join(l.host for l in lights), flush=True); sys.stdin.read(); "
+                                         "print(json.dumps([l.puts for l in lights]), flush=True)"),
+                          QString::number(count), QString::number(firstHangS)});
         QElapsedTimer timer;
         timer.start();
         QByteArray out;
@@ -178,6 +185,8 @@ public:
     }
 
     QStringList hosts() const { return m_hosts; }
+    // Nach stop(): je Lampe die gesendeten Werte, zum Beispiel [[{"brightness": 50}], []]
+    QJsonArray puts() const { return m_puts; }
 
     void stop()
     {
@@ -188,12 +197,14 @@ public:
             m_process->kill();
             m_process->waitForFinished();
         }
+        m_puts = QJsonDocument::fromJson(m_process->readAllStandardOutput().trimmed()).array();
         m_process.reset();
     }
 
 private:
     std::unique_ptr<QProcess> m_process;
     QStringList m_hosts;
+    QJsonArray m_puts;
 };
 
 } // namespace kameradienst

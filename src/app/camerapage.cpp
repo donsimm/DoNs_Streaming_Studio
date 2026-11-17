@@ -19,6 +19,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
+#include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -76,6 +77,33 @@ QLabel *hintLine(QWidget *parent, int lines = 1)
     }
     return label;
 }
+
+// Zeile, die ihren ganzen Text zeigt, solange Platz ist, sonst am Ende «…» (P15 f2a); der Anfang
+// bleibt immer sichtbar, den ganzen Text zeigt der Tooltip. Erhöht die Mindestbreite nicht: Der
+// Text ändert nur, was gezeichnet wird, nicht das Layout (Regel 9).
+class ElidedLabel : public QLabel
+{
+public:
+    using QLabel::QLabel;
+
+    QSize minimumSizeHint() const override
+    {
+        return {fontMetrics().horizontalAdvance(QStringLiteral("…")), QLabel::minimumSizeHint().height()};
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        const QRect r = contentsRect();
+        if (fontMetrics().horizontalAdvance(text()) <= r.width()) {
+            QLabel::paintEvent(event);
+            return;
+        }
+        QPainter painter(this);
+        style()->drawItemText(&painter, r, static_cast<int>(alignment()), palette(), isEnabled(),
+                              fontMetrics().elidedText(text(), Qt::ElideRight, r.width()), foregroundRole());
+    }
+};
 
 // Bildlauf wie das Dock «Eigenschaften» (docks.cpp, #propertiesScroll)
 QScrollArea *scrollColumn(const QString &objectName, QWidget *parent)
@@ -178,6 +206,10 @@ QWidget *CameraPage::createHeader()
     // «… gesperrt …» (statt einer eigenen Zeile über den Spalten); rechts der Zustand des Dienstes
     // in beiden Zeilen. Der Zustand bekommt die Breite, die er braucht (nie abgeschnitten), der
     // Hinweis links nimmt den Rest.
+    // P15 f2a: Die zweite Zeile (Hinweis und Meldung) reicht über beide Spalten, so nutzt eine lange
+    // Meldung den Platz unter Auswahl und Knöpfen statt die Seite zu verbreitern. Reicht auch das
+    // nicht, endet sie mit «…» (ElidedLabel, ganzer Text im Tooltip); die Kopfzeile erhöht die
+    // Mindestbreite der Seite nicht.
     auto *header = new QWidget(this);
     header->setObjectName(QStringLiteral("cameraHeader"));
     header->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -222,19 +254,22 @@ QWidget *CameraPage::createHeader()
     // Hinweis, solange der Dienst nicht antwortet (Entwurf Seite 4 E), rot über state
     m_blockedHint = hintLine(header);
     setStyleState(m_blockedHint, QStringLiteral("error"));
-    grid->addWidget(m_blockedHint, 1, 0);
 
     // Zustand des Dienstes in zwei Zeilen, Platz für beide von Anfang an (wie die Zeile «OBS»)
     m_state = new QLabel(header);
     m_state->setObjectName(QStringLiteral("cameraState"));
     m_state->setAlignment(Qt::AlignRight | Qt::AlignBottom);
-    m_stateDetail = new QLabel(header);
+    m_stateDetail = new ElidedLabel(header);
     m_stateDetail->setObjectName(QStringLiteral("cameraStateDetail"));
     m_stateDetail->setAlignment(Qt::AlignRight | Qt::AlignTop);
     m_stateDetail->setTextFormat(Qt::PlainText);
     m_stateDetail->setMinimumHeight(fontMetrics().lineSpacing());
     grid->addWidget(m_state, 0, 1);
-    grid->addWidget(m_stateDetail, 1, 1);
+    auto *second = new QHBoxLayout;
+    second->setSpacing(grid->horizontalSpacing());
+    second->addWidget(m_blockedHint, 1);
+    second->addWidget(m_stateDetail, 0);
+    grid->addLayout(second, 1, 0, 1, 2);
     grid->setColumnStretch(0, 1);
     return header;
 }

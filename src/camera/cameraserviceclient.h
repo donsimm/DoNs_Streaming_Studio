@@ -1,7 +1,9 @@
 #pragma once
 
+#include "cameracallqueue.h"
 #include "sseparser.h"
 
+#include <QHash>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QObject>
@@ -96,6 +98,9 @@ public:
     // undefiniert oder null: ohne Inhalt, sonst als JSON. handler kommt immer, auch bei einem Fehler,
     // und nie vor der Rückkehr von request(). Geht in jedem Zustand ausser Off; bei Error versucht
     // die Anfrage es trotzdem (der Dienst kann schon wieder da sein).
+    // P15 f2a (Punkt 129): Schreibende Anfragen an dieselbe Lampe oder Kamera gehen nacheinander,
+    // wartende PUT mit gleichem Pfad und gleichen Feldern fasst der Client zusammen; beide handler
+    // bekommen dann die Antwort des neuen Werts (CallQueue).
     void request(const QByteArray &method, const QString &path, const QJsonValue &body, ReplyHandler handler);
 
     // Pfad relativ zu /api/v1/, ohne «..», Abfrage und Leerraum. Für request() und den Kern (d2).
@@ -123,6 +128,9 @@ private:
     void dropReplies();
     void handleEvent(const SseEvent &event);
     void setStatusPart(const QString &key, const QJsonValue &value);
+    void startReady();
+    void send(const CallQueue::Call &call);
+    void finishCall(quint64 id, const Reply &reply);
 
     Timing m_timing;
     Config m_config;
@@ -133,6 +141,8 @@ private:
     QNetworkReply *m_statusReply = nullptr;
     QNetworkReply *m_streamReply = nullptr;
     QSet<QNetworkReply *> m_requests;
+    CallQueue m_queue;
+    QHash<quint64, QList<ReplyHandler>> m_handlers; // je Kennung aus m_queue
     SseParser m_parser;
     State m_state = State::Off;
     QString m_message;

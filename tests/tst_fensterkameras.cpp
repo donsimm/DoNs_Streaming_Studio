@@ -187,6 +187,15 @@ class TestFensterKameras : public QObject
 
     CameraPage *page() { return child<CameraPage>("cameraPage"); }
 
+    // Reiter oben («Overlays», «Chat-Bot», «Kameras») wählen
+    void showModule(const QString &name)
+    {
+        for (QToolButton *b : child<QFrame>("moduleTabs")->findChildren<QToolButton *>()) {
+            if (b->text() == name)
+                QTest::mouseClick(b, Qt::LeftButton);
+        }
+    }
+
     // P15 f1: Aktion im Kern anlegen (action_put), true bei Erfolg
     bool putAction(const actions::Action &a)
     {
@@ -312,10 +321,7 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(m_window.get()));
         m_client->start();
         QTRY_VERIFY_WITH_TIMEOUT(m_client->isConnected(), 5000);
-        for (QToolButton *b : child<QFrame>("moduleTabs")->findChildren<QToolButton *>()) {
-            if (b->text() == QStringLiteral("Kameras"))
-                QTest::mouseClick(b, Qt::LeftButton);
-        }
+        showModule(QStringLiteral("Kameras"));
         QTRY_VERIFY_WITH_TIMEOUT(page()->isVisible(), 3000);
         QVERIFY2(waitForState(QStringLiteral("connected")), qPrintable(m_core->readAllStandardError()));
         QVERIFY(chooseCamera(kTiny2));
@@ -1031,61 +1037,15 @@ private slots:
         QVERIFY(chooseCamera(kTiny2));
     }
 
-    // Dienst weg: ganzer Reiter grau, Zustand rot in zwei Zeilen, Hinweis über den Spalten
-    void serviceGone()
-    {
-        m_service->stop();
-        QTRY_VERIFY_WITH_TIMEOUT(!child<QSplitter>("cameraColumns")->isEnabled(), 10000);
-        auto *state = child<QLabel>("cameraState");
-        QVERIFY2(state->property("state").toString() != QStringLiteral("ok"), qPrintable(state->text()));
-        QVERIFY(!child<QPushButton>("cameraWake")->isEnabled());
-        QVERIFY(!child<QPushButton>("cameraSetup")->isEnabled());
-        QVERIFY(!child<QComboBox>("cameraChoice")->isEnabled());
-        QVERIFY(!child<QPushButton>("cameraLamps")->isEnabled());
-
-        // Entscheid 9 (Entwurf 4 E): Auswahl nur mit Namen, Zoom und Lampen «–», kein veralteter Stand
-        auto *choice = child<QComboBox>("cameraChoice");
-        for (int i = 0; i < choice->count(); ++i)
-            QVERIFY2(!choice->itemText(i).contains(QStringLiteral(" · ")), qPrintable(choice->itemText(i)));
-        QVERIFY(!choice->currentText().isEmpty());
-        QCOMPARE(child<QLabel>("cameraZoomText")->text(), QStringLiteral("–"));
-        QVERIFY(!m_lightIds.isEmpty());
-        for (const QString &id : std::as_const(m_lightIds)) {
-            QCOMPARE(sectionText(QStringLiteral("cameraLight_") + id)->text(), QStringLiteral("–"));
-            QVERIFY(sectionText(QStringLiteral("cameraLight_") + id)->property("state").toString().isEmpty());
-            auto *on = child<QCheckBox>(qPrintable(QStringLiteral("cameraLightOn_") + id));
-            QVERIFY(!on->isChecked() && !on->isEnabled());
-            auto *brightness = child<QSlider>(qPrintable(QStringLiteral("cameraLightBrightness_") + id));
-            QCOMPARE(brightness->value(), brightness->minimum());
-        }
-
-        // Kopfzeile: Hinweis «… gesperrt …» links in der zweiten Zeile (rot), der Zustand rechts ganz
-        // sichtbar; eine lange Meldung des Kerns wird nie links abgeschnitten (Entscheid Lotse)
-        QLabel *blocked = hint("cameraHeader");
-        QVERIFY(blocked->text().startsWith(QStringLiteral("Steuerung, Bild und Licht sind gesperrt")));
-        QCOMPARE(blocked->property("state").toString(), QStringLiteral("error"));
-        auto *detail = child<QLabel>("cameraStateDetail");
-        QTRY_VERIFY_WITH_TIMEOUT(!detail->text().isEmpty(), 3000);
-        qInfo("Meldung des Kerns: %s", qPrintable(detail->text()));
-        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(state) && fullyShown(detail), 3000);
-        QVERIFY(blocked->mapTo(page(), QPoint(0, 0)).y() >= state->mapTo(page(), QPoint(0, 0)).y() + state->height());
-        m_window->statusBar()->clearMessage();
-        savePicture(m_window.get(), QStringLiteral("kameras-e3-weg.png"));
-
-        const QString message = detail->text();
-        detail->setText(QStringLiteral("Kamera-Dienst unter streaming-pc.heimnetz.example:8093 nicht erreichbar "
-                                       "(Verbindung abgelehnt). Neuer Versuch läuft."));
-        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(detail), 3000);
-        QVERIFY(m_window->minimumSizeHint().width() <= 1280);
-        detail->setText(message);
-    }
-
     // P15 f1: Schritte «Kamera-Position» und «Licht-Preset» im Reiter «Chat-Bot», Unterreiter
-    // «Aktionen», rechts. Nach serviceGone: zuerst ohne Dienst ausgegraut mit Grund, dann mit dem neu
-    // gestarteten Dienst Auswahl aus seinen Presets, Hinweis bei gelöschter Kennung, Wahl geht an den
-    // Kern. Mit DSS_TEST_BILDER das Bild schritt-kamera.png.
+    // «Aktionen», rechts. Zuerst ohne Dienst ausgegraut mit Grund, dann mit dem neu gestarteten
+    // Dienst Auswahl aus seinen Presets, Hinweis bei gelöschter Kennung, Wahl geht an den Kern. Mit
+    // DSS_TEST_BILDER das Bild schritt-kamera.png. Seit f2a unabhängig von serviceGone: hält den
+    // Dienst selbst an und endet im Reiter «Kameras» mit laufendem Dienst.
     void actionSteps()
     {
+        m_service->stop();
+        QVERIFY(waitForState(QStringLiteral("error")));
         actions::Step camera = actions::newStep(QString::fromLatin1(actions::kStepCameraPreset));
         camera.fields.insert(QStringLiteral("preset"), QStringLiteral("weit"));
         actions::Step light = actions::newStep(QString::fromLatin1(actions::kStepLightPreset));
@@ -1096,10 +1056,7 @@ private slots:
         a.steps = {camera, light};
         QVERIFY(putAction(a));
 
-        for (QToolButton *b : child<QFrame>("moduleTabs")->findChildren<QToolButton *>()) {
-            if (b->text() == QStringLiteral("Chat-Bot"))
-                QTest::mouseClick(b, Qt::LeftButton);
-        }
+        showModule(QStringLiteral("Chat-Bot"));
         QTest::mouseClick(child<QToolButton>("chatBotTab1"), Qt::LeftButton);
         auto *actionsPage = child<ActionsPage>("actionsPage");
         QTRY_VERIFY_WITH_TIMEOUT(actionsPage->isVisible(), 3000);
@@ -1156,6 +1113,91 @@ private slots:
         actionsPage->selectStep(camera.id);
         m_window->statusBar()->clearMessage();
         savePicture(m_window.get(), QStringLiteral("schritt-kamera.png"));
+
+        showModule(QStringLiteral("Kameras"));
+        QTRY_VERIFY_WITH_TIMEOUT(page()->isVisible(), 3000);
+    }
+
+    // Dienst weg: ganzer Reiter grau, Zustand rot in zwei Zeilen, Hinweis in der zweiten Zeile.
+    // Seit f2a nach einem Reiterwechsel (actionSteps davor) und am Ende mit laufendem Dienst.
+    void serviceGone()
+    {
+        showModule(QStringLiteral("Kameras"));
+        QTRY_VERIFY_WITH_TIMEOUT(page()->isVisible(), 3000);
+        m_service->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!child<QSplitter>("cameraColumns")->isEnabled(), 10000);
+        auto *state = child<QLabel>("cameraState");
+        QVERIFY2(state->property("state").toString() != QStringLiteral("ok"), qPrintable(state->text()));
+        QVERIFY(!child<QPushButton>("cameraWake")->isEnabled());
+        QVERIFY(!child<QPushButton>("cameraSetup")->isEnabled());
+        QVERIFY(!child<QComboBox>("cameraChoice")->isEnabled());
+        QVERIFY(!child<QPushButton>("cameraLamps")->isEnabled());
+
+        // Entscheid 9 (Entwurf 4 E): Auswahl nur mit Namen, Zoom und Lampen «–», kein veralteter Stand
+        auto *choice = child<QComboBox>("cameraChoice");
+        for (int i = 0; i < choice->count(); ++i)
+            QVERIFY2(!choice->itemText(i).contains(QStringLiteral(" · ")), qPrintable(choice->itemText(i)));
+        QVERIFY(!choice->currentText().isEmpty());
+        QCOMPARE(child<QLabel>("cameraZoomText")->text(), QStringLiteral("–"));
+        QVERIFY(!m_lightIds.isEmpty());
+        for (const QString &id : std::as_const(m_lightIds)) {
+            QCOMPARE(sectionText(QStringLiteral("cameraLight_") + id)->text(), QStringLiteral("–"));
+            QVERIFY(sectionText(QStringLiteral("cameraLight_") + id)->property("state").toString().isEmpty());
+            auto *on = child<QCheckBox>(qPrintable(QStringLiteral("cameraLightOn_") + id));
+            QVERIFY(!on->isChecked() && !on->isEnabled());
+            auto *brightness = child<QSlider>(qPrintable(QStringLiteral("cameraLightBrightness_") + id));
+            QCOMPARE(brightness->value(), brightness->minimum());
+        }
+
+        // Kopfzeile: Hinweis «… gesperrt …» links in der zweiten Zeile (rot), der Zustand rechts ganz
+        // sichtbar; eine lange Meldung des Kerns wird nie links abgeschnitten (Entscheid Lotse)
+        QLabel *blocked = hint("cameraHeader");
+        QVERIFY(blocked->text().startsWith(QStringLiteral("Steuerung, Bild und Licht sind gesperrt")));
+        QCOMPARE(blocked->property("state").toString(), QStringLiteral("error"));
+        auto *detail = child<QLabel>("cameraStateDetail");
+        QTRY_VERIFY_WITH_TIMEOUT(!detail->text().isEmpty(), 3000);
+        qInfo("Meldung des Kerns: %s", qPrintable(detail->text()));
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(state) && fullyShown(detail), 3000);
+        QVERIFY(blocked->mapTo(page(), QPoint(0, 0)).y() >= state->mapTo(page(), QPoint(0, 0)).y() + state->height());
+        m_window->statusBar()->clearMessage();
+        savePicture(m_window.get(), QStringLiteral("kameras-e3-weg.png"));
+
+        // P15 f2a: Eine lange Meldung verbreitert die Seite nicht, auch nicht nach einem Wechsel des
+        // Reiters (vorher 1294 px Seite, 1302 px Fenster); bei 1280 px ist sie ganz lesbar
+        const QString message = detail->text();
+        const QString longer = QStringLiteral("Kamera-Dienst unter streaming-pc.heimnetz.example:8093 nicht erreichbar "
+                                              "(Verbindung abgelehnt). Neuer Versuch läuft.");
+        detail->setText(longer);
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(detail), 3000);
+        showModule(QStringLiteral("Overlays"));
+        QTRY_VERIFY_WITH_TIMEOUT(!page()->isVisible(), 3000);
+        showModule(QStringLiteral("Kameras"));
+        QTRY_VERIFY_WITH_TIMEOUT(page()->isVisible(), 3000);
+        qInfo("Mindestbreite mit langer Meldung: Seite %d px, Fenster %d px", page()->minimumSizeHint().width(),
+              m_window->minimumSizeHint().width());
+        QVERIFY(page()->minimumSizeHint().width() <= 1280);
+        QVERIFY(m_window->minimumSizeHint().width() <= 1280);
+        m_window->resize(1280, 800);
+        QTRY_COMPARE_WITH_TIMEOUT(m_window->width(), 1280, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(fullyShown(detail), 3000);
+        QVERIFY(blocked->width() >= blocked->fontMetrics().horizontalAdvance(blocked->text()));
+        QVERIFY(blocked->mapTo(page(), QPoint(0, 0)).x() + blocked->width() <= detail->mapTo(page(), QPoint(0, 0)).x());
+
+        // Zu lang für 1280 px: endet mit «…», der Anfang bleibt sichtbar, die Breite bleibt
+        const QString longest = longer + QLatin1Char(' ') + longer;
+        detail->setText(longest);
+        QTRY_VERIFY_WITH_TIMEOUT(detail->width() < detail->sizeHint().width(), 3000);
+        QVERIFY(detail->mapTo(page(), QPoint(0, 0)).x() >= 0);
+        QVERIFY(page()->minimumSizeHint().width() <= 1280);
+        QVERIFY(m_window->minimumSizeHint().width() <= 1280);
+        QCOMPARE(m_window->width(), 1280);
+        detail->setText(message);
+        m_window->resize(1600, 900);
+
+        // Dienst wieder da: Reiter bedienbar
+        QVERIFY2(m_service->start(), qPrintable(m_service->log()));
+        QVERIFY(waitForState(QStringLiteral("connected")));
+        QTRY_VERIFY_WITH_TIMEOUT(child<QSplitter>("cameraColumns")->isEnabled(), 10000);
     }
 };
 

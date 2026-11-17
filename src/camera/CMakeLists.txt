@@ -3,6 +3,7 @@
 # nicht ein: dss_common fehlt hier absichtlich.
 add_library(dss_camera STATIC
   sseparser.h sseparser.cpp
+  cameracallqueue.h cameracallqueue.cpp
   cameraserviceclient.h cameraserviceclient.cpp
 )
 target_include_directories(dss_camera PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

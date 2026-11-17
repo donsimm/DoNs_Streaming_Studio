@@ -1,10 +1,13 @@
 // P15 d1: CameraServiceClient (dss_camera) gegen den echten Kamera-Dienst in der Attrappe
 // (python3 -m dss_camera --attrappe --geraeteordner, eigener Prozess auf 127.0.0.1, freier Port,
 // eigene XDG-Ordner im Testordner), dazu der Leser für Server-Sent Events ohne Netz.
+// P15 f2a (Punkt 129): Reihenfolge je Ziel (CallQueue) ohne Netz und gegen den Dienst mit einer
+// langsamen Attrappen-Lampe.
 //
 // Quellen: docs/09-kamera-dienst.md; Start und Attrappe: kamera-dienst/LIESMICH.md,
 // kamera-dienst/tests/test_api.py (Service, free_port, ini; seit d2 in kameradiensthilfe.h).
 
+#include "cameracallqueue.h"
 #include "cameraserviceclient.h"
 #include "kameradiensthilfe.h"
 #include "sseparser.h"
@@ -61,6 +64,8 @@ private slots:
     void validPath();
     void offWithoutService();
     void againstFakeService();
+    void callQueue();
+    void lightOrder();
 };
 
 void TestCameraService::sseParser()
@@ -243,6 +248,174 @@ void TestCameraService::againstFakeService()
     client.configure(Config{});
     QCOMPARE(client.state(), CameraServiceClient::State::Off);
     QVERIFY(client.status().isEmpty());
+    QCOMPARE(service.stop(), 0);
+}
+
+void TestCameraService::callQueue()
+{
+    using dss::camera::CallQueue;
+    using dss::camera::CallTarget;
+    using dss::camera::callTarget;
+    using Area = CallTarget::Area;
+    const auto target = [](const char *method, const char *path) {
+        return callTarget(QByteArray(method), QString::fromLatin1(path));
+    };
+    // Ziele
+    QCOMPARE(target("GET", "status"), CallTarget{});
+    QCOMPARE(target("GET", "cameras/x/controls"), CallTarget{});
+    QCOMPARE(target("PUT", "cameras/x/controls"), (CallTarget{Area::Camera, QStringLiteral("x")}));
+    QCOMPARE(target("POST", "cameras/x/step"), (CallTarget{Area::Camera, QStringLiteral("x")}));
+    QCOMPARE(target("POST", "cameras/x/move"), CallTarget{});
+    QCOMPARE(target("POST", "cameras/x/stop"), CallTarget{});
+    QCOMPARE(target("POST", "camera-presets/p/recall"), (CallTarget{Area::Camera, QString()}));
+    QCOMPARE(target("PUT", "lights/links"), (CallTarget{Area::Light, QStringLiteral("links")}));
+    QCOMPARE(target("PUT", "lights/links/config"), (CallTarget{Area::Light, QStringLiteral("links")}));
+    QCOMPARE(target("DELETE", "lights/links"), (CallTarget{Area::Light, QStringLiteral("links")}));
+    QCOMPARE(target("PUT", "lights/all"), (CallTarget{Area::Light, QString()}));
+    QCOMPARE(target("POST", "lights"), (CallTarget{Area::Light, QString()}));
+    QCOMPARE(target("POST", "lights/check"), CallTarget{});
+    QCOMPARE(target("POST", "light-presets/stream/recall"), (CallTarget{Area::Light, QString()}));
+
+    const auto ids = [](const QList<CallQueue::Call> &calls) {
+        QList<quint64> list;
+        for (const CallQueue::Call &c : calls)
+            list.append(c.id);
+        return list;
+    };
+    const auto value = [](const char *key, const QJsonValue &v) { return QJsonObject{{QString::fromLatin1(key), v}}; };
+
+    // Eine Lampe nacheinander, wartende gleiche PUT zusammengefasst; frei und andere Lampe sofort
+    CallQueue q;
+    const quint64 a1 = q.add("PUT", QStringLiteral("lights/a"), value("brightness", 50));
+    QCOMPARE(ids(q.takeReady()), QList<quint64>{a1});
+    const quint64 a2 = q.add("PUT", QStringLiteral("lights/a"), value("brightness", 60));
+    QCOMPARE(q.add("PUT", QStringLiteral("lights/a"), value("brightness", 70)), a2);
+    QVERIFY(q.takeReady().isEmpty());
+    const quint64 get = q.add("GET", QStringLiteral("status"), QJsonValue());
+    const quint64 b1 = q.add("PUT", QStringLiteral("lights/b"), value("brightness", 10));
+    QCOMPARE(ids(q.takeReady()), (QList<quint64>{get, b1}));
+    q.finish(get);
+    // «Licht» wartet auf jede Lampe; danach keine Zusammenfassung über «Licht» hinweg
+    const quint64 all = q.add("PUT", QStringLiteral("lights/all"), value("brightness", 30));
+    const quint64 b2 = q.add("PUT", QStringLiteral("lights/b"), value("brightness", 20));
+    QVERIFY(b2 != b1);
+    const quint64 a3 = q.add("PUT", QStringLiteral("lights/a"), value("brightness", 80));
+    QVERIFY(a3 != a2);
+    QVERIFY(q.takeReady().isEmpty());
+    q.finish(a1);
+    const QList<CallQueue::Call> next = q.takeReady();
+    QCOMPARE(ids(next), QList<quint64>{a2});
+    QCOMPARE(next.at(0).body, QJsonValue(value("brightness", 70)));
+    q.finish(a2);
+    QVERIFY(q.takeReady().isEmpty()); // b1 läuft noch
+    q.finish(b1);
+    QCOMPARE(ids(q.takeReady()), QList<quint64>{all});
+    q.finish(all);
+    QCOMPARE(ids(q.takeReady()), (QList<quint64>{b2, a3}));
+    q.finish(b2);
+    q.finish(a3);
+    QCOMPARE(q.waitingCount(), qsizetype(0));
+    QCOMPARE(q.runningCount(), qsizetype(0));
+
+    // Nie zusammengefasst: andere Felder, toggle, POST; verschachtelt nur bei gleichen Feldern
+    const quint64 busy = q.add("PUT", QStringLiteral("lights/a"), value("on", true));
+    q.takeReady();
+    const quint64 t1 = q.add("PUT", QStringLiteral("lights/a"), value("on", QStringLiteral("toggle")));
+    QVERIFY(q.add("PUT", QStringLiteral("lights/a"), value("on", QStringLiteral("toggle"))) != t1);
+    const quint64 f1 = q.add("PUT", QStringLiteral("lights/a"), value("brightness", 40));
+    QVERIFY(q.add("PUT", QStringLiteral("lights/a"), value("temperature", 300)) != f1);
+    const quint64 c1 = q.add("PUT", QStringLiteral("cameras/x/config"), value("motion", value("speed", 5)));
+    q.takeReady();
+    const quint64 c2 = q.add("PUT", QStringLiteral("cameras/x/config"), value("motion", value("speed", 6)));
+    QCOMPARE(q.add("PUT", QStringLiteral("cameras/x/config"), value("motion", value("speed", 7))), c2);
+    QVERIFY(q.add("PUT", QStringLiteral("cameras/x/config"), value("motion", value("auto_wake", true))) != c2);
+    const quint64 s1 = q.add("POST", QStringLiteral("cameras/x/step"), value("pan", 1));
+    QVERIFY(q.add("POST", QStringLiteral("cameras/x/step"), value("pan", 1)) != s1);
+    // move und stop warten nie, auch nicht hinter einer laufenden Anfrage an dieselbe Kamera
+    const quint64 move = q.add("POST", QStringLiteral("cameras/x/move"), value("pan", 1));
+    const quint64 stop = q.add("POST", QStringLiteral("cameras/x/stop"), QJsonValue());
+    QCOMPARE(ids(q.takeReady()), (QList<quint64>{move, stop}));
+    // Kamera-Presets warten auf jede Kamera und umgekehrt
+    q.finish(busy);
+    q.finish(c1);
+    const quint64 recall = q.add("POST", QStringLiteral("camera-presets/p/recall"), QJsonValue());
+    const QList<quint64> started = ids(q.takeReady());
+    QVERIFY(started.contains(t1));
+    QVERIFY(started.contains(c2));
+    QVERIFY(!started.contains(recall));
+}
+
+void TestCameraService::lightOrder()
+{
+    // Punkt 129: Werte für eine Lampe, die langsam antwortet (0,3 s je Anfrage an die Lampe, Setzen
+    // mit Zurücklesen also rund 0,6 s), ohne zu warten nacheinander geschickt.
+    QTemporaryDir tmp(QDir::tempPath() + QStringLiteral("/tst_kameradienst-XXXXXX"));
+    QVERIFY(tmp.isValid());
+    const QString devices = kameradienst::createFakeDevices(tmp.filePath(QStringLiteral("geraete")));
+    QVERIFY2(devices.isEmpty(), qPrintable(devices));
+    const int port = freePort();
+    QVERIFY(port > 0);
+    Service service(tmp.path(), port);
+    QVERIFY2(service.start(), qPrintable(service.log()));
+    kameradienst::FakeLights lamps;
+    QVERIFY(lamps.start(2, 0.3));
+
+    CameraServiceClient client;
+    client.configure(Config{true, QStringLiteral("127.0.0.1"), port});
+    QTRY_COMPARE_WITH_TIMEOUT(client.state(), CameraServiceClient::State::Connected, 10000);
+    for (const auto &[name, host] : {std::pair{QStringLiteral("Links"), lamps.hosts().at(0)},
+                                     std::pair{QStringLiteral("Rechts"), lamps.hosts().at(1)}}) {
+        const Reply reply = call(client, "POST", QStringLiteral("lights"),
+                                 QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("host"), host}});
+        QVERIFY2(reply.status == 200, qPrintable(reply.error + QString::number(reply.status)));
+    }
+
+    const auto value = [](const char *key, int v) { return QJsonObject{{QString::fromLatin1(key), v}}; };
+    const QList<std::pair<QString, QJsonObject>> sent = {
+        {QStringLiteral("lights/links"), value("brightness", 50)},
+        {QStringLiteral("lights/links"), value("brightness", 60)},  // ersetzt durch 70
+        {QStringLiteral("lights/links"), value("brightness", 70)},
+        {QStringLiteral("lights/links"), value("temperature", 300)}, // andere Felder: eigene Anfrage
+        {QStringLiteral("lights/links"), value("brightness", 80)},
+        {QStringLiteral("lights/all"), value("brightness", 30)},
+        {QStringLiteral("lights/links"), value("brightness", 90)},
+    };
+    QList<int> order;
+    QList<Reply> replies(sent.size());
+    for (int i = 0; i < sent.size(); ++i) {
+        client.request("PUT", sent.at(i).first, sent.at(i).second, [&order, &replies, i](const Reply &reply) {
+            order.append(i);
+            replies[i] = reply;
+        });
+    }
+    // Lesen wartet nicht auf die Lampe
+    bool statusRead = false;
+    client.request("GET", QStringLiteral("status"), QJsonValue(), [&](const Reply &reply) {
+        QCOMPARE(reply.status, 200);
+        QVERIFY(order.size() < sent.size());
+        statusRead = true;
+    });
+    QTRY_COMPARE_WITH_TIMEOUT(order.size(), sent.size(), 20000);
+    QVERIFY(statusRead);
+
+    // Antworten in der Reihenfolge des Sendens, ohne Fehler; die ersetzte hat die Antwort von 70
+    QCOMPARE(order, (QList<int>{0, 1, 2, 3, 4, 5, 6}));
+    for (int i = 0; i < replies.size(); ++i) {
+        QVERIFY2(replies.at(i).status == 200, qPrintable(QString::number(i) + replies.at(i).error));
+        QCOMPARE(replies.at(i).body.value(QStringLiteral("errors")).toArray(), QJsonArray());
+    }
+    QCOMPARE(replies.at(1).body, replies.at(2).body);
+    QVERIFY(replies.at(0).body != replies.at(2).body);
+
+    // An der Lampe angekommen: in der Reihenfolge, 60 nie, der letzte Wert gewinnt
+    client.configure(Config{});
+    lamps.stop();
+    const QJsonArray puts = lamps.puts();
+    QCOMPARE(puts.size(), 2);
+    const QJsonArray expected{value("brightness", 50), value("brightness", 70), value("temperature", 300),
+                              value("brightness", 80), value("brightness", 30), value("brightness", 90)};
+    QCOMPARE(puts.at(0).toArray(), expected);
+    QCOMPARE(puts.at(1).toArray(), QJsonArray{value("brightness", 30)});
     QCOMPARE(service.stop(), 0);
 }
 

@@ -363,22 +363,57 @@ void CameraServiceClient::request(const QByteArray &method, const QString &path,
         failLater(QStringLiteral("Ungültige Methode «%1».").arg(QString::fromLatin1(method)));
         return;
     }
-    QNetworkRequest request(url(path));
+    const quint64 id = m_queue.add(method, path, body);
+    m_handlers[id].append(std::move(handler));
+    startReady();
+}
+
+void CameraServiceClient::startReady()
+{
+    const QList<CallQueue::Call> ready = m_queue.takeReady();
+    for (const CallQueue::Call &call : ready)
+        send(call);
+}
+
+void CameraServiceClient::send(const CallQueue::Call &call)
+{
+    // Hat gewartet: Inzwischen kann der Dienst abgeschaltet sein.
+    if (m_state == State::Off || m_config.host.isEmpty()) {
+        const quint64 id = call.id;
+        QTimer::singleShot(0, this, [this, id] {
+            Reply reply;
+            reply.error = QStringLiteral("Kamera-Dienst ist abgeschaltet.");
+            finishCall(id, reply);
+        });
+        return;
+    }
+    QNetworkRequest request(url(call.path));
     request.setTransferTimeout(m_timing.requestTimeout);
     QByteArray data;
-    if (!body.isUndefined() && !body.isNull()) {
-        data = body.isArray() ? QJsonDocument(body.toArray()).toJson(QJsonDocument::Compact)
-                              : QJsonDocument(body.toObject()).toJson(QJsonDocument::Compact);
+    if (!call.body.isUndefined() && !call.body.isNull()) {
+        data = call.body.isArray() ? QJsonDocument(call.body.toArray()).toJson(QJsonDocument::Compact)
+                                   : QJsonDocument(call.body.toObject()).toJson(QJsonDocument::Compact);
         request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     }
-    QNetworkReply *reply = data.isEmpty() ? m_network->sendCustomRequest(request, method)
-                                          : m_network->sendCustomRequest(request, method, data);
+    QNetworkReply *reply = data.isEmpty() ? m_network->sendCustomRequest(request, call.method)
+                                          : m_network->sendCustomRequest(request, call.method, data);
     m_requests.insert(reply);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, handler] {
+    const quint64 id = call.id;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, id] {
         m_requests.remove(reply);
         reply->deleteLater();
-        handler(readReply(reply));
+        finishCall(id, readReply(reply));
     });
+}
+
+void CameraServiceClient::finishCall(quint64 id, const Reply &reply)
+{
+    const QList<ReplyHandler> handlers = m_handlers.take(id);
+    m_queue.finish(id);
+    // Zuerst die nächste Anfrage an dieses Ziel, dann die handler (sie dürfen request() aufrufen).
+    startReady();
+    for (const ReplyHandler &handler : handlers)
+        handler(reply);
 }
 
 } // namespace dss::camera

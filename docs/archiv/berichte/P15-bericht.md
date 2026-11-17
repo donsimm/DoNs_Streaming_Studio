@@ -311,3 +311,46 @@ Ein Commit (Auftrag).
 - Punkt 129 betrifft jetzt auch Aktionen: Zwei Schritte «Licht-Preset» direkt nacheinander gehen ohne Pause an den Dienst.
 - `tests/daten/aktionen/vollstaendig.json` enthält beide Typen; neue Typen dort ergänzen, sonst scheitert `tst_aktionsformat::typeTables`.
 - Prüfung f: Stufe «Baustein» (frischer Klon, `startpruefung.py`, `dienstpruefung.py`).
+
+## f2a: Reihenfolge der Anfragen je Lampe und Kamera (Punkt 129), Mindestbreite Reiter «Kameras» (2026-11-17)
+
+Ein Commit für beide Teile (Regel 8, Auftrag): Beide betreffen den Weg Fenster/Kern → Kamera-Dienst bei derselben Version 19 der Schnittstelle, ohne neue Nachricht.
+
+- **Geändert:**
+  - Reihenfolge im Kern: neu `src/camera/cameracallqueue.{h,cpp}` (`CallQueue`, `callTarget`, nur Qt Core), `src/camera/cameraserviceclient.{h,cpp}` (`request` reiht ein; `startReady`, `send`, `finishCall`), `src/camera/CMakeLists.txt`. `CoreService::handleCameraCall` und `CameraActions` unverändert, sie nutzen denselben Client.
+  - Kopfzeile «Kameras»: `src/app/camerapage.cpp` (zweite Zeile mit Hinweis und Meldung über beide Spalten, `ElidedLabel` für die Meldung).
+  - Tests: `tst_kameradienst` (`callQueue` ohne Netz, `lightOrder` gegen den Dienst mit langsamer Attrappen-Lampe), `tests/kameradiensthilfe.h` (`FakeLights::start(count, firstHangS)`, `puts()`), `tst_fensterkameras` (`showModule`; `actionSteps` hält den Dienst selbst an und steht jetzt vor `serviceGone`; `serviceGone` prüft die Breite nach Reiterwechsel und bei 1280 px, startet den Dienst am Ende neu).
+  - Doku: Punkt 129 von `docs/04-offene-punkte.md` nach `docs/archiv/04-erledigte-punkte.md`; `docs/08-kern-schnittstelle.md`, `camera_call`, Absatz «Reihenfolge».
+- **Geprüft (2026-11-17, Studio-PC, Stufe «Klein»; X11-Sitzung 1 aktiv, nicht gesperrt, `loginctl show-session 1 -p Active -p LockedHint` vor den Fenstertests):**
+  - `scripts/bauen.sh`: Bau ok, 0 Warnungen.
+  - `scripts/testen.sh --voll tst_fensterkameras`: 15 bestanden, `picture` übersprungen (ohne `DSS_TEST_BILDER`). Mindestbreite mit langer Meldung nach Reiterwechsel: Seite 1076 px, Fenster 1084 px (vorher 1294 und 1302 px, f1).
+  - `scripts/testen.sh -R "tst_kameraansicht|tst_kernkamera|tst_kernaktionen|tst_kameradienst|bildschirmfoto|kd_"`: 16 von 16 (106,36 s).
+  - `scripts/testen.sh -R "^tst_kameradienst$"` 20-mal einzeln nacheinander: 20 von 20 (13,2 bis 13,5 s je Lauf). `scripts/wiederholen.sh` war nicht freigegeben.
+  - Gegenprobe: Mit allen Anfragen frei (Ziele abgeschaltet, danach zurückgesetzt) scheitern `callQueue` und `lightOrder` (die ersetzte Anfrage bekam die Antwort von 60 statt 70 %).
+  - `scripts/testen.sh`: 88 von 88 (464,20 s), nichts übersprungen.
+  - **Nicht geprüft:** echte Key Lights und Kameras; Stufe «Baustein» (frischer Klon, `startpruefung.py`, `dienstpruefung.py`) nicht verlangt.
+- **Handtest, prüft Lotse:**
+  - **Bild Kopfzeile ohne Dienst:** `DSS_TEST_BILDER=<ordner> scripts/testen.sh -R '^tst_fensterkameras$'`, Datei `kameras-e3-weg.png`: Hinweis «Steuerung, Bild und Licht sind gesperrt …» links, Meldung rechts ganz lesbar, rechtsbündig unter «Kamera-Dienst nicht erreichbar:». Grund: Die zweite Zeile ist anders aufgeteilt (über beide Spalten); im Bau nur vermessen, nicht angesehen.
+- **Handtest, prüft der Nutzer:**
+  - **Lampe am Regler:** Im Reiter «Kameras» den Regler «Helligkeit» einer echten Key Light schnell ziehen und loslassen; die Lampe steht danach auf dem letzten Wert, kein Fehler. Grund: echtes Gerät, Laufzeit der Lampe im Heimnetz. Kann in den Gerätetest von P15 mit Lotse.
+- **Nicht erledigt, `[OFFEN]`:**
+  - `stop` kann wie bisher ein vorher geschicktes `move` überholen; dann fährt die Kamera bis zum Totmann (500 ms) weiter. Eine Reihe für `move` würde beim Halten stauen (siehe unten).
+  - «Kamera» als Ganzes: Ein Abruf eines Kamera-Presets, der die Tiny 2 weckt (bis 10 s), hält so lange auch Bildwerte anderer Kameras zurück (sie kommen danach, zusammengefasst).
+  - Der Weg über den Kern (Socket, `camera_call`) ist mit langsamer Lampe nicht eigens getestet; geprüft ist der Client, den der Kern nutzt (`tst_kernkamera`, `tst_kernaktionen` grün).
+- **Annahmen, Interna-Entscheide:**
+  - Ort: im Kamera-Client (`dss_camera`), nicht in `CoreService`: Fenster, `dss-cli` und Aktionen gehen alle über `CameraServiceClient::request` und sind so gleich geschützt. Die Logik (`CallQueue`) kennt kein Netz und ist ohne Fenster getestet (Regel 9).
+  - Ziele: eine Lampe (`lights/<id>`, `…/config`, `DELETE`); «Licht» als Ganzes (`lights/all`, `POST lights`, `light-presets/…`) wartet auf jede Lampe und jede Lampe darauf, weil ein Licht-Preset mehrere Lampen schaltet; eine Kamera (`cameras/<id>/…`); «Kamera» als Ganzes (`camera-presets/…`), weil nur der Dienst weiss, welche Kamera ein Preset fährt. Lesende `GET` und `POST lights/check` (liest nur) sind frei.
+  - `move` und `stop` frei: Beim Halten kommt alle 200 ms ein `move`; die Antwort kann bis 15 s dauern (Wecken). In einer Reihe ohne Zusammenfassen (Auftrag: Bewegungen nie zusammenfassen) würden sich die `move` stauen und `stop` käme erst nach allen. Der Totmann des Dienstes begrenzt eine Überholung auf 500 ms.
+  - Zusammenfassen nur bei `PUT`, gleichem Pfad, gleichen Feldern (auch verschachtelt, z. B. `motion` in `config`) und ohne `"toggle"`; nur mit der letzten wartenden Anfrage an dasselbe Ziel (steht z. B. `lights/all` dazwischen, bleibt die Reihenfolge). Die ersetzte Anfrage bekommt dieselbe Antwort wie die neue statt einer eigenen Antwort «ersetzt»: kein neues Feld in `camera_result`, Fenster und Verlauf sehen den Stand nach dem letzten Wert.
+  - Zeitgrenze: die bestehende von 15 s je Anfrage (`setTransferTimeout`); danach geht die nächste los. Wartet eine Anfrage, während der Dienst abgeschaltet wird, antwortet sie mit «Kamera-Dienst ist abgeschaltet.».
+  - Kopfzeile: kein Zeilenumbruch, weil die zweite Zeile genau eine Textzeile hoch ist (feste Höhe, Regel 9) und ein Umbruch eine dritte Zeile oder ein anderes Bild der Kopfzeile bräuchte. Stattdessen nutzt die Meldung die ganze Breite unter Auswahl und Knöpfen (bei 1280 px ganz lesbar, auch die lange Meldung aus dem Test); erst wenn auch das nicht reicht, endet sie mit «…», der Anfang bleibt, der ganze Text steht im Tooltip (wie bisher gesetzt). `ElidedLabel` ändert nur das Zeichnen, nicht das Layout.
+  - Tests: Reihenfolge in `tst_kameradienst` mit dem Client direkt (kein Socket nötig, derselbe Client wie im Kern). Testfälle in `tst_fensterkameras` hinterlassen den Dienst laufend und den Reiter «Kameras»; `actionSteps` steht absichtlich vor `serviceGone`, damit der frühere Fehlschlag nach einem Reiterwechsel abgedeckt ist.
+- **Quellen:** `docs/09-kamera-dienst.md` («Anfragen», «Bewegen» mit Totmann 500 ms, «Lampen», «Licht-Presets»); `kamera-dienst/dss_camera/lights.py` (`_apply`, Sperre je Lampe), `kamera-dienst/dss_camera/fake.py` (`FakeLight.hang_s`, `puts`); Qt 6.8: https://doc.qt.io/qt-6.8/qfontmetrics.html#elidedText, https://doc.qt.io/qt-6.8/qstyle.html#drawItemText, https://doc.qt.io/qt-6.8/qwidget.html#minimumSizeHint-prop, https://doc.qt.io/qt-6.8/qnetworkrequest.html#setTransferTimeout.
+
+### Für den nächsten Abschnitt (f2b: Doku 01–09)
+- `docs/08` hat den Absatz «Reihenfolge» unter `camera_call` schon (f2a); Version bleibt 19.
+- `docs/09`: Hinweis, dass das Studio Schreibanfragen je Lampe/Kamera nacheinander schickt (der Dienst selbst ordnet nicht); `move`/`stop` frei.
+- `docs/03`: Schritte «Kamera-Position» und «Licht-Preset» (aus f1) und das Verhalten zweier Licht-Presets direkt nacheinander (in Reihenfolge).
+- `docs/04`: neue Punkte aus f1 (Warten auf Ende der Bewegung) und aus f2a `[OFFEN]` (`stop` überholt `move`, «Kamera» als Ganzes beim Wecken) nach Entscheid aufnehmen.
+- `docs/01`/`docs/07`: Stand P15 f nachführen; Kopfzeile «Kameras» zweite Zeile über beide Spalten.
+- Prüfung f: Stufe «Baustein» steht aus.
