@@ -1,6 +1,6 @@
 # 05 – Quellen
 
-Stand: 2026-11-02.
+Stand: 2026-11-17 (Abschnitt «Kameras und Licht», P15; sonst 2026-11-02 mit Nachträgen).
 
 ## Angaben des Nutzers
 
@@ -78,6 +78,22 @@ Seit P13 (gelesen 2026-11-09, bestätigt in Schritt 0 am 2026-11-15, Bericht `do
 - Argumentnamen von Streamer.bot: https://docs.streamer.bot/api/triggers/twitch/, https://docs.streamer.bot/api/triggers/core/commands/command-triggered, https://github.com/Streamerbot/docs/tree/main/streamerbot/3.api/.variables
 - Qt: https://doc.qt.io/qt-6/qoauth2deviceauthorizationflow.html (erst ab 6.9), https://packages.debian.org/trixie/qt6-networkauth-dev, https://doc.qt.io/qt-6.8/qwebsocket.html, https://doc.qt.io/qt-6.8/qsslsocket.html#supportsSsl
 - Ablage der Geheimnisse (F1): https://www.freedesktop.org/software/systemd/man/latest/systemd-creds.html
+
+## Kameras und Licht (P15)
+
+Grundlage: Recherche von Lotse «Kamera- und Lichtsteuerung unter Linux» vom 2026-11-15 mit Nachtrag «Probeläufe am Gerät» (nicht im Repo). Am Gerät gemessen und geprüft: Schritt 0 (2026-11-15, Plan `docs/archiv/prompts/P15-kamera.md`, «Ergebnis Schritt 0») und Prüfung a bis c sowie b4 bis b7 (2026-11-16, Bericht `docs/archiv/berichte/P15-bericht.md`); die Messwerte am Gerät haben Vorrang vor den Quellen. Die Quellen der Recherche hat Lotse am 2026-11-15 gelesen. Mit «nicht abgerufen» vermerkt sind Quellen, die laut Bericht oder `docs/09-kamera-dienst.md` im Bau nicht neu geöffnet wurden (kein Netz ausser `127.0.0.1`). Die tragenden Werte sind gegen die Kernel-Header des Studio-PCs (`kd_v4l2`) oder am Gerät geprüft.
+
+- OBSBOT Tiny 2, Erweiterungseinheit, Statusblock, Wecken/Schlafen, KI-Modus (Vorlage, Lizenz EUPL-1.2, kein Code kopiert): https://github.com/cgevans/tiny2, https://raw.githubusercontent.com/cgevans/tiny2/main/src/lib.rs, https://github.com/cgevans/tiny2/issues (Issue #7, `EPROTO`); https://github.com/OpenFoxes/Tiny4Linux, https://github.com/OpenFoxes/Tiny4Linux/blob/main/LICENSE.md
+- Schlaf bei Kopf unten (Tiny 2 Lite): https://www.manualslib.com/answers/4463421/obsbot-tiny-2-lite-dedicated-software-functionality.html
+- UVC und V4L2 im Kernel: https://docs.kernel.org/userspace-api/media/drivers/uvcvideo.html (`UVCIOC_CTRL_QUERY`, `UVCIOC_CTRL_MAP`), https://docs.kernel.org/6.3/userspace-api/media/v4l/control.html (`power_line_frequency`), https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/ext-ctrls-camera.html (Pan/Tilt absolut, `V4L2_CID_PAN_SPEED`, `V4L2_CID_TILT_SPEED`), https://docs.kernel.org/userspace-api/media/v4l/vidioc-queryctrl.html (`V4L2_CTRL_FLAG_READ_ONLY`), https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/vidioc-g-ctrl.html (`__s32 value`); Minimum der Speed-Werte: https://lkml.iu.edu/2511.2/02322.html, https://lkml.iu.edu/2512.1/00400.html (alle nicht abgerufen)
+- cameractrls (Umfang, `cameractrlsd`, LGPL-3.0-or-later): https://github.com/soyersoyer/cameractrls
+- OBS schreibt beim Start keine Kamerawerte: https://raw.githubusercontent.com/obsproject/obs-studio/master/plugins/linux-v4l2/v4l2-input.c, https://raw.githubusercontent.com/obsproject/obs-studio/master/plugins/linux-v4l2/v4l2-controls.c
+- Elgato Key Light (Bereiche, stiller Fehler, `Content-Length`): https://apihandyman.io/hacking-elgato-key-light-with-postman/
+- firewalld (reiche Regeln, Zone einer Schnittstelle): https://firewalld.org/documentation/man-pages/firewalld.richlanguage.html, https://firewalld.org/documentation/man-pages/firewall-cmd.html; `ip route get`: https://man7.org/linux/man-pages/man8/ip-route.8.html (nicht abgerufen)
+- systemd-Benutzerdienst: https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html, https://www.freedesktop.org/software/systemd/man/latest/systemd.special.html (`default.target`) (nicht abgerufen)
+- Python: https://docs.python.org/3/library/http.server.html, https://docs.python.org/3/library/threading.html#lock-objects (Reihenfolge der Wartenden nicht festgelegt, Punkt 129) (nicht abgerufen)
+- Server-Sent Events: https://html.spec.whatwg.org/multipage/server-sent-events.html (nicht abgerufen)
+- Qt im Reiter «Kameras» und im Kamera-Client: https://doc.qt.io/qt-6/qabstractspinbox.html#specialValueText-prop, https://doc.qt.io/qt-6/qabstractslider.html#sliderDown-prop, https://doc.qt.io/qt-6/qwidget.html#customContextMenuRequested, https://doc.qt.io/qt-6/qsizepolicy.html#setRetainSizeWhenHidden, https://doc.qt.io/qt-6.8/qfontmetrics.html#elidedText, https://doc.qt.io/qt-6.8/qstyle.html#drawItemText, https://doc.qt.io/qt-6.8/qwidget.html#minimumSizeHint-prop, https://doc.qt.io/qt-6.8/qnetworkrequest.html#setTransferTimeout (genannt in den Berichten e2, e3 und f2a; ob dort abgerufen, vermerkt nur e3: nicht neu abgerufen)
 
 ## Qt (Bau ab P03)
 

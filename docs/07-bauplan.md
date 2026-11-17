@@ -1,8 +1,8 @@
 # 07 – Bauplan
 
-Stand: 2026-11-15. Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
+Stand: 2026-11-17 (P15 Abschnitte a bis f gebaut). Reihenfolge der Bausteine. Eine Prompt-Datei gibt es nur noch für grosse Bausteine. Gepflegt vom Projektleiter-Agenten, Änderungen nur nach Absprache mit dem Nutzer.
 
-Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02), P12 bis P14 vom Nutzer entschieden (2026-11-09), Umfang von P14 und die Kamerasteuerung danach entschieden (2026-11-15). Was danach kommt, ist sonst noch offen.
+Status: Reihenfolge P06 bis P12 vom Nutzer bestätigt (2026-11-02), P12 bis P14 vom Nutzer entschieden (2026-11-09), Umfang von P14 und die Kamerasteuerung danach entschieden (2026-11-15), Reiter «Kameras» statt Dock (2026-11-15). Was danach kommt, ist sonst noch offen.
 
 ## Erledigt
 
@@ -36,7 +36,7 @@ Grundsatz der Reihenfolge: zuerst alles, was die MUSS-Funktionen des Editors (E-
 | P14-2 | Chat-Bot, Komfort | nach dem ersten Stream: OBS-Quelle ein/aus, Ziehen und Kopieren von Schritten, Platzhalter-Liste, Vorschau, «Nochmals auslösen», Warteschlangen steuern, Benutzergruppen, Zitate, weiches Ein- und Ausblenden. Abschnitte o und k, etwa 2 Sitzungen. Plan wie P14-1 | P14-1 | E-14 (Vorlage) |
 
 Danach:
-- **P15 Kamerasteuerung** (Entscheid des Nutzers 2026-11-15: direkt nach P14): Kamera-Dienst in Python auf dem Streaming-PC (Ordner `kamera-dienst/`, Benutzerdienst, Schnittstelle HTTP/JSON für Studio, Stream Deck und Aktionssystem; Presets im Dienst), Dock «Kameras» mit Steuerkreuz, Bildwerten und Licht (Key Light) mit Kamera- und Licht-Presets, Schritte «Kamera-Preset» und «Licht-Preset» im Aktionssystem. Plan `docs/archiv/prompts/P15-kamera.md` (2026-11-15), Go des Nutzers 2026-11-15. Schritt 0 und die Abschnitte a bis c (nur der Dienst) sind gebaut; d bis f (Studio) folgen nach der Abnahme von P14-1 (2026-11-17).
+- **P15 Kamerasteuerung** (Entscheid des Nutzers 2026-11-15: direkt nach P14): Kamera-Dienst in Python auf dem Streaming-PC (Ordner `kamera-dienst/`, Benutzerdienst, Schnittstelle HTTP/JSON für Studio, Stream Deck und Aktionssystem; Presets im Dienst), Modul-Reiter «Kameras» (statt Dock, Entscheid 2026-11-15; Variante 1B mit drei Spalten) mit Steuerkreuz, Bildwerten und Licht (Key Light) mit Kamera- und Licht-Presets, Schritte «Kamera-Position» und «Licht-Preset» im Aktionssystem. Plan `docs/archiv/prompts/P15-kamera.md` (2026-11-15), Go des Nutzers 2026-11-15. **Stand 2026-11-17:** Schritt 0 und alle Abschnitte a bis f gebaut (Dienst a bis c, am Gerät geprüft 2026-11-16; Kern-Anbindung d, Schnittstelle Version 19; Reiter e mit Entscheiden 1 bis 14 des Nutzers; Schritte f1, Reihenfolge der Anfragen je Lampe und Kamera f2a, Punkt 129; Kopfzeile «Kameras» mit zweiter Zeile über beide Spalten; Dokumente f2b). Offen: Prüfstufe «Baustein», Gerätetest (Handtest) mit Lotse und Nutzer, Installation des Dienstes durch den Nutzer (N7). Bericht `docs/archiv/berichte/P15-bericht.md`.
 - **Später als feste Bausteine des Chat-Bots** (Entscheid 2026-11-15): Countdown-Timer, Watchtime (baut auf den übernommenen Werten auf); Import der Aktionen aus Streamer.bot als eigener Baustein (die Zuschauer-Daten übernimmt schon P14-1).
 - **Später, nicht für die ersten Streams** (Entscheid 2026-11-15): Kanalpunkte-Effekte, Kamera-Fernbedienung per Chat, Kategorie per Befehl, Umfrage und Vorhersage, Moderations-Knöpfe. **Vorerst nicht:** Subathon, YouTube Music, Golf, Hugs, Q&A.
 - Reihenfolge noch offen: SOLL-Punkte des Editors (E-06, E-10, E-13 bis E-15, TX-06 bis TX-11); NDI (E-19, T-03).

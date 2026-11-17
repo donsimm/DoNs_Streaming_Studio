@@ -48,6 +48,8 @@ Es gibt keine Zugangsdaten. Im Protokoll stehen Adressen anderer Absender nur be
 | `GET events` | Ereignisse als Server-Sent Events |
 | `GET export` | alle Dateien des Datenordners als ein JSON |
 
+**Reihenfolge:** Der Dienst bearbeitet jede Anfrage in einem eigenen Faden und hält keine Reihenfolge fest; zwei Anfragen an dieselbe Lampe kurz nacheinander können sich überholen (die Sperre je Lampe hat keine feste Reihenfolge). Das Studio schickt darum schreibende Anfragen je Lampe, je Kamera, für «Licht» als Ganzes (`lights/all`, `POST lights`, `light-presets/…`) und für «Kamera» als Ganzes (`camera-presets/…`) erst nach der Antwort der vorigen (seit P15 f2a, `docs/08-kern-schnittstelle.md`, `camera_call`, «Reihenfolge»). Frei bleiben `GET`, `POST lights/check`, `move` und `stop`; ein `stop` kann so ein vorher geschicktes `move` überholen, dann hält der Totmann nach 500 ms (Punkt 131). Andere Absender (Stream Deck, `curl`) müssen selbst auf die Antwort warten, wenn die Reihenfolge zählt.
+
 In den Beispielen steht `D=http://127.0.0.1:8093/api/v1` und `CAM` für die Kennung einer Kamera.
 
 ### Status
@@ -269,6 +271,7 @@ Dauerbewegungen (`move`) eignen sich nicht für eine einzelne Taste, weil sie al
 ## Einschränkungen
 
 - **Tiny 2, KI-Modus:** Vor jeder Bewegung (Start, Schritt, Ziel, nicht je Takt) sendet der Dienst «KI-Verfolgung aus» (`16 02 00 00`, am Gerät bestätigt 2026-11-16, `ai_off_before_move`). Die Kamera braucht ≈ 5 s, bis die Verfolgung aus ist (Status 6, dann 0); der Dienst wartet nicht darauf. Ob sie Bewegungsbefehle während dieses Übergangs annimmt, ist nicht geprüft. Einschalten geht über `obsbot_ai` (nur «Oberkörper», `16 02 02 01`, am Gerät bestätigt 2026-11-16); weitere Modi und ein Tempo der Verfolgung sind nicht geprüft und nicht angeboten. Auto-Schlaf wird nur gelesen.
+- **Ende einer Bewegung:** `recall`, `step` und `home` antworten, sobald das Ziel gesetzt ist; das Ende der Fahrt meldet der Dienst nicht (Punkt 130). Darum hat der Schritt «Kamera-Position» des Aktionssystems kein Feld `wait`.
 - **Richtung und Tempo:** Die Standards von «Richtung umkehren» und bei der C922 das Tempo 100 (60°/s, Zoom 2 s über den ganzen Bereich) sind Annahmen; der Handtest N1 legt sie fest.
 - **Lage der Tiny 2:** geschätzt, nicht gemessen (die Kamera meldet sie nicht). Die Schätzung folgt der am Gerät gemessenen Kurve Tempo → Grad pro Sekunde (2026-11-16, über das OBS-Bild; Pan bis 80, Tilt bis 20 gemessen, darüber verlängert). Nach einem Abbruch (Kamera unerreichbar) ist die Lage unsicher, bis `home` oder ein Preset sie absolut setzt.
 

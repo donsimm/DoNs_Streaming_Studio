@@ -1,6 +1,6 @@
 # 03 – Funktionen je Modul (Entwurf)
 
-Stand: 2026-11-14 (E-22 ergänzt nach Entscheid vor P08, E-28 nach P10a, E-20 und E-21 nach P12b). Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
+Stand: 2026-11-17 (Abschnitt «Kameras und Licht» nach P15; E-22 ergänzt nach Entscheid vor P08, E-28 nach P10a, E-20 und E-21 nach P12b). Dieser Entwurf fasst zusammen, was der Nutzer genannt hat (du), was auf dem Bild der Oberfläche zu sehen ist (Bild) und was im alten Repo `donstv_Studio` stand (altes Repo, Funktionsliste `docs/01-funktionen.md`). Die Prioritäten des Editors sind entschieden (2026-11-02). Alles andere ist zu bestätigen und noch nicht priorisiert.
 
 ## Editor (Hauptfokus)
 
@@ -73,6 +73,30 @@ Umfang entschieden (2026-11-02, vom Nutzer bestätigt). Stufen wie beim Editor. 
 - Gebaut mit P13 (2026-11-15, Handtest steht aus): Anmeldung von Kanal und Bot (Bereich «Twitch» im Dialog «Einstellungen»), Ereignisse von Twitch auf dem Ereignisfluss (Chat-Nachricht, erste Nachricht im Stream, Follow, Sub, Resub, Geschenk einzeln und als Bündel, Cheer, Raid, Kanalpunkte, Stream online und offline, dazu `obs.scene_changed`), Reiter «Chat-Bot» mit Kopfzeile und Unterreiter «Live» mit der Liste «Ereignisse» (höchstens 200). Nachrichten senden, Befehle und Aktionen kommen mit P14 (Aktionssystem, `docs/archiv/prompts/P14-chatbot.md`).
 - Danach: Actions, Queues, Variablen, Timer, Trigger (Streamer.bot-Stil) und Import einer früheren Streamer.bot-Installation (altes Repo; der Nutzer hatte den Import als wichtig bezeichnet).
 - Chat-Spiele mit Anzeige im Overlay (du). Ablauf: Chat-Ereignis, Spiellogik, Anzeige per Browserquelle.
+
+## Kameras und Licht
+
+Gebaut mit P15 (2026-11-15 bis 2026-11-17; Prüfstufe «Baustein» und Gerätetest stehen aus). Entscheide: `docs/01-festlegungen.md`, «Kamerasteuerung (P15)»; Schnittstelle des Dienstes: `docs/09-kamera-dienst.md`; Bericht `docs/archiv/berichte/P15-bericht.md`.
+
+- **Kamera-Dienst** auf dem Streaming-PC (du): Kameras finden und beim Ein- und Ausstecken nachführen, alle Bildwerte der Kameras lesen und setzen (Umfang wie cameractrls), verstellte Werte merken und beim Erscheinen der Kamera neu setzen (zum Beispiel Netzfrequenz der C922 auf 50 Hz). Tiny 2: Wecken, Schlafen, HDR, Bildwinkel (weit, mittel, eng), KI-Verfolgung «Aus»/«Oberkörper»; Schutzregeln (nichts bewegen im Schlaf, Neigen unten begrenzt auf −66°, nie unter −75°, KI-Verfolgung vor jeder Bewegung aus, Totmann 500 ms). Bewegen als Dauerbewegung, Schritt, Mitte. Kamera-Presets (Position und Zoom, wahlweise Bildwerte), Lampen mit Ein/Aus, Helligkeit, Farbtemperatur, Licht-Presets, Ereignisse, Export. Läuft ohne Studio (Stream Deck).
+- **Reiter «Kameras»** (Variante 1B, drei Spalten): Kopfzeile mit Kamera-Auswahl (Name und Zustand), «Wecken»/«Schlafen», «Einrichten …» und Zustand des Dienstes. Links «Bewegen» (Steuerkreuz 3 × 3 mit «Mitte»: Klick = ein Schritt, Halten = fahren bis Loslassen, Pfeiltasten mit Fokus auf dem Kreuz; Zoom «−»/«+»; «Tempo», «Schritt»), «KI-Verfolgung», «Positionen» (Abrufen, Speichern mit «Bildwerte mitspeichern», Überschreiben, Umbenennen, Löschen). Mitte «Bildwerte» mit den Bereichen «Bild», «Belichtung», «Fokus», «Weissabgleich», «Weitere», «OBSBOT», Regler gebündelt höchstens alle 100 ms, «Zurücksetzen» je Wert und Bereich. Rechts je Lampe «Ein», «Helligkeit» 3–100 %, «Farbtemperatur» 2900–7000 K, «Alle ein»/«Alle aus», «Licht-Presets», «Lampen …».
+- **Dialoge:** «Kamera einrichten» (Name, Grenzen, Richtung umkehren, Tempo, Schritt, gemerkte Werte mit «Vergessen»), «Lampen» (Name, Adresse, «Hinzufügen», «Lampe löschen», «Verbindung prüfen» ohne Schalten), Bereich «Kamera-Dienst» im Dialog «Einstellungen» (Aktiv, Adresse, Port).
+- **Reihenfolge der Anfragen:** Der Kern schickt schreibende Anfragen je Lampe, je Kamera, für «Licht» als Ganzes und für «Kamera» als Ganzes nacheinander (jede wartet auf die Antwort der vorigen); so wirkt beim Loslassen eines Reglers immer der letzte Wert. Bewegen (`move`, `stop`) und Lesen gehen ohne Warten (`docs/08-kern-schnittstelle.md`, `camera_call`, «Reihenfolge»).
+
+### Schritte im Aktionssystem
+
+| Schritt | Typ | Feld | Verhalten |
+|---|---|---|---|
+| «Kamera-Position» | `camera_preset` | `preset` (Kennung des Kamera-Presets) | ruft die Position über den Kern beim Dienst ab (`POST camera-presets/<id>/recall`); weckt die Tiny 2 zuerst (bis 10 s) |
+| «Licht-Preset» | `light_preset` | `preset` (Kennung des Licht-Presets) | ruft das Licht-Preset ab (`POST light-presets/<id>/recall`) |
+
+- **Im Editor:** eigener Abschnitt «Kamera und Licht» im Menü «Schritt hinzufügen» (nach «Overlay und Ton»). Die Auswahl zeigt die Presets des Dienstes nach Name, «Keine» vorne; ein gelöschtes Preset erscheint als «<Kennung> (fehlt)» mit Hinweis. Ohne verbundenen Dienst ist das Feld ausgegraut, der Grund steht im Tooltip und unter dem Abschnitt. Der Kurzinhalt in der Mitte zeigt den Namen des Presets. Ohne Nummer bei Streamer.bot (eigene Schritte des Studios).
+- **Kein `wake`:** Abrufen einer Position weckt die Tiny 2 immer (Entscheid 6, 2026-11-17).
+- **Kein `wait`:** Der Dienst antwortet, sobald das Ziel gesetzt ist, und meldet das Ende der Bewegung nicht; der Lauf wartet also nicht, bis die Kamera steht (offener Punkt 130).
+- **Probelauf:** ruft nichts ab, sondern meldet «Probelauf: würde Position «<Name>» abrufen» bzw. «Probelauf: würde Licht-Preset «<Name>» abrufen» (wie die Schritte zu Twitch und OBS, weil sie etwas im Raum ändern). Die Stumm-Regel gilt wie für alle Schritte: Läuft die Version im Einsatz, startet die Version in Arbeit keine Läufe aus Ereignissen.
+- **Fehler im Verlauf:** Dienst aus («Kamera-Dienst ist aus.»), keine Antwort (Meldung des Kamera-Clients, Zeitgrenze 15 s je Anfrage), Fehler des Dienstes mit seiner Meldung (zum Beispiel gelöschtes Preset). Antwortet beim Licht-Preset eine Lampe nicht, sind die anderen gesetzt, und der Schritt meldet einen Fehler mit allen Meldungen. Der Lauf geht immer weiter und endet wie bei anderen Schritten als «Fehler» mit der ersten Meldung. Ein Kern ohne Kamera-Dienst (Schalter `DSS_CORE_CAMERA` aus) meldet «nicht verfügbar».
+- **Zwei Licht-Presets direkt nacheinander** gehen in dieser Reihenfolge an den Dienst: Der zweite Abruf geht erst los, wenn der erste beantwortet ist; am Ende gilt das zweite Preset. Dasselbe gilt für zwei Positionen nacheinander (die zweite fährt los, wenn die erste ihr Ziel gesetzt hat, nicht erst, wenn die Kamera steht).
+- **Später:** Kamera-Fernbedienung per Chat (baut auf diesen Schritten auf), Stream-Deck-Tasten direkt am Dienst (eigener Auftrag).
 
 ## Spätere Module (nur Ideen)
 

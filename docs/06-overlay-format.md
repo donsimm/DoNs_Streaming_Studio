@@ -1,6 +1,6 @@
 # 06 – Format der Overlay-Datei
 
-Stand: 2026-11-15 (P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5, Dateien des Chat-Bots P14 a). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
+Stand: 2026-11-17 (Dateien des Kamera-Dienstes und Schritte «Kamera-Position»/«Licht-Preset», P15; davor 2026-11-15: P04, Nachträge P05, Test des Beispiels P07, Liste `liste.json` P08, Ausgabe ein/aus P10, Medienliste `medien.json` P10b, Lautstärke und Stumm der Videos P12b, Format 5, Dateien des Chat-Bots P14 a). Diese Datei ist die Vorlage für beide Zeichner (K-01): den Zeichner im Editor und den Zeichner der Browserquelle. Massgebend ist der Code in `src/common/overlay.h`, `src/common/overlayjson.cpp` und `src/common/overlaystore.cpp`; das Beispiel unten lädt ein Test (`tst_overlaystore`, Fall `formatDocExample`).
 
 ## Datenordner
 
@@ -252,6 +252,7 @@ Seit P14 (Abschnitt a). Aktionen mit Auslösern und Schritten, Befehle, Zeitnach
 | `timers` | Liste | Zeitnachrichten (`id`, `name`, `enabled`, `repeat`, `interval_s` ab 60, `random`, `random_min_s`, `random_max_s`, `lines`, `only_live`) |
 
 - **Schritte:** gemeinsame Felder `id`, `type`, `enabled`, `weight` (Zahl ab 0, kein Pflichtfeld, Standard 0) und bei `group`, `if`, `if_true`, `if_false` die Liste `steps`. Dazu die Felder des Typs nach der Tabelle in `steptypes.cpp` (Plan 2.4). `if` hat genau die Kinder `if_true` und `if_false` in dieser Reihenfolge; diese stehen nur dort. Verschachtelt höchstens 32 Ebenen. `unsupported` ist immer aus; `script` wird gelesen und geschrieben, nie ausgeführt.
+- **Schritte zu Kamera und Licht** (seit P15 f1, Format bleibt 1): `camera_preset` («Kamera-Position») und `light_preset` («Licht-Preset»), je mit dem Pflichtfeld `preset` (Text, Kennung des Presets im Kamera-Dienst, leer = keine gewählt). Kein `wake`, kein `wait` (`docs/03-funktionen-entwurf.md`, «Kameras und Licht»). Ein Preset, das es im Dienst nicht mehr gibt, macht die Datei nicht ungültig; der Schritt meldet den Fehler im Lauf. Testdaten: beide Typen in `tests/daten/aktionen/vollstaendig.json` (neue Typen dort ergänzen, sonst scheitert `tst_aktionsformat::typeTables`).
 - **Auslöser:** `id`, `type`, `enabled` und die Filter nach `triggertypes.cpp` (Plan 2.5).
 - **Kennungen:** UUID in Kleinbuchstaben ohne Klammern, je Art eindeutig in der ganzen Datei (Aktionen, Schritte, Auslöser, Befehle, Zeitnachrichten, Warteschlangen, Gruppen). `queue` und `template_id` dürfen `null` sein; bei `queue` heisst auch die UUID aus lauter Nullen «Standard» und wird als `null` geschrieben.
 - **Unbekannte Felder** sind erlaubt und bleiben auf jeder Ebene erhalten (beim Lesen gesammelt, beim Schreiben wieder ausgegeben). Alle übrigen Felder sind Pflicht; ein fehlendes oder ungültiges Feld macht die Datei ungültig, die Meldung nennt es (zum Beispiel `actions[0].steps[2].text`).
@@ -290,6 +291,27 @@ Seit P14 (Abschnitt a), gefüllt vom Import aus Streamer.bot (Plan P14, Abschnit
 | `streamerbot-archiv.json` | `{"format_version": 1, "files": {"<Datei>": {"<Sammlung>": <JSON>}}}`, unverändert, nicht sichtbar |
 
 **Prüfen beim Installieren:** `dss-core --format-pruefen` liest alle fünf Dateien des Chat-Bots streng (`aktionen.json`, `variablen.json` und die drei oben). Eine ungültige Datei meldet es als «nicht lesbar, bleibt unverändert», eine `format_version` über 1 als neueres Format (Exit-Code 5). Ein älteres Format gibt es noch nicht.
+
+## Kamera-Dienst
+
+Seit P15. Die Dateien des Kamera-Dienstes liegen **auf dem Streaming-PC**, nicht im Datenordner des Studios; nur der Dienst schreibt sie, das Studio ändert sie über die Schnittstelle (`docs/09-kamera-dienst.md`, «Dateien im Datenordner»). Massgebend ist der Code in `kamera-dienst/dss_camera/` (`controls.py`, `motion.py`, `presets.py`, `lights.py`, `export.py`); Orte und Installation: `kamera-dienst/LIESMICH.md`.
+
+```
+~/.local/share/dss-kamera/     ($XDG_DATA_HOME/dss-kamera/)
+├── kameras.json               je Kamera Anzeigename (name), gemerkte Bildwerte (controls), Einstellungen zum Bewegen (motion)
+├── kamera-presets.json        Kamera-Presets (presets): id, name, camera, pan, tilt, zoom, wahlweise controls
+├── licht.json                 Lampen (lights): id, name, host
+└── licht-presets.json         Licht-Presets (presets): id, name, je Lampe on, brightness, temperature oder null
+~/.config/dss-kamera/dienst.ini            Lauschadressen, erlaubte Adressen, Port (nur von Hand)
+~/.local/share/dss-kamera-sicherungen/<JJJJ-MM-TT_hh-mm-ss>/   Sicherung vor jeder Aktualisierung (programm/, daten/)
+```
+
+- Alle vier Dateien mit `format_version` 1, atomar geschrieben (temporäre Datei, dann `os.replace`). Eine ungültige Datei wird gemeldet und nie überschrieben; Änderungen an ihrem Teil weist der Dienst mit `409 file_error` ab.
+- Kennungen von Presets und Lampen aus dem Namen (klein, Umlaute als ae/oe/ue, übrige Zeichen als «-», bei gleichem Namen eine Zahl), sie bleiben beim Umbenennen. `all` ist nie die Kennung einer Lampe.
+- Pan und Tilt in Presets in Grad, Zoom im Wert des Geräts; `null` bei einer Achse heisst «fehlt an der Kamera». Farbtemperatur in Mired (143 bis 344), Helligkeit 3 bis 100.
+- Die KI-Verfolgung der Tiny 2 (`obsbot_ai`) wird weder gemerkt noch in Presets gespeichert (P15 e1b).
+- `GET export` liefert alle Dateien als ein JSON (Sicherung); ihr Aufbau ist keine zugesicherte Schnittstelle, das Studio liest ihn nicht.
+- Keine Zugangsdaten, keine Seriennummern im Repo (Testdaten erfunden).
 
 ## Versionen
 

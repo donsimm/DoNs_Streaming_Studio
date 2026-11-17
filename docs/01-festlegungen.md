@@ -1,6 +1,6 @@
 # 01 – Festlegungen
 
-Stand: 2026-11-14 (Ton von Videos, P12). «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
+Stand: 2026-11-17 (Kamerasteuerung, P15; davor Ton von Videos, P12). «Entschieden» heisst: vom Nutzer bestätigt. «Vorschlag» heisst: Vorschlag von Claude, noch nicht bestätigt. Quellen: `docs/05-quellen.md`.
 
 ## Ziel
 
@@ -66,6 +66,36 @@ Entscheide des Nutzers vom 2026-11-09 und 2026-11-15 (Plan `docs/archiv/prompts/
 - Reiter «Chat-Bot» mit Unterreitern nach dem Entwurf (`lotse/entwurf-chatbot`); die fünf Docks des Overlay-Editors sind dort ausgeblendet. (entschieden 2026-11-15)
 - Der Bot läuft nur, solange das Studio offen ist (Kern wie heute). (entschieden 2026-11-15)
 - Follows kommen als Ereignis direkt von Twitch. «Erste Nachricht im Stream» leitet der Kern selbst ab, Twitch liefert nur «erste Nachricht überhaupt». (entschieden 2026-11-09, Interna)
+
+## Kamerasteuerung (P15)
+
+Entscheide des Nutzers vom 2026-11-15 und 2026-11-17 (Plan `docs/archiv/prompts/P15-kamera.md`, «Entscheide des Nutzers» und «Antworten des Nutzers» 1 bis 5; Checkliste `docs/archiv/prompts/P15-e-checkliste.md`, Abschnitt 4, Entscheide 1 bis 14; Bericht `docs/archiv/berichte/P15-bericht.md`). Schnittstelle des Dienstes: `docs/09-kamera-dienst.md`.
+
+- Geräte am Streaming-PC: OBSBOT Tiny 2 und Logitech C922 Pro Stream über USB (beide UVC), dazu zwei Elgato Key Light Air im Heimnetz (Ein/Aus, Helligkeit, Farbtemperatur). (entschieden 2026-11-15)
+- Aufbau: ein kleiner Kamera-Dienst in Python auf dem Streaming-PC (Ordner `kamera-dienst/` im Repo, Benutzerdienst `dss-kamera`, HTTP/JSON auf Port 8093) ist der einzige Weg zu Kameras und Lampen; Studio, Stream Deck und Aktionssystem nutzen dieselbe Schnittstelle. Im Studio spricht der Kern mit dem Dienst, nicht das Fenster. Kamera- und Licht-Presets liegen im Dienst, damit das Stream Deck sie auch ohne Studio abrufen kann. (entschieden 2026-11-15; Ort im Repo, Sprache, Presets im Dienst und Kern als Vermittler: Interna, Plan 2.1, 3 und 7)
+- Umfang mindestens wie cameractrls, dazu Schwenken, Neigen und Zoomen der Tiny 2. Ihre Sonderfunktionen (Schlafen/Wecken, HDR, Bildwinkel, KI-Verfolgung) über das offen erforschte Protokoll (Vorlage `cgevans/tiny2`, Bytefolgen selbst geschrieben, kein Code kopiert), kein OBSBOT-SDK. Freigeschaltet ist nur, was am Gerät geprüft ist. (entschieden 2026-11-15)
+- Ort der Bedienung: eigener Modul-Reiter «Kameras» neben «Overlays» und «Chat-Bot», kein Dock. (entschieden 2026-11-15, Antwort 1)
+- Aufteilung des Reiters: Variante 1B «Alles sichtbar», ohne Unterreiter, drei Spalten: links Steuerung (Steuerkreuz, Zoom, Tempo, Schritt, KI-Verfolgung) und Positionen, Mitte Bildwerte mit Bildlauf, rechts Licht (Lampen, Licht-Presets). Kopfzeile mit Kamera-Auswahl, «Wecken»/«Schlafen», «Einrichten …» und Zustand des Dienstes. (entschieden 2026-11-15, Antwort 5, Entwurf `lotse/entwurf-kamera`)
+- Ein Kamera-Preset («Position») speichert Position und Zoom; beim Speichern das Kästchen «Bildwerte mitspeichern», Standard aus. (entschieden 2026-11-15, Antwort 2)
+- Schutz des Dienstes ohne Anmeldung, drei Schichten: lauscht nur auf IPv4 (Adresse im Heimnetz und `127.0.0.1`), antwortet nur erlaubten Absendern (`dienst.ini`, Studio-PC und `127.0.0.1`), Firewall-Regel nur für den Port vom Studio-PC (`docs/02-umgebung.md`, «Streaming-PC»). (entschieden 2026-11-15, Antwort 3)
+- Reihenfolge: Schritt 0 und die Abschnitte a bis c (nur der Dienst) parallel zu P13/P14, d bis f nach der Abnahme von P14. Lotse darf am Streaming-PC für Prüfungen Kameras bewegen, wecken und schlafen legen, eine Testinstanz des Dienstes starten und Licht schalten, nie während eines Streams; Werte, die bleiben, nur mit OK des Nutzers in der Sitzung. (entschieden 2026-11-15, Antwort 4)
+- Reiter «Kameras» (entschieden 2026-11-17, Entscheide 1 bis 14):
+  - Neue Bausteine nur in `src/app` (Seite, Dialoge «Kamera einrichten», «Lampen» und Namensdialog, grosser Richtungsknopf mit 6 neuen Symbolen, Reglerzeile «Regler + Wert fester Breite», `section()` mit Text rechts in der Titelzeile). Leisten mit fünf Knöpfen («Positionen», «Licht-Presets») brechen auf zwei Zeilen um. (1)
+  - «Tempo» und «Schritt» im Bereich «Bewegen» ändern die Einstellungen der Kamera, Einheit je Kamera: Tiny 2 in °/s (1 bis 100, Standard 10), C922 in % (Standard 50). (2)
+  - Hinweise als Text ohne Kasten in den Farben der Kopfzeile, Marke «•» vor gemerkten Werten, Kamera-Auswahl ohne Farben, keine neuen Theme-Werte. (3)
+  - Dialog «Lampen»: «Lampe löschen» statt «Entfernen». (4)
+  - KI-Verfolgung bei der Tiny 2 bedienbar, nur «Aus» und «Oberkörper», ohne Tempo; weitere Modi erst nach einem Test am Gerät. Bei der C922 ausgegraut mit «Diese Kamera hat das nicht.». (5)
+  - Kein Kästchen «Presets wecken die Kamera»: Abrufen einer Position weckt die Tiny 2 immer; im Reiter steht der Hinweis «weckt die Kamera zuerst». (6)
+  - Überall «Schritt» und «Positionen», auch im Dialog. Linke Spalte bestätigt. (7, 8)
+  - Dienst nicht erreichbar: Die Auswahl zeigt nur den Namen der Kamera, Lampen und Zoom zeigen «–», bis der Dienst wieder antwortet. (9)
+  - «Bewegen»: Hinweis und «Wecken» rechts neben dem Kreuz, der Platz bleibt reserviert; bei «KI-Verfolgung» steht der Hinweis in der Zeile der Auswahl. (10)
+  - Gesperrte Regler ohne Wert stehen grau ganz links, daneben «–», nie die Stellung einer anderen Kamera. (11)
+  - Dialog «Kamera einrichten»: alle sechs Zahlenfelder so breit wie das breiteste Grenzfeld, Spaltenkopf «Gemerkt», Minuszeichen wie sonst im Projekt. (12)
+  - «Verbindung prüfen» im Dialog «Lampen» fragt die Lampe sofort, ohne sie zu schalten, auch unter einer noch nicht gespeicherten Adresse (`POST lights/check`). (13)
+  - «Diese Kamera hat das nicht.» bleibt in der Titelzeile der Bereiche. (14)
+- Kopfzeile des Reiters (Interna, Entscheide Lotse e4 und f2a): rechts der Zustand des Dienstes in voller Breite; die zweite Zeile reicht über beide Spalten, links der Hinweis «Steuerung, Bild und Licht sind gesperrt …», rechts die Meldung, bei zu wenig Platz am Ende mit «…» gekürzt, der ganze Text im Tooltip.
+- Aktionssystem: Schritte «Kamera-Position» (`camera_preset`) und «Licht-Preset» (`light_preset`), je nur mit dem Feld `preset`. Kein Feld `wake` (Abrufen weckt immer, Entscheid 6) und kein Feld `wait` (der Dienst meldet das Ende einer Bewegung nicht, Punkt 130). Im Probelauf rufen sie nichts ab. (Plan 9; Felder: Interna f1)
+- Später: Kamera-Fernbedienung per Chat (Entscheid 2026-11-15). Das Stream Deck stellt ein eigener Auftrag im Stream-Deck-Projekt auf die Schnittstelle des Dienstes um.
 
 ## Betrieb im Netz
 

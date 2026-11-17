@@ -1,6 +1,59 @@
-# P15 – Bericht (Kamera-Dienst, Abschnitte a bis c)
+# P15 – Bericht (Kamerasteuerung, Abschnitte a bis f)
 
-Stand: Dienst a1 bis c4 gebaut und mit der Attrappe geprüft (`ctest -R '^kd_'` 10/10, `kd_bewegen` 20×). Studio-Teil d bis f folgt nach P14.
+Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» je Abschnitt bestanden (letzter ganzer Lauf in f2a: `scripts/testen.sh` 88 von 88). **Offen:** Prüfstufe «Baustein», Gerätetest mit Lotse und Nutzer (Liste unten), Installation des Dienstes durch den Nutzer (N7). Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste des Reiters `docs/archiv/prompts/P15-e-checkliste.md`.
+
+## Gesamtübersicht
+
+| Abschnitt | Inhalt | Stand |
+|---|---|---|
+| Schritt 0 | Lotse am Gerät (2026-11-15): Konstanten, Statusblock, Wecken/Schlafen, 4,5 s nach dem Wecken, Schwelle zum Einschlafen −76° (Grenze −66°), Python 3.14.8, Port 8093 frei, Firewall ohne offenen Bereich | erledigt, Ergebnis im Plan |
+| a1–a3 | Dienst: Grundgerüst (`dienst.ini`, Sperre, HTTP mit Absenderprüfung, `GET status`, Attrappe), V4L2 und Geräte (`by-id`, Ein-/Ausstecken), Bildwerte mit gemerkten Werten | gebaut, am Gerät geprüft (Prüfung a) |
+| b1–b7 | Dienst: OBSBOT (Statusblock, Wecken, Schlafen, HDR), Bewegen mit Schutzregeln und Totmann, Kamera-Presets; b4/b5 Dauerbewegung der Tiny 2 über Geschwindigkeit mit gemessener Tempokurve; b6 Zone aus `ip route get`; b7 Bildwinkel, «KI aus» vor Bewegung, Geräte ohne Werte ausgeblendet | gebaut, am Gerät geprüft (Prüfung b, b5, b7) |
+| c1–c4 | Dienst: Licht und Licht-Presets, Ereignisse (SSE) und Export, `docs/09-kamera-dienst.md`, Installation (`installieren.sh`, `system-einrichten.sh`, Einheit), Einstellungen je Kamera | gebaut, am Gerät geprüft (Prüfung c); Firewall-Regel vom Nutzer eingerichtet 2026-11-16 |
+| d1–d3 | Studio: Bibliothek `dss_camera` (`CameraServiceClient`), Kern-Anbindung (`kern.ini [kamera-dienst]`, Schnittstelle Version 19, Ereignisfluss, `dss-cli kamera-…`), Dialog «Einstellungen», Bereich «Kamera-Dienst» | gebaut, nur gegen die Attrappe |
+| e1–e4 | Studio: Checkliste und Ansichtslogik `cameraview` (e1), KI-Verfolgung «Aus»/«Oberkörper» (e1b), Reiter «Kameras» links mit Dialog «Kamera einrichten» (e2), Mitte «Bildwerte», rechts «Licht», Dialog «Lampen» (e3), Nacharbeit nach der UI-Prüfung mit Entscheiden 9 bis 14 und `POST lights/check` (e4) | gebaut, nur gegen die Attrappe; UI-Prüfung nach e2/e3 durch einen getrennten Prüfer |
+| f1 | Schritte «Kamera-Position» (`camera_preset`) und «Licht-Preset» (`light_preset`) im Aktionssystem | gebaut, nur gegen die Attrappe |
+| f2a | Reihenfolge der schreibenden Anfragen je Lampe und Kamera im Kamera-Client (Punkt 129), Kopfzeile «Kameras» mit zweiter Zeile über beide Spalten | gebaut, nur gegen die Attrappe |
+| f2b | Dokumente `01` bis `09` nachgeführt, diese Übersicht | erledigt (nur Doku) |
+
+### Offene Punkte
+
+- In `docs/04-offene-punkte.md` aufgenommen (Entscheid Lotse 2026-11-17: aufnehmen, nicht bauen): **130** Warten, bis die Bewegung fertig ist; **131** `stop` kann `move` überholen; **132** «Kamera» als Ganzes hält beim Wecken der Tiny 2 andere Kameras auf; **133** Dauerbewegung während eines laufenden Ziels (b4); **134** weitere KI-Modi erst nach Test am Gerät; **135** `kd_presets` scheiterte einmal (e4); **136** `zoom_continuous` meldet 245 (b6); **137** Schlüssel der Bildwerte nicht an den echten Kameras geprüft.
+- Punkt 129 erledigt in f2a (Archiv `docs/archiv/04-erledigte-punkte.md`).
+- `[OFFEN]` Lampe links fiel im WLAN aus (Prüfung c); kein Fehler des Dienstes, beobachten.
+- `[OFFEN]` Die Rechte von Lotse am Streaming-PC für P15 (Plan, Frage 4 A: «wird in `CLAUDE.md`, «Umgebung», eingetragen») stehen nicht in `CLAUDE.md`. Nicht Teil von f2b (nur `docs/`), Entscheid Lotse.
+- `[OFFEN]` Nicht als Fenstertest abgedeckt: Fehler einmal je Halten (e3, nur ohne Fenster), Weg über den Kern-Socket mit langsamer Lampe (f2a, geprüft ist der Client).
+- Reste ohne Freigabe zum Löschen: `build/bilder-e4` (leer, e4), `build/scratch-f1-teil.txt` (f1).
+
+### Prüfstufe «Baustein» (steht aus, Plan 12, Ordner `build/pruefung-p15/`)
+
+Bau, `ctest` mit X11-Sitzung (0 übersprungen), frischer Klon, `scripts/startpruefung.py --runs 20`, `scripts/dienstpruefung.py --kills 5`. 50 Wiederholungen ohne Last daneben, Fenstertests nie gleichzeitig: `kd_bewegen`, `kd_obsbot`, `kd_ereignisse`, `kd_presets` (Punkt 135), `tst_kameradienst`, `tst_kernkamera`, `tst_fensterkameras`. Last am Dienst (Attrappe, Plan 12): 10 Anfragen je Sekunde über 60 s mit Ein-/Ausstecken alle 5 s, CPU des Dienstes als Messwert.
+
+### Handtest-Liste für den Gerätetest
+
+Nie während eines Streams (vorher Stream und Aufnahme prüfen). Am Gerät schon erledigt (2026-11-16, nicht wiederholen): `status` und `controls` beider Kameras, Wecken/Schlafen 10×, Preset aus dem Schlaf, Dauerbewegung hält bei −66°, Totmann (332 ms), Tempokurven und ruhiges Anhalten (b5), Bildwinkel und «KI aus» vor Bewegung (b7), Licht-Presets 10× mit Begrenzung (L2), Absender und Firewall-Regel vom Studio-PC (L3).
+
+**Prüft Lotse**
+
+1. **Bilder des Reiters.** `DSS_TEST_BILDER=<ordner> scripts/testen.sh -R '^tst_fensterkameras$'`, dann ansehen: `kameras-e3.png` (Kreuz oben in «Bewegen», Platz rechts unter «Schritt», «KI-Verfolgung» in einer Zeile, Breite rechts, Marke «•»), `kameras-e3-weg.png` (Auswahl nur mit Namen, Zoom und Lampen «–», Hinweis links in der zweiten Zeile, Meldung rechts ganz lesbar), `kameras-e3-c922.png` (Regler ohne Wert ganz links), `kameras-e3-einrichten.png` (sechs Zahlenfelder gleich breit, «Gemerkt»), `kameras-e3-lampen.png` (Meldungszeile), `schritt-kamera.png` (Aktion «DSS-Test Kamera» mit beiden Schritten, Kurzinhalte «Weit» und «Hell», Abschnitt «Kamera und Licht»). Grund: im Bau nicht angesehen.
+2. **Dienst am Gerät, Rest.** KI über `PUT cameras/<tiny2>/controls {"obsbot_ai": 1}` (Kamera folgt), `0` (steht, nach ≈ 5 s weiter 0), nicht gemerkt (`remembered: false`, nicht in `kameras.json`, nicht im Preset «mit Bildwerten»), im Schlaf `409 camera_asleep` (e1b); Bewegung direkt nach «KI aus» während des Übergangs 6 (b7, nicht geprüft); Dienst während einer Fahrt beenden hält an (b4); `system-einrichten.sh --trocken <studio-pc>` zeigt die Zone der Kabelkarte (b6); Schlüssel der Bildwerte mit `dss-cli kamera-aufruf GET cameras/<id>/controls` (Punkt 137); `zoom_continuous` der Tiny 2 (Punkt 136). Grund: nur am Gerät.
+3. **Studio gegen den Dienst (L4).** Kern und Fenster aus `build/` mit eigenem `XDG_CONFIG_HOME` gegen den Dienst: Kreuz (Klick = Schritt, Halten fährt fliessend und hält beim Loslassen, Pfeiltasten mit Fokus, Richtung von Pfeil und Bild); KI «Oberkörper» im Reiter, danach ein Schritt → Anzeige «Aus», Kamera steht; Bildwerte (C922 Helligkeit ziehen, Weissabgleich von Hand, «Zurücksetzen» eines Bereichs; Tiny 2 Bildwinkel); `dss-cli kamera-preset <id>`; Bild der Kameraquelle in «test 2» vorher/nachher über obs-websocket, Testquelle danach löschen, Szene zurück auf «Szene». Grund: echter Weg Fenster → Kern → Dienst → Kamera, Bild nur in OBS.
+4. **Key Lights im Reiter.** Dialog «Lampen» mit den echten Adressen; «Verbindung prüfen» mit echter Adresse vor OK und mit falscher Adresse, die Lampe schaltet dabei nicht; Helligkeit und Farbtemperatur ziehen, «Alle ein»/«Alle aus», Licht-Preset speichern und abrufen, danach Zustand wie vorher. Grund: echte Lampen im Netz.
+5. **Aktion mit beiden Schritten.** Aus der Version in Arbeit eine Aktion mit «Kamera-Position» und zwei «Licht-Preset» direkt nacheinander echt auslösen (nicht Probelauf), Tiny 2 im Schlaf; im Verlauf die Meldungen, am Ende gilt das zweite Licht-Preset. Danach einmal mit gelöschtem Preset (Fehler im Verlauf, Lauf geht weiter). Grund: echte Geräte, Wecken bis 10 s, Reihenfolge (f2a).
+6. **Neustart des Dienstes (L5).** Eigener Schritt: `systemctl --user restart dss-kamera` am Streaming-PC (erst nach N7). Presets, Lampen und gemerkte Werte unverändert; das Studio verbindet sich von selbst neu. Grund: Speichern und Wiederverbinden im echten Betrieb.
+
+**Prüft der Nutzer**
+
+1. **Installation und Netzregel (N7).** Eigene Schritte: `~/DoNs_Streaming_Studio/kamera-dienst/installieren.sh <streaming-pc>` auf dem Studio-PC; am Streaming-PC `~/.config/dss-kamera/dienst.ini` anlegen (`kamera-dienst/LIESMICH.md`) und `systemctl --user restart dss-kamera`. Die Firewall-Regel steht schon (2026-11-16). Prüfen: Dienst läuft nach der Anmeldung von selbst; ein drittes Gerät im Heimnetz (Handy, Browser auf `http://<streaming-pc>:8093/api/v1/status`) bekommt keine Antwort. Grund: Installation macht nur der Nutzer, drittes Gerät.
+2. **Steuerkreuz und Zoom (N1).** Klick und Halten in alle Richtungen, Zoom, «Tempo», «Schritt»; passt die Richtung der Pfeile (sonst «Richtung umkehren», der Standard wird hier festgelegt); Positionen anlegen, abrufen, umbenennen, löschen. Grund: Bedienung und Gefühl.
+3. **Aussehen des Reiters.** Mitte und rechte Spalte (Breite rechts, Lage von «Diese Kamera hat das nicht.», Grösse der Liste «Licht-Presets»), «Bewegen» mit Hinweis und «Wecken» neben dem Kreuz, Kopfzeile bei «Dienst weg», soweit nicht schon mit den Entscheiden 9 bis 14 gesehen. Grund: nur im Fenster zu beurteilen.
+4. **Bildwerte (N2).** C922 Netzfrequenz 50 Hz (Flackern weg?), Belichtung, Fokus, Weissabgleich; Tiny 2 HDR, Bildwinkel, KI-Verfolgung; Bild in OBS beurteilen. Grund: Aussehen im Stream.
+5. **Umstecken (N3).** Eigener Schritt: beide Kameras bei laufendem OBS (ohne Stream) ab- und wieder anstecken. Nach wenigen Sekunden stimmen die gemerkten Werte wieder (C922 50 Hz); Lotse liest danach das Protokoll des Dienstes und `journalctl -k`. Grund: nur der Nutzer kann umstecken.
+6. **Schlafen und Wecken (N4).** «Schlafen» und «Wecken» im Reiter, LED und Bild in OBS; Position aus dem Schlaf abrufen. Grund: LED und Kopf sieht nur der Nutzer.
+7. **Licht (N5).** Eigene Licht-Presets «Stream» und «Abend» anlegen und abrufen; Regler «Helligkeit» einer Lampe schnell ziehen und loslassen, die Lampe steht danach auf dem letzten Wert (f2a). Grund: Licht im Raum.
+8. **Aktionssystem (N6).** Eine eigene Aktion mit «Kamera-Position» und «Licht-Preset» anlegen und echt auslösen (Test-Knopf mit «echt ausführen»), auch die Texte im Menü «Schritt hinzufügen» und den Hinweis ohne Dienst ansehen. Grund: Bedienung des Editors.
+
+Stream Deck: nicht Teil dieses Gerätetests (eigener Auftrag im Stream-Deck-Projekt).
 
 ## Prüfung am Gerät a bis c (2026-11-16, 07:20–07:50, Lotse, Nutzer am Streaming-PC)
 
@@ -354,3 +407,26 @@ Ein Commit für beide Teile (Regel 8, Auftrag): Beide betreffen den Weg Fenster/
 - `docs/04`: neue Punkte aus f1 (Warten auf Ende der Bewegung) und aus f2a `[OFFEN]` (`stop` überholt `move`, «Kamera» als Ganzes beim Wecken) nach Entscheid aufnehmen.
 - `docs/01`/`docs/07`: Stand P15 f nachführen; Kopfzeile «Kameras» zweite Zeile über beide Spalten.
 - Prüfung f: Stufe «Baustein» steht aus.
+
+## f2b: Dokumente 01 bis 09, Gesamtübersicht (2026-11-17)
+
+Ein Commit, nur Doku (Auftrag).
+
+- **Geändert:**
+  - `docs/01-festlegungen.md`: neuer Abschnitt «Kamerasteuerung (P15)» (Entscheide 2026-11-15 und Antworten 1 bis 5, Entscheide 1 bis 14 vom 2026-11-17, Kopfzeile, Schritte ohne `wake` und `wait`).
+  - `docs/02-umgebung.md`: Streaming-PC mit Firewall-Regel für 8093, zweiter Zone, neuer Teil «Kamera-Dienst (P15)» (Python 3.14.8, Kameras, Lampen, Dienst, Port, Regel, cameractrls).
+  - `docs/03-funktionen-entwurf.md`: neuer Abschnitt «Kameras und Licht» mit den Schritten «Kamera-Position» und «Licht-Preset» (Felder, Probelauf, Fehler im Verlauf, kein `wake`, kein `wait`, zwei Licht-Presets nacheinander).
+  - `docs/04-offene-punkte.md`: Punkte 130 bis 137.
+  - `docs/05-quellen.md`: Abschnitt «Kameras und Licht (P15)».
+  - `docs/06-overlay-format.md`: Schritte `camera_preset`/`light_preset` in `aktionen.json`, Abschnitt «Kamera-Dienst» (Dateien auf dem Streaming-PC).
+  - `docs/07-bauplan.md`: Stand P15 (a bis f gebaut, Reiter statt Dock, offen: Baustein, Gerätetest, N7).
+  - `docs/08-kern-schnittstelle.md`: Stand, Probelauf mit Kamera und Licht, Absatz zu den Schritten (`CameraActions`, keine neue Nachricht, Version 19).
+  - `docs/09-kamera-dienst.md`: Absatz «Reihenfolge» unter «Anfragen», Einschränkung «Ende einer Bewegung».
+  - Dieser Bericht: Titel, Gesamtübersicht, offene Punkte, Prüfstufe, Handtest-Liste.
+- **Geprüft (2026-11-17, Stufe «Klein», nur Doku):** `scripts/bauen.sh` Bau ok, 0 Warnungen; `git diff --stat` nur die zehn Dateien unter `docs/`; Suche nach «ß» in `docs/` ohne neuen Treffer (nur Stellen, die die Regel «ß» → «ss» beschreiben). `ctest` nicht gelaufen (kein Code geändert).
+- **Handtest:** kein Handtest nötig (nur Doku); die Liste für den Gerätetest steht oben.
+- **Annahmen, Interna-Entscheide:**
+  - Neben den fünf Punkten aus dem Entscheid Lotse kamen drei offene Befunde aus den Berichten nach `04` (133 aus b4, 136 aus b6, 137 aus der Checkliste e), damit sie nicht nur im Bericht stehen (Regel 1).
+  - Ob der Dienst inzwischen installiert ist, steht in keinem Bericht; `docs/02` sagt darum «nicht geprüft».
+  - Die Dateien des Dienstes stehen in `06` als eigener Abschnitt, obwohl sie auf dem Streaming-PC liegen (Auftrag: «06 (Dateien des Dienstes)»); massgebend bleibt `09`.
+- **Quellen:** Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste `docs/archiv/prompts/P15-e-checkliste.md` (Abschnitte 4 und 5), dieser Bericht (a bis f2a), `kamera-dienst/LIESMICH.md`, `kamera-dienst/dss_camera/presets.py` (Kopf), `motion.py` (`_goto`), `src/actions/steptypes.cpp`, `src/actions/actionrun.cpp` (Texte des Probelaufs), `src/core/cameraactions.cpp`.

@@ -1,6 +1,6 @@
 # 02 – Umgebung (Zielsystem)
 
-Stand: 2026-11-14 (Pakete für den Ton, P12b; Streaming-PC und Netz Stand 2026-11-08; Studio-PC Stand 2026-11-02). Die Werte des Studio-PCs wurden dort gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben. Systemangaben beider Rechner führt `~/projekte/privat/it-system/SYSTEM.md`; hier steht, was das Studio braucht.
+Stand: 2026-11-17 (Kamera-Dienst und Firewall des Streaming-PCs, P15; Pakete für den Ton, P12b, 2026-11-14; Streaming-PC und Netz sonst Stand 2026-11-08; Studio-PC Stand 2026-11-02). Die Werte des Studio-PCs wurden dort gemessen (Ausgaben des Nutzers im Terminal), ausser wo angegeben. Systemangaben beider Rechner führt `~/projekte/privat/it-system/SYSTEM.md`; hier steht, was das Studio braucht.
 
 ## Studio-PC
 
@@ -117,10 +117,24 @@ Für das Studio wichtig, von Lotse per SSH lesend geprüft am 2026-11-08 (Berich
 | Grafik | RTX 4090, Treiber 595.112.07 |
 | OBS | 32.2.2 (rpm) |
 | obs-websocket | 5.7.4 auf Port 4455 (IPv4 und IPv6), mit Anmeldung, vom Studio-PC aus erreichbar |
-| Firewall | Zone `FedoraWorkstation` auf `eno2`, offen nur `41641/udp`, die Dienste dhcpv6-client, mdns und samba-client sowie reiche Regeln (4455 nur vom Studio-PC, ssh aus dem Heimnetz); der Bereich 1025–65535 ist nicht mehr offen (Schritt 0 P15, 2026-11-15) |
+| Firewall | Zone `FedoraWorkstation` auf `eno2`, offen nur `41641/udp`, die Dienste dhcpv6-client, mdns und samba-client sowie reiche Regeln (4455 nur vom Studio-PC, ssh aus dem Heimnetz, seit 2026-11-16 8093 nur vom Studio-PC); der Bereich 1025–65535 ist nicht mehr offen (Schritt 0 P15, 2026-11-15). Eine zweite aktive Zone `trusted` liegt auf `tailscale0` (P15 b6) |
 | NDI-Plugin | fehlt (Angabe von Lotse in der Übergabe vom 2026-11-08, `docs/archiv/uebergabe-2026-11-08.md`) |
 
 Zugang und Rechte: `CLAUDE.md`, «Umgebung».
+
+### Kamera-Dienst (P15)
+
+Von Lotse am Gerät geprüft in Schritt 0 (2026-11-15) und in der Prüfung a bis c (2026-11-16); Bericht `docs/archiv/berichte/P15-bericht.md`, Plan `docs/archiv/prompts/P15-kamera.md` («Ergebnis Schritt 0»). Schnittstelle: `docs/09-kamera-dienst.md`; Installation: `kamera-dienst/LIESMICH.md`.
+
+| Angabe | Wert |
+|---|---|
+| Python | 3.14.8 (Nobara 44); der Dienst nutzt nur die Standardbibliothek, kein Paket nötig. Auf dem Studio-PC laufen die Tests des Dienstes mit Python 3.13.5 |
+| Kameras | OBSBOT Tiny 2 (`3564:fef8`, Firmware `bcdDevice` 4.09) und Logitech C922 Pro Stream (`046d:085c`) über USB. `/dev/video*` gehört der Gruppe `video` mit ACL; der Benutzer ist nicht in der Gruppe, der Zugriff geht trotzdem. Die Blackmagic-Karte hat keine einstellbaren Werte und erscheint nicht in `status` (P15 b7). USB-Autosuspend stört nicht, keine udev-Regel nötig. `v4l2-ctl` ist nicht installiert (nicht nötig) |
+| Lampen | zwei Elgato Key Light Air, Firmware 1.0.3, HTTP auf Port 9123 |
+| Dienst | Benutzerdienst `dss-kamera` (`~/.config/systemd/user/dss-kamera.service`, startet mit der Anmeldung), Programm `~/.local/opt/dss-kamera/`, Daten `~/.local/share/dss-kamera/` (Dateien: `docs/06-overlay-format.md`, «Kamera-Dienst»), Einstellungen `~/.config/dss-kamera/dienst.ini` (Lauschadressen, erlaubte Adressen, Port), Protokoll `journalctl --user -u dss-kamera`. Installiert und aktualisiert der Nutzer vom Studio-PC aus mit `kamera-dienst/installieren.sh <streaming-pc>`. **Stand:** Bis 2026-11-16 lief nur eine Testinstanz von Lotse (`~/dss-kamera-test/`, ohne Einheit); ob der Dienst inzwischen installiert ist, steht nicht im Bericht (nicht geprüft) |
+| Port | 8093 (TCP, nur IPv4); in Schritt 0 frei (`ss -ltn`). Nicht 4455 (obs-websocket) und nicht 8080/8081 (Overlay-Server) |
+| Firewall-Regel | `sudo ~/.local/opt/dss-kamera/system-einrichten.sh <studio-pc>`: dauerhafte reiche Regel «IPv4 von `<studio-pc>` auf Port 8093/tcp annehmen» in der Zone der Schnittstelle, über die der Studio-PC erreicht wird (ohne `--zone` aus `ip route get <studio-pc>`, P15 b6; heute `FedoraWorkstation` auf `eno2`). Andere Absender trifft das Ziel der Zone. Eingerichtet vom Nutzer am 2026-11-16 mit `--zone FedoraWorkstation`; danach vom Studio-PC `200`, vom Streaming-PC über seine Heimnetz-Adresse `403` (Absenderprüfung). Von einem dritten Gerät aus **nicht geprüft** (N7) |
+| cameractrls | `cameractrls` und `cameractrlsd` laufen nicht (Schritt 0). Sie dürfen nie gleichzeitig mit dem Dienst Werte oder XU-Befehle senden |
 
 ## Nicht geprüft
 
