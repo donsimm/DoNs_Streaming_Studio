@@ -1,6 +1,6 @@
 # P15 – Bericht (Kamerasteuerung, Abschnitte a bis f)
 
-Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» je Abschnitt bestanden, Prüfstufe «Baustein» bestanden bis auf die Lastprobe (geschrieben, Lauf durch Lotse, Abschnitt «Prüfstufe Baustein» unten). **Offen:** Lastprobe `kd_last`, Gerätetest mit Lotse und Nutzer (Liste unten), Installation des Dienstes durch den Nutzer (N7). Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste des Reiters `docs/archiv/prompts/P15-e-checkliste.md`.
+Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» je Abschnitt bestanden, Prüfstufe «Baustein» bestanden, mit Lastprobe (Lauf durch Lotse, Abschnitt «Prüfstufe Baustein» unten). **Offen:** Gerätetest mit Lotse und Nutzer (Liste unten), Installation des Dienstes durch den Nutzer (N7). Plan `docs/archiv/prompts/P15-kamera.md`, Checkliste des Reiters `docs/archiv/prompts/P15-e-checkliste.md`.
 
 ## Gesamtübersicht
 
@@ -15,7 +15,7 @@ Stand 2026-11-17: Schritt 0 und alle Abschnitte a bis f gebaut, Stufe «Klein» 
 | f1 | Schritte «Kamera-Position» (`camera_preset`) und «Licht-Preset» (`light_preset`) im Aktionssystem | gebaut, nur gegen die Attrappe |
 | f2a | Reihenfolge der schreibenden Anfragen je Lampe und Kamera im Kamera-Client (Punkt 129), Kopfzeile «Kameras» mit zweiter Zeile über beide Spalten | gebaut, nur gegen die Attrappe |
 | f2b | Dokumente `01` bis `09` nachgeführt, diese Übersicht | erledigt (nur Doku) |
-| Prüfstufe «Baustein» | Plan 12; dazu Fix der Attrappe (Punkt 135), erwartete Zeilen in `scripts/startpruefung.py`, Lastprobe `kd_last` | bestanden; `kd_last` geschrieben, nicht ausgeführt (Lotse) |
+| Prüfstufe «Baustein» | Plan 12; dazu Fix der Attrappe (Punkt 135), erwartete Zeilen in `scripts/startpruefung.py`, Lastprobe `kd_last` | bestanden; `kd_last` bestanden (Lauf durch Lotse) |
 
 ### Offene Punkte
 
@@ -40,7 +40,7 @@ Stand `lotse/p15` nach f2b, dazu die drei Änderungen unten. Studio-PC, X11-Sitz
 | Startprüfung | `python3 scripts/startpruefung.py --runs 20 --out build/pruefung-p15/start/startpruefung` (11:52–11:54) | je **20 von 20** sauber: `core-sigterm` (Start Median 47,7 ms, Ende 8,1 ms), `core-sigint` (47,2 / 7,8 ms), `app-sigterm` (478,0 / 32,8 ms), `app-kern-sigterm` (465,8 / 48,7 ms); keine Restprozesse, keine unerwarteten Zeilen. Erster Lauf (11:48) «nicht sauber», siehe unten |
 | Dienstprüfung | `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-p15/dienst` | **bestanden**. Fenster startet den Kern in 0,520 s (verbunden 0,580 s); Neustart nach `kill -9` 1,136 bis 1,175 s, Fenster wieder verbunden 1,906 bis 2,979 s |
 | 50 Wiederholungen | `scripts/wiederholen.sh build <Test> 50 <absoluter Ordner>`, nacheinander 11:57–13:26 | `kd_presets` vor dem Fix **48 von 50** (Lauf 7 und 9, Punkt 135), nach dem Fix **100 von 100** (2 × 50, Ende 12:22:42 und 12:26:27); je **50 von 50**: `kd_bewegen` (vor dem Fix 12:01:01, nach dem Fix 13:12:33), `kd_obsbot` (12:05:30, 13:17:03), `kd_ereignisse` (12:14:39, 13:26:14), `tst_kameradienst` (12:37:42), `tst_kernkamera` (12:42:45), `tst_fensterkameras` (13:01:07) |
-| Lastprobe | `ctest --test-dir build -C Lastprobe -R '^kd_last$' -V` | **nicht geprüft**: Der Testfall ist geschrieben, der Aufruf (auch `DSS_LASTPROBE=1 python3 kamera-dienst/tests/test_last.py`) war dem Agenten nicht freigegeben. Lauf durch Lotse, ohne Last daneben |
+| Lastprobe | `ctest --test-dir build -C Lastprobe -R '^kd_last$' -V` | bestanden, 2026-11-17, Lauf durch Lotse ohne Last daneben, 64 s: 600 Anfragen in 60 s, kein 5xx, 11-mal Ein-/Ausstecken. Status 409 nur für ausgesteckte Kameras (controls 39, move 18, recall 35). Ohne Wartezeit nach dem Einstecken 538 Anfragen, max 6,4 ms; in der Wartezeit gesendet 62, max 2,91 s, alle vor dem Ende der Wartezeit beantwortet (max −98 ms danach). Medianwerte 1,3–4,0 ms je Art. Totmann 3-mal gemeldet, keine Verletzung. Tiny 2: 0 Neustarts, 0 verlorene Bewegungen. CPU des Dienstes in % eines Kerns: Mittel 2,6, Median 2,0, p95 5,0, max 5,0. Lampen: 0 Fehler. Nebenbei eine `ResourceWarning` (offene stderr-Pipe im Test), ohne Einfluss |
 
 **Fix Punkt 135 (Attrappe).** Mit 50 Wiederholungen nachgestellt: 2 von 50 gescheitert, beide in `test_presets_over_http` beim Lesen der Gerätedatei (`FakeDeviceFolder.values` → `JSONDecodeError: Expecting value: line 1 column 1`). Ursache: `Path.write_text` leert die Datei zuerst und schreibt dann; der Dienst schreibt die Knotendatei bei jedem Wert neu, der Test liest sie gleichzeitig. Ein Fehler der Attrappe, nicht des Dienstes (am Gerät gibt es keine Datei). `kamera-dienst/dss_camera/fake.py`: neue Funktion `_write_node` schreibt in eine Hilfsdatei `.<knoten>.<pid>.<thread>.tmp` im selben Ordner und tauscht sie mit `os.replace` (rename(2), atomar); alle fünf Schreibstellen der Knotendateien nutzen sie. Die Gerätesuche liest `dev/` nicht (nur `by-id`), die Hilfsdatei wird also nie als Gerät gesehen. Danach 100 von 100 (bei 4 % Fehlerrate wären 0 von 100 mit ≈ 1,7 % Wahrscheinlichkeit Zufall).
 
