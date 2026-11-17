@@ -245,10 +245,7 @@ QWidget *CameraPage::createHeader()
             send(dss::cameraWakeCall(camera->id, camera->state != QLatin1String("awake")));
     });
     row->addWidget(m_wake);
-    m_setup = new QPushButton(QStringLiteral("Einrichten …"), header);
-    m_setup->setObjectName(QStringLiteral("cameraSetup"));
-    connect(m_setup, &QPushButton::clicked, this, &CameraPage::openSetup);
-    row->addWidget(m_setup);
+    // «Kamera einrichten …» steht im Menü «Werkzeuge» (Wunsch Gerätetest P15, N3)
     row->addStretch(1);
 
     // Hinweis, solange der Dienst nicht antwortet (Entwurf Seite 4 E), rot über state
@@ -998,7 +995,10 @@ void CameraPage::refresh()
     m_wake->setText(m_view.wakeText);
     m_wake->setEnabled(m_view.wakeEnabled);
     m_wake->setToolTip(m_view.wakeToolTip);
-    m_setup->setEnabled(m_view.setupEnabled);
+    if (m_view.setupEnabled != m_setupEnabled) {
+        m_setupEnabled = m_view.setupEnabled;
+        emit setupEnabledChanged(m_setupEnabled);
+    }
     m_state->setText(m_service.text);
     m_stateDetail->setText(m_service.detail);
     m_stateDetail->setToolTip(m_service.detail);

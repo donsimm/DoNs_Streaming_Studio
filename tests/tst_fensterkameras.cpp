@@ -158,6 +158,9 @@ class TestFensterKameras : public QObject
         return w;
     }
 
+    // Werkzeuge → «Kamera einrichten …» (Wunsch Gerätetest P15, N3; vorher Knopf in der Kopfzeile)
+    QAction *setupAction() { return child<QAction>("cameraSetupAction"); }
+
     // Wartet auf eine Antwort mit Methode und Pfadende; gibt sie zurück (status 0 = keine)
     Answer waitForAnswer(const QString &method, const QString &pathEnd, qsizetype from, int timeoutMs = 5000)
     {
@@ -342,7 +345,7 @@ private slots:
         m_lamps.stop();
     }
 
-    // Dritter Modul-Reiter, Kopfzeile mit Auswahl, Wecken/Schlafen, «Einrichten …» und Zustand
+    // Dritter Modul-Reiter, Kopfzeile mit Auswahl, Wecken/Schlafen und Zustand
     void header()
     {
         QStringList tabs;
@@ -368,7 +371,29 @@ private slots:
         QCOMPARE(wake->text(), QStringLiteral("Schlafen"));
         QVERIFY(wake->isEnabled());
         const int width = wake->width();
-        QVERIFY(child<QPushButton>("cameraSetup")->isEnabled());
+        // «Einrichten …» nicht mehr in der Kopfzeile, sondern zuerst im Menü «Werkzeuge»,
+        // Trennlinie, dann «Einstellungen …» (wie «Datei»)
+        QVERIFY(!m_window->findChild<QPushButton *>(QStringLiteral("cameraSetup")));
+        for (QPushButton *b : child<QWidget>("cameraHeader")->findChildren<QPushButton *>())
+            QVERIFY2(!b->text().contains(QStringLiteral("Einrichten")), qPrintable(b->text()));
+        QVERIFY(setupAction()->isEnabled());
+        QCOMPARE(setupAction()->text(), QStringLiteral("&Kamera einrichten …"));
+        QMenu *tools = nullptr;
+        for (QMenu *m : m_window->findChildren<QMenu *>())
+            if (m->title() == QStringLiteral("&Werkzeuge"))
+                tools = m;
+        QVERIFY(tools && tools->isEnabled());
+        const QList<QAction *> toolActions = tools->actions();
+        QCOMPARE(toolActions.size(), 3);
+        QCOMPARE(toolActions.at(0), setupAction());
+        QVERIFY(toolActions.at(1)->isSeparator());
+        QCOMPARE(toolActions.at(2)->objectName(), QStringLiteral("settingsAction"));
+        tools->popup(wake->mapToGlobal(QPoint(0, wake->height())));
+        QTRY_VERIFY_WITH_TIMEOUT(tools->isVisible(), 3000);
+        QTest::qWait(100);
+        savePicture(tools, QStringLiteral("menue-werkzeuge.png"));
+        tools->hide();
+        savePicture(child<QWidget>("cameraHeader"), QStringLiteral("kameras-kopfzeile.png"));
         QVERIFY(child<QSplitter>("cameraColumns")->isEnabled());
         QCOMPARE(child<QWidget>("cameraImagePanel")->findChild<QLabel *>(QStringLiteral("chatBotPanelTitle"))->text(),
                  QStringLiteral("Bildwerte · OBSBOT Tiny 2"));
@@ -561,8 +586,21 @@ private slots:
     // Dialog «Kamera einrichten»: Name und Grenze, «Standard», Tempo aus «Bewegen», «Vergessen»
     void setupDialog()
     {
-        QTest::mouseClick(child<QPushButton>("cameraSetup"), Qt::LeftButton);
+        // Über das Menü auch aus einem anderen Reiter: gilt die in «Kameras» gewählte Kamera
+        QVERIFY(child<QComboBox>("cameraChoice")->currentText().startsWith(QStringLiteral("OBSBOT Tiny 2")));
+        showModule(QStringLiteral("Overlays"));
+        QTRY_VERIFY_WITH_TIMEOUT(!page()->isVisible(), 3000);
+        QVERIFY(setupAction()->isEnabled());
+        setupAction()->trigger();
         QPointer<CameraSetupDialog> dialog;
+        QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<CameraSetupDialog *>()) && dialog->isVisible(), 3000);
+        QCOMPARE(dialog->windowTitle(), QStringLiteral("Kamera einrichten – OBSBOT Tiny 2"));
+        dialog->reject();
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog, 3000); // WA_DeleteOnClose
+        showModule(QStringLiteral("Kameras"));
+        QTRY_VERIFY_WITH_TIMEOUT(page()->isVisible(), 3000);
+
+        setupAction()->trigger();
         QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<CameraSetupDialog *>()) && dialog->isVisible(), 3000);
         QCOMPARE(dialog->windowTitle(), QStringLiteral("Kamera einrichten – OBSBOT Tiny 2"));
         auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("cameraSetupName"));
@@ -615,7 +653,7 @@ private slots:
         // Die Tiny 2 der Attrappe hat keine Helligkeit; der Bildwinkel wird gemerkt (docs/09)
         m_client->callCamera(cameraControlsPutCall(kTiny2, {{QStringLiteral("obsbot_fov"), 1}}));
         QCOMPARE(waitForAnswer(QStringLiteral("PUT"), QStringLiteral("/controls"), from).result.status, 200);
-        QTest::mouseClick(child<QPushButton>("cameraSetup"), Qt::LeftButton);
+        setupAction()->trigger();
         QTRY_VERIFY_WITH_TIMEOUT((dialog = m_window->findChild<CameraSetupDialog *>()) && dialog->isVisible(), 3000);
         QCOMPARE(dialog->windowTitle(), QStringLiteral("Kamera einrichten – Kamera oben"));
         QCOMPARE(dialog->findChild<QDoubleSpinBox *>(QStringLiteral("cameraSetupTiltMin"))->value(), -50.0);
@@ -1129,7 +1167,7 @@ private slots:
         auto *state = child<QLabel>("cameraState");
         QVERIFY2(state->property("state").toString() != QStringLiteral("ok"), qPrintable(state->text()));
         QVERIFY(!child<QPushButton>("cameraWake")->isEnabled());
-        QVERIFY(!child<QPushButton>("cameraSetup")->isEnabled());
+        QVERIFY(!setupAction()->isEnabled());
         QVERIFY(!child<QComboBox>("cameraChoice")->isEnabled());
         QVERIFY(!child<QPushButton>("cameraLamps")->isEnabled());
 

@@ -142,9 +142,10 @@ MainWindow::MainWindow(const Theme &theme, bool keepLayout, dss::CoreClient *cli
 
 void MainWindow::createMenus()
 {
-    // Datei → Beenden, Bearbeiten → Transformieren (P09b), Docks und Hilfe → Über tun etwas;
-    // die übrigen Menüs sind noch leer und ausgegraut (Auftrag P05). Eigene Menüleiste, weil sie mit dem Kopfbereich
-    // zusammen als Menü-Widget des Fensters steht (createHeader); menuBar() würde sie ersetzen.
+    // Datei → Beenden, Bearbeiten → Transformieren (P09b), Docks, Werkzeuge und Hilfe → Über tun
+    // etwas; die übrigen Menüs sind noch leer und ausgegraut (Auftrag P05). Eigene Menüleiste, weil
+    // sie mit dem Kopfbereich zusammen als Menü-Widget des Fensters steht (createHeader); menuBar()
+    // würde sie ersetzen.
     m_menuBar = new QMenuBar(this);
     QMenuBar *bar = m_menuBar;
     QMenu *file = bar->addMenu(QStringLiteral("&Datei"));
@@ -171,13 +172,18 @@ void MainWindow::createMenus()
     bar->addMenu(QStringLiteral("&Ansicht"))->setEnabled(false);
     m_docksMenu = bar->addMenu(QStringLiteral("D&ocks"));
     QMenu *tools = bar->addMenu(QStringLiteral("&Werkzeuge"));
+    // Kamera einrichten (Wunsch Gerätetest P15, N3; vorher Knopf im Reiter «Kameras»): für die dort
+    // gewählte Kamera, aktiv wie deren setupEnabled (Verbindung in createCentralArea). Wie im Menü
+    // «Datei» zuerst der Eintrag zur Sache, nach der Trennlinie der für das ganze Programm.
+    m_cameraSetupAction = tools->addAction(QStringLiteral("&Kamera einrichten …"));
+    m_cameraSetupAction->setObjectName(QStringLiteral("cameraSetupAction"));
+    m_cameraSetupAction->setEnabled(false);
 #if DSS_APP_SETTINGS_DIALOG
+    tools->addSeparator();
     // Einstellungen des Kerns (P10-vor, Teil B 1); nur mit Verbindung zum Kern.
     m_settingsAction = tools->addAction(QStringLiteral("&Einstellungen …"), this, &MainWindow::showSettings);
     m_settingsAction->setObjectName(QStringLiteral("settingsAction"));
     m_settingsAction->setEnabled(false);
-#else
-    tools->setEnabled(false);
 #endif
 
     QMenu *help = bar->addMenu(QStringLiteral("&Hilfe"));
@@ -226,6 +232,9 @@ void MainWindow::createCentralArea()
     // P15 e2: Reiter «Kameras» (camerapage.h); ohne Kern zeigt die Kopfzeile «Kamera-Dienst: –».
     m_cameras = new CameraPage(m_theme, m_modules);
     m_modules->addWidget(m_cameras);
+    m_cameraSetupAction->setEnabled(m_cameras->setupEnabled());
+    connect(m_cameras, &CameraPage::setupEnabledChanged, m_cameraSetupAction, &QAction::setEnabled);
+    connect(m_cameraSetupAction, &QAction::triggered, m_cameras, &CameraPage::openSetup);
     column->addWidget(m_modules, 1);
 
     connect(m_header, &HeaderBar::moduleSelected, this, &MainWindow::onModuleSelected);

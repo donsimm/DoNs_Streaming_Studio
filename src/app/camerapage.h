@@ -31,9 +31,10 @@ class QVBoxLayout;
 
 // P15 e2: Reiter «Kameras» (Plan P15 Abschnitt 8 mit den Antworten des Nutzers 1, 2 und 5:
 // eigener Reiter, Variante 1B «Alles sichtbar»; Checkliste docs/archiv/prompts/P15-e-checkliste.md).
-// Oben die Kopfzeile mit Kamera-Auswahl, «Wecken»/«Schlafen», «Einrichten …» und dem Zustand des
-// Dienstes, darunter drei Spalten: links «Bewegen», «KI-Verfolgung», «Positionen»; Mitte «Bildwerte»
-// mit festen Zeilen (P15 e3) und rechts «Licht» mit den Lampen und «Licht-Presets» (P15 e3). Dünn
+// Oben die Kopfzeile mit Kamera-Auswahl, «Wecken»/«Schlafen» und dem Zustand des Dienstes
+// («Kamera einrichten …» steht im Menü «Werkzeuge», Wunsch Gerätetest P15), darunter drei
+// Spalten: links «Bewegen», «KI-Verfolgung», «Positionen»; Mitte «Bildwerte» mit festen Zeilen
+// (P15 e3) und rechts «Licht» mit den Lampen und «Licht-Presets» (P15 e3). Dünn
 // (Regel 9): Texte, Freigaben, Anfragen, Halten und Bündeln kommen aus cameraview.h; die Seite
 // schickt die Anfragen über CoreClient::callCamera und zeigt den Stand aus camera_service,
 // camera_event und camera_result.
@@ -46,10 +47,15 @@ public:
 
     void setClient(dss::CoreClient *client);
     QString currentCameraId() const { return m_cameraId; }
+    // Werkzeuge → «Kamera einrichten …»: Dialog für die hier gewählte Kamera, auch wenn der Reiter
+    // nicht offen ist; aktiv wie setupEnabled (cameraview.h)
+    bool setupEnabled() const { return m_setupEnabled; }
+    void openSetup();
 
 signals:
     // Meldung für die Statuszeile (Gespeichert, Gelöscht, Fehler des Dienstes)
     void statusMessage(const QString &text);
+    void setupEnabledChanged(bool enabled);
 
 protected:
     // Pfeiltasten am Steuerkreuz: Drücken und Loslassen wie die Maus (ohne Wiederholung der Taste)
@@ -111,7 +117,6 @@ private:
     void overwritePreset();
     void renamePreset();
     void removePreset();
-    void openSetup();
     void reportResult(const dss::CameraResult &result, const QString &okText);
 
     Theme m_theme;
@@ -131,7 +136,7 @@ private:
 
     QComboBox *m_choice = nullptr;
     QPushButton *m_wake = nullptr;
-    QPushButton *m_setup = nullptr;
+    bool m_setupEnabled = false;
     QLabel *m_state = nullptr;
     QLabel *m_stateDetail = nullptr;
     QLabel *m_blockedHint = nullptr;

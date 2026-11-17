@@ -97,7 +97,7 @@ struct CameraControlView
     QString wakeText = QStringLiteral("Wecken"); // feste Breite für den längeren Text im Fenster
     bool wakeEnabled = false;
     QString wakeToolTip;
-    bool setupEnabled = false; // «Einrichten …»
+    bool setupEnabled = false; // Werkzeuge → «Kamera einrichten …»
 
     bool moveEnabled = false; // Steuerkreuz, Mitte, Zoom
     // Zoom neben dem Kreuz (cameraZoomText); «–», solange der Dienst nicht antwortet oder die Kamera

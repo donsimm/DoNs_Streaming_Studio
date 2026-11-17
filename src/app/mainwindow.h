@@ -299,6 +299,7 @@ private:
     QList<QAction *> m_transformActions;   // alle Befehle ausser Kopieren und Einfügen
     QMenuBar *m_menuBar = nullptr;
     QAction *m_settingsAction = nullptr;       // P10-vor, nur mit DSS_APP_SETTINGS_DIALOG
+    QAction *m_cameraSetupAction = nullptr;    // Werkzeuge → Kamera einrichten … (P15)
     QAction *m_canvasImageAction = nullptr;    // P10-vor, nur mit DSS_APP_CANVAS_IMAGE
     QString m_canvasImageDir;                  // Ablage der Bilder der Leinwand
     SettingsDialog *m_settingsDialog = nullptr;

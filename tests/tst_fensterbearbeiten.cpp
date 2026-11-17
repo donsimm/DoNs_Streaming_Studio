@@ -1667,6 +1667,13 @@ private slots:
                 tools = m;
         QVERIFY(tools && tools->isEnabled() && tools->actions().contains(action));
         QCOMPARE(action->text(), QStringLiteral("&Einstellungen …"));
+        // P15 (Wunsch Gerätetest): zuerst «Kamera einrichten …», Trennlinie, «Einstellungen …» zuletzt
+        const QList<QAction *> toolActions = tools->actions();
+        QCOMPARE(toolActions.size(), 3);
+        QCOMPARE(toolActions.at(0)->objectName(), QStringLiteral("cameraSetupAction"));
+        QCOMPARE(toolActions.at(0)->text(), QStringLiteral("&Kamera einrichten …"));
+        QVERIFY(toolActions.at(1)->isSeparator());
+        QCOMPARE(toolActions.at(2), action);
 
         action->trigger();
         QDialog *dialog = nullptr;
