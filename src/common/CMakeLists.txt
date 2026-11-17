@@ -46,6 +46,7 @@ add_library(dss_common STATIC
   emoteloader.h emoteloader.cpp # P14 Emotes em-4: Laden mit HTTP-Zwischenspeicher
   chatbotoverlay.h chatbotoverlay.cpp # P14 f2: mitgeliefertes Overlay «Chat-Bot»
   cameraprotocol.h cameraprotocol.cpp # P15 d2: Nachrichten zum Kamera-Dienst
+  cameraview.h cameraview.cpp # P15 e1: Ansichtslogik des Reiters «Kameras»
 )
 # P14 f2: Platzhalterbild des Overlays «Chat-Bot», beim Bau von dss-platzhalterbild gezeichnet (Qt
 # Gui nur in diesem Werkzeug, dss_common bleibt ohne) und als Qt-Ressource

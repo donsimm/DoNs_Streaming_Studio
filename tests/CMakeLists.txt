@@ -50,6 +50,7 @@ set_tests_properties(tst_medienliste PROPERTIES FIXTURES_REQUIRED "dss_media;dss
 dss_add_test(tst_protocol)
 dss_add_test(tst_windowdata)
 dss_add_test(tst_chatbotlive) # P14 e2-5: «Chat-Bot» › «Live», ohne Fenster
+dss_add_test(tst_kameraansicht) # P15 e1: Reiter «Kameras», ohne Fenster
 # P14 Emotes em-3: Abschnitte aus den Testnachrichten von EventSub (Ereignis über dss_twitch)
 target_link_libraries(tst_chatbotlive PRIVATE dss_twitch)
 target_compile_definitions(tst_chatbotlive PRIVATE DSS_TEST_TWITCH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/daten/twitch")
