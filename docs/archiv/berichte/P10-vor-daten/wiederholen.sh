@@ -3,7 +3,7 @@
 # (aktiv, nicht gesperrt; light-locker sperrt nach 600 s ohne Eingabe). Bei einem Fehler wird
 # die ganze Ausgabe gespeichert. Aufruf: wiederholen.sh BAUORDNER TEST N AUSGABEORDNER
 B=$1; T=$2; N=$3; O=$4; mkdir -p "$O"
-SID=$(loginctl list-sessions --no-legend | awk '$3=="dominik" && $4=="seat0"{print $1; exit}')
+SID=$(loginctl list-sessions --no-legend | awk -v u="$(id -un)" '$3==u && $4=="seat0"{print $1; exit}')
 ok=0
 for i in $(seq 1 $N); do
     st=$(loginctl show-session "$SID" -p Active -p LockedHint --value | tr '\n' ' ')

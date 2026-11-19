@@ -111,8 +111,8 @@ Für das Studio wichtig, von Lotse per SSH lesend geprüft am 2026-11-08 (Berich
 
 | Angabe | Wert |
 |---|---|
-| Betriebssystem | Nobara 44 GNOME (Wayland), seit 2026-11-08 (vorher Zorin OS, Rechnername `Dominik-Desktop`) |
-| Rechnername | `streamin-pc` |
+| Betriebssystem | Nobara 44 GNOME (Wayland), seit 2026-11-08 (vorher Zorin OS, anderer Rechnername) |
+| Rechnername | `streaming-pc` (Beispiel) |
 | Kernel | 7.3.1 (`7.3.1-202.nobara.fc44`) |
 | Grafik | RTX 4090, Treiber 595.112.07 |
 | OBS | 32.2.2 (rpm) |
