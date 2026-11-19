@@ -332,8 +332,8 @@ Plan: `docs/archiv/prompts/P12-ton.md`, Abschnitt «b1». Prototyp `pw-messen` u
 ### Befehle
 
 ```
-bash /home/dominik/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh --kurz   # 2026-11-11 23:00:30–23:03:54, Exit-Code 0
-bash /home/dominik/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh          # 2026-11-11 23:04:02–23:22:41, Exit-Code 0
+bash /home/benutzer/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh --kurz   # 2026-11-11 23:00:30–23:03:54, Exit-Code 0
+bash /home/benutzer/DoNs_Streaming_Studio/prototypes/ton/pw-lauf.sh          # 2026-11-11 23:04:02–23:22:41, Exit-Code 0
 ```
 
 - Beide Läufe: vorher und nachher `clock.force-quantum 0`, Standardausgang `alsa_output.pci-0000_00_1b.0.iec958-stereo`; Aufräumen geprüft, keine `dss_p12a`-Knoten übrig. Alle Programme als `systemd-run --user` (`pw-lauf.sh:163`).
@@ -409,7 +409,7 @@ Befunde zu E1:
 Befehl (2026-11-12, Python 3 von Debian 13; Auswertung der vorhandenen CSV, keine Messung):
 
 ```
-python3 /home/dominik/DoNs_Streaming_Studio/prototypes/ton/z3_neu_auswerten.py /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304 /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2300-kurz
+python3 /home/benutzer/DoNs_Streaming_Studio/prototypes/ton/z3_neu_auswerten.py /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304 /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2300-kurz
 ```
 
 Exit-Code 0. Ausgabe je Ordner in `z3-neu.txt`. Gegenprobe: Die alte Rechnung (Median des Rests, 5 Klicks vor gegen 5 nach, wie `pwklick.cpp:957-981`) aus `z3c.csv` neu gerechnet ergibt bei allen 6 Wechseln dieselben Werte wie die Zusammenfassung («bestanden»). Im Probelauf liegt Klick 28 höchstens 1 ms nach der Marke «2048» (Wanduhr in der CSV ganzzahlig); die Zuordnung stimmt trotzdem mit der alten überein (Gegenprobe gleich).

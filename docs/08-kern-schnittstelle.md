@@ -200,7 +200,7 @@ Vor dem Neuladen speichert der Kern noch nicht gespeicherte Änderungen (Abschni
 | `data_dir` | Text, nicht immer da | seit Version 3 nur vom Kern: Datenordner als absoluter Pfad. Das Fenster liest dort die Dateien der Quellen (`media/…`) für den Zeichner der Leinwand; es schreibt nie hinein (K-03) |
 
 ```json
-{"data_dir":"/home/dominik/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":17,"type":"hello","version":"0.1.0"}
+{"data_dir":"/home/benutzer/.local/share/dons-streaming-studio","program":"dss-core","protocol_version":17,"type":"hello","version":"0.1.0"}
 ```
 
 ### `overlay_list`
@@ -373,7 +373,7 @@ Auswahl der Schriften für Textquellen (P08, Teil F), Antwort auf `get_fonts`. D
 | `error` | Text oder `null` | Meldung, wenn ein Teil fehlt (zum Beispiel `fc-list` nicht ausführbar); die übrigen Schnitte sind trotzdem da |
 
 ```json
-{"error":null,"faces":[{"family":"Be Vietnam Pro","file":"/home/dominik/DoNs_Streaming_Studio/src/common/schriften/be-vietnam-pro/BeVietnamPro-Thin.ttf","italic":false,"origin":"builtin","style":"Thin","weight":100},{"family":"DejaVu Sans","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","italic":false,"origin":"system","style":"Bold","weight":700},{"family":"DejaVu Sans","file":"media/a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890.ttf","italic":false,"origin":"media","style":"Bold","weight":700}],"type":"font_list"}
+{"error":null,"faces":[{"family":"Be Vietnam Pro","file":"/home/benutzer/DoNs_Streaming_Studio/src/common/schriften/be-vietnam-pro/BeVietnamPro-Thin.ttf","italic":false,"origin":"builtin","style":"Thin","weight":100},{"family":"DejaVu Sans","file":"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","italic":false,"origin":"system","style":"Bold","weight":700},{"family":"DejaVu Sans","file":"media/a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890.ttf","italic":false,"origin":"media","style":"Bold","weight":700}],"type":"font_list"}
 ```
 
 (gekürzt: auf dem Studio-PC 133 Schnitte am 2026-11-03)
@@ -842,7 +842,7 @@ Antwort auf `get_settings` und nach jeder Änderung an **alle** begrüssten Verb
 | `camera_enabled`, `camera_host`, `camera_port` | wahr/falsch, Text, ganze Zahl | Abschnitt `[kamera-dienst]`, seit Version 19 |
 
 ```json
-{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"camera_enabled":false,"camera_host":"","camera_port":8093,"file":"/home/dominik/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
+{"audio_offset_max_ms":500,"audio_offset_min_ms":-500,"audio_routes":{"aktionen":{"offset_ms":0,"output":""},"video":{"offset_ms":0,"output":""}},"camera_enabled":false,"camera_host":"","camera_port":8093,"file":"/home/benutzer/.config/dons-streaming-studio-entwicklung/kern.ini","home_address":"<Adresse im Heimnetz>","obs_enabled":false,"obs_host":"","obs_password_set":false,"obs_port":4455,"port":8081,"port_max":32767,"port_min":1024,"settings_error":null,"twitch_client_id":"","twitch_client_secret_set":false,"twitch_enabled":false,"type":"settings"}
 ```
 
 ### `update_settings` (Fenster → Kern)
@@ -947,7 +947,7 @@ Der Kern liefert jedem Overlay eine Webseite für die Browserquelle in OBS (E-12
 | Technik | eigener kleiner HTTP/1.1-Server auf `QTcpServer` (Qt Network ist schon da; Qt HttpServer und Qt WebSockets sind nicht installiert, Regel 5). Änderungen als Server-Sent Events (`text/event-stream`): Der Kern schickt nur zur Seite, `EventSource` verbindet sich von selbst neu (https://html.spec.whatwg.org/multipage/server-sent-events.html). HTTP/1.1 nach RFC 9110 und RFC 9112 (https://www.rfc-editor.org/rfc/rfc9110, https://www.rfc-editor.org/rfc/rfc9112) |
 | Adressen | nur IPv4: ein `QTcpServer` je Adresse, auf `127.0.0.1` und der «Adresse im Heimnetz» aus `kern.ini`, nie `QHostAddress::Any` (das nimmt auch IPv6 an). Port aus `kern.ini`. Gemessen am 2026-11-04 mit `ss -ltnH "sport = :24901"`: `192.0.2.9:24901` und `127.0.0.1:24901`; `ss -ltn6H` leer |
 | Neue Einstellungen | Port oder Adresse geändert: Server schliesst alle Verbindungen und lauscht neu |
-| Port belegt | Meldung in `server_status.problems` und im Protokoll (Warnung), zum Beispiel «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess 1234). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Das Programm findet der Kern über `/proc/net/tcp` und `/proc/net/tcp6` (Zeilen im Zustand `0A` = LISTEN mit dem Port, Inode) und die Links `/proc/<pid>/fd/*` → `socket:[<inode>]`; heisst das Programm (`/proc/<pid>/exe`) `dss-core` und liegt unter `~/.local/opt/dons-streaming-studio/`, heisst es «im Einsatz», ein anderer `dss-core` «in Arbeit (Pfad)», sonst «von «Dateiname»»; ohne Zugriff (Prozess eines anderen Benutzers) «von einem Programm, das sich nicht feststellen lässt». Neuer Versuch alle 2 s. Quellen: https://docs.kernel.org/networking/proc_net_tcp.html, proc_pid_fd(5) https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html, proc_pid_exe(5) https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html |
+| Port belegt | Meldung in `server_status.problems` und im Protokoll (Warnung), zum Beispiel «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/benutzer/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess 1234). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Das Programm findet der Kern über `/proc/net/tcp` und `/proc/net/tcp6` (Zeilen im Zustand `0A` = LISTEN mit dem Port, Inode) und die Links `/proc/<pid>/fd/*` → `socket:[<inode>]`; heisst das Programm (`/proc/<pid>/exe`) `dss-core` und liegt unter `~/.local/opt/dons-streaming-studio/`, heisst es «im Einsatz», ein anderer `dss-core` «in Arbeit (Pfad)», sonst «von «Dateiname»»; ohne Zugriff (Prozess eines anderen Benutzers) «von einem Programm, das sich nicht feststellen lässt». Neuer Versuch alle 2 s. Quellen: https://docs.kernel.org/networking/proc_net_tcp.html, proc_pid_fd(5) https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html, proc_pid_exe(5) https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html |
 | Adresse fehlt | Ist die Adresse im Heimnetz leer oder gerade auf keiner Karte (Kabel), lauscht der Server nur auf `127.0.0.1`, meldet das in `server_status.problems` und prüft alle 2 s, ob sie da ist; dann lauscht er von selbst auch dort (Protokoll «Overlay-Server: Adresse im Heimnetz … ist da») |
 
 ### Pfade

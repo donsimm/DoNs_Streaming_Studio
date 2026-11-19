@@ -2,7 +2,7 @@
 # P10: Bau jedes Schalters einzeln aus (bzw. DSS_INSTALLED_EDITION ein) und Release, in einem
 # frischen Klon. Bei den neuen Schaltern zusätzlich ctest. Aufruf: schalter-lauf.sh ARBEITSORDNER
 W=$(readlink -m "$1"); mkdir -p "$W"; cd "$W" || exit 1
-git clone -q /home/dominik/DoNs_Streaming_Studio klon || exit 1
+git clone -q /home/benutzer/DoNs_Streaming_Studio klon || exit 1
 echo "Klon: $(git -C klon log --oneline -1)"
 build() { # name, testen (0/1), optionen…
     local name=$1 test=$2; shift 2

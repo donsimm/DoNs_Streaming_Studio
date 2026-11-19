@@ -3,7 +3,7 @@
   "variant": "A",
   "started": "2026-11-02 11:13:31 +0100",
   "command": [
-   "/home/dominik/DoNs_Streaming_Studio/prototypes/a-cpp-qt/build/p01_a",
+   "/home/benutzer/DoNs_Streaming_Studio/prototypes/a-cpp-qt/build/p01_a",
    "--mode",
    "t01"
   ],

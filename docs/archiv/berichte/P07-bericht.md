@@ -51,7 +51,7 @@ Vollständig beschrieben in `docs/08-kern-schnittstelle.md` (neu). Kurz: Unix-So
 - CPU: belegt = user + nice + system + irq + softirq + steal; gesamt = belegt + idle + iowait; Prozent aus der Differenz zweier Messungen.
 - RAM: belegt = `MemTotal` − `MemAvailable`.
 - LAN: Karte der Standardroute aus `/proc/net/route` (Ziel und Maske `00000000`, Flag `RTF_UP` 0x1 aus `/usr/include/linux/route.h`, bei mehreren die kleinste Metrik), Bytes aus `/proc/net/dev` (Feld 1 empfangen, Feld 9 gesendet), umgerechnet in kbit/s (1 kbit = 1000 bit). Ohne Standardroute: «–».
-- Feste Testdaten: `tests/daten/proc/messung1`, `messung2`, `ohne-route` (Kopien von `/proc` des Studio-PCs, 2026-11-02 19:48:24 +0100). Erwartet und geprüft: CPU 100·33/804 %, RAM 3 713 872 von 32 809 248 KiB belegt, je 132 Byte in 1 s → 1,056 kbit/s, Karte `enx2aea2d88f6c1`.
+- Feste Testdaten: `tests/daten/proc/messung1`, `messung2`, `ohne-route` (Kopien von `/proc` des Studio-PCs, 2026-11-02 19:48:24 +0100). Erwartet und geprüft: CPU 100·33/804 %, RAM 3 713 872 von 32 809 248 KiB belegt, je 132 Byte in 1 s → 1,056 kbit/s, Karte `enx020000000001`.
 
 ## Teil F – Fenster
 
@@ -99,7 +99,7 @@ $ ctest --test-dir build --output-on-failure      (Arbeitsordner, Endstand)
 17/17 bestanden: tst_version, tst_unixsignals, tst_overlaymodel, tst_canvasview, tst_connectionstate,
 tst_windowsize, media_vorbereiten, tst_overlaystore, tst_configpaths, tst_protocol, tst_windowdata,
 tst_systemstats, tst_sperre, tst_kernverbindung, tst_fonts, tst_symbols, bildschirmfoto
-$ git clone /home/dominik/DoNs_Streaming_Studio <scratch>/klon-p07 && cmake … && ctest   (2026-11-02 20:09:27)
+$ git clone /home/benutzer/DoNs_Streaming_Studio <scratch>/klon-p07 && cmake … && ctest   (2026-11-02 20:09:27)
 0 Warnungen, 17/17 bestanden (Total 31.67 s)
 ```
 
@@ -158,10 +158,10 @@ Ein erster Lauf um 19:59:18 (vor den Korrekturen 2 und 3) war ebenfalls bestande
 ```
 $ scripts/dienst-einrichten.sh --entfernen --einheit dss-core-test.service   (Testeinheit der Handprobe)
 angehalten: dss-core-test.service
-entfernt: /home/dominik/.config/systemd/user/dss-core-test.service
+entfernt: /home/benutzer/.config/systemd/user/dss-core-test.service
 $ scripts/dienst-einrichten.sh
-geschrieben: /home/dominik/.config/systemd/user/dss-core.service
-ExecStart: "/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core"
+geschrieben: /home/benutzer/.config/systemd/user/dss-core.service
+ExecStart: "/home/benutzer/DoNs_Streaming_Studio/build/src/core/dss-core"
 Zustand: inactive (Start durch das Fenster dss-app oder: systemctl --user start dss-core.service)
 $ systemctl --user show dss-core.service -p ActiveState -p UnitFileState
 ActiveState=inactive
@@ -194,7 +194,7 @@ Grund (Regel 10): Aussehen und Bedienung des Fensters mit den eigenen Symbolen d
 
 1. Overlay anlegen (der Kern läuft nicht, also geht das):
    `build/src/cli/dss-cli overlay-neu "Handtest P07" 1280 720 && build/src/cli/dss-cli quelle-bild handtest-p07 prototypes/media/bild1.png && build/src/cli/dss-cli quelle-text handtest-p07 "Hallo" /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`
-   Dann `build/src/app/dss-app &` starten. Erwartet: unten rechts «Kern-Dienst: verbunden» grün; Verbindungsknöpfe mit den eigenen Symbolen; «Hilfe → Über» zeigt den NDI-Hinweis; CPU, RAM, LAN ändern sich jede Sekunde und passen ungefähr zu `top` (LAN misst die Karte der Standardroute, zurzeit `enx2aea2d88f6c1`).
+   Dann `build/src/app/dss-app &` starten. Erwartet: unten rechts «Kern-Dienst: verbunden» grün; Verbindungsknöpfe mit den eigenen Symbolen; «Hilfe → Über» zeigt den NDI-Hinweis; CPU, RAM, LAN ändern sich jede Sekunde und passen ungefähr zu `top` (LAN misst die Karte der Standardroute, zurzeit `enx020000000001`).
 2. Im Dock «Overlays» «Handtest P07» anklicken. Erwartet: Quellen «Text: Hallo» (oben) und «bild1.png» mit Auge-Symbol; Lineal der Leinwand bis 1280; eine Quelle anklicken zeigt ihre Werte ausgegraut.
 3. `systemctl --user stop dss-core.service` → Statuszeile rot, alle Docks leer. Dann `systemctl --user start dss-core.service` → nach höchstens 2 s wieder grün, Liste wieder da.
 4. Fenster mit dem Schliessknopf (×) schliessen, dann `systemctl --user is-active dss-core.service` → `inactive` (der Kern hat sich mit dem letzten Fenster beendet).

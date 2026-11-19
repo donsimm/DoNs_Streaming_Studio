@@ -2,7 +2,7 @@
 // Prüfung der Werte, Lesen und Schreiben von kern.ini, atomares Schreiben und die Adresse im
 // Heimnetz aus der Standardroute. Testdaten: tests/daten/proc/heimnetz/net/route ist eine Kopie
 // von /proc/net/route des Studio-PCs vom 2026-11-03 20:52:31 (enp3s0, 192.0.2.9);
-// messung1 (enx2aea2d88f6c1) und ohne-route wie in tst_systemstats (CLAUDE.md Regel 7).
+// messung1 (enx020000000001) und ohne-route wie in tst_systemstats (CLAUDE.md Regel 7).
 
 #include "coresettings.h"
 
@@ -45,7 +45,7 @@ QList<QHostAddress> studioAddresses(const QString &iface)
 {
     if (iface == QStringLiteral("enp3s0"))
         return {QHostAddress(QStringLiteral("fe80::1")), QHostAddress(QStringLiteral("192.0.2.9"))};
-    if (iface == QStringLiteral("enx2aea2d88f6c1"))
+    if (iface == QStringLiteral("enx020000000001"))
         return {QHostAddress(QStringLiteral("169.254.3.4")), QHostAddress(QStringLiteral("172.20.10.2"))};
     if (iface == QStringLiteral("lo"))
         return {QHostAddress(QStringLiteral("127.0.0.1"))};
@@ -599,7 +599,7 @@ private slots:
                                   << QStringLiteral("enp3s0") << QString();
         // link-local 169.254.x.x wird übersprungen
         QTest::newRow("messung1") << QStringLiteral("messung1") << QStringLiteral("172.20.10.2")
-                                  << QStringLiteral("enx2aea2d88f6c1") << QString();
+                                  << QStringLiteral("enx020000000001") << QString();
         QTest::newRow("ohne-route") << QStringLiteral("ohne-route") << QString() << QString()
                                     << QStringLiteral("keine Standardroute mit IPv4");
     }

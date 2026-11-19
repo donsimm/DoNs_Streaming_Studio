@@ -32,8 +32,8 @@ Die Prüfsummen erhob ein kleines Python-Skript (`build/pruefung-vor-install/sum
 | 4 | `python3 scripts/dienstpruefung.py --kills 5 --out build/pruefung-vor-install/dienst` | **bestanden**. Neustart nach `kill -9` 1.089 bis 1.114 s, Fenster wieder verbunden 1.815 bis 2.886 s |
 | 5 | `scripts/installieren-pruefen.sh build/pruefung-vor-install/inst` (Start 16:30:58) | Installation Exit 0, Einsatz Commit `1f228c2`, keine Warnung. Daten nachher gleich vorher, «Format aktuell», `format-pruefen` Exit 0, `medien-liste` Exit 0 (10 Medien). Testeinheit entfernt, Kopien gelöscht. «FEHLER: Sicherung weicht ab», siehe unten |
 | 6 | Prüfsummen nachher, `diff summen-vorher.txt summen-nachher.txt` | 89 Dateien, **kein Unterschied** |
-| 7 | `scripts/wiederholen.sh /home/dominik/DoNs_Streaming_Studio/build tst_fensterbearbeiten 50 /home/dominik/DoNs_Streaming_Studio/build/pruefung-vor-install/wiederholen` | **50 von 50** bestanden, Ende 17:01:20 |
-| Zusatz | `scripts/wiederholen.sh /home/dominik/DoNs_Streaming_Studio/build/vorinstall-klon/build tst_aenderungen 50 /home/dominik/DoNs_Streaming_Studio/build/pruefung-vor-install/wiederholen-aenderungen` | **48 von 50**, Ende 17:05:33. Lauf 40 und 49 scheiterten in `schedulerMaxDelay`, beide mit erstem Zeitpunkt 949 ms («Speichern bei 949 1922 2802» und «949 1912 2791»), siehe unten |
+| 7 | `scripts/wiederholen.sh /home/benutzer/DoNs_Streaming_Studio/build tst_fensterbearbeiten 50 /home/benutzer/DoNs_Streaming_Studio/build/pruefung-vor-install/wiederholen` | **50 von 50** bestanden, Ende 17:01:20 |
+| Zusatz | `scripts/wiederholen.sh /home/benutzer/DoNs_Streaming_Studio/build/vorinstall-klon/build tst_aenderungen 50 /home/benutzer/DoNs_Streaming_Studio/build/pruefung-vor-install/wiederholen-aenderungen` | **48 von 50**, Ende 17:05:33. Lauf 40 und 49 scheiterten in `schedulerMaxDelay`, beide mit erstem Zeitpunkt 949 ms («Speichern bei 949 1922 2802» und «949 1912 2791»), siehe unten |
 
 **Fehlschlag `tst_aenderungen` im frischen Klon (Schritt 2):**
 

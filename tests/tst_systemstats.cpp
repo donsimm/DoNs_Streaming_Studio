@@ -89,7 +89,7 @@ private slots:
     void defaultRoute()
     {
         QCOMPARE(defaultRouteInterface(readFile(kData + QStringLiteral("/messung1/net/route"))),
-                 QStringLiteral("enx2aea2d88f6c1"));
+                 QStringLiteral("enx020000000001"));
         QCOMPARE(defaultRouteInterface(readFile(kData + QStringLiteral("/ohne-route/net/route"))),
                  QString());
         QCOMPARE(defaultRouteInterface(QByteArray()), QString());
@@ -106,7 +106,7 @@ private slots:
     {
         InterfaceBytes b;
         QVERIFY(parseNetDev(readFile(kData + QStringLiteral("/messung1/net/dev")),
-                            QStringLiteral("enx2aea2d88f6c1"), &b));
+                            QStringLiteral("enx020000000001"), &b));
         // Empfangen: erste Zahl, gesendet: neunte Zahl der Zeile
         QCOMPARE(b.received, quint64(61874997));
         QCOMPARE(b.sent, quint64(19665410));
@@ -136,7 +136,7 @@ private slots:
         QCOMPARE(*second.ramUsedKiB, qint64(32809248 - 29095376));
         QCOMPARE(*second.ramTotalKiB, qint64(32809248));
         QVERIFY(second.lan);
-        QCOMPARE(second.lan->interface, QStringLiteral("enx2aea2d88f6c1"));
+        QCOMPARE(second.lan->interface, QStringLiteral("enx020000000001"));
         // 61875129 − 61874997 = 132 Byte in 1 s → 132 × 8 / 1000 = 1.056 kbit/s; gesendet ebenso
         // 19665542 − 19665410 = 132 Byte.
         QVERIFY(qAbs(second.lan->receivedKbitPerSecond - 1.056) < 1e-9);

@@ -1,4 +1,4 @@
-2026-11-11 23:04:02 P12b Z3 (voll), Ausgabe /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304
+2026-11-11 23:04:02 P12b Z3 (voll), Ausgabe /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304
 2026-11-11 23:04:02 Rechner: Studio-PC, Last (1/5/15 min): 0.70 0.41 0.24
 2026-11-11 23:04:03 Vorher: clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
   pw: force_quantum 0
@@ -246,4 +246,4 @@ Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 0
 2026-11-11 23:22:39 Messungen fertig
 2026-11-11 23:22:39 Aufräumen (Exit-Code bis hier 0)
 2026-11-11 23:22:41 Aufräumen geprüft: keine dss_p12a-Knoten, clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
-2026-11-11 23:22:41 Ergebnis: /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304/ergebnis.txt
+2026-11-11 23:22:41 Ergebnis: /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12b-daten/2026-11-11-2304/ergebnis.txt

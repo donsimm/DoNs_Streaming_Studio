@@ -18,7 +18,7 @@ Teil A, Punkt 3 (Format): Auf dem Studio-PC gibt es keine echten Overlay-Dateien
 
 ```
 $ ls ~/.local/share/dons-streaming-studio ; echo rc=$?      (2026-11-02 15:40:59 +0100)
-ls: Zugriff auf '/home/dominik/.local/share/dons-streaming-studio' nicht möglich: Datei oder Verzeichnis nicht gefunden
+ls: Zugriff auf '/home/benutzer/.local/share/dons-streaming-studio' nicht möglich: Datei oder Verzeichnis nicht gefunden
 rc=2
 ```
 

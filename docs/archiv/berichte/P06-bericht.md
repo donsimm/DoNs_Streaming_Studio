@@ -115,7 +115,7 @@ Gefundenes Problem und Lösung: Mit `min-width: 55px` aus Yami setzt Qt eine fes
 | `obs.svg` | OBS |
 | `ndi.svg` | NDI |
 
-- Ort: `src/app/symbole/` im Repo (`/home/dominik/DoNs_Streaming_Studio/src/app/symbole/`).
+- Ort: `src/app/symbole/` im Repo (`/home/benutzer/DoNs_Streaming_Studio/src/app/symbole/`).
 - Format: SVG; die heutigen Dateien haben `viewBox="0 0 64 64"`, angezeigt werden sie in 28x28 Pixeln. Andere quadratische `viewBox` gehen auch (Qt skaliert); nicht quadratische werden mit gleichem Seitenverhältnis kleiner gezeichnet.
 - Farbe der Datei ist egal: Jede sichtbare Fläche wird in Textfarbe gezeichnet, durchsichtige Stellen bleiben durchsichtig. Ein Logo mit farbigem Hintergrund wird also zu einer einfarbigen Fläche; geeignet sind einfarbige Umriss- oder Flächensymbole (zum Beispiel die aus `donstv_Studio`, `assets/icons/connections/`).
 - Ersetzen: Datei mit **gleichem Namen** ablegen, `dss-app` neu starten. **Kein neuer Bau nötig.**

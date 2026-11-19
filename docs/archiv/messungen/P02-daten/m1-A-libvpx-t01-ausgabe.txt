@@ -18,4 +18,4 @@
 {"run": 18, "exit_code": 0, "first_frame_ms": 123.5, "total_ms": 1137.9, "timeout": false, "leftover_processes": [], "stderr_lines": 0, "clean": true}
 {"run": 19, "exit_code": 0, "first_frame_ms": 118.4, "total_ms": 1131.3, "timeout": false, "leftover_processes": [], "stderr_lines": 0, "clean": true}
 {"run": 20, "exit_code": 0, "first_frame_ms": 116.4, "total_ms": 1130.7, "timeout": false, "leftover_processes": [], "stderr_lines": 0, "clean": true}
-{"variant": "A", "started": "2026-11-02 12:29:04 +0100", "command": ["/home/dominik/DoNs_Streaming_Studio/prototypes/a-cpp-qt-libvpx/build/p02_a_libvpx", "--mode", "t01"], "runs": 20, "clean": 20, "first_frame_ms_min": 112.6, "first_frame_ms_median": 125.7, "first_frame_ms_max": 139.0}
+{"variant": "A", "started": "2026-11-02 12:29:04 +0100", "command": ["/home/benutzer/DoNs_Streaming_Studio/prototypes/a-cpp-qt-libvpx/build/p02_a_libvpx", "--mode", "t01"], "runs": 20, "clean": 20, "first_frame_ms_min": 112.6, "first_frame_ms_median": 125.7, "first_frame_ms_max": 139.0}

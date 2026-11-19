@@ -34,7 +34,7 @@ Jede Änderung im Modell wird zuerst an einer Kopie des Overlays ausgeführt und
 
 ### Datenordner
 
-Ohne `--datenordner` nimmt `dss::defaultDataDir()` den Ordner aus `QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)`. Laut Qt-6.8-Dokumentation ist das unter Linux `~/.local/share/<APPNAME>` (Quelle: https://doc.qt.io/qt-6.8/qstandardpaths.html, abgerufen 2026-11-02; `<APPNAME>` ist dort «the organization name, the application name, or both»). Weil Kern, Fenster und `dss-cli` verschiedene Programmnamen haben, setzt `defaultDataDir()` den Programmnamen nur für diese Abfrage auf `dons-streaming-studio` (kein Organisationsname gesetzt). Ergebnis auf dem Studio-PC: **`/home/dominik/.local/share/dons-streaming-studio`**.
+Ohne `--datenordner` nimmt `dss::defaultDataDir()` den Ordner aus `QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)`. Laut Qt-6.8-Dokumentation ist das unter Linux `~/.local/share/<APPNAME>` (Quelle: https://doc.qt.io/qt-6.8/qstandardpaths.html, abgerufen 2026-11-02; `<APPNAME>` ist dort «the organization name, the application name, or both»). Weil Kern, Fenster und `dss-cli` verschiedene Programmnamen haben, setzt `defaultDataDir()` den Programmnamen nur für diese Abfrage auf `dons-streaming-studio` (kein Organisationsname gesetzt). Ergebnis auf dem Studio-PC: **`/home/benutzer/.local/share/dons-streaming-studio`**.
 
 Geprüft (2026-11-02):
 
@@ -46,7 +46,7 @@ $ find <Scratch>/xdg
 <Scratch>/xdg/dons-streaming-studio/media
 <Scratch>/xdg/dons-streaming-studio/overlays
 $ ls -d ~/.local/share/dons-streaming-studio
-ls: Zugriff auf '/home/dominik/.local/share/dons-streaming-studio' nicht möglich: Datei oder Verzeichnis nicht gefunden
+ls: Zugriff auf '/home/benutzer/.local/share/dons-streaming-studio' nicht möglich: Datei oder Verzeichnis nicht gefunden
 ```
 
 Dasselbe prüft `tst_overlaystore::defaultDataDir` (mit `XDG_DATA_HOME` auf den Testordner). Der echte Datenordner im Home wurde in dieser Sitzung nicht angelegt.

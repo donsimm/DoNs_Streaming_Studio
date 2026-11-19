@@ -4,7 +4,7 @@
 # nacheinander (ohne -j: die Fenstertests ziehen mit der Maus und vertragen keine zweiten
 # Fenster). Aufruf: schalter-lauf.sh ARBEITSORDNER
 W=$(readlink -m "$1"); mkdir -p "$W"; cd "$W" || exit 1
-git clone -q /home/dominik/DoNs_Streaming_Studio klon || exit 1
+git clone -q /home/benutzer/DoNs_Streaming_Studio klon || exit 1
 echo "Klon: $(git -C klon log --oneline -1), Beginn $(date '+%F %T')"
 build() { # name, testen (0/1), optionen…
     local name=$1 test=$2; shift 2

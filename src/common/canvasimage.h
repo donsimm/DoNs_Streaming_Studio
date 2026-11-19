@@ -9,7 +9,7 @@
 // Ordner: <Bilder>/DoNs Streaming Studio. <Bilder> ist QStandardPaths::PicturesLocation; Qt liest
 // dafür XDG_PICTURES_DIR aus $XDG_CONFIG_HOME/user-dirs.dirs (sonst ~/.config/user-dirs.dirs),
 // dieselbe Datei wie xdg-user-dir PICTURES, und nimmt ~/Pictures, wenn dort nichts steht.
-// Auf dem Studio-PC am 2026-11-03 gemessen: beide /home/dominik/Bilder.
+// Auf dem Studio-PC am 2026-11-03 gemessen: beide /home/benutzer/Bilder.
 // Quellen: https://doc.qt.io/qt-6.8/qstandardpaths.html (PicturesLocation),
 //   https://github.com/qt/qtbase/blob/v6.8.2/src/corelib/io/qstandardpaths_unix.cpp
 //   (user-dirs.dirs, Schlüssel XDG_PICTURES_DIR),

@@ -73,7 +73,7 @@ Zwei Läufe hintereinander (Abnahme 1):
 
 ```
 $ scripts/einrichten.sh
-Alle Pakete aus /home/dominik/DoNs_Streaming_Studio/scripts/pakete.txt sind installiert, es wird nichts installiert.
+Alle Pakete aus /home/benutzer/DoNs_Streaming_Studio/scripts/pakete.txt sind installiert, es wird nichts installiert.
 
 Prüfung:
   ok          build-essential      12.12

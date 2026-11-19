@@ -2,7 +2,7 @@
  "summary": {
   "case": "core-sigint",
   "started": "2026-11-03 10:09:07 +0100",
-  "command": "/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core",
+  "command": "/home/benutzer/DoNs_Streaming_Studio/build/src/core/dss-core",
   "with_core": false,
   "signal": "SIGINT",
   "display": ":0.0",

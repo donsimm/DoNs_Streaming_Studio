@@ -3,7 +3,7 @@
   "variant": "A",
   "started": "2026-11-02 12:29:04 +0100",
   "command": [
-   "/home/dominik/DoNs_Streaming_Studio/prototypes/a-cpp-qt-libvpx/build/p02_a_libvpx",
+   "/home/benutzer/DoNs_Streaming_Studio/prototypes/a-cpp-qt-libvpx/build/p02_a_libvpx",
    "--mode",
    "t01"
   ],

@@ -2,7 +2,7 @@
  "summary": {
   "case": "app-kern-sigterm",
   "started": "2026-11-03 13:26:46 +0100",
-  "command": "/home/dominik/DoNs_Streaming_Studio/build/src/app/dss-app",
+  "command": "/home/benutzer/DoNs_Streaming_Studio/build/src/app/dss-app",
   "with_core": true,
   "signal": "SIGTERM",
   "display": ":0.0",

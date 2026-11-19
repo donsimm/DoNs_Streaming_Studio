@@ -43,7 +43,7 @@ Pfade, Antworten, Ereignisse und Meldungen stehen in `docs/08-kern-schnittstelle
 
 ### Port belegt (Teil A 2)
 
-Kann der Server nicht lauschen, sucht der Kern das belegende Programm über `/proc/net/tcp` und `/proc/net/tcp6` (Inode des Sockets im Zustand LISTEN) und `/proc/<pid>/fd` sowie `/proc/<pid>/exe`. Die Meldung lautet zum Beispiel: «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess …). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Sie steht in `server_status` und im Protokoll. Alle 2 s versucht der Kern es neu. Geprüft wird das mit `tst_overlayserver` (nachgebautes `/proc` und echter belegter Port) und `tst_fensterbearbeiten::browserSource` (Meldung im Fenster).
+Kann der Server nicht lauschen, sucht der Kern das belegende Programm über `/proc/net/tcp` und `/proc/net/tcp6` (Inode des Sockets im Zustand LISTEN) und `/proc/<pid>/fd` sowie `/proc/<pid>/exe`. Die Meldung lautet zum Beispiel: «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/benutzer/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess …). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Sie steht in `server_status` und im Protokoll. Alle 2 s versucht der Kern es neu. Geprüft wird das mit `tst_overlayserver` (nachgebautes `/proc` und echter belegter Port) und `tst_fensterbearbeiten::browserSource` (Meldung im Fenster).
 
 ### Adresse fehlt (Teil A 3)
 
@@ -268,10 +268,10 @@ Damit entsteht im Entwicklungsordner das Overlay «Handtest P10»: Bild mit EXIF
 cd ~/DoNs_Streaming_Studio && mousepad ~/browserquelle.txt
 ```
 
-   Mit Strg+V einfügen, speichern, Mousepad schliessen. Dann **auf dem Streaming-PC** in einem Terminal (fragt beim ersten Mal nach dem Schlüssel des Studio-PCs, «yes», danach nach dem Passwort von `dominik` auf dem Studio-PC):
+   Mit Strg+V einfügen, speichern, Mousepad schliessen. Dann **auf dem Streaming-PC** in einem Terminal (fragt beim ersten Mal nach dem Schlüssel des Studio-PCs, «yes», danach nach dem Passwort von `benutzer` auf dem Studio-PC):
 
 ```
-ssh dominik@192.0.2.9 cat browserquelle.txt
+ssh <benutzer>@192.0.2.9 cat browserquelle.txt
 ```
 
    Die angezeigte Zeile markieren und kopieren. Wer einen anderen Weg hat (Nachricht an sich selbst, abtippen), nimmt diesen. Prüfung 5 löscht die Datei wieder.
@@ -279,7 +279,7 @@ ssh dominik@192.0.2.9 cat browserquelle.txt
 4. **Auf dem Streaming-PC in OBS:** Rechtsklick auf die Quelle «Handtest P10» → «Bildschirmfoto (Quelle)». Laut Quellcode von OBS 30.2.3 landet das Bild im Aufnahmeordner (Einstellungen → Ausgabe → Aufnahmepfad), nicht geprüft. Im Editor Strg+Umschalt+B drücken (das Bild landet in `~/Bilder/DoNs Streaming Studio/`). Das Bild von OBS auf den Studio-PC holen, **auf dem Streaming-PC**:
 
 ```
-scp "<Pfad des Bildschirmfotos von OBS>" dominik@192.0.2.9:Bilder/
+scp "<Pfad des Bildschirmfotos von OBS>" <benutzer>@192.0.2.9:Bilder/
 ```
 
    Dann auf dem Studio-PC beide Bilder ansehen:

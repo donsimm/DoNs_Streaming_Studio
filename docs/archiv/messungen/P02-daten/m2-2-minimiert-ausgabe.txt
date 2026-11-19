@@ -2,7 +2,7 @@
  "name": "2-minimiert",
  "started": "2026-11-02 12:21:18 +0100",
  "app_command": [
-  "/home/dominik/DoNs_Streaming_Studio/prototypes/b-web-capture/host/build/p02_b_capture",
+  "/home/benutzer/DoNs_Streaming_Studio/prototypes/b-web-capture/host/build/p02_b_capture",
   "--url",
   "http://127.0.0.1:8765/overlay.html",
   "--count",
@@ -14,9 +14,9 @@
   "--duration",
   "75",
   "--stats",
-  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-minimiert/app-zeitstempel.json",
+  "/home/benutzer/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-minimiert/app-zeitstempel.json",
   "--save-frame",
-  "/home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-minimiert/abgriff",
+  "/home/benutzer/DoNs_Streaming_Studio/docs/messungen/P02-daten/m2-2-minimiert/abgriff",
   "--save-at",
   "68"
  ],
@@ -37,7 +37,7 @@
    "60"
   ],
   "nvidia-smi": "nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv,noheader,nounits -l 1",
-  "screenshot": "ffmpeg -hide_banner -loglevel error -y -f x11grab -video_size 1920x1080 -i :0.0+0,0 -frames:v 1 /home/dominik/DoNs_Streaming_Studio/docs/messungen/P02-bilder/m2-2-minimiert-bildschirm.png"
+  "screenshot": "ffmpeg -hide_banner -loglevel error -y -f x11grab -video_size 1920x1080 -i :0.0+0,0 -frames:v 1 /home/benutzer/DoNs_Streaming_Studio/docs/messungen/P02-bilder/m2-2-minimiert-bildschirm.png"
  },
  "app_exit_code": 0,
  "processes": {

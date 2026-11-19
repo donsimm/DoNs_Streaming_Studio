@@ -8,14 +8,14 @@ Umgewandelt; Sicherung der alten Dateien: <Arbeit>/installtest/daten-sicherungen
 Programmordner geleert: <Arbeit>/installtest/ziel/bin, <Arbeit>/installtest/ziel/share/dons-streaming-studio
 dss-app 0.1.0 (Einsatz, Commit dec3587)
 dss-core 0.1.0 (Einsatz, Commit dec3587)
--rw-rw-r-- 1 dominik dominik   0 20:35:59 <Arbeit>/installtest/ziel/share/dons-streaming-studio/symbole/veraltet.svg
+-rw-rw-r-- 1 benutzer benutzer   0 20:35:59 <Arbeit>/installtest/ziel/share/dons-streaming-studio/symbole/veraltet.svg
 
 <Arbeit>/installtest/ziel/bin:
 insgesamt 2552
--rwxr-xr-x 1 dominik dominik 1350728 20:35:59 dss-app
--rwxr-xr-x 1 dominik dominik  424424 20:35:47 dss-cli
--rwxr-xr-x 1 dominik dominik  834584 20:35:50 dss-core
--rw-rw-r-- 1 dominik dominik       0 20:35:59 veraltet-programm
+-rwxr-xr-x 1 benutzer benutzer 1350728 20:35:59 dss-app
+-rwxr-xr-x 1 benutzer benutzer  424424 20:35:47 dss-cli
+-rwxr-xr-x 1 benutzer benutzer  834584 20:35:50 dss-core
+-rw-rw-r-- 1 benutzer benutzer       0 20:35:59 veraltet-programm
 == Lauf 2: neue Installation mit veralteten Dateien (2026-11-03 20:35:59)
 Exit 0
 Format aktuell: <Arbeit>/installtest/daten
@@ -37,7 +37,7 @@ symbole
 uebersetzung
 DoNs Streaming Studio 0.1.0
 Commit dec3587
-Installiert 2026-11-03 20:36:00 +0100 aus /home/dominik/DoNs_Streaming_Studio
+Installiert 2026-11-03 20:36:00 +0100 aus /home/benutzer/DoNs_Streaming_Studio
 Daten unverändert
 == Lauf 3: absichtlich scheiternder Bau (2026-11-03 20:36:01)
 Exit 1

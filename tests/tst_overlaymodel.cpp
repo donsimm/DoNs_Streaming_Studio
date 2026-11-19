@@ -285,7 +285,7 @@ private slots:
         case 11: o.sources[2].text.weight = 99; break;
         case 12: o.sources[2].text.weight = 901; break;
         case 13: o.sources[2].text.fontSize = 0; break;
-        case 14: o.sources[0].file = QStringLiteral("/home/dominik/bild.png"); break;
+        case 14: o.sources[0].file = QStringLiteral("/home/benutzer/bild.png"); break;
         case 15: o.address = QStringLiteral("Ueberblick Start"); break;
         case 16: o.sources[1].name.clear(); break;
         case 17: o.sources[1].id = o.sources[0].id; break;

@@ -206,7 +206,7 @@ Fenster danach schliessen.
 cd ~/DoNs_Streaming_Studio && scripts/installieren.sh
 ```
 
-Erwartet (etwa 1 Minute): «Baue DoNs Streaming Studio 0.1.0 (Commit …)», «älteres Format: overlays/6f845017-9f86-4b8b-bc92-7fa1801c3165.json (Format 2)», «Sicherung des Datenordners: /home/dominik/.local/share/dons-streaming-studio-sicherungen/<Datum_Uhrzeit>», «1 Datei umgewandelt», «Einheit: dss-core.service», «Menüeintrag: …/dons-streaming-studio.desktop», am Ende «dss-app 0.1.0 (Einsatz, Commit …)» und «dss-core 0.1.0 (Einsatz, Commit …)». Steht hinter dem Commit «-geändert», hat das Repo nicht committete Änderungen. Läuft noch ein Fenster der installierten Version (bei der ersten Installation nicht möglich), bricht es ab. Die Sicherung bleibt liegen.
+Erwartet (etwa 1 Minute): «Baue DoNs Streaming Studio 0.1.0 (Commit …)», «älteres Format: overlays/6f845017-9f86-4b8b-bc92-7fa1801c3165.json (Format 2)», «Sicherung des Datenordners: /home/benutzer/.local/share/dons-streaming-studio-sicherungen/<Datum_Uhrzeit>», «1 Datei umgewandelt», «Einheit: dss-core.service», «Menüeintrag: …/dons-streaming-studio.desktop», am Ende «dss-app 0.1.0 (Einsatz, Commit …)» und «dss-core 0.1.0 (Einsatz, Commit …)». Steht hinter dem Commit «-geändert», hat das Repo nicht committete Änderungen. Läuft noch ein Fenster der installierten Version (bei der ersten Installation nicht möglich), bricht es ab. Die Sicherung bleibt liegen.
 
 ### Prüfung 3 – Start über das Anwendungsmenü
 

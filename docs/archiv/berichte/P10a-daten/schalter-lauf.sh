@@ -2,7 +2,7 @@
 # Bau jedes Schalters einzeln aus (bzw. DSS_INSTALLED_EDITION ein) und der Zwischen-Commits.
 S=$(dirname "$(readlink -f "$0")")
 cd $S
-git clone -q /home/dominik/DoNs_Streaming_Studio klon || exit 1
+git clone -q /home/benutzer/DoNs_Streaming_Studio klon || exit 1
 echo "Klon: $(git -C klon log --oneline -1)"
 build() { # name, quelle, optionen…
     local name=$1 src=$2; shift 2

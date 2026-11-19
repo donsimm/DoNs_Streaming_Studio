@@ -1,4 +1,4 @@
-2026-11-11 03:43:53 P12a Nachtlauf (voll), Ausgabe /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343
+2026-11-11 03:43:53 P12a Nachtlauf (voll), Ausgabe /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343
 2026-11-11 03:43:53 Rechner: Studio-PC, Last (1/5/15 min): 0.15 0.10 0.05
 2026-11-11 03:43:53 Vorher: clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
   pw: force_quantum 0
@@ -642,11 +642,11 @@ Sprünge der Lage (Aufnahme − Ausgabe, > 2 Proben): 65
   pw: standard_senke alsa_output.pci-0000_00_1b.0.iec958-stereo
   pw: knoten 63 dss_p12a_aufnahme
   pw: knoten 64 dss_p12a_ausgabe
-2026-11-11 04:05:50 M2: Server (Dienst) und Messseite in Qt WebEngine, 3600 s, Nachführen: --folgen /home/dominik/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40
+2026-11-11 04:05:50 M2: Server (Dienst) und Messseite in Qt WebEngine, 3600 s, Nachführen: --folgen /home/benutzer/DoNs_Streaming_Studio/tests/daten/ton/blitz-piep.webm --ausgang dss_p12a_ausgabe --puffer-ms 40
 Seite geladen: ja, Fenster bei 0,27 1290x754
 2026-11-11 04:06:23 M2: nach 30 s 838 Meldungen «bild» (Fenster ausserhalb des Bildschirms)
 2026-11-11 05:05:54 M2: Seite beendet (Exit 0)
 2026-11-11 05:05:58 Messungen fertig
 2026-11-11 05:05:58 Aufräumen (Exit-Code bis hier 0)
 2026-11-11 05:06:00 Aufräumen geprüft: keine dss_p12a-Knoten, clock.force-quantum 0, Standardausgang alsa_output.pci-0000_00_1b.0.iec958-stereo
-2026-11-11 05:06:00 Ergebnis: /home/dominik/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343/ergebnis.txt
+2026-11-11 05:06:00 Ergebnis: /home/benutzer/DoNs_Streaming_Studio/docs/archiv/messungen/P12a-daten/2026-11-11-0343/ergebnis.txt

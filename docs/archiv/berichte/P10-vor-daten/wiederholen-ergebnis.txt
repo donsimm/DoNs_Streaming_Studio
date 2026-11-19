@@ -9,12 +9,12 @@ tst_medien: 50 von 50 bestanden (2026-11-03 22:20:30)
 FAIL!  : TestFensterBearbeiten::usableWhileImportingLargeFile() Compared values are not the same
    Actual   (sourceAtRow(0).x): 0
    Expected (before + 1)      : 1
-   Loc: [/home/dominik/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
+   Loc: [/home/benutzer/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
 -- Lauf 24:
 FAIL!  : TestFensterBearbeiten::usableWhileImportingLargeFile() Compared values are not the same
    Actual   (sourceAtRow(0).x): 0
    Expected (before + 1)      : 1
-   Loc: [/home/dominik/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
+   Loc: [/home/benutzer/DoNs_Streaming_Studio/tests/tst_fensterbearbeiten.cpp(1346)]
 -- Messungen usableWhileImportingLargeFile (bestandene Läufe):
 Lauf 1: Übernehmen 1024 MiB: 13671 ms; 121 Antworten des Kerns min 0 / Median 0 / max 165 ms; 24 Änderungen im Fenster max 61 ms; grösste Lücke der Ereignisschleife 20 ms
 Lauf 2: Übernehmen 1024 MiB: 13612 ms; 121 Antworten des Kerns min 0 / Median 0 / max 143 ms; 24 Änderungen im Fenster max 53 ms; grösste Lücke der Ereignisschleife 20 ms

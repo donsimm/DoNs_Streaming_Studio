@@ -1,7 +1,7 @@
 Overlay «Watchdog Test» angelegt: Adresse watchdog-test, 1920x1080
 Datei erzeugen: 21:13:20
 Grösse 4294967296 Byte
-ExecStart: "/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core" "--datenordner" "<Arbeit>/daten" "--verbindung" "/run/user/1000/dss-watchdogtest.sock" "--einstellungen" "<Arbeit>/config/kern.ini"
+ExecStart: "/home/benutzer/DoNs_Streaming_Studio/build/src/core/dss-core" "--datenordner" "<Arbeit>/daten" "--verbindung" "/run/user/1000/dss-watchdogtest.sock" "--einstellungen" "<Arbeit>/config/kern.ini"
 WatchdogUSec=10s
 Übernehmen start: 21:13:32, PID 334255
 Antwort nach 58.5 s: ok=True 
