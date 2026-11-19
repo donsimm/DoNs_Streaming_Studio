@@ -39,9 +39,9 @@
    "core_log": [
     "2026-11-03 22:44:03.707 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:03.707 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:03.707 info Einstellungen: Adresse im Heimnetz 192.168.1.9 eingetragen (Netzwerkkarte enp3s0 der Standardroute)",
+    "2026-11-03 22:44:03.707 info Einstellungen: Adresse im Heimnetz 192.0.2.9 eingetragen (Netzwerkkarte enp3s0 der Standardroute)",
     "2026-11-03 22:44:03.707 info Einstellungen: /tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini angelegt",
-    "2026-11-03 22:44:03.707 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:03.707 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:03.707 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:03.708 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:03.925 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -74,7 +74,7 @@
    "core_log": [
     "2026-11-03 22:44:05.510 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:05.510 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:05.510 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:05.510 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:05.510 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:05.511 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:05.719 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -106,7 +106,7 @@
    "core_log": [
     "2026-11-03 22:44:07.306 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:07.306 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:07.306 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:07.306 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:07.306 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:07.307 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:07.507 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -139,7 +139,7 @@
    "core_log": [
     "2026-11-03 22:44:09.097 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:09.097 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:09.097 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:09.097 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:09.098 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:09.098 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:09.294 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -171,7 +171,7 @@
    "core_log": [
     "2026-11-03 22:44:10.886 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:10.886 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:10.887 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:10.887 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:10.887 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:10.887 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:11.103 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -204,7 +204,7 @@
    "core_log": [
     "2026-11-03 22:44:12.703 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:12.703 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:12.703 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:12.703 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:12.703 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:12.704 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:12.926 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -236,7 +236,7 @@
    "core_log": [
     "2026-11-03 22:44:14.509 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:14.509 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:14.510 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:14.510 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:14.510 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:14.510 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:14.730 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -268,7 +268,7 @@
    "core_log": [
     "2026-11-03 22:44:16.318 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:16.318 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:16.318 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:16.318 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:16.318 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:16.319 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:16.528 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -300,7 +300,7 @@
    "core_log": [
     "2026-11-03 22:44:18.122 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:18.122 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:18.122 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:18.122 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:18.122 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:18.123 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:18.342 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -332,7 +332,7 @@
    "core_log": [
     "2026-11-03 22:44:19.926 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:19.926 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:19.926 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:19.926 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:19.927 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:19.927 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:20.122 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -364,7 +364,7 @@
    "core_log": [
     "2026-11-03 22:44:21.715 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:21.716 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:21.716 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:21.716 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:21.716 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:21.716 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:21.923 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -397,7 +397,7 @@
    "core_log": [
     "2026-11-03 22:44:23.519 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:23.519 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:23.519 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:23.519 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:23.519 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:23.520 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:23.727 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -429,7 +429,7 @@
    "core_log": [
     "2026-11-03 22:44:25.315 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:25.316 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:25.316 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:25.316 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:25.316 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:25.316 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:25.528 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -461,7 +461,7 @@
    "core_log": [
     "2026-11-03 22:44:27.121 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:27.121 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:27.121 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:27.121 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:27.121 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:27.122 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:27.336 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -493,7 +493,7 @@
    "core_log": [
     "2026-11-03 22:44:28.936 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:28.936 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:28.936 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:28.936 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:28.936 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:28.937 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:29.126 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -526,7 +526,7 @@
    "core_log": [
     "2026-11-03 22:44:30.723 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:30.723 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:30.723 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:30.723 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:30.723 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:30.724 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:30.926 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -559,7 +559,7 @@
    "core_log": [
     "2026-11-03 22:44:32.517 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:32.517 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:32.517 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:32.517 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:32.517 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:32.518 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:32.722 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -591,7 +591,7 @@
    "core_log": [
     "2026-11-03 22:44:34.320 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:34.320 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:34.320 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:34.320 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:34.320 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:34.320 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:34.520 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -623,7 +623,7 @@
    "core_log": [
     "2026-11-03 22:44:36.111 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:36.112 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:36.112 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:36.112 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:36.112 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:36.112 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:36.329 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",
@@ -655,7 +655,7 @@
    "core_log": [
     "2026-11-03 22:44:37.919 info dss-core 0.1.0 (Entwicklung) gestartet, Qt 6.8.2",
     "2026-11-03 22:44:37.919 info Aufräumen media/: 0 vorläufige Dateien von QSaveFile gelöscht (0 Byte)",
-    "2026-11-03 22:44:37.919 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
+    "2026-11-03 22:44:37.919 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (/tmp/dss-startpruefung-vo63vojk/dons-streaming-studio-entwicklung/kern.ini)",
     "2026-11-03 22:44:37.919 info Datenordner /tmp/dss-startpruefung-daten-gtku9ah4: 0 Overlays geladen",
     "2026-11-03 22:44:37.919 info Verbindung offen: /run/user/1000/dss-sp-kyh9q9or/kern.sock",
     "2026-11-03 22:44:38.109 info Verbunden: dss-app 0.1.0 (1 Verbindungen)",

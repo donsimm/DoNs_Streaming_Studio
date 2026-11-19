@@ -96,9 +96,9 @@ private slots:
         // Mehrere Standardrouten: kleinste Metrik. Route ohne RTF_UP zählt nicht.
         const QByteArray two =
             "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n"
-            "wlan0\t00000000\t0101A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0\n"
-            "enp3s0\t00000000\t0101A8C0\t0003\t0\t0\t100\t00000000\t0\t0\t0\n"
-            "down0\t00000000\t0101A8C0\t0002\t0\t0\t1\t00000000\t0\t0\t0\n";
+            "wlan0\t00000000\t010200C0\t0003\t0\t0\t600\t00000000\t0\t0\t0\n"
+            "enp3s0\t00000000\t010200C0\t0003\t0\t0\t100\t00000000\t0\t0\t0\n"
+            "down0\t00000000\t010200C0\t0002\t0\t0\t1\t00000000\t0\t0\t0\n";
         QCOMPARE(defaultRouteInterface(two), QStringLiteral("enp3s0"));
     }
 

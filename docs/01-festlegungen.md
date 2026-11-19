@@ -100,7 +100,7 @@ Entscheide des Nutzers vom 2026-11-15 und 2026-11-17 (Plan `docs/archiv/prompts/
 ## Betrieb im Netz
 
 - Zugriff auf den Overlay-Server: im Heimnetz erreichbar, mit Token pro Overlay, ohne Port am Router. (entschieden)
-- Der Studio-PC hängt per Kabel am Netz und bekommt am Router eine feste Adresse. (entschieden) Umgesetzt (2026-11-03, Angabe des Nutzers): Kabel `enp3s0`, Adresse `192.168.1.9`, am Router reserviert.
+- Der Studio-PC hängt per Kabel am Netz und bekommt am Router eine feste Adresse. (entschieden) Umgesetzt (2026-11-03, Angabe des Nutzers): Kabel `enp3s0`, Adresse siehe `~/projekte/privat/it-system/SYSTEM.md`, am Router reserviert.
 - Overlay-Server (umgesetzt mit P10, 2026-11-04, Entscheide des Nutzers vom 2026-11-03): nur HTTP, nur IPv4 auf der «Adresse im Heimnetz» und `127.0.0.1`, Port aus `kern.ini`; Adresse der Browserquelle `http://<Adresse im Heimnetz>:<Port>/o/<adresse>/<token>/`; alte oder unbekannte Adresse ergibt eine leere, durchsichtige Seite. Einzelheiten: `docs/08-kern-schnittstelle.md`, «Overlay-Server».
 - Zielwerte für die Last: 1080p30, bis zu 2 NDI-Ausgänge, bis zu 10 Quellen pro Overlay. (entschieden)
 - Spenden und Tip Jar aus dem alten Entwurf sind nicht Teil des Neustarts. (entschieden)

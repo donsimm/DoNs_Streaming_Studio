@@ -128,7 +128,7 @@ private:
         int busyRetries = 0;
     };
 
-    QString endpoint() const; // «192.168.1.116:4455»
+    QString endpoint() const; // «192.0.2.116:4455»
     void setStatus(State state, const QString &message);
     void startConnecting();
     void startAttempt();

@@ -6,13 +6,13 @@ Alle Messwerte stammen von diesem Gerät, mit Datum und Befehl. Was nur in OBS a
 
 ## Kurzfassung
 
-- **Overlay-Server im Kern** (`src/server/`, Schalter `DSS_CORE_OVERLAY_SERVER`): eigener HTTP/1.1-Server auf `QTcpServer`, nur IPv4 auf `127.0.0.1` und der Adresse im Heimnetz (`192.168.1.9`), Port aus `kern.ini`. Adresse `http://192.168.1.9:<Port>/o/<adresse>/<token>/`. Änderungen gehen als Server-Sent Events an die Seite, ohne Neuladen. Den Token vergleicht der Server mit gleichbleibender Laufzeit, ins Protokoll schreibt er ihn nie. Eine alte oder unbekannte Adresse bekommt eine leere, durchsichtige Seite, ins Protokoll kommt «unbekannte Adresse», und das Fenster zeigt einen Hinweis. Ist der Port belegt, nennt die Meldung das Programm. Fehlt die Adresse, lauscht der Server nur auf `127.0.0.1` und kommt von selbst auf die Adresse, sobald sie da ist.
+- **Overlay-Server im Kern** (`src/server/`, Schalter `DSS_CORE_OVERLAY_SERVER`): eigener HTTP/1.1-Server auf `QTcpServer`, nur IPv4 auf `127.0.0.1` und der Adresse im Heimnetz (`192.0.2.9`), Port aus `kern.ini`. Adresse `http://192.0.2.9:<Port>/o/<adresse>/<token>/`. Änderungen gehen als Server-Sent Events an die Seite, ohne Neuladen. Den Token vergleicht der Server mit gleichbleibender Laufzeit, ins Protokoll schreibt er ihn nie. Eine alte oder unbekannte Adresse bekommt eine leere, durchsichtige Seite, ins Protokoll kommt «unbekannte Adresse», und das Fenster zeigt einen Hinweis. Ist der Port belegt, nennt die Meldung das Programm. Fehlt die Adresse, lauscht der Server nur auf `127.0.0.1` und kommt von selbst auf die Adresse, sobald sie da ist.
 - **Seite als zweiter Zeichner** (`web/overlay.html`, `web/overlay.js`): durchsichtig, gleiche Lage, Grösse, Reihenfolge, Spiegelung und Drehung wie der Editor. EXIF und Video-Drehung wendet die Seite selbst an, mit der Angabe des Kerns. Der Kern liefert die Dateien dafür mit neutraler Ausrichtung aus, damit das Ergebnis nicht von der Chromium-Version abhängt. Text kommt aus derselben Schriftdatei mit den Zeilenmassen wie Qt. Videos sind stumm und beginnen immer von vorne. Was die Seite nicht abspielen kann, bleibt leer und wird dem Kern gemeldet.
 - **Ausgabe ein/aus** (E-24): ein Kästchen links neben jedem Overlay, gespeichert in der Overlay-Datei (Format 4).
 - **Neuer Token** mit Rückfrage im Fenster und in `dss-cli`.
 - **Dock «Steuerung»:** Adresse, «Kopieren», «Neuer Token», «Ausgabe: …». Meldungen des Servers erscheinen fett in der Warnfarbe im Dock und in der Statuszeile (Schalter `DSS_APP_BROWSER_SOURCE`).
 - **Teil D:** Punkte 76, 77 und 78 sind umgesetzt. Die Schnittstelle Kern–Fenster steht auf **Version 9**.
-- **Stufe 1 der Prüfung** (`tst_browserquelle`, Qt WebEngine 6.8.2 / Chromium 122 über `http://192.168.1.9:<Port>/`) besteht. Bilder, Spiegeln und Drehung weichen im Mittel um 0.02 bis 0.06 vom Editor ab, Text um 1.3 bis 1.9. Bei Videos ist die Abweichung grösser: Chromium rechnet die Farben um (Mittel 10.4, höchstens 95; `[OFFEN]`, Punkt 79). Eine Änderung braucht bis zur Seite im Median 21 bis 22 ms.
+- **Stufe 1 der Prüfung** (`tst_browserquelle`, Qt WebEngine 6.8.2 / Chromium 122 über `http://192.0.2.9:<Port>/`) besteht. Bilder, Spiegeln und Drehung weichen im Mittel um 0.02 bis 0.06 vom Editor ab, Text um 1.3 bis 1.9. Bei Videos ist die Abweichung grösser: Chromium rechnet die Farben um (Mittel 10.4, höchstens 95; `[OFFEN]`, Punkt 79). Eine Änderung braucht bis zur Seite im Median 21 bis 22 ms.
 - **Videoformate in Chromium (Qt WebEngine 6.8.2):** H.264, VP9 (WebM und MP4), VP9 mit Alpha und AV1 laufen. HEVC, MPEG-4 Part 2 und ProRes laufen nicht (`[OFFEN]`, Punkt 81).
 
 ## Teil A – Overlay-Server im Kern
@@ -30,14 +30,14 @@ Nur IPv4: je ein `QTcpServer` auf `127.0.0.1` und auf der Adresse im Heimnetz, n
 Gemessen am 2026-11-04 00:52 mit einem Testkern auf Port 24901 (eigener Datenordner und eigene `kern.ini`):
 
 ```
-ss -ltnH "sport = :24901"     → 192.168.1.9:24901 und 127.0.0.1:24901 (LISTEN)
+ss -ltnH "sport = :24901"     → 192.0.2.9:24901 und 127.0.0.1:24901 (LISTEN)
 ss -ltn6H "sport = :24901"    → leer
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:24901/     → 200
-curl -s -o /dev/null -w "%{http_code}" http://192.168.1.9:24901/   → 200
+curl -s -o /dev/null -w "%{http_code}" http://192.0.2.9:24901/   → 200
 curl http://[::1]:24901/                                           → Verbindung abgelehnt
 ```
 
-Protokoll des Kerns dabei (Auszug): «Overlay-Server lauscht auf 127.0.0.1:24901», «Overlay-Server lauscht auf 192.168.1.9:24901», «Browserquelle: unbekannte Adresse /o/test-szene/… von 127.0.0.1», «SIGTERM erhalten, beende», «beendet, Exit-Code 0».
+Protokoll des Kerns dabei (Auszug): «Overlay-Server lauscht auf 127.0.0.1:24901», «Overlay-Server lauscht auf 192.0.2.9:24901», «Browserquelle: unbekannte Adresse /o/test-szene/… von 127.0.0.1», «SIGTERM erhalten, beende», «beendet, Exit-Code 0».
 
 Pfade, Antworten, Ereignisse und Meldungen stehen in `docs/08-kern-schnittstelle.md`, Abschnitt «Overlay-Server».
 
@@ -57,7 +57,7 @@ Beim Nachführen der Doku am 2026-11-04 fiel auf: Der Vergleich wurde übersprun
 
 ### Alte oder unbekannte Adresse (Teil A 5)
 
-Eine alte oder unbekannte Adresse bekommt eine leere, durchsichtige Seite, die sich alle 10 s neu lädt; `…/events` bekommt `gone`. Ins Protokoll kommt höchstens einmal pro Minute je Gegenstelle und Adresse «Browserquelle: unbekannte Adresse /o/<adresse>/… von <IPv4>». Das Fenster zeigt 30 s lang den Hinweis, zum Beispiel in `tst_browserquelle` (2026-11-04): «Eine Browserquelle (192.168.1.9) benutzt eine ungültige Adresse (/o/pruefung-browserquelle/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.»
+Eine alte oder unbekannte Adresse bekommt eine leere, durchsichtige Seite, die sich alle 10 s neu lädt; `…/events` bekommt `gone`. Ins Protokoll kommt höchstens einmal pro Minute je Gegenstelle und Adresse «Browserquelle: unbekannte Adresse /o/<adresse>/… von <IPv4>». Das Fenster zeigt 30 s lang den Hinweis, zum Beispiel in `tst_browserquelle` (2026-11-04): «Eine Browserquelle (192.0.2.9) benutzt eine ungültige Adresse (/o/pruefung-browserquelle/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.»
 
 ### Ausgabe ein/aus (Teil A 7, E-24)
 
@@ -124,13 +124,13 @@ Farben von Videos: H.264 ohne Farbangaben behandelt Chromium wie `smpte170m` (BT
 
 ## Teil D – Nacharbeiten
 
-- **Punkt 78:** `update_settings` nimmt nur Adressen an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Aufgezeichnet am 2026-11-04 mit einem Testkern: `192.168.1.1` → `rejected`, «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.». Die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt.
+- **Punkt 78:** `update_settings` nimmt nur Adressen an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Aufgezeichnet am 2026-11-04 mit einem Testkern: `192.0.2.1` → `rejected`, «192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.0.2.9.». Die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt.
 - **Punkt 76:** Antworten auf `update_settings` und `reset_settings` gehen im `CoreClient` über das eigene Signal `settingsUpdateFinished` nur an den Dialog, nicht in die Statuszeile.
 - **Punkt 77:** Knopf «Auf Standardwerte zurücksetzen» (nur bei ungültiger `kern.ini` frei) und Nachricht `reset_settings`. Der Kern benennt die Datei in `kern.ini.ungueltig-<JJJJ-MM-TT_hh-mm-ss>` um, schreibt die Standardwerte, trägt die Adresse aus der Standardroute ein und meldet «Auf Standardwerte zurückgesetzt. Die ungültige Datei heisst jetzt …». Bei einer gültigen Datei: `rejected` «… ist gültig; nichts zurückgesetzt.».
 
 ## Stufe 1 der Prüfung (`tst_browserquelle`)
 
-Aufbau: Ein Testkern mit eigenem Datenordner und eigenem Port (24000 + PID % 2000 · 4 + 2). Ein `QWebEngineView` mit durchsichtigem Hintergrund (https://doc.qt.io/qt-6.8/qwebenginepage.html#backgroundColor-prop, https://doc.qt.io/qt-6.8/qwebengineview.html) lädt `http://192.168.1.9:<Port>/o/…/<token>/`, also über die echte Netzwerkkarte. Das Bild mit Alpha kommt über `QQuickWidget::grabFramebuffer` (Weg aus P02, M2; https://doc.qt.io/qt-6.8/qquickwidget.html#grabFramebuffer). Verglichen wird mit `dss_render` (gleiches Overlay, gleiche Dateien). Test-Overlay 800x450: 8 JPEG und 8 PNG aus `tests/daten/exif/` (je 88x44), die 4 Drehvideos aus `tests/daten/video-drehung/`, Text DejaVu Sans 36 px zentriert (#FFE040), Text Be Vietnam Pro Bold 30 px rechtsbündig, ein gespiegeltes PNG, ein PNG um 12.5° gedreht, ein Video mit Drehung 90° in der Datei, das zusätzlich um 300° gedreht und senkrecht gespiegelt ist. Ohne X11 oder ohne Adresse im Heimnetz endet der Test mit 77 (übersprungen).
+Aufbau: Ein Testkern mit eigenem Datenordner und eigenem Port (24000 + PID % 2000 · 4 + 2). Ein `QWebEngineView` mit durchsichtigem Hintergrund (https://doc.qt.io/qt-6.8/qwebenginepage.html#backgroundColor-prop, https://doc.qt.io/qt-6.8/qwebengineview.html) lädt `http://192.0.2.9:<Port>/o/…/<token>/`, also über die echte Netzwerkkarte. Das Bild mit Alpha kommt über `QQuickWidget::grabFramebuffer` (Weg aus P02, M2; https://doc.qt.io/qt-6.8/qquickwidget.html#grabFramebuffer). Verglichen wird mit `dss_render` (gleiches Overlay, gleiche Dateien). Test-Overlay 800x450: 8 JPEG und 8 PNG aus `tests/daten/exif/` (je 88x44), die 4 Drehvideos aus `tests/daten/video-drehung/`, Text DejaVu Sans 36 px zentriert (#FFE040), Text Be Vietnam Pro Bold 30 px rechtsbündig, ein gespiegeltes PNG, ein PNG um 12.5° gedreht, ein Video mit Drehung 90° in der Datei, das zusätzlich um 300° gedreht und senkrecht gespiegelt ist. Ohne X11 oder ohne Adresse im Heimnetz endet der Test mit 77 (übersprungen).
 
 Abweichung Seite gegen Editor, je Kanal 0 bis 255 (Mittel / grösste / Anteil Pixel mit Abweichung > 32), Lauf vom 2026-11-04:
 
@@ -181,7 +181,7 @@ cat /etc/nftables.conf                      → Tabelle inet filter mit leeren K
 lsmod | grep -E "nf_tables|ip_tables"       → nf_tables nicht geladen, ip_tables mit 0 Nutzern
 ```
 
-`nft list ruleset` braucht root. Die **aktiven Regeln sind deshalb nicht geprüft**. Weil das Modul `nf_tables` nicht geladen ist, gibt es vermutlich keine (Annahme). Der Zugriff über `192.168.1.9` vom Studio-PC selbst ging (siehe oben). Ob der Streaming-PC durchkommt, zeigt erst der Handtest.
+`nft list ruleset` braucht root. Die **aktiven Regeln sind deshalb nicht geprüft**. Weil das Modul `nf_tables` nicht geladen ist, gibt es vermutlich keine (Annahme). Der Zugriff über `192.0.2.9` vom Studio-PC selbst ging (siehe oben). Ob der Streaming-PC durchkommt, zeigt erst der Handtest.
 
 ## Ausgeführte Befehle und Ergebnisse
 
@@ -211,7 +211,7 @@ Nach `327dfc6`: `ctest --test-dir build -j4` 2026-11-04 02:04, **37 von 37**, 0 
 docs/berichte/P10-daten/installieren-pruefen.sh <Notizordner>/p10/inst 24950
 ```
 
-2026-11-04 02:06:01 bis 02:06:52, Ergebnis in `docs/berichte/P10-daten/installieren-ergebnis.txt`. `scripts/installieren.sh` lief mit `--ziel`, `--datenordner` (Kopie von `tests/daten/formate`), `--einheit dss-core-installtest.service`, `--menue-ordner`, `--symbol-ordner`: Exit 0, Sicherung angelegt, 3 Dateien umgewandelt, danach alle 4 im Format 4. `share/dons-streaming-studio/web/` enthält `overlay.html` und `overlay.js` (gleich wie im Repo). Das installierte `dss-core` (eigene `kern.ini` mit Port 24950) lauschte auf `127.0.0.1:24950` und `192.168.1.9:24950`. Die Seite lieferte 200 (gleich `web/overlay.html`), `overlay.js` 200, `events` das Ereignis `overlay`, ein falscher Token die leere Seite. Kein Token im Protokoll, Exit 0. Die Testeinheit ist wieder entfernt. «Commit 327dfc6-geändert» heisst: Im Arbeitsordner lagen die Dokumente noch nicht committet. Der erste Versuch (02:04) scheiterte am Prüfskript selbst: Der Pfad des Sockets im Notizordner war mit 119 Byte zu lang (höchstens 107). Danach nutzte das Skript einen kurzen Pfad unter `/run/user/1000/`.
+2026-11-04 02:06:01 bis 02:06:52, Ergebnis in `docs/berichte/P10-daten/installieren-ergebnis.txt`. `scripts/installieren.sh` lief mit `--ziel`, `--datenordner` (Kopie von `tests/daten/formate`), `--einheit dss-core-installtest.service`, `--menue-ordner`, `--symbol-ordner`: Exit 0, Sicherung angelegt, 3 Dateien umgewandelt, danach alle 4 im Format 4. `share/dons-streaming-studio/web/` enthält `overlay.html` und `overlay.js` (gleich wie im Repo). Das installierte `dss-core` (eigene `kern.ini` mit Port 24950) lauschte auf `127.0.0.1:24950` und `192.0.2.9:24950`. Die Seite lieferte 200 (gleich `web/overlay.html`), `overlay.js` 200, `events` das Ereignis `overlay`, ein falscher Token die leere Seite. Kein Token im Protokoll, Exit 0. Die Testeinheit ist wieder entfernt. «Commit 327dfc6-geändert» heisst: Im Arbeitsordner lagen die Dokumente noch nicht committet. Der erste Versuch (02:04) scheiterte am Prüfskript selbst: Der Pfad des Sockets im Notizordner war mit 119 Byte zu lang (höchstens 107). Danach nutzte das Skript einen kurzen Pfad unter `/run/user/1000/`.
 
 ### Tests
 
@@ -261,7 +261,7 @@ cd ~/DoNs_Streaming_Studio && cmake --build build -j8 && mkdir -p build/handtest
 
 Damit entsteht im Entwicklungsordner das Overlay «Handtest P10»: Bild mit EXIF 6, Video mit Drehung 90° in der Datei, Text, ein gespiegeltes und um 12.5° gedrehtes Bild und ein Video mit laufendem Zähler (`testsrc` von ffmpeg, https://ffmpeg.org/ffmpeg-filters.html). Danach startet das Fenster «DoNs Streaming Studio – Entwicklung». Läuft `dss-core-entwicklung.service` schon, verweigert `dss-cli` das Anlegen (Exit 3). Dann zuerst `cd ~/DoNs_Streaming_Studio && systemctl --user stop dss-core-entwicklung.service` und den Befehl nochmals ausführen.
 
-1. Im Dock «Overlays» «Handtest P10» wählen. Erwartet im Dock «Steuerung»: Im Feld «Browserquelle» steht `http://192.168.1.9:8081/o/handtest-p10/…/` (die ganze Adresse zeigt der Tooltip), daneben «Ausgabe: ein, keine Browserquelle verbunden». In der Statuszeile steht keine rote Meldung. Links neben «Handtest P10» ist ein angekreuztes Kästchen.
+1. Im Dock «Overlays» «Handtest P10» wählen. Erwartet im Dock «Steuerung»: Im Feld «Browserquelle» steht `http://192.0.2.9:8081/o/handtest-p10/…/` (die ganze Adresse zeigt der Tooltip), daneben «Ausgabe: ein, keine Browserquelle verbunden». In der Statuszeile steht keine rote Meldung. Links neben «Handtest P10» ist ein angekreuztes Kästchen.
 2. «Kopieren» drücken. **Weg der Adresse zum Streaming-PC:** Die Zwischenablage gilt nur auf dem Studio-PC. Vorschlag über SSH (auf dem Studio-PC läuft `openssh-server`, geprüft am 2026-11-04; ob die Anmeldung vom Streaming-PC klappt, ist nicht geprüft). Auf dem Studio-PC:
 
 ```
@@ -271,7 +271,7 @@ cd ~/DoNs_Streaming_Studio && mousepad ~/browserquelle.txt
    Mit Strg+V einfügen, speichern, Mousepad schliessen. Dann **auf dem Streaming-PC** in einem Terminal (fragt beim ersten Mal nach dem Schlüssel des Studio-PCs, «yes», danach nach dem Passwort von `dominik` auf dem Studio-PC):
 
 ```
-ssh dominik@192.168.1.9 cat browserquelle.txt
+ssh dominik@192.0.2.9 cat browserquelle.txt
 ```
 
    Die angezeigte Zeile markieren und kopieren. Wer einen anderen Weg hat (Nachricht an sich selbst, abtippen), nimmt diesen. Prüfung 5 löscht die Datei wieder.
@@ -279,7 +279,7 @@ ssh dominik@192.168.1.9 cat browserquelle.txt
 4. **Auf dem Streaming-PC in OBS:** Rechtsklick auf die Quelle «Handtest P10» → «Bildschirmfoto (Quelle)». Laut Quellcode von OBS 30.2.3 landet das Bild im Aufnahmeordner (Einstellungen → Ausgabe → Aufnahmepfad), nicht geprüft. Im Editor Strg+Umschalt+B drücken (das Bild landet in `~/Bilder/DoNs Streaming Studio/`). Das Bild von OBS auf den Studio-PC holen, **auf dem Streaming-PC**:
 
 ```
-scp "<Pfad des Bildschirmfotos von OBS>" dominik@192.168.1.9:Bilder/
+scp "<Pfad des Bildschirmfotos von OBS>" dominik@192.0.2.9:Bilder/
 ```
 
    Dann auf dem Studio-PC beide Bilder ansehen:
@@ -302,7 +302,7 @@ Fenster und OBS offen lassen für Prüfung 2.
 ### Prüfung 3 – Neuer Token
 
 1. Im Dock «Steuerung» «Neuer Token» drücken. Erwartet: Rückfrage «Die alte Adresse funktioniert danach nicht mehr. In OBS muss die neue Adresse eingetragen werden. Fortfahren?». «Ja» wählen.
-2. Erwartet: In OBS wird die Quelle leer und durchsichtig, ohne Fehlertext. Im Editor erscheinen im Dock «Steuerung» und rechts in der Statuszeile in roter, fetter Schrift der Hinweis «Eine Browserquelle (192.168.1.116) benutzt eine ungültige Adresse (/o/handtest-p10/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.» Im Feld «Browserquelle» steht eine andere Adresse als vorher.
+2. Erwartet: In OBS wird die Quelle leer und durchsichtig, ohne Fehlertext. Im Editor erscheinen im Dock «Steuerung» und rechts in der Statuszeile in roter, fetter Schrift der Hinweis «Eine Browserquelle (192.0.2.116) benutzt eine ungültige Adresse (/o/handtest-p10/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.» Im Feld «Browserquelle» steht eine andere Adresse als vorher.
 3. Die neue Adresse wie in Prüfung 1 Schritt 2 auf den Streaming-PC bringen (Mousepad: alten Inhalt ersetzen) und in OBS in den Eigenschaften der Quelle «Handtest P10» als URL eintragen. Erwartet: Das Overlay ist wieder da. Der Hinweis im Editor verschwindet spätestens 30 s nach der letzten Anfrage mit der alten Adresse.
 
 Das Fenster schliessen.
@@ -315,7 +315,7 @@ Nur der Nutzer installiert (Regel 18). Die echten Daten sind im Format 3. Das Sk
 cd ~/DoNs_Streaming_Studio && scripts/installieren.sh
 ```
 
-Erwartet: am Ende «installiert» mit Version und Commit, vorher ein Hinweis auf die Sicherung unter `~/.local/share/dons-streaming-studio-sicherungen/<Datum_Zeit>/` und das Umwandeln. Dann «DoNs Streaming Studio» aus dem Anwendungsmenü starten (Titel ohne «Entwicklung»). Ein echtes Overlay wählen. Erwartet im Dock «Steuerung»: `http://192.168.1.9:8080/o/<adresse>/…/`, ohne rote Meldung (insbesondere nicht «Port 8080 ist belegt»). Die Adresse wie in Prüfung 1 auf den Streaming-PC bringen und **in OBS auf dem Streaming-PC** als Browserquelle eintragen (Breite und Höhe wie das Overlay). Erwartet: OBS zeigt dasselbe wie die Leinwand. Eine kleine Änderung im Editor erscheint in OBS ohne Neuladen. Diese Browserquelle bleibt für den Stream.
+Erwartet: am Ende «installiert» mit Version und Commit, vorher ein Hinweis auf die Sicherung unter `~/.local/share/dons-streaming-studio-sicherungen/<Datum_Zeit>/` und das Umwandeln. Dann «DoNs Streaming Studio» aus dem Anwendungsmenü starten (Titel ohne «Entwicklung»). Ein echtes Overlay wählen. Erwartet im Dock «Steuerung»: `http://192.0.2.9:8080/o/<adresse>/…/`, ohne rote Meldung (insbesondere nicht «Port 8080 ist belegt»). Die Adresse wie in Prüfung 1 auf den Streaming-PC bringen und **in OBS auf dem Streaming-PC** als Browserquelle eintragen (Breite und Höhe wie das Overlay). Erwartet: OBS zeigt dasselbe wie die Leinwand. Eine kleine Änderung im Editor erscheint in OBS ohne Neuladen. Diese Browserquelle bleibt für den Stream.
 
 ### Prüfung 5 – Aufräumen
 
@@ -334,7 +334,7 @@ Erwartet: Es bleiben `dons-streaming-studio` (echte Daten, in `~/.local/share/` 
 | 1 – Test-Overlay in OBS, Vergleich | bestanden (08:15, 08:21). OBS 33.0.1 auf dem Streaming-PC (Zorin OS). Lage, Grösse, Drehung, Spiegelung, EXIF und Video-Drehung gleich wie im Editor. «Bildschirmfoto (Quelle)» von OBS 33.0.1 ist **nicht durchsichtig** (freie Flächen schwarz), wie nach dem Quellcode erwartet. Adresse über Mousepad und `ssh` auf den Streaming-PC gebracht |
 | 2 – Änderung ohne Neuladen, Ausgabe, Video | bestanden (08:24) |
 | 3 – Neuer Token | bestanden (08:28) |
-| 4 – Echte Installation, Port 8080 | bestanden (08:50) nach einer Störung des Netzwerks: Um 08:29:35 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort des Routers, Punkt 84). Der installierte Kern startete um 08:32 ohne Netzwerk, trug keine Adresse ein und lauschte nur auf `127.0.0.1` mit Meldung im Fenster (richtiges Verhalten). Nach `nmcli connection up` (08:41) und Neustart des Kerns: `http://192.168.1.9:8080/…`, Browserquelle in OBS mit den echten Daten, Änderung ohne Neuladen. Punkt 85 (Adresse nur beim Start eingetragen) |
+| 4 – Echte Installation, Port 8080 | bestanden (08:50) nach einer Störung des Netzwerks: Um 08:29:35 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort des Routers, Punkt 84). Der installierte Kern startete um 08:32 ohne Netzwerk, trug keine Adresse ein und lauschte nur auf `127.0.0.1` mit Meldung im Fenster (richtiges Verhalten). Nach `nmcli connection up` (08:41) und Neustart des Kerns: `http://192.0.2.9:8080/…`, Browserquelle in OBS mit den echten Daten, Änderung ohne Neuladen. Punkt 85 (Adresse nur beim Start eingetragen) |
 | 5 – Aufräumen | bestanden (08:52) |
 
 Wunsch aus dem Handtest: E-29 (Browserquelle über obs-websocket in OBS anlegen), Baustein P10c.

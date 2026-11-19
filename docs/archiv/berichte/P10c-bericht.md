@@ -63,7 +63,7 @@ cd ~/DoNs_Streaming_Studio && git switch lotse/p10c && cmake --build build -j8 &
 ```
 
 1. Auf den OBS-Knopf im Kopfbereich klicken. Erwartet: Der Dialog «Einstellungen» öffnet sich.
-2. «Mit OBS verbinden» ankreuzen, Adresse `192.168.1.116`, Port `4455`, ein **falsches** Passwort, «OK». Erwartet: OBS-Knopf rot, Tooltip «OBS hat das Passwort abgelehnt. Im Dialog «Einstellungen» neu eingeben.».
+2. «Mit OBS verbinden» ankreuzen, Adresse `192.0.2.116`, Port `4455`, ein **falsches** Passwort, «OK». Erwartet: OBS-Knopf rot, Tooltip «OBS hat das Passwort abgelehnt. Im Dialog «Einstellungen» neu eingeben.».
 3. Dialog wieder öffnen. Erwartet: Passwortfeld leer, Platzhalter «gespeichert; leer lassen = behalten».
 4. Richtiges Passwort, «OK». Erwartet: Knopf grün, Tooltip «OBS: verbunden (OBS 33.0.1, Szene «…»)».
 
@@ -73,7 +73,7 @@ In OBS die Szene wechseln. Erwartet: Der Tooltip des OBS-Knopfes nennt innerhalb
 
 ### Prüfung 3 – Neustart von OBS
 
-1. OBS schliessen. Erwartet: Knopf rot, Tooltip «OBS unter 192.168.1.116:4455 nicht erreichbar. Neuer Versuch läuft.».
+1. OBS schliessen. Erwartet: Knopf rot, Tooltip «OBS unter 192.0.2.116:4455 nicht erreichbar. Neuer Versuch läuft.».
 2. OBS wieder öffnen. Erwartet: Knopf von selbst wieder grün, ohne Eingabe.
 
 ### Prüfung 4 – Quelle anlegen

@@ -157,7 +157,7 @@ const char *const kUsageTemplate =
     "einstellungen: Port und Adresse im Heimnetz des Kerns (kern.ini). Läuft der Kern, fragt dss-cli\n"
     "ihn; sonst liest es die Datei ~/.config/%1/kern.ini (nur lesen).\n"
     "einstellung-port, einstellung-adresse: ändern über den laufenden Kern (nur er schreibt die\n"
-    "Datei). PORT 1024 bis 32767; ADRESSE IPv4 wie 192.168.1.9, \"\" = leer (der Kern trägt\n"
+    "Datei). PORT 1024 bis 32767; ADRESSE IPv4 wie 192.0.2.9, \"\" = leer (der Kern trägt\n"
     "innerhalb von 2 s die Adresse der Standardroute ein, sobald es eine gibt); nur Adressen\n"
     "dieses PCs. Beides wirkt sofort (der Overlay-Server startet neu; in OBS dann die neue\n"
     "Adresse der Browserquelle eintragen).\n"

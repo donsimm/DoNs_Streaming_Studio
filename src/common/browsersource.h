@@ -11,7 +11,7 @@ namespace dss {
 
 // "/o/<adresse>/<token>/"
 QString browserSourcePath(const QString &address, const QString &token);
-// Ganze Adresse; host ist eine IPv4-Adresse wie 192.168.1.9.
+// Ganze Adresse; host ist eine IPv4-Adresse wie 192.0.2.9.
 QString browserSourceUrl(const QString &host, int port, const QString &address, const QString &token);
 // Pfad für das Protokoll: "/o/<adresse>/…" (Token ausgelassen).
 QString browserSourceLogPath(const QString &address);

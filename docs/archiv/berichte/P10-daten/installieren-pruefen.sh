@@ -26,21 +26,21 @@ cmp "$REPO/web/overlay.js" "$WORK/ziel/share/dons-streaming-studio/web/overlay.j
 grep -ho '"format_version": *[0-9]*' "$WORK"/daten/overlays/*.json | sort | uniq -c
 
 echo "== Installiertes dss-core mit Port $PORT ($(date '+%F %T'))"
-printf '[overlay-server]\nport=%s\nadresse-im-heimnetz=192.168.1.9\n' "$PORT" > "$WORK/kern.ini"
+printf '[overlay-server]\nport=%s\nadresse-im-heimnetz=192.0.2.9\n' "$PORT" > "$WORK/kern.ini"
 "$WORK/ziel/bin/dss-core" --datenordner "$WORK/daten" --einstellungen "$WORK/kern.ini" \
     --verbindung "${XDG_RUNTIME_DIR:-/tmp}/dss-p10-installtest.sock" 2> "$WORK/kern.log" &
 CORE=$!
-for _ in $(seq 50); do grep -q "lauscht auf 192.168.1.9" "$WORK/kern.log" && break; sleep 0.1; done
+for _ in $(seq 50); do grep -q "lauscht auf 192.0.2.9" "$WORK/kern.log" && break; sleep 0.1; done
 grep -E "gestartet|Einstellungen:|lauscht" "$WORK/kern.log"
 ss -ltnH "sport = :$PORT" | awk '{print "ss:", $4}'
 ID=f3ab0d90-c6d2-40d3-87a3-4251c27d5d51   # Overlay «format-drei»
 TOKEN=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['tokens'][sys.argv[2]])" "$WORK/daten/tokens.json" "$ID")
-BASE="http://192.168.1.9:$PORT/o/format-drei/$TOKEN"
+BASE="http://192.0.2.9:$PORT/o/format-drei/$TOKEN"
 code() { curl -s -o "$WORK/antwort" -w "%{http_code} %{content_type}" "$1"; }
 echo "Seite: $(code "$BASE/")";      cmp -s "$WORK/antwort" "$REPO/web/overlay.html" && echo "  = web/overlay.html"
 echo "overlay.js: $(code "$BASE/overlay.js")"
 echo "events: $(curl -s -m 1 "$BASE/events" | head -c 200 | grep -o '^event: overlay' | head -1)"
-echo "falscher Token: $(code "http://192.168.1.9:$PORT/o/format-drei/${TOKEN%?}x/")"
+echo "falscher Token: $(code "http://192.0.2.9:$PORT/o/format-drei/${TOKEN%?}x/")"
 grep -q "meta http-equiv=\"refresh\"" "$WORK/antwort" && echo "  = leere Seite"
 kill -TERM "$CORE"; wait "$CORE"; echo "dss-core Exit $?"
 grep -E "unbekannte Adresse|beendet" "$WORK/kern.log"

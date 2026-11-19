@@ -25,10 +25,10 @@
 //
 //   [overlay-server]
 //   port=8081
-//   adresse-im-heimnetz=192.168.1.9
+//   adresse-im-heimnetz=192.0.2.9
 //   [obs]
 //   aktiv=nein
-//   adresse=192.168.1.116
+//   adresse=192.0.2.116
 //   port=4455
 //   [ton-video]
 //   ausgang=alsa_output.usb-…
@@ -41,7 +41,7 @@
 //   client-id=…
 //   [kamera-dienst]
 //   aktiv=nein
-//   adresse=192.168.1.30
+//   adresse=192.0.2.30
 //   port=8093
 //
 // Das Passwort von OBS steht nie hier, sondern verschlüsselt in obs-passwort.cred (P10c, Regel 12).
@@ -210,7 +210,7 @@ QString detectHomeAddress(QString *interface = nullptr, QString *reason = nullpt
 // sortiert (QNetworkInterface::allAddresses).
 QStringList localIpv4Addresses();
 // Meldung, wenn address (gültig nach validateHomeAddress, nicht leer) keine Adresse dieses PCs
-// ist: «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»; sonst leer.
+// ist: «192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.0.2.9.»; sonst leer.
 QString checkLocalAddress(const QString &address, const QStringList &localAddresses);
 
 // P10, Punkt 77: Name der umbenannten ungültigen Datei, kern.ini.ungueltig-<JJJJ-MM-TT_hh-mm-ss>.

@@ -145,7 +145,7 @@ Grund (Regel 10): Nur das echte OBS auf dem Streaming-PC zeigt, ob die Browserqu
 Vorher: OBS läuft, kein Stream; Szene «test 2» aktiv machen (danach zurück). Aufruf auf dem Studio-PC, Zugangsdatei von Lotse (Name `obs-websocket`, Port 4455 ist Standard):
 
 ```
-cd ~/DoNs_Streaming_Studio && DSS_BILDVERGLEICH_OBS="192.168.1.116;test 2;$HOME/.config/lotse/obs-websocket.cred;obs-websocket" ctest --test-dir build -R '^tst_bildvergleich$' -V --output-log build/pruefung-p11/pruefung-n.log
+cd ~/DoNs_Streaming_Studio && DSS_BILDVERGLEICH_OBS="192.0.2.116;test 2;$HOME/.config/lotse/obs-websocket.cred;obs-websocket" ctest --test-dir build -R '^tst_bildvergleich$' -V --output-log build/pruefung-p11/pruefung-n.log
 ```
 
 Der Test legt die Quelle «DSS Bildvergleich» an und löscht sie am Ende wieder. Erwartung:

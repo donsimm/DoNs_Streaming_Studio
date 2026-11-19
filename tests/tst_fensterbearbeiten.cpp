@@ -1699,9 +1699,9 @@ private slots:
 
         // Ungültige Adresse: Meldung des Kerns im Dialog, Dialog bleibt offen, nichts geändert
         const int problemHeight = problem->height();
-        address->setText(QStringLiteral("192.168.1"));
+        address->setText(QStringLiteral("192.0.2"));
         QTest::mouseClick(ok, Qt::LeftButton);
-        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("Adresse «192.168.1» ungültig")), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(problem->text().contains(QStringLiteral("Adresse «192.0.2» ungültig")), 3000);
         QVERIFY(dialog->isVisible());
         QCOMPARE(problem->height(), problemHeight); // Meldung ändert das Layout nicht
         QVERIFY(ok->isEnabled());
@@ -1921,7 +1921,7 @@ private slots:
         QVERIFY(dialog->findChild<QFrame *>(QStringLiteral("propertySectionLine")));
         QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled(), 3000);
         QVERIFY(!enabled->isChecked());
-        QCOMPARE(host->placeholderText(), QStringLiteral("192.168.1.116"));
+        QCOMPARE(host->placeholderText(), QStringLiteral("192.0.2.116"));
         QCOMPARE(host->text(), QString());
         QCOMPARE(port->value(), 4455);
         QCOMPARE(password->echoMode(), QLineEdit::Password);
@@ -2166,7 +2166,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(ok->isEnabled() && enabled->isEnabled(), 3000);
         QVERIFY(host->isEnabled() && port->isEnabled());
         QVERIFY(!enabled->isChecked());
-        QCOMPARE(host->placeholderText(), QStringLiteral("192.168.1.30"));
+        QCOMPARE(host->placeholderText(), QStringLiteral("192.0.2.30"));
         QCOMPARE(host->text(), QString());
         QCOMPARE(port->value(), 8093);
         QTRY_VERIFY_WITH_TIMEOUT(m_client->cameraService()

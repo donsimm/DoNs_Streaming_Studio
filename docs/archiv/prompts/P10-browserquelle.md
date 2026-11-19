@@ -6,7 +6,7 @@ Lies zuerst `CLAUDE.md`, alle Dokumente unter `docs/` (besonders `docs/01-festle
 
 ## Ausgangslage
 
-P10-vor ist abgenommen (2026-11-03): Übernehmen von Dateien im eigenen Thread, `kern.ini` mit Port (8080 im Einsatz, 8081 in Arbeit) und «Adresse im Heimnetz», Dialog «Einstellungen», Bild der Leinwand (`dss_render`). Das Netzwerk zum Streaming-PC besteht (Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`). Jetzt kommt der Hauptweg der Ausgabe: die Browserquelle (E-12) mit dem zweiten Zeichner.
+P10-vor ist abgenommen (2026-11-03): Übernehmen von Dateien im eigenen Thread, `kern.ini` mit Port (8080 im Einsatz, 8081 in Arbeit) und «Adresse im Heimnetz», Dialog «Einstellungen», Bild der Leinwand (`dss_render`). Das Netzwerk zum Streaming-PC besteht (Studio-PC `192.0.2.9`, Streaming-PC `192.0.2.116`). Jetzt kommt der Hauptweg der Ausgabe: die Browserquelle (E-12) mit dem zweiten Zeichner.
 
 ## Teil A: Overlay-Server im Kern (Entscheide des Nutzers 2026-11-03)
 
@@ -39,14 +39,14 @@ P10-vor ist abgenommen (2026-11-03): Übernehmen von Dateien im eigenen Thread, 
 
 ## Teil D: Nacharbeiten aus P10-vor (Entscheide des Nutzers 2026-11-03)
 
-1. **Punkt 78:** Der Kern nimmt als «Adresse im Heimnetz» nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat; sonst Meldung im Dialog mit den Adressen dieses PCs (zum Beispiel «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»).
+1. **Punkt 78:** Der Kern nimmt als «Adresse im Heimnetz» nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat; sonst Meldung im Dialog mit den Adressen dieses PCs (zum Beispiel «192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.0.2.9.»).
 2. **Punkt 76:** Abgewiesene Einstellungen erscheinen nur im Dialog, nicht in der Statuszeile.
 3. **Punkt 77:** Bei ungültiger `kern.ini` bietet der Dialog den Knopf «Auf Standardwerte zurücksetzen»; der Kern benennt die alte Datei in `kern.ini.ungueltig-<JJJJ-MM-TT_hh-mm-ss>` um, schreibt eine neue mit Standardwerten und trägt die Adresse im Heimnetz wieder selbst ein.
 
 ## Tests
 
 - Ohne Fenster: Prüfung des Tokens, alte und unbekannte Adressen (leere Seite, kein Token im Protokoll), Adresse nur von diesem PC (Punkt 78), `kern.ini` zurücksetzen (Punkt 77), Port belegt (Meldung), Server auf IPv4 und nicht auf IPv6 (mit `ss -ltn` oder gleichwertig belegen).
-- **Stufe 1 der Prüfung (Entscheid des Nutzers):** ein Testprogramm auf Basis von Qt WebEngine (schon installiert, `docs/02-umgebung.md`) lädt die Seite über `http://192.168.1.9:<Port>/…`, also über die echte Netzwerkkarte, und greift das Bild mit Durchsichtigkeit ab (Weg aus P02, M2). Geprüft werden: Bild gegen das Bild der Leinwand (`dss_render`) mit den Testdaten `tests/daten/exif/` und `tests/daten/video-drehung/`, Text, Spiegeln, Drehung; Änderung im Editor erscheint ohne Neuladen (Zeit messen); Ausgabe aus und wieder ein; neuer Token; Wiederverbinden nach Neustart des Kerns. Abweichungen zwischen den Zeichnern mit Zahlen nennen (die feste Grenze kommt mit P11).
+- **Stufe 1 der Prüfung (Entscheid des Nutzers):** ein Testprogramm auf Basis von Qt WebEngine (schon installiert, `docs/02-umgebung.md`) lädt die Seite über `http://192.0.2.9:<Port>/…`, also über die echte Netzwerkkarte, und greift das Bild mit Durchsichtigkeit ab (Weg aus P02, M2). Geprüft werden: Bild gegen das Bild der Leinwand (`dss_render`) mit den Testdaten `tests/daten/exif/` und `tests/daten/video-drehung/`, Text, Spiegeln, Drehung; Änderung im Editor erscheint ohne Neuladen (Zeit messen); Ausgabe aus und wieder ein; neuer Token; Wiederverbinden nach Neustart des Kerns. Abweichungen zwischen den Zeichnern mit Zahlen nennen (die feste Grenze kommt mit P11).
 - Last: ein Overlay mit 10 Quellen, darunter 2 Videos, 1080p30: CPU und Speicher von Kern und Testprogramm messen.
 - Ob eine Firewall auf dem Studio-PC den Port sperrt, prüfen und nennen (nichts ändern ohne Rückfrage).
 - `tst_medien` und `tst_fensterbearbeiten` je 50 Mal; Startprüfung `--runs 20`; `ctest` auch in einem frischen Klon.

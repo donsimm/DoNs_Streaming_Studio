@@ -962,7 +962,7 @@ private slots:
         QFile tcp(proc.filePath(QStringLiteral("net/tcp")));
         QVERIFY(tcp.open(QIODevice::WriteOnly));
         tcp.write("  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
-                  "   0: 0901A8C0:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 777001 1\n"
+                  "   0: 090200C0:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 777001 1\n"
                   "   1: 0100007F:1F91 00000000:0000 01 00000000:00000000 00:00000000 00000000  1000        0 777002 1\n");
         tcp.close();
         const QString installed = proc.filePath(QStringLiteral("opt/dons-streaming-studio"));

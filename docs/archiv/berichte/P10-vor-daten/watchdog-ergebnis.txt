@@ -10,7 +10,7 @@ Exit Python: 0
 PID vorher 334255, nachher 334255 (gleich), NRestarts=0
 Starting dss-core-watchdogtest.service - DoNs Streaming Studio – Kern (dss-core, Entwicklung)...
 2026-11-03 21:13:32.516 info Einstellungen: <Arbeit>/config/kern.ini angelegt
-2026-11-03 21:13:32.516 info Einstellungen: Port 8081, Adresse im Heimnetz 192.168.1.9 (<Arbeit>/config/kern.ini)
+2026-11-03 21:13:32.516 info Einstellungen: Port 8081, Adresse im Heimnetz 192.0.2.9 (<Arbeit>/config/kern.ini)
 2026-11-03 21:13:32.516 info Datenordner <Arbeit>/daten: 1 Overlays geladen
 2026-11-03 21:13:32.517 info Verbindung offen: /run/user/1000/dss-watchdogtest.sock
 2026-11-03 21:13:32.517 info systemd: Watchdog 10000 ms, Meldung alle 5000 ms

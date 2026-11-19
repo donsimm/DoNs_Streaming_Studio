@@ -59,7 +59,7 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     m_obsEnabled->setObjectName(QStringLiteral("settingsObsEnabled"));
     m_obsHost = new QLineEdit(this);
     m_obsHost->setObjectName(QStringLiteral("settingsObsHost"));
-    m_obsHost->setPlaceholderText(QStringLiteral("192.168.1.116"));
+    m_obsHost->setPlaceholderText(QStringLiteral("192.0.2.116"));
     m_obsPort = new QSpinBox(this);
     m_obsPort->setObjectName(QStringLiteral("settingsObsPort"));
     m_obsPort->setRange(dss::kObsPortMin, dss::kObsPortMax);
@@ -136,7 +136,7 @@ SettingsDialog::SettingsDialog(dss::CoreClient *client, QWidget *parent)
     m_cameraEnabled->setObjectName(QStringLiteral("settingsCameraEnabled"));
     m_cameraHost = new QLineEdit(this);
     m_cameraHost->setObjectName(QStringLiteral("settingsCameraHost"));
-    m_cameraHost->setPlaceholderText(QStringLiteral("192.168.1.30"));
+    m_cameraHost->setPlaceholderText(QStringLiteral("192.0.2.30"));
     m_cameraPort = new QSpinBox(this);
     m_cameraPort->setObjectName(QStringLiteral("settingsCameraPort"));
     m_cameraPort->setRange(dss::kObsPortMin, dss::kObsPortMax); // wie validateCameraPort im Kern

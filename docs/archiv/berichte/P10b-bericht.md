@@ -46,7 +46,7 @@ Datei `<Datenordner>/medien.json`, `format_version` 1 (Code `src/common/medialib
 
 ### Adresse im Heimnetz (A 5, Punkt 85)
 
-`HomeAddressWatcher` (`src/common/coresettings.h/.cpp`) ruft alle 2 s `CoreSettingsStore::fillMissingHomeAddress` auf: Bei gültiger Datei und leerer Adresse trägt er die Adresse der Standardroute ein, schreibt `kern.ini`, und der Kern schickt `settings` an alle und startet den Server neu (`settingsApplied`). Protokoll: «Einstellungen: Adresse im Heimnetz 192.168.1.9 eingetragen (Netzwerkkarte enp3s0 der Standardroute, ohne Neustart)». Geprüft ohne Netzwerk mit vorgegebener Route und Liste der lokalen Adressen (`tst_kerneinstellungen`: keine Route, dann Karte ohne IPv4, dann mit 192.168.1.9) und mit Kern (`tst_kernverbindung::settingsReadAndChange`: leere Adresse über `update_settings`, nach höchstens 2 s wieder eingetragen). Der echte Fall mit Kabel ist nicht geprüft.
+`HomeAddressWatcher` (`src/common/coresettings.h/.cpp`) ruft alle 2 s `CoreSettingsStore::fillMissingHomeAddress` auf: Bei gültiger Datei und leerer Adresse trägt er die Adresse der Standardroute ein, schreibt `kern.ini`, und der Kern schickt `settings` an alle und startet den Server neu (`settingsApplied`). Protokoll: «Einstellungen: Adresse im Heimnetz 192.0.2.9 eingetragen (Netzwerkkarte enp3s0 der Standardroute, ohne Neustart)». Geprüft ohne Netzwerk mit vorgegebener Route und Liste der lokalen Adressen (`tst_kerneinstellungen`: keine Route, dann Karte ohne IPv4, dann mit 192.0.2.9) und mit Kern (`tst_kernverbindung::settingsReadAndChange`: leere Adresse über `update_settings`, nach höchstens 2 s wieder eingetragen). Der echte Fall mit Kabel ist nicht geprüft.
 
 ### Schnittstelle und `dss-cli` (A 6)
 
@@ -182,7 +182,7 @@ Im zweiten Versuch scheiterte `usableWhileImportingLargeFile` 6 Mal an derselben
 cd ~/DoNs_Streaming_Studio && python3 scripts/startpruefung.py --runs 20 --out <Notizordner>/start/startpruefung
 ```
 
-2026-11-04 12:42:31 bis 12:44:45, Stand `9641893`, `DISPLAY=:0.0`, Exit 0. `dss-core-entwicklung.service` lief daneben (Port 8081). Die Kerne der Prüfung lauschten auf Port 32488 (32000 + PID % 768, Punkt 83), auf 127.0.0.1 und 192.168.1.9 (Protokoll in `startpruefung-core-sigterm.json`). Ergebnisse in `docs/berichte/P10b-daten/startpruefung-*.md` und `.json`.
+2026-11-04 12:42:31 bis 12:44:45, Stand `9641893`, `DISPLAY=:0.0`, Exit 0. `dss-core-entwicklung.service` lief daneben (Port 8081). Die Kerne der Prüfung lauschten auf Port 32488 (32000 + PID % 768, Punkt 83), auf 127.0.0.1 und 192.0.2.9 (Protokoll in `startpruefung-core-sigterm.json`). Ergebnisse in `docs/berichte/P10b-daten/startpruefung-*.md` und `.json`.
 
 | Fall | sauber | Start ms (min / Median / max) | Ende ms (min / Median / max) |
 |---|---|---|---|
@@ -199,7 +199,7 @@ Alle Läufe: Exit-Code 0, Fenster sichtbar (Fälle mit `dss-app`), keine Restpro
 cd ~/DoNs_Streaming_Studio && python3 scripts/dienstpruefung.py --kills 5 --out <Notizordner>/dienstN
 ```
 
-`dss-core-entwicklung.service` lief daneben. Die Prüfeinheit `dss-core-pruefung.service` nutzte eine eigene `kern.ini` mit Port 32505 (Journal: «Overlay-Server lauscht auf 127.0.0.1:32505» und «192.168.1.9:32505»). Alle Ausgaben in `docs/berichte/P10b-daten/dienstpruefung.txt`.
+`dss-core-entwicklung.service` lief daneben. Die Prüfeinheit `dss-core-pruefung.service` nutzte eine eigene `kern.ini` mit Port 32505 (Journal: «Overlay-Server lauscht auf 127.0.0.1:32505» und «192.0.2.9:32505»). Alle Ausgaben in `docs/berichte/P10b-daten/dienstpruefung.txt`.
 
 | Lauf | Stand | Beginn | Ergebnis |
 |---|---|---|---|
@@ -341,7 +341,7 @@ Begründung nach Regel 8:
   - `docs/04-offene-punkte.md`, `docs/06-overlay-format.md`, `docs/07-bauplan.md`, `docs/08-kern-schnittstelle.md`
 - Ausserhalb des Repos:
   - Nur für Tests, wieder entfernt: Testkerne mit Datenordnern und `kern.ini` in temporären Ordnern und im Notizordner, Sockets unter `/run/user/1000/`, Testeinheiten `dss-core-installtest.service` und `dss-core-pruefung.service`.
-  - `dss-core-entwicklung.service` habe ich um 10:12 gestartet (lief vorher nicht) und am Ende angehalten. Dabei legte der Kern `~/.local/share/dons-streaming-studio-entwicklung` (leer) und `~/.config/dons-streaming-studio-entwicklung/kern.ini` (Port 8081, Adresse 192.168.1.9) an.
+  - `dss-core-entwicklung.service` habe ich um 10:12 gestartet (lief vorher nicht) und am Ende angehalten. Dabei legte der Kern `~/.local/share/dons-streaming-studio-entwicklung` (leer) und `~/.config/dons-streaming-studio-entwicklung/kern.ini` (Port 8081, Adresse 192.0.2.9) an.
   - Zwei verwaiste Testkerne von `tst_fensterbearbeiten` (gestartet 10:04 und 10:05, aus Läufen, die an einer Prüfzeile abstürzten) habe ich um 10:23 beendet und ihre Ordner in `/tmp` gelöscht (Punkt 87).
   - Die echten Daten, `~/.local/opt` und `~/.config/dons-streaming-studio` habe ich nicht verändert (Prüfsummen oben). Die echte `fenster.ini` hat der Test nur als Kopie gelesen.
 

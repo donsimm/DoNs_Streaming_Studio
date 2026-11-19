@@ -288,7 +288,7 @@ Adresse der Browserquelle des Overlays, nach dem das Fenster mit `get_browser_so
 | `problem` | Text oder `null` | warum es keine Adresse gibt: «Kein Overlay mit dieser Kennung.», «Das Overlay hat keinen Token. «Neuer Token» erzeugt einen.», «Der Kern hat keine Einstellungen.», «Keine Adresse im Heimnetz eingestellt (Dialog «Einstellungen»).» |
 
 ```json
-{"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618","problem":null,"type":"browser_source","url":"http://192.168.1.9:24901/o/test-szene/<token>/"}
+{"overlay_id":"58de1c10-461d-43b7-bbeb-80532319b618","problem":null,"type":"browser_source","url":"http://192.0.2.9:24901/o/test-szene/<token>/"}
 ```
 
 (aufgezeichnet am 2026-11-04 mit einem Kern mit eigenem Datenordner und Port 24901; Token hier ersetzt.)
@@ -302,11 +302,11 @@ Zustand des Overlay-Servers, nach dem `hello` und bei jeder Änderung an **alle*
 | `enabled` | true/false | `false`, wenn der Kern ohne Server gebaut ist (`DSS_CORE_OVERLAY_SERVER=OFF`) |
 | `listening` | Liste von Text | wo der Server lauscht, zum Beispiel `127.0.0.1:8081` |
 | `problems` | Liste von Text | Meldungen auf Deutsch: Port belegt (mit dem Programm, Abschnitt «Overlay-Server»), Adresse im Heimnetz fehlt oder ist gerade nicht vorhanden, Lauschen fehlgeschlagen |
-| `invalid_use` | Text oder `null` | Hinweis, dass eine Browserquelle eine ungültige Adresse benutzt (30 s lang nach der letzten solchen Anfrage), ohne Token: «Eine Browserquelle (192.168.1.116) benutzt eine ungültige Adresse (/o/szene/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.» |
+| `invalid_use` | Text oder `null` | Hinweis, dass eine Browserquelle eine ungültige Adresse benutzt (30 s lang nach der letzten solchen Anfrage), ohne Token: «Eine Browserquelle (192.0.2.116) benutzt eine ungültige Adresse (/o/szene/…). In OBS die Adresse aus «Kopieren» im Dock «Steuerung» eintragen.» |
 | `pages` | Objekt | verbundene Seiten je Overlay: Schlüssel Kennung, Wert Anzahl (nur Overlays mit mindestens einer) |
 
 ```json
-{"enabled":true,"invalid_use":null,"listening":["127.0.0.1:24901","192.168.1.9:24901"],"pages":{},"problems":[],"type":"server_status"}
+{"enabled":true,"invalid_use":null,"listening":["127.0.0.1:24901","192.0.2.9:24901"],"pages":{},"problems":[],"type":"server_status"}
 ```
 
 ### `media_list` (seit Version 10, P10b)
@@ -777,7 +777,7 @@ Einstellungen des Kerns stehen in `kern.ini` im Ordner der Einstellungen der Ver
 ```ini
 [overlay-server]
 port=8081
-adresse-im-heimnetz=192.168.1.9
+adresse-im-heimnetz=192.0.2.9
 
 [obs]
 aktiv=nein
@@ -801,7 +801,7 @@ port=8093
 | Wert | Festlegung |
 |---|---|
 | `port` | Port des Overlay-Servers. Standard 8080 im Einsatz, 8081 in Arbeit (beide Versionen können gleichzeitig laufen). Gültig **1024 bis 32767**: Ports unter 1024 darf unter Linux nur ein Prozess mit besonderen Rechten öffnen (`/proc/sys/net/ipv4/ip_unprivileged_port_start` = 1024); ab 32768 vergibt Linux Ports für ausgehende Verbindungen (`/proc/sys/net/ipv4/ip_local_port_range` = 32768 60999), ein Port dort kann beim Start des Servers zufällig belegt sein. Werte gemessen auf dem Studio-PC am 2026-11-03 mit `cat`. Quelle: ip(7), https://man7.org/linux/man-pages/man7/ip.7.html |
-| `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Ist sie leer (beim Start oder später, zum Beispiel ohne Kabel beim Start), prüft der Kern seit P10b (Punkt 85) alle 2 s die Standardroute und trägt, sobald es eine gibt, die Adresse ihrer Netzwerkkarte ein, schreibt die Datei, schickt `settings` an alle und startet den Overlay-Server mit der Adresse neu (`HomeAddressWatcher` in `src/common/coresettings.h`); ein Neustart ist nicht nötig. Eine eingetragene Adresse ermittelt er nie neu. Bei ungültiger Datei trägt er nichts ein. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch nach 2 s. Seit P10 (Punkt 78) nimmt `update_settings` nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, IPv4 ohne 127.x.x.x), sonst «192.168.1.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.168.1.9.»; die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt (Kabel) |
+| `adresse-im-heimnetz` | IPv4-Adresse des Studio-PCs, vier Zahlen 0 bis 255 ohne führende Nullen; nicht 0.0.0.0, 127.x.x.x und ab 224.0.0.0. Leer erlaubt. Ist sie leer (beim Start oder später, zum Beispiel ohne Kabel beim Start), prüft der Kern seit P10b (Punkt 85) alle 2 s die Standardroute und trägt, sobald es eine gibt, die Adresse ihrer Netzwerkkarte ein, schreibt die Datei, schickt `settings` an alle und startet den Overlay-Server mit der Adresse neu (`HomeAddressWatcher` in `src/common/coresettings.h`); ein Neustart ist nicht nötig. Eine eingetragene Adresse ermittelt er nie neu. Bei ungültiger Datei trägt er nichts ein. Standardroute: die erste Zeile in `/proc/net/route` mit `Destination` und `Mask` 00000000 und gesetztem Flag `RTF_UP` (0x0001, `/usr/include/linux/route.h`) (wie die LAN-Anzeige, `defaultRouteInterface` in `src/common/systemstats.h`; Quelle: proc_pid_net(5), https://man7.org/linux/man-pages/man5/proc_pid_net.5.html, und route(8)), Adresse: die erste IPv4-Adresse dieser Karte, die nicht 127.x.x.x und nicht 169.254.x.x ist (`QNetworkInterface::interfaceFromName`, https://doc.qt.io/qt-6.8/qnetworkinterface.html). Ohne IPv4-Standardroute bleibt der Wert leer (Warnung im Protokoll), neuer Versuch nach 2 s. Seit P10 (Punkt 78) nimmt `update_settings` nur eine Adresse an, die eine Netzwerkkarte dieses PCs gerade hat (`QNetworkInterface::allAddresses`, IPv4 ohne 127.x.x.x), sonst «192.0.2.1 gehört nicht zu diesem PC. Adressen dieses PCs: 192.0.2.9.»; die bisherige Adresse darf bleiben, auch wenn sie gerade fehlt (Kabel) |
 | `[obs] aktiv` | `ja` oder `nein`, Standard `nein`. «Mit OBS verbinden» im Dialog; braucht eine Adresse (P10c) |
 | `[obs] adresse` | Adresse von obs-websocket auf dem Streaming-PC: Buchstaben, Ziffern, `.` und `-`, leer erlaubt. Nicht auf Adressen dieses PCs beschränkt, die Tests nutzen `127.0.0.1` |
 | `[obs] port` | Port von obs-websocket, 1 bis 65535, Standard 4455 |
@@ -851,7 +851,7 @@ Felder: `request_id` (wie bei Änderungen), dazu mindestens eines von `port` (ga
 
 ```json
 {"type":"update_settings","request_id":9,"port":8090}
-{"type":"update_settings","request_id":10,"home_address":"192.168.1.9"}
+{"type":"update_settings","request_id":10,"home_address":"192.0.2.9"}
 {"type":"update_settings","request_id":11,"audio_routes":{"video":{"output":"alsa_output.<gerät>.analog-stereo","offset_ms":-40}}}
 ```
 
@@ -896,7 +896,7 @@ Nach `hello` und bei jeder Änderung von Zustand, Meldung oder Stand an alle.
 | Feld | Typ | Inhalt |
 |---|---|---|
 | `state` | Text | `off` (aus), `connecting`, `connected`, `error`, `unavailable` (Kern ohne Kamera-Dienst gebaut, `DSS_CORE_CAMERA` aus) |
-| `message` | Text oder `null` | Meldung zum Zustand, zum Beispiel «Kamera-Dienst unter 192.168.1.30:8093 nicht erreichbar. Neuer Versuch läuft.», bei `off` «Nicht eingerichtet oder abgeschaltet»; `null`, wenn verbunden |
+| `message` | Text oder `null` | Meldung zum Zustand, zum Beispiel «Kamera-Dienst unter 192.0.2.30:8093 nicht erreichbar. Neuer Versuch läuft.», bei `off` «Nicht eingerichtet oder abgeschaltet»; `null`, wenn verbunden |
 | `status` | Objekt | letzter Stand von `GET status` des Dienstes, nachgeführt mit seinen Ereignissen `status`, `presets` (Listen nur mit `id` und `name`) und `lights`; bleibt bei `error` erhalten, leer bei `off`, nach neuen Einstellungen und bei `unavailable` |
 
 ```json
@@ -945,7 +945,7 @@ Der Kern liefert jedem Overlay eine Webseite für die Browserquelle in OBS (E-12
 | Punkt | Festlegung |
 |---|---|
 | Technik | eigener kleiner HTTP/1.1-Server auf `QTcpServer` (Qt Network ist schon da; Qt HttpServer und Qt WebSockets sind nicht installiert, Regel 5). Änderungen als Server-Sent Events (`text/event-stream`): Der Kern schickt nur zur Seite, `EventSource` verbindet sich von selbst neu (https://html.spec.whatwg.org/multipage/server-sent-events.html). HTTP/1.1 nach RFC 9110 und RFC 9112 (https://www.rfc-editor.org/rfc/rfc9110, https://www.rfc-editor.org/rfc/rfc9112) |
-| Adressen | nur IPv4: ein `QTcpServer` je Adresse, auf `127.0.0.1` und der «Adresse im Heimnetz» aus `kern.ini`, nie `QHostAddress::Any` (das nimmt auch IPv6 an). Port aus `kern.ini`. Gemessen am 2026-11-04 mit `ss -ltnH "sport = :24901"`: `192.168.1.9:24901` und `127.0.0.1:24901`; `ss -ltn6H` leer |
+| Adressen | nur IPv4: ein `QTcpServer` je Adresse, auf `127.0.0.1` und der «Adresse im Heimnetz» aus `kern.ini`, nie `QHostAddress::Any` (das nimmt auch IPv6 an). Port aus `kern.ini`. Gemessen am 2026-11-04 mit `ss -ltnH "sport = :24901"`: `192.0.2.9:24901` und `127.0.0.1:24901`; `ss -ltn6H` leer |
 | Neue Einstellungen | Port oder Adresse geändert: Server schliesst alle Verbindungen und lauscht neu |
 | Port belegt | Meldung in `server_status.problems` und im Protokoll (Warnung), zum Beispiel «Port 8081 ist belegt, vermutlich von DoNs Streaming Studio in Arbeit (/home/dominik/DoNs_Streaming_Studio/build/src/core/dss-core) (Prozess 1234). Die Browserquelle ist nicht erreichbar. Anderen Port im Dialog «Einstellungen» wählen oder das Programm beenden.» Das Programm findet der Kern über `/proc/net/tcp` und `/proc/net/tcp6` (Zeilen im Zustand `0A` = LISTEN mit dem Port, Inode) und die Links `/proc/<pid>/fd/*` → `socket:[<inode>]`; heisst das Programm (`/proc/<pid>/exe`) `dss-core` und liegt unter `~/.local/opt/dons-streaming-studio/`, heisst es «im Einsatz», ein anderer `dss-core` «in Arbeit (Pfad)», sonst «von «Dateiname»»; ohne Zugriff (Prozess eines anderen Benutzers) «von einem Programm, das sich nicht feststellen lässt». Neuer Versuch alle 2 s. Quellen: https://docs.kernel.org/networking/proc_net_tcp.html, proc_pid_fd(5) https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html, proc_pid_exe(5) https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html |
 | Adresse fehlt | Ist die Adresse im Heimnetz leer oder gerade auf keiner Karte (Kabel), lauscht der Server nur auf `127.0.0.1`, meldet das in `server_status.problems` und prüft alle 2 s, ob sie da ist; dann lauscht er von selbst auch dort (Protokoll «Overlay-Server: Adresse im Heimnetz … ist da») |

@@ -14,10 +14,10 @@ overlay.js wie im Repo
       4 "format_version": 4
 == Installiertes dss-core mit Port 24950 (2026-11-04 02:06:51)
 2026-11-04 02:06:51.143 info dss-core 0.1.0 (Einsatz, Commit 327dfc6-geändert) gestartet, Qt 6.8.2
-2026-11-04 02:06:51.143 info Einstellungen: Port 24950, Adresse im Heimnetz 192.168.1.9 (<Notizordner>/p10/inst/kern.ini)
+2026-11-04 02:06:51.143 info Einstellungen: Port 24950, Adresse im Heimnetz 192.0.2.9 (<Notizordner>/p10/inst/kern.ini)
 2026-11-04 02:06:51.144 info Overlay-Server lauscht auf 127.0.0.1:24950
-2026-11-04 02:06:51.145 info Overlay-Server lauscht auf 192.168.1.9:24950
-ss: 192.168.1.9:24950
+2026-11-04 02:06:51.145 info Overlay-Server lauscht auf 192.0.2.9:24950
+ss: 192.0.2.9:24950
 ss: 127.0.0.1:24950
 Seite: 200 text/html; charset=utf-8
   = web/overlay.html
@@ -26,7 +26,7 @@ events: event: overlay
 falscher Token: 200 text/html; charset=utf-8
   = leere Seite
 dss-core Exit 0
-2026-11-04 02:06:52.273 warning Browserquelle: unbekannte Adresse /o/format-drei/… von 192.168.1.9
+2026-11-04 02:06:52.273 warning Browserquelle: unbekannte Adresse /o/format-drei/… von 192.0.2.9
 2026-11-04 02:06:52.276 info beendet, Exit-Code 0
 Token im Protokoll (Anzahl): 0
 Testeinheit entfernt

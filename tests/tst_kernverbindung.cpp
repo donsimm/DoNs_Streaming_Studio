@@ -412,8 +412,8 @@ private slots:
         const QList<QPair<QByteArray, QString>> invalid = {
             {"{\"type\":\"update_settings\",\"request_id\":1,\"port\":80}", QStringLiteral("Port 80 ungültig")},
             {"{\"type\":\"update_settings\",\"request_id\":2,\"port\":40000}", QStringLiteral("Port 40000 ungültig")},
-            {"{\"type\":\"update_settings\",\"request_id\":3,\"home_address\":\"192.168.1\"}",
-             QStringLiteral("Adresse «192.168.1» ungültig")},
+            {"{\"type\":\"update_settings\",\"request_id\":3,\"home_address\":\"192.0.2\"}",
+             QStringLiteral("Adresse «192.0.2» ungültig")},
             {"{\"type\":\"update_settings\",\"request_id\":4,\"port\":9000,\"home_address\":\"127.0.0.1\"}",
              QStringLiteral("keine Adresse im Heimnetz")},
             {"{\"type\":\"update_settings\",\"request_id\":5}", QStringLiteral("update_settings ohne Wert")},

@@ -43,7 +43,7 @@ Hinweis: `tst_fensterbearbeiten` scheiterte im 50er-Lauf einmal mit «im Streamz
 
 ## Netzwerk
 
-Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Mit P10c führt der Kern die Adresse in OBS nach, sobald sie abgenommen ist.
+Studio-PC `192.0.2.9`, Streaming-PC `192.0.2.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Mit P10c führt der Kern die Adresse in OBS nach, sobald sie abgenommen ist.
 
 Seit 2026-11-08 läuft auf dem Streaming-PC das Zielsystem Nobara 44 GNOME (Wayland), Kernel 7.3.1, alle Updates installiert. Dazu laufen OBS 32.2.2 (rpm) und obs-websocket 5.7.4 auf Port 4455 mit Anmeldung, vom Studio-PC aus erreichbar (von Lotse geprüft, ohne Anmeldung). Die Firewall lässt 1025–65535 offen, die Grafik ist eine RTX 4090 mit NVIDIA 595, ein NDI-Plugin fehlt. Die OBS-Einstellung (Host, Port, Passwort) gibt es erst in `lotse/p10c`, sie gehört zum Handtest. `docs/02-umgebung.md` nennt noch Zorin und muss nachgeführt werden. Lotse liest per SSH mit (`CLAUDE.md`, Zeile 30).
 

@@ -55,7 +55,7 @@ P10a, P10-vor und P10 sind abgenommen, einschliesslich Handtest. Die Browserquel
 
 **Echte Daten:** Laut Nutzer (2026-11-03) ist im Datenordner noch nichts Wichtiges. Der Nutzer meldet, ab wann die Software offiziell im Einsatz ist. Regel 18 gilt schon jetzt.
 
-**Netzwerk:** Studio-PC `192.168.1.9`, Streaming-PC `192.168.1.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Am 2026-11-04 um 08:29 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort, Punkt 84); `nmcli connection up "Wired connection 1"` holte sie zurück.
+**Netzwerk:** Studio-PC `192.0.2.9`, Streaming-PC `192.0.2.116`, beide Kabel, am Router reserviert (`docs/02-umgebung.md`). Am 2026-11-04 um 08:29 verlor der Studio-PC seine IPv4-Adresse (DHCP ohne Antwort, Punkt 84); `nmcli connection up "Wired connection 1"` holte sie zurück.
 
 **Als Nächstes, in dieser Reihenfolge:**
 

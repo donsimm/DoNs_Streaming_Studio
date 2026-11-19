@@ -91,7 +91,7 @@ QString validateHomeAddress(const QString &address)
 {
     if (address.isEmpty())
         return {};
-    // Nur die übliche Schreibweise; QHostAddress nähme auch «1» oder «192.168.1» an (inet_aton).
+    // Nur die übliche Schreibweise; QHostAddress nähme auch «1» oder «192.0.2» an (inet_aton).
     static const QRegularExpression form(QStringLiteral(
         "\\A(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\z"));
     const QRegularExpressionMatch m = form.match(address);
@@ -99,7 +99,7 @@ QString validateHomeAddress(const QString &address)
     for (int i = 1; ok && i <= 4; ++i)
         ok = m.captured(i).toInt() <= 255;
     if (!ok)
-        return QStringLiteral("Adresse «%1» ungültig, erwartet ist eine IPv4-Adresse wie 192.168.1.9.")
+        return QStringLiteral("Adresse «%1» ungültig, erwartet ist eine IPv4-Adresse wie 192.0.2.9.")
             .arg(address);
     const int first = m.captured(1).toInt();
     if (address == QLatin1String("0.0.0.0") || first == 127 || first >= 224)
@@ -123,7 +123,7 @@ bool isRemoteHostForm(const QString &host)
 QString validateObsHost(const QString &host)
 {
     if (!isRemoteHostForm(host))
-        return QStringLiteral("Adresse von OBS «%1» ungültig, erwartet ist eine Adresse wie 192.168.1.116.")
+        return QStringLiteral("Adresse von OBS «%1» ungültig, erwartet ist eine Adresse wie 192.0.2.116.")
             .arg(host);
     return {};
 }
@@ -139,7 +139,7 @@ QString validateObsPort(int port)
 QString validateCameraHost(const QString &host)
 {
     if (!isRemoteHostForm(host))
-        return QStringLiteral("Adresse des Kamera-Dienstes «%1» ungültig, erwartet ist eine Adresse wie 192.168.1.30.")
+        return QStringLiteral("Adresse des Kamera-Dienstes «%1» ungültig, erwartet ist eine Adresse wie 192.0.2.30.")
             .arg(host);
     return {};
 }

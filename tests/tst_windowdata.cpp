@@ -119,15 +119,15 @@ private slots:
 
     void settingsForm()
     {
-        const CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        const CoreSettings current{8081, QStringLiteral("192.0.2.9")};
         const auto form = [](int port, const QString &address) {
             SettingsForm f;
             f.port = port;
             f.address = address;
             return f;
         };
-        QVERIFY(!settingsUpdateFromForm(current, form(8081, QStringLiteral(" 192.168.1.9 ")), false));
-        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, form(8090, QStringLiteral("192.168.1.9")), false);
+        QVERIFY(!settingsUpdateFromForm(current, form(8081, QStringLiteral(" 192.0.2.9 ")), false));
+        std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, form(8090, QStringLiteral("192.0.2.9")), false);
         QVERIFY(u);
         QCOMPARE(u->port, std::optional<int>(8090));
         QVERIFY(!u->homeAddress);
@@ -148,23 +148,23 @@ private slots:
     // P10c: Bereich «OBS» im Dialog
     void settingsFormObs()
     {
-        CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        CoreSettings current{8081, QStringLiteral("192.0.2.9")};
         SettingsForm f;
         f.port = 8081;
-        f.address = QStringLiteral("192.168.1.9");
+        f.address = QStringLiteral("192.0.2.9");
         QVERIFY(!settingsUpdateFromForm(current, f, false));
         // Einzeln, nur Geändertes; Adresse ohne Leerzeichen am Rand
         f.obsEnabled = true;
-        f.obsHost = QStringLiteral(" 192.168.1.116 ");
+        f.obsHost = QStringLiteral(" 192.0.2.116 ");
         f.obsPort = 4456;
         std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
         QVERIFY(u && !u->port && !u->homeAddress && !u->obsPassword);
         QCOMPARE(u->obsEnabled, std::optional<bool>(true));
-        QCOMPARE(u->obsHost, std::optional<QString>(QStringLiteral("192.168.1.116")));
+        QCOMPARE(u->obsHost, std::optional<QString>(QStringLiteral("192.0.2.116")));
         QCOMPARE(u->obsPort, std::optional<int>(4456));
         // Leer = behalten; «Passwort löschen» schickt leer; ein neues Passwort geht vor
         current.obsEnabled = true;
-        current.obsHost = QStringLiteral("192.168.1.116");
+        current.obsHost = QStringLiteral("192.0.2.116");
         current.obsPort = 4456;
         QVERIFY(!settingsUpdateFromForm(current, f, false));
         f.deleteObsPassword = true;
@@ -198,20 +198,20 @@ private slots:
     // P15 d3: Bereich «Kamera-Dienst»; nur geänderte Werte, Adresse ohne Leerzeichen am Rand.
     void settingsFormCamera()
     {
-        CoreSettings current{8081, QStringLiteral("192.168.1.20")};
+        CoreSettings current{8081, QStringLiteral("192.0.2.20")};
         SettingsForm f;
         f.port = 8081;
-        f.address = QStringLiteral("192.168.1.20");
+        f.address = QStringLiteral("192.0.2.20");
         QCOMPARE(f.cameraPort, 8093);
         QVERIFY(!settingsUpdateFromForm(current, f, false));
         f.cameraEnabled = true;
-        f.cameraHost = QStringLiteral(" 192.168.1.30 ");
+        f.cameraHost = QStringLiteral(" 192.0.2.30 ");
         std::optional<SettingsUpdate> u = settingsUpdateFromForm(current, f, false);
         QVERIFY(u && !u->port && !u->obsEnabled && !u->twitchEnabled && !u->cameraPort);
         QCOMPARE(u->cameraEnabled, std::optional<bool>(true));
-        QCOMPARE(u->cameraHost, std::optional<QString>(QStringLiteral("192.168.1.30")));
+        QCOMPARE(u->cameraHost, std::optional<QString>(QStringLiteral("192.0.2.30")));
         current.cameraEnabled = true;
-        current.cameraHost = QStringLiteral("192.168.1.30");
+        current.cameraHost = QStringLiteral("192.0.2.30");
         QVERIFY(!settingsUpdateFromForm(current, f, false));
         f.cameraPort = 8094;
         u = settingsUpdateFromForm(current, f, false);
@@ -225,10 +225,10 @@ private slots:
     // P13: Bereich «Twitch»; Client-ID und Secret sind Platzhalter, keine echten Werte.
     void settingsFormTwitch()
     {
-        CoreSettings current{8081, QStringLiteral("192.168.1.9")};
+        CoreSettings current{8081, QStringLiteral("192.0.2.9")};
         SettingsForm f;
         f.port = 8081;
-        f.address = QStringLiteral("192.168.1.9");
+        f.address = QStringLiteral("192.0.2.9");
         QVERIFY(!settingsUpdateFromForm(current, f, false));
         f.twitchEnabled = true;
         f.twitchClientId = QStringLiteral(" testclientid ");
@@ -685,8 +685,8 @@ private slots:
         QCOMPARE(f.placeholder, QStringLiteral("Kein Overlay gewählt"));
         f = browserSourceField(a, BrowserSourceInfo{b, QStringLiteral("http://x/"), QString()});
         QVERIFY(f.text.isEmpty() && !f.canCopy); // Antwort zu einem anderen Overlay
-        f = browserSourceField(a, BrowserSourceInfo{a, QStringLiteral("http://192.168.1.9:8081/o/a/t/"), QString()});
-        QCOMPARE(f.text, QStringLiteral("http://192.168.1.9:8081/o/a/t/"));
+        f = browserSourceField(a, BrowserSourceInfo{a, QStringLiteral("http://192.0.2.9:8081/o/a/t/"), QString()});
+        QCOMPARE(f.text, QStringLiteral("http://192.0.2.9:8081/o/a/t/"));
         QVERIFY(f.canCopy);
         f = browserSourceField(a, BrowserSourceInfo{a, QString(), QStringLiteral("Keine Adresse")});
         QVERIFY(f.text.isEmpty() && !f.canCopy);
@@ -706,19 +706,19 @@ private slots:
         QCOMPARE(serverMessages(true, std::nullopt).shortText, QString());
         s.problems = {QStringLiteral("Port 8081 ist belegt, vermutlich von DoNs Streaming Studio im Einsatz (Prozess 12). "
                                      "Die Browserquelle ist nicht erreichbar. Anderen Port wählen.")};
-        s.invalidUse = QStringLiteral("Eine Browserquelle (192.168.1.116) benutzt eine ungültige Adresse (/o/a/…).");
+        s.invalidUse = QStringLiteral("Eine Browserquelle (192.0.2.116) benutzt eine ungültige Adresse (/o/a/…).");
         QCOMPARE(serverMessages(false, s).text, QString()); // ohne Verbindung nichts
         const ServerMessages m = serverMessages(true, s);
         QCOMPARE(m.text, s.problems.first() + QLatin1Char('\n') + s.invalidUse);
         QCOMPARE(m.shortText, QStringLiteral("Browserquelle: Port 8081 ist belegt, vermutlich von DoNs Streaming Studio im "
                                              "Einsatz (Pro… (+1)"));
-        s.problems = {QStringLiteral("Die Adresse im Heimnetz 192.168.1.9 ist auf diesem PC gerade nicht vorhanden "
+        s.problems = {QStringLiteral("Die Adresse im Heimnetz 192.0.2.9 ist auf diesem PC gerade nicht vorhanden "
                                      "(Netzwerkkabel?). Die Browserquelle ist nur auf diesem PC erreichbar (127.0.0.1) "
                                      "und wird es dort, sobald die Adresse da ist.")};
         s.invalidUse.clear();
         // Punkte in der Adresse beenden den Satz nicht; höchstens 90 Zeichen
         QCOMPARE(serverMessages(true, s).shortText,
-                 QStringLiteral("Browserquelle: Die Adresse im Heimnetz 192.168.1.9 ist auf diesem PC gerade nicht vorhand…"));
+                 QStringLiteral("Browserquelle: Die Adresse im Heimnetz 192.0.2.9 ist auf diesem PC gerade nicht vorhanden…"));
         QCOMPARE(serverMessages(true, s).shortText.size(), 90);
         s = ServerStatusInfo();
         QVERIFY(serverMessages(true, s).text.contains(QStringLiteral("ohne Overlay-Server")));

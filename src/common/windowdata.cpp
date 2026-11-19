@@ -756,7 +756,7 @@ ServerMessages serverMessages(bool connected, const std::optional<ServerStatusIn
         lines.append(info->invalidUse);
     if (lines.isEmpty())
         return {};
-    // Erster Satz: bis zum ersten «. » (Adressen wie 192.168.1.9 enthalten Punkte ohne Leerzeichen).
+    // Erster Satz: bis zum ersten «. » (Adressen wie 192.0.2.9 enthalten Punkte ohne Leerzeichen).
     QString first = lines.first();
     const qsizetype end = first.indexOf(QLatin1String(". "));
     if (end >= 0)

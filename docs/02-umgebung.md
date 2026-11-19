@@ -83,25 +83,25 @@ Tests sprechen nie mit Twitch: `dss-core --twitch-testserver http://127.0.0.1:PO
 
 ## Netzwerk
 
-Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf dem Studio-PC, 19:55):
+Stand 2026-11-03 (Angaben des Nutzers, Ausgabe von `ip -br addr && ip route` auf dem Studio-PC, 19:55). Die Adressen in diesem Abschnitt sind durch Beispieladressen aus `192.0.2.0/24` ersetzt (letztes Feld unverändert); die echten Adressen stehen in `~/projekte/privat/it-system/SYSTEM.md`:
 
 | Angabe | Studio-PC |
 |---|---|
 | Netzwerkkarte | `enp3s0` (Kabel), `UP` |
-| Adresse IPv4 | `192.168.1.9/24`, seit 2026-11-04 08:55 **fest auf dem Studio-PC eingetragen** (NetworkManager, Verbindung «Wired connection 1»: `ipv4.method manual`, Router `192.168.1.1`, Namensauflösung `192.168.1.1`; geprüft mit `ip route` → `proto static`, Ping zum Router 2 von 2, `getent hosts github.com`). Am Router weiter reserviert. Vorher per DHCP (Punkt 84). Rückgängig: `sudo nmcli connection modify "Wired connection 1" ipv4.method auto ipv4.addresses "" ipv4.gateway "" ipv4.dns ""` |
-| Router (Standardroute) | `192.168.1.1` über `enp3s0` |
+| Adresse IPv4 | `192.0.2.9/24`, seit 2026-11-04 08:55 **fest auf dem Studio-PC eingetragen** (NetworkManager, Verbindung «Wired connection 1»: `ipv4.method manual`, Router `192.0.2.1`, Namensauflösung `192.0.2.1`; geprüft mit `ip route` → `proto static`, Ping zum Router 2 von 2, `getent hosts github.com`). Am Router weiter reserviert. Vorher per DHCP (Punkt 84). Rückgängig: `sudo nmcli connection modify "Wired connection 1" ipv4.method auto ipv4.addresses "" ipv4.gateway "" ipv4.dns ""` |
+| Router (Standardroute) | `192.0.2.1` über `enp3s0` |
 | IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten). Ob der Router eingehende IPv6-Verbindungen sperrt: nicht geprüft |
 | USB-Tethering | nicht mehr vorhanden |
 
-Streaming-PC (Ausgabe von `ip -br addr && ip route && ping -c 4 192.168.1.9` auf dem Streaming-PC, Angabe des Nutzers 2026-11-03, 19:59):
+Streaming-PC (Ausgabe von `ip -br addr && ip route && ping -c 4 192.0.2.9` auf dem Streaming-PC, Angabe des Nutzers 2026-11-03, 19:59):
 
 | Angabe | Streaming-PC |
 |---|---|
 | Netzwerkkarte | `eno2` (Kabel, Angabe des Nutzers), `UP`; `wlo1` (WLAN) `DOWN` |
-| Adresse IPv4 | `192.168.1.116/24`, vom Router per DHCP, am Router fest reserviert (Angabe des Nutzers) |
-| Router (Standardroute) | `192.168.1.1` über `eno2` |
+| Adresse IPv4 | `192.0.2.116/24`, vom Router per DHCP, am Router fest reserviert (Angabe des Nutzers) |
+| Router (Standardroute) | `192.0.2.1` über `eno2` |
 | IPv6 | öffentliche Adressen vorhanden (nicht im Repo festgehalten) |
-| Ping zum Studio-PC `192.168.1.9` | 4 von 4, 0 % Verlust, Zeit min/Mittel/max 0,139 / 0,313 / 0,582 ms, TTL 64 (gleiches Netz, kein Router dazwischen) |
+| Ping zum Studio-PC `192.0.2.9` | 4 von 4, 0 % Verlust, Zeit min/Mittel/max 0,139 / 0,313 / 0,582 ms, TTL 64 (gleiches Netz, kein Router dazwischen) |
 
 ## Streaming-PC (nicht Teil der Entwicklung)
 
