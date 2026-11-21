@@ -111,14 +111,14 @@ Für das Studio wichtig, von Lotse per SSH lesend geprüft am 2026-11-08 (Berich
 
 | Angabe | Wert |
 |---|---|
-| Betriebssystem | Nobara 44 GNOME (Wayland), seit 2026-11-08 (vorher Zorin OS, anderer Rechnername) |
+| Betriebssystem | Nobara 44 KDE Plasma 6.7 (Wayland), neu installiert am 2026-11-21 (/home behalten); davor Nobara 44 GNOME seit 2026-11-08, vorher Zorin OS |
 | Rechnername | `streaming-pc` (Beispiel) |
-| Kernel | 7.3.1 (`7.3.1-202.nobara.fc44`) |
-| Grafik | RTX 4090, Treiber 595.112.07 |
+| Kernel | 7.3.4 (`7.3.4-202.nobara.fc44`, Stand 2026-11-21) |
+| Grafik | RTX 4090, Treiber 620.70.06 (Stand 2026-11-21) |
 | OBS | 32.2.2 (rpm) |
 | obs-websocket | 5.7.4 auf Port 4455 (IPv4 und IPv6), mit Anmeldung, vom Studio-PC aus erreichbar |
 | Firewall | Zone `FedoraWorkstation` auf `eno2`, offen nur `41641/udp`, die Dienste dhcpv6-client, mdns und samba-client sowie reiche Regeln (4455 nur vom Studio-PC, ssh aus dem Heimnetz, seit 2026-11-16 8093 nur vom Studio-PC); der Bereich 1025–65535 ist nicht mehr offen (Schritt 0 P15, 2026-11-15). Eine zweite aktive Zone `trusted` liegt auf `tailscale0` (P15 b6) |
-| NDI-Plugin | fehlt (Angabe von Lotse in der Übergabe vom 2026-11-08, `docs/archiv/uebergabe-2026-11-08.md`) |
+| NDI-Plugin | DistroAV 6.2.1 als Paket (seit 2026-11-15, nach der Neuinstallation am 2026-11-21 wieder installiert) |
 
 Zugang und Rechte: `CLAUDE.md`, «Umgebung».
 
@@ -129,7 +129,7 @@ Von Lotse am Gerät geprüft in Schritt 0 (2026-11-15) und in der Prüfung a bis
 | Angabe | Wert |
 |---|---|
 | Python | 3.14.8 (Nobara 44); der Dienst nutzt nur die Standardbibliothek, kein Paket nötig. Auf dem Studio-PC laufen die Tests des Dienstes mit Python 3.13.5 |
-| Kameras | OBSBOT Tiny 2 (`3564:fef8`, Firmware `bcdDevice` 4.09) und Logitech C922 Pro Stream (`046d:085c`) über USB. `/dev/video*` gehört der Gruppe `video` mit ACL; der Benutzer ist nicht in der Gruppe, der Zugriff geht trotzdem. Die Blackmagic-Karte hat keine einstellbaren Werte und erscheint nicht in `status` (P15 b7). USB-Autosuspend stört nicht, keine udev-Regel nötig. `v4l2-ctl` ist nicht installiert (nicht nötig) |
+| Kameras | OBSBOT Tiny 2 (`3564:fef8`, Firmware `bcdDevice` 4.09) und Logitech C922 Pro Stream (`046d:085c`) über USB. `/dev/video*` gehört der Gruppe `video` mit ACL; der Benutzer ist nicht in der Gruppe, der Zugriff geht trotzdem. Die Blackmagic-Karte hat keine einstellbaren Werte und erscheint nicht in `status` (P15 b7). USB-Autosuspend stört nicht, keine udev-Regel nötig. `v4l2-ctl` ist seit 2026-11-16 installiert (`v4l-utils`, zum Auslesen) |
 | Lampen | zwei Elgato Key Light Air, Firmware 1.0.3, HTTP auf Port 9123 |
 | Dienst | Benutzerdienst `dss-kamera` (`~/.config/systemd/user/dss-kamera.service`, startet mit der Anmeldung), Programm `~/.local/opt/dss-kamera/`, Daten `~/.local/share/dss-kamera/` (Dateien: `docs/06-overlay-format.md`, «Kamera-Dienst»), Einstellungen `~/.config/dss-kamera/dienst.ini` (Lauschadressen, erlaubte Adressen, Port), Protokoll `journalctl --user -u dss-kamera`. Installiert und aktualisiert der Nutzer vom Studio-PC aus mit `kamera-dienst/installieren.sh <streaming-pc>`. **Stand:** Am 2026-11-17 von Lotse mit Freigabe des Nutzers installiert (Bericht P15, «Gerätetest, Teil Lotse»); davor nur eine Testinstanz (`~/dss-kamera-test/`, ohne Einheit) |
 | Port | 8093 (TCP, nur IPv4); in Schritt 0 frei (`ss -ltn`). Nicht 4455 (obs-websocket) und nicht 8080/8081 (Overlay-Server) |

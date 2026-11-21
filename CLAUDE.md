@@ -27,7 +27,7 @@ Private Overlay-Software für einen Twitch-Stream, ein Nutzer, kein Verkauf. Sie
 ## Umgebung (Zielsystem = Entwicklungssystem)
 
 - Claude Code läuft direkt auf dem Studio-PC (Adresse: `~/projekte/privat/it-system/SYSTEM.md`): Debian 13, Xfce unter X11, 8 Threads, 32 GB, GTX 1660 SUPER, Bildschirm 1920x1080 (`docs/02-umgebung.md`). Technik und Betriebssystem entschieden: C++ mit Qt 6 auf Debian 13 mit Xfce unter X11 (`docs/01-festlegungen.md`).
-- OBS läuft auf dem Streaming-PC (Adresse: `~/projekte/privat/it-system/SYSTEM.md`) (Nobara 44 GNOME, Wayland). Systemangaben beider Rechner führt nur `~/projekte/privat/it-system/SYSTEM.md`; was das Studio braucht, steht in `docs/02-umgebung.md`.
+- OBS läuft auf dem Streaming-PC (Adresse: `~/projekte/privat/it-system/SYSTEM.md`) (Nobara 44 KDE Plasma, Wayland, seit 2026-11-21). Systemangaben beider Rechner führt nur `~/projekte/privat/it-system/SYSTEM.md`; was das Studio braucht, steht in `docs/02-umgebung.md`.
 - Lotse erreicht den Streaming-PC per SSH (`ssh <benutzer>@<Streaming-PC>`, Adresse siehe `~/projekte/privat/it-system/SYSTEM.md`, Schlüssel vom Studio-PC). Dort wird nur gelesen (Pakete, Logs, Konfiguration, offene Ports). Änderungen gibt es erst nach dem OK des Nutzers, `sudo` gibt der Nutzer selbst ein. Gestartete Agenten nutzen den Zugang nur, wenn ihr Auftrag es ausdrücklich erlaubt.
 - Ausnahme in angekündigten Handtests, ab dem Baustein nach P10c (entschieden vom Nutzer, 2026-11-08): Lotse darf
   - OBS auf dem Streaming-PC per SSH schliessen und wieder öffnen, nie während eines Streams (vorher Prozess und Ausgabe prüfen);
